@@ -28,7 +28,7 @@ func main() {
 	flag.Parse()
 
 	opts := providerserver.ServeOpts{
-		Address: "registry.terraform.io/groundcover/groundcover",
+		Address: "registry.terraform.io/groundcover-com/groundcover",
 		Debug:   debug,
 	}
 
