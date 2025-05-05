@@ -33,13 +33,13 @@ To use this provider locally before it is published to the Terraform Registry, f
     # ~/.terraformrc or %APPDATA%\terraform.rc
 
     provider_installation {
-      # Replace "groundcover/groundcover" if you used a different source 
+      # Replace "groundcover-com/groundcover" if you used a different source 
       # address in main.go. Replace the path with the actual absolute path
       # to the directory containing the built provider binary (step 1).
       dev_overrides {
-        "registry.terraform.io/groundcover/groundcover" = "/Users/<YOUR_HOME_FOLDER>/projects/terraform-provider-groundcover/dist"
+        "registry.terraform.io/groundcover-com/groundcover" = "/Users/<YOUR_HOME_FOLDER>/projects/terraform-provider-groundcover/dist"
         # Example for Windows:
-        # "registry.terraform.io/groundcover/groundcover" = "C:/Users/<YourUser>/path/to/terraform-provider-groundcover/dist"
+        # "registry.terraform.io/groundcover-com/groundcover" = "C:/Users/<YourUser>/path/to/terraform-provider-groundcover/dist"
       }
 
       # For all other providers, install them directly from their origin registries.
@@ -47,7 +47,7 @@ To use this provider locally before it is published to the Terraform Registry, f
     }
     ```
 
-    *   **Important:** Replace `registry.terraform.io/groundcover/groundcover` if your provider address in `main.go` is different.
+    *   **Important:** Replace `registry.terraform.io/groundcover-com/groundcover` if your provider address in `main.go` is different.
     *   **Important:** Replace `/Users/<YOUR_HOME_FOLDER>/projects/terraform-provider-groundcover/dist` with the **absolute path** to the directory containing the `terraform-provider-groundcover` binary built by `make build`.
 
 3.  **Use in a Terraform Project:**
@@ -63,7 +63,7 @@ To use this provider locally before it is published to the Terraform Registry, f
             # 1. The key used in your ~/.terraformrc dev_overrides block
             # 2. The 'Address' set in your provider's main.go
             groundcover = {
-              source = "registry.terraform.io/groundcover/groundcover"
+              source = "registry.terraform.io/groundcover-com/groundcover"
               # Version constraint is still good practice, but less critical
               # for local dev as dev_overrides takes precedence.
               # Use ">= 0.1.0" or similar if you haven't tagged releases yet.
