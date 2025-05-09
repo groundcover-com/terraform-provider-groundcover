@@ -7,7 +7,10 @@ require (
 	github.com/hashicorp/terraform-plugin-log v0.9.0
 )
 
-require github.com/groundcover-com/groundcover-sdk-go v0.0.0-20250504183127-f4519723ed6a
+require (
+	github.com/groundcover-com/groundcover-sdk-go v0.0.0-20250504183127-f4519723ed6a
+	gopkg.in/yaml.v3 v3.0.1
+)
 
 require (
 	github.com/PuerkitoBio/rehttp v1.4.0 // indirect
