@@ -8,8 +8,8 @@ require (
 )
 
 require (
+	github.com/goccy/go-yaml v1.17.1
 	github.com/groundcover-com/groundcover-sdk-go v0.0.0-20250504183127-f4519723ed6a
-	gopkg.in/yaml.v3 v3.0.1
 )
 
 require (
