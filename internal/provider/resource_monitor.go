@@ -2,9 +2,8 @@ package provider
 
 import (
 	"context"
-	"fmt"
-
 	"errors"
+	"fmt"
 
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
@@ -13,13 +12,8 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/hashicorp/terraform-plugin-log/tflog"
-	"gopkg.in/yaml.v3"
+	// "gopkg.in/yaml.v3" // No longer directly needed here if only NormalizeMonitorYaml uses it
 )
-
-type kvPair struct {
-	key   *yaml.Node
-	value *yaml.Node
-}
 
 var _ resource.Resource = &monitorResource{}
 var _ resource.ResourceWithImportState = &monitorResource{}
@@ -81,93 +75,9 @@ func (r *monitorResource) Configure(ctx context.Context, req resource.ConfigureR
 	tflog.Info(ctx, "monitor resource configured successfully")
 }
 
-// normalizeMonitorYaml sorts keys in a YAML string alphabetically.
-// It also handles potential errors during parsing and marshalling.
-func normalizeMonitorYaml(ctx context.Context, yamlString string) (string, error) {
-	var node yaml.Node
-	err := yaml.Unmarshal([]byte(yamlString), &node)
-	if err != nil {
-		tflog.Error(ctx, "Failed to unmarshal YAML", map[string]interface{}{"error": err, "yaml": yamlString})
-		return "", fmt.Errorf("failed to unmarshal YAML: %w", err)
-	}
-
-	if len(node.Content) == 1 {
-		sortYamlNodeRecursively(node.Content[0])
-	} else {
-		// Handle cases where YAML might not be a single document or has unexpected structure
-		tflog.Warn(ctx, "YAML content is not a single document node, attempting to sort directly if it's a map or sequence.")
-		sortYamlNodeRecursively(&node)
-	}
-
-	out, err := yaml.Marshal(&node)
-	if err != nil {
-		tflog.Error(ctx, "Failed to marshal YAML", map[string]interface{}{"error": err})
-		return "", fmt.Errorf("failed to marshal sorted YAML: %w", err)
-	}
-
-	return string(out), nil
-}
-
-// sortYamlNodeRecursively sorts map keys within a yaml.Node.
-// It traverses the YAML structure and applies sorting to all mapping nodes.
-func sortYamlNodeRecursively(node *yaml.Node) {
-	if node == nil {
-		return
-	}
-
-	switch node.Kind {
-	case yaml.MappingNode:
-		if len(node.Content)%2 != 0 {
-			// This shouldn't happen for valid YAML maps
-			return
-		}
-		pairs := make([]kvPair, len(node.Content)/2)
-		for i := 0; i < len(node.Content); i += 2 {
-			pairs[i/2] = kvPair{key: node.Content[i], value: node.Content[i+1]}
-		}
-
-		// Sort pairs by key's string value
-		customSortPairs(pairs)
-
-		// Rebuild node.Content from sorted pairs
-		newContent := make([]*yaml.Node, 0, len(node.Content))
-		for _, p := range pairs {
-			newContent = append(newContent, p.key, p.value)
-		}
-		node.Content = newContent
-
-		for i := 1; i < len(node.Content); i += 2 {
-			sortYamlNodeRecursively(node.Content[i])
-		}
-
-	case yaml.SequenceNode:
-		for _, elem := range node.Content {
-			sortYamlNodeRecursively(elem)
-		}
-	case yaml.DocumentNode:
-		for _, elem := range node.Content {
-			sortYamlNodeRecursively(elem)
-		}
-	}
-}
-
-func customSortPairs(pairs []kvPair) {
-	n := len(pairs)
-	for i := 0; i < n-1; i++ {
-		for j := 0; j < n-i-1; j++ {
-			if pairs[j].key.Kind == yaml.ScalarNode && pairs[j+1].key.Kind == yaml.ScalarNode {
-				if pairs[j].key.Value > pairs[j+1].key.Value {
-					pairs[j], pairs[j+1] = pairs[j+1], pairs[j]
-				}
-			}
-		}
-	}
-}
-
 func (r *monitorResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
 	var data monitorResourceModel
 
-	// Read Terraform plan data into the model
 	resp.Diagnostics.Append(req.Plan.Get(ctx, &data)...)
 
 	if resp.Diagnostics.HasError() {
@@ -176,8 +86,8 @@ func (r *monitorResource) Create(ctx context.Context, req resource.CreateRequest
 
 	tflog.Debug(ctx, "Creating monitor resource from YAML")
 
-	userInputMonitorYaml := data.MonitorYaml.ValueString() // Get user's original input
-	normalizedApiYaml, err := normalizeMonitorYaml(ctx, userInputMonitorYaml)
+	userInputMonitorYaml := data.MonitorYaml.ValueString()
+	normalizedApiYaml, err := NormalizeMonitorYaml(ctx, userInputMonitorYaml)
 	if err != nil {
 		resp.Diagnostics.AddError("YAML Normalization Error", fmt.Sprintf("Unable to normalize monitor YAML during Create: %s", err))
 		return
@@ -185,35 +95,28 @@ func (r *monitorResource) Create(ctx context.Context, req resource.CreateRequest
 
 	monitorYamlBytesForApi := []byte(normalizedApiYaml)
 
-	// Use the SDK's CreateMonitorYaml function via the ApiClient interface
 	createResp, err := r.client.CreateMonitorYaml(ctx, monitorYamlBytesForApi)
 	if err != nil {
 		resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Unable to create monitor using YAML, got error: %s", err))
 		return
 	}
 
-	// Use the correct field MonitorID
 	if createResp == nil || createResp.MonitorID == "" {
 		resp.Diagnostics.AddError("API Error", "Monitor creation response did not contain a MonitorID")
 		return
 	}
 
-	// Set the ID from the response using MonitorID
 	data.Id = types.StringValue(createResp.MonitorID)
-	// data.MonitorYaml is already set from req.Plan.Get, which is the user's original input.
-	// We ensure it remains the user's original input.
-	data.MonitorYaml = types.StringValue(userInputMonitorYaml) // Explicitly set to user's original input for clarity
+	data.MonitorYaml = types.StringValue(userInputMonitorYaml)
 
 	tflog.Trace(ctx, "Created monitor resource from YAML", map[string]interface{}{"id": data.Id.ValueString()})
 
-	// Save data into Terraform state
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
 }
 
 func (r *monitorResource) Read(ctx context.Context, req resource.ReadRequest, resp *resource.ReadResponse) {
 	var data monitorResourceModel
 
-	// Read Terraform prior state data into the model
 	resp.Diagnostics.Append(req.State.Get(ctx, &data)...)
 
 	if resp.Diagnostics.HasError() {
@@ -235,6 +138,7 @@ func (r *monitorResource) Read(ctx context.Context, req resource.ReadRequest, re
 	}
 
 	tflog.Trace(ctx, "Read monitor resource YAML (confirmed existence)", map[string]interface{}{"id": monitorId})
+
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
 }
 
@@ -253,7 +157,7 @@ func (r *monitorResource) Update(ctx context.Context, req resource.UpdateRequest
 	tflog.Debug(ctx, "Updating monitor resource from YAML", map[string]interface{}{"id": monitorId})
 
 	userInputMonitorYaml := plan.MonitorYaml.ValueString()
-	normalizedApiYaml, err := normalizeMonitorYaml(ctx, userInputMonitorYaml)
+	normalizedApiYaml, err := NormalizeMonitorYaml(ctx, userInputMonitorYaml)
 	if err != nil {
 		resp.Diagnostics.AddError("YAML Normalization Error", fmt.Sprintf("Unable to normalize monitor YAML during Update for monitor %s: %s", monitorId, err))
 		return
@@ -294,7 +198,7 @@ func (r *monitorResource) Delete(ctx context.Context, req resource.DeleteRequest
 			tflog.Warn(ctx, fmt.Sprintf("DeleteMonitor returned ErrNotFound for %s, which should have been handled by the wrapper. Removing from state anyway.", monitorId))
 		} else {
 			resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Unable to delete monitor %s, got error: %s", monitorId, err))
-			return // Keep resource in state if delete fails unexpectedly
+			return
 		}
 	}
 
@@ -305,8 +209,6 @@ func (r *monitorResource) ImportState(ctx context.Context, req resource.ImportSt
 	resource.ImportStatePassthroughID(ctx, path.Root("id"), req, resp)
 }
 
-// ModifyPlan is used to compare the normalized versions of the monitor_yaml
-// and adjust the plan if they are semantically equivalent to avoid unnecessary diffs.
 func (r *monitorResource) ModifyPlan(ctx context.Context, req resource.ModifyPlanRequest, resp *resource.ModifyPlanResponse) {
 	if req.State.Raw.IsNull() || req.Plan.Raw.IsNull() {
 		tflog.Debug(ctx, "ModifyPlan: Skipping custom YAML diff for new or destroyed resource.")
@@ -327,8 +229,6 @@ func (r *monitorResource) ModifyPlan(ctx context.Context, req resource.ModifyPla
 		return
 	}
 
-	// If either YAML is null or unknown at this stage (shouldn't happen for updates if properly configured),
-	// skip custom logic.
 	if plannedYaml.IsNull() || plannedYaml.IsUnknown() || stateYaml.IsNull() || stateYaml.IsUnknown() {
 		tflog.Debug(ctx, "ModifyPlan: Planned or State YAML is null/unknown, skipping custom diff.")
 		return
@@ -342,7 +242,7 @@ func (r *monitorResource) ModifyPlan(ctx context.Context, req resource.ModifyPla
 		return
 	}
 
-	normalizedPlannedYaml, err := normalizeMonitorYaml(ctx, plannedYamlString)
+	normalizedPlannedYaml, err := NormalizeMonitorYaml(ctx, plannedYamlString)
 	if err != nil {
 		resp.Diagnostics.AddAttributeError(
 			path.Root("monitor_yaml"),
@@ -352,7 +252,7 @@ func (r *monitorResource) ModifyPlan(ctx context.Context, req resource.ModifyPla
 		return
 	}
 
-	normalizedStateYaml, err := normalizeMonitorYaml(ctx, stateYamlString)
+	normalizedStateYaml, err := NormalizeMonitorYaml(ctx, stateYamlString)
 	if err != nil {
 		resp.Diagnostics.AddAttributeError(
 			path.Root("monitor_yaml"),
@@ -362,9 +262,6 @@ func (r *monitorResource) ModifyPlan(ctx context.Context, req resource.ModifyPla
 		return
 	}
 
-	// If the normalized versions are the same, there's no semantic diff.
-	// In this case, we tell Terraform that the planned value for monitor_yaml
-	// should be considered the same as the state value to prevent a diff.
 	if normalizedPlannedYaml == normalizedStateYaml {
 		tflog.Info(ctx, "ModifyPlan: Normalized YAMLs are identical. Setting plan's monitor_yaml to state's monitor_yaml to suppress diff.")
 		diags := resp.Plan.SetAttribute(ctx, path.Root("monitor_yaml"), stateYaml)
