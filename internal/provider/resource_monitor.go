@@ -2,10 +2,8 @@ package provider
 
 import (
 	"context"
-	"fmt"
-
-	// Required for HTTP status codes
 	"errors"
+	"fmt"
 
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
@@ -14,23 +12,22 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/hashicorp/terraform-plugin-log/tflog"
+	// "gopkg.in/yaml.v3" // No longer directly needed here if only NormalizeMonitorYaml uses it
 )
 
-// Ensure provider defined types fully satisfy framework interfaces.
 var _ resource.Resource = &monitorResource{}
 var _ resource.ResourceWithImportState = &monitorResource{}
 var _ resource.ResourceWithConfigure = &monitorResource{}
+var _ resource.ResourceWithModifyPlan = &monitorResource{}
 
 func NewMonitorResource() resource.Resource {
 	return &monitorResource{}
 }
 
-// monitorResource defines the resource implementation.
 type monitorResource struct {
 	client ApiClient
 }
 
-// monitorResourceModel describes the resource data model.
 type monitorResourceModel struct {
 	Id          types.String `tfsdk:"id"`
 	MonitorYaml types.String `tfsdk:"monitor_yaml"`
@@ -55,9 +52,7 @@ func (r *monitorResource) Schema(ctx context.Context, req resource.SchemaRequest
 			"monitor_yaml": schema.StringAttribute{
 				MarkdownDescription: "The monitor definition in YAML format.",
 				Required:            true,
-				PlanModifiers: []planmodifier.String{
-					stringplanmodifier.RequiresReplace(),
-				},
+				PlanModifiers:       []planmodifier.String{},
 			},
 		},
 	}
@@ -83,7 +78,6 @@ func (r *monitorResource) Configure(ctx context.Context, req resource.ConfigureR
 func (r *monitorResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
 	var data monitorResourceModel
 
-	// Read Terraform plan data into the model
 	resp.Diagnostics.Append(req.Plan.Get(ctx, &data)...)
 
 	if resp.Diagnostics.HasError() {
@@ -92,34 +86,37 @@ func (r *monitorResource) Create(ctx context.Context, req resource.CreateRequest
 
 	tflog.Debug(ctx, "Creating monitor resource from YAML")
 
-	monitorYamlBytes := []byte(data.MonitorYaml.ValueString())
+	userInputMonitorYaml := data.MonitorYaml.ValueString()
+	normalizedApiYaml, err := NormalizeMonitorYaml(ctx, userInputMonitorYaml)
+	if err != nil {
+		resp.Diagnostics.AddError("YAML Normalization Error", fmt.Sprintf("Unable to normalize monitor YAML during Create: %s", err))
+		return
+	}
 
-	// Use the SDK's CreateMonitorYaml function via the ApiClient interface
-	createResp, err := r.client.CreateMonitorYaml(ctx, monitorYamlBytes)
+	monitorYamlBytesForApi := []byte(normalizedApiYaml)
+
+	createResp, err := r.client.CreateMonitorYaml(ctx, monitorYamlBytesForApi)
 	if err != nil {
 		resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Unable to create monitor using YAML, got error: %s", err))
 		return
 	}
 
-	// Use the correct field MonitorID
 	if createResp == nil || createResp.MonitorID == "" {
 		resp.Diagnostics.AddError("API Error", "Monitor creation response did not contain a MonitorID")
 		return
 	}
 
-	// Set the ID from the response using MonitorID
 	data.Id = types.StringValue(createResp.MonitorID)
+	data.MonitorYaml = types.StringValue(userInputMonitorYaml)
 
 	tflog.Trace(ctx, "Created monitor resource from YAML", map[string]interface{}{"id": data.Id.ValueString()})
 
-	// Save data into Terraform state
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
 }
 
 func (r *monitorResource) Read(ctx context.Context, req resource.ReadRequest, resp *resource.ReadResponse) {
 	var data monitorResourceModel
 
-	// Read Terraform prior state data into the model
 	resp.Diagnostics.Append(req.State.Get(ctx, &data)...)
 
 	if resp.Diagnostics.HasError() {
@@ -129,26 +126,19 @@ func (r *monitorResource) Read(ctx context.Context, req resource.ReadRequest, re
 	monitorId := data.Id.ValueString()
 	tflog.Debug(ctx, "Reading monitor resource YAML", map[string]interface{}{"id": monitorId})
 
-	// Use the SDK's GetMonitor function via the ApiClient interface
-	monitorYamlBytes, err := r.client.GetMonitor(ctx, monitorId)
+	_, err := r.client.GetMonitor(ctx, monitorId)
 	if err != nil {
-		// Use errors.Is to check for the wrapped ErrNotFound from handleApiError
 		if errors.Is(err, ErrNotFound) {
 			tflog.Warn(ctx, fmt.Sprintf("Monitor %s not found (handled via ErrNotFound), removing from state", monitorId))
 			resp.State.RemoveResource(ctx)
 			return
 		}
-		// Handle other errors
 		resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Unable to read monitor %s YAML, got error: %s", monitorId, err))
 		return
 	}
 
-	// Update the model with the fetched YAML
-	data.MonitorYaml = types.StringValue(string(monitorYamlBytes))
+	tflog.Trace(ctx, "Read monitor resource YAML (confirmed existence)", map[string]interface{}{"id": monitorId})
 
-	tflog.Trace(ctx, "Read monitor resource YAML", map[string]interface{}{"id": monitorId})
-
-	// Save updated data into Terraform state
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
 }
 
@@ -156,7 +146,6 @@ func (r *monitorResource) Update(ctx context.Context, req resource.UpdateRequest
 	var plan monitorResourceModel
 	var state monitorResourceModel
 
-	// Read Terraform plan and state data into the models
 	resp.Diagnostics.Append(req.Plan.Get(ctx, &plan)...)
 	resp.Diagnostics.Append(req.State.Get(ctx, &state)...)
 
@@ -164,13 +153,19 @@ func (r *monitorResource) Update(ctx context.Context, req resource.UpdateRequest
 		return
 	}
 
-	monitorId := state.Id.ValueString() // ID comes from prior state
+	monitorId := state.Id.ValueString()
 	tflog.Debug(ctx, "Updating monitor resource from YAML", map[string]interface{}{"id": monitorId})
 
-	monitorYamlBytes := []byte(plan.MonitorYaml.ValueString())
+	userInputMonitorYaml := plan.MonitorYaml.ValueString()
+	normalizedApiYaml, err := NormalizeMonitorYaml(ctx, userInputMonitorYaml)
+	if err != nil {
+		resp.Diagnostics.AddError("YAML Normalization Error", fmt.Sprintf("Unable to normalize monitor YAML during Update for monitor %s: %s", monitorId, err))
+		return
+	}
 
-	// Use the SDK's UpdateMonitorYaml function via the ApiClient interface
-	_, err := r.client.UpdateMonitorYaml(ctx, monitorId, monitorYamlBytes)
+	monitorYamlBytesForApi := []byte(normalizedApiYaml)
+
+	_, err = r.client.UpdateMonitorYaml(ctx, monitorId, monitorYamlBytesForApi)
 	if err != nil {
 		resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Unable to update monitor %s using YAML, got error: %s", monitorId, err))
 		return
@@ -178,15 +173,16 @@ func (r *monitorResource) Update(ctx context.Context, req resource.UpdateRequest
 
 	tflog.Trace(ctx, "Updated monitor resource from YAML", map[string]interface{}{"id": monitorId})
 
-	// Update the state with the planned YAML (reflecting the user's intent)
-	plan.Id = state.Id // Ensure ID is carried over from state to the updated state model
-	resp.Diagnostics.Append(resp.State.Set(ctx, &plan)...)
+	updatedState := plan
+	updatedState.Id = state.Id
+	updatedState.MonitorYaml = types.StringValue(userInputMonitorYaml)
+
+	resp.Diagnostics.Append(resp.State.Set(ctx, &updatedState)...)
 }
 
 func (r *monitorResource) Delete(ctx context.Context, req resource.DeleteRequest, resp *resource.DeleteResponse) {
 	var data monitorResourceModel
 
-	// Read Terraform prior state data into the model
 	resp.Diagnostics.Append(req.State.Get(ctx, &data)...)
 
 	if resp.Diagnostics.HasError() {
@@ -196,22 +192,81 @@ func (r *monitorResource) Delete(ctx context.Context, req resource.DeleteRequest
 	monitorId := data.Id.ValueString()
 	tflog.Debug(ctx, "Deleting monitor resource", map[string]interface{}{"id": monitorId})
 
-	// Use the SDK's DeleteMonitor function via the ApiClient interface
 	err := r.client.DeleteMonitor(ctx, monitorId)
 	if err != nil {
-		// We check if the *wrapped* error is ErrNotFound. DeleteMonitor itself returns nil on success (including 404).
 		if errors.Is(err, ErrNotFound) {
 			tflog.Warn(ctx, fmt.Sprintf("DeleteMonitor returned ErrNotFound for %s, which should have been handled by the wrapper. Removing from state anyway.", monitorId))
 		} else {
 			resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Unable to delete monitor %s, got error: %s", monitorId, err))
-			return // Keep resource in state if delete fails unexpectedly
+			return
 		}
 	}
 
 	tflog.Trace(ctx, "Deleted monitor resource", map[string]interface{}{"id": monitorId})
-	// State removal is handled by the framework implicitly upon successful completion.
 }
 
 func (r *monitorResource) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {
 	resource.ImportStatePassthroughID(ctx, path.Root("id"), req, resp)
+}
+
+func (r *monitorResource) ModifyPlan(ctx context.Context, req resource.ModifyPlanRequest, resp *resource.ModifyPlanResponse) {
+	if req.State.Raw.IsNull() || req.Plan.Raw.IsNull() {
+		tflog.Debug(ctx, "ModifyPlan: Skipping custom YAML diff for new or destroyed resource.")
+		return
+	}
+
+	var plannedYaml types.String
+	diags := req.Plan.GetAttribute(ctx, path.Root("monitor_yaml"), &plannedYaml)
+	resp.Diagnostics.Append(diags...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+
+	var stateYaml types.String
+	diags = req.State.GetAttribute(ctx, path.Root("monitor_yaml"), &stateYaml)
+	resp.Diagnostics.Append(diags...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+
+	if plannedYaml.IsNull() || plannedYaml.IsUnknown() || stateYaml.IsNull() || stateYaml.IsUnknown() {
+		tflog.Debug(ctx, "ModifyPlan: Planned or State YAML is null/unknown, skipping custom diff.")
+		return
+	}
+
+	plannedYamlString := plannedYaml.ValueString()
+	stateYamlString := stateYaml.ValueString()
+
+	if plannedYamlString == stateYamlString {
+		tflog.Debug(ctx, "ModifyPlan: Raw YAML strings are identical.")
+		return
+	}
+
+	normalizedPlannedYaml, err := NormalizeMonitorYaml(ctx, plannedYamlString)
+	if err != nil {
+		resp.Diagnostics.AddAttributeError(
+			path.Root("monitor_yaml"),
+			"Plan YAML Normalization Error",
+			fmt.Sprintf("Failed to normalize planned monitor_yaml: %s. Input: %s", err, plannedYamlString),
+		)
+		return
+	}
+
+	normalizedStateYaml, err := NormalizeMonitorYaml(ctx, stateYamlString)
+	if err != nil {
+		resp.Diagnostics.AddAttributeError(
+			path.Root("monitor_yaml"),
+			"State YAML Normalization Error",
+			fmt.Sprintf("Failed to normalize state monitor_yaml: %s. Input: %s", err, stateYamlString),
+		)
+		return
+	}
+
+	if normalizedPlannedYaml == normalizedStateYaml {
+		tflog.Info(ctx, "ModifyPlan: Normalized YAMLs are identical. Setting plan's monitor_yaml to state's monitor_yaml to suppress diff.")
+		diags := resp.Plan.SetAttribute(ctx, path.Root("monitor_yaml"), stateYaml)
+		resp.Diagnostics.Append(diags...)
+	} else {
+		tflog.Info(ctx, "ModifyPlan: Normalized YAMLs differ. Plan will proceed with update for monitor_yaml.")
+	}
 }
