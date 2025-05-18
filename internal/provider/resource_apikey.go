@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/go-openapi/strfmt"
 	"github.com/hashicorp/terraform-plugin-framework/attr"
 	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/path"
@@ -15,7 +16,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/hashicorp/terraform-plugin-log/tflog"
 
-	apikeys "github.com/groundcover-com/groundcover-sdk-go/sdk/api/rbac/apikeys"
+	"github.com/groundcover-com/groundcover-sdk-go/pkg/models"
 )
 
 var (
@@ -175,10 +176,14 @@ func (r *apiKeyResource) Create(ctx context.Context, req resource.CreateRequest,
 	tflog.Debug(ctx, fmt.Sprintf("Creating API Key: %s for Service Account: %s", plan.Name.ValueString(), plan.ServiceAccountId.ValueString()))
 
 	// Prepare request to SDK
-	createReq := &apikeys.CreateApiKeyRequest{
-		Name:             plan.Name.ValueString(),
-		ServiceAccountId: plan.ServiceAccountId.ValueString(),
-		Description:      plan.Description.ValueString(),
+	nameStr := plan.Name.ValueString()
+	saIDStr := plan.ServiceAccountId.ValueString()
+	descStr := plan.Description.ValueString()
+
+	createReq := &models.CreateAPIKeyRequest{
+		Name:             &nameStr,
+		ServiceAccountID: &saIDStr,
+		Description:      descStr,
 	}
 
 	if !plan.ExpirationDate.IsNull() && !plan.ExpirationDate.IsUnknown() {
@@ -191,7 +196,8 @@ func (r *apiKeyResource) Create(ctx context.Context, req resource.CreateRequest,
 			)
 			return
 		}
-		createReq.ExpirationDate = &expDate
+		expDateTime := strfmt.DateTime(expDate)
+		createReq.ExpirationDate = &expDateTime
 	}
 
 	// Call SDK via the ApiClient interface
@@ -205,13 +211,12 @@ func (r *apiKeyResource) Create(ctx context.Context, req resource.CreateRequest,
 	}
 
 	// Update model with computed values from create response
-	plan.Id = types.StringValue(apiKeyResp.Id)
-	plan.ApiKey = types.StringValue(apiKeyResp.ApiKey)
+	plan.Id = types.StringValue(apiKeyResp.ID)
+	plan.ApiKey = types.StringValue(apiKeyResp.APIKey)
 
-	tflog.Debug(ctx, fmt.Sprintf("API Key created with ID: %s", apiKeyResp.Id))
+	tflog.Debug(ctx, fmt.Sprintf("API Key created with ID: %s", apiKeyResp.ID))
 
 	// Read the full state back to populate computed fields
-	// Use List and find because there's no GetById endpoint
 	diags = r.readApiKey(ctx, &plan)
 	resp.Diagnostics.Append(diags...)
 	if resp.Diagnostics.HasError() {
@@ -311,13 +316,13 @@ func (r *apiKeyResource) readApiKey(ctx context.Context, state *apiKeyResourceMo
 		return diags
 	}
 
-	var foundKey *apikeys.ListApiKeysResponseItem
+	var foundKey *models.ListAPIKeysResponseItem
 	keyFoundInList := false
 	for _, key := range apiKeys {
-		if key.Id == apiKeyId {
+		if key.ID == apiKeyId {
 			// Need to copy the key because 'key' is a loop variable
 			tempKey := key
-			foundKey = &tempKey
+			foundKey = tempKey
 			keyFoundInList = true
 			break
 		}
@@ -335,9 +340,9 @@ func (r *apiKeyResource) readApiKey(ctx context.Context, state *apiKeyResourceMo
 			return diags
 		}
 		for _, key := range apiKeysFiltered {
-			if key.Id == apiKeyId {
+			if key.ID == apiKeyId {
 				tempKey := key
-				foundKey = &tempKey
+				foundKey = tempKey
 				break
 			}
 		}
@@ -350,43 +355,53 @@ func (r *apiKeyResource) readApiKey(ctx context.Context, state *apiKeyResourceMo
 
 	tflog.Debug(ctx, fmt.Sprintf("Found API Key: %s. Populating state.", apiKeyId))
 
-	state.Id = types.StringValue(foundKey.Id)
+	state.Id = types.StringValue(foundKey.ID)
 	state.Name = types.StringValue(foundKey.Name)
-	state.ServiceAccountId = types.StringValue(foundKey.ServiceAccountId)
+	state.ServiceAccountId = types.StringValue(foundKey.ServiceAccountID)
 	state.Description = types.StringValue(foundKey.Description)
 	state.CreatedBy = types.StringValue(foundKey.CreatedBy)
-	state.CreationDate = types.StringValue(foundKey.CreationDate.Format(time.RFC3339))
+	state.CreationDate = types.StringValue(foundKey.CreationDate.String())
 
-	if foundKey.LastActive != nil {
-		state.LastActive = types.StringValue(foundKey.LastActive.Format(time.RFC3339))
+	if !foundKey.LastActive.IsZero() {
+		state.LastActive = types.StringValue(foundKey.LastActive.String())
 	} else {
 		state.LastActive = types.StringNull()
 	}
 
-	if foundKey.RevokedAt != nil {
-		state.RevokedAt = types.StringValue(foundKey.RevokedAt.Format(time.RFC3339))
+	if !foundKey.RevokedAt.IsZero() {
+		state.RevokedAt = types.StringValue(foundKey.RevokedAt.String())
 	} else {
 		state.RevokedAt = types.StringNull()
 	}
 
-	if foundKey.ExpiredAt != nil {
-		state.ExpiredAt = types.StringValue(foundKey.ExpiredAt.Format(time.RFC3339))
+	if !foundKey.ExpiredAt.IsZero() {
+		state.ExpiredAt = types.StringValue(foundKey.ExpiredAt.String())
 	} else {
 		state.ExpiredAt = types.StringNull()
 	}
 
-	policies := make([]attr.Value, len(foundKey.Policies))
-	for i, p := range foundKey.Policies {
+	policies := make([]attr.Value, 0, len(foundKey.Policies))
+	for _, p := range foundKey.Policies {
+		if p == nil {
+			continue
+		}
+		var policyNameValue types.String
+		if p.Name == nil {
+			policyNameValue = types.StringNull()
+		} else {
+			policyNameValue = types.StringValue(*p.Name)
+		}
+
 		policyAttrs := map[string]attr.Value{
 			"uuid": types.StringValue(p.UUID),
-			"name": types.StringValue(p.Name),
+			"name": policyNameValue,
 		}
 		policyObj, policyDiags := types.ObjectValue(policyMetadataObjectType.AttrTypes, policyAttrs)
 		diags.Append(policyDiags...)
 		if diags.HasError() {
 			return diags // Stop processing if object creation failed
 		}
-		policies[i] = policyObj
+		policies = append(policies, policyObj)
 	}
 
 	policiesList, listDiags := types.ListValue(policyMetadataObjectType, policies)

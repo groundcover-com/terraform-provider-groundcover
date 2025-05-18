@@ -10,6 +10,7 @@ import (
 
 	"github.com/hashicorp/terraform-plugin-framework/attr"
 	"github.com/hashicorp/terraform-plugin-framework/diag"
+	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/int64planmodifier"
@@ -21,15 +22,16 @@ import (
 	"github.com/hashicorp/terraform-plugin-log/tflog"
 
 	// SDK Imports
-	sdkreq "github.com/groundcover-com/groundcover-sdk-go/sdk/api/rbac/policies" // Policy request types (CreatePolicyRequest, etc.)
-	sdkmodels "github.com/groundcover-com/groundcover-sdk-go/sdk/models"         // Policy model types (Policy, DataScope, RoleMap)
+	"github.com/groundcover-com/groundcover-sdk-go/pkg/models"           // Consolidated to use "models"
+	sdkmodels "github.com/groundcover-com/groundcover-sdk-go/pkg/models" // Policy model types (Policy, DataScope, RoleMap)
+	// Policy request types (CreatePolicyRequest, etc.)
 )
 
 // Ensure provider defined types fully satisfy framework interfaces.
 var _ resource.Resource = &policyResource{}
 var _ resource.ResourceWithConfigure = &policyResource{}
 
-// var _ resource.ResourceWithImportState = &policyResource{} // TODO: Implement ImportState
+// var _ resource.ResourceWithImportState = &policyResource{} // Temporarily remove ImportState
 
 // policyResource defines the resource implementation.
 type policyResource struct {
@@ -38,14 +40,16 @@ type policyResource struct {
 
 // policyResourceModel describes the resource data model.
 type policyResourceModel struct {
-	UUID           types.String `tfsdk:"uuid"`
-	Name           types.String `tfsdk:"name"`
-	Role           types.Map    `tfsdk:"role"`
-	Description    types.String `tfsdk:"description"`
-	ClaimRole      types.String `tfsdk:"claim_role"`
-	DataScope      types.Object `tfsdk:"data_scope"`
-	RevisionNumber types.Int64  `tfsdk:"revision_number"`
-	ReadOnly       types.Bool   `tfsdk:"read_only"`
+	UUID            types.String `tfsdk:"uuid"`
+	Name            types.String `tfsdk:"name"`
+	Role            types.Map    `tfsdk:"role"`
+	Description     types.String `tfsdk:"description"`
+	ClaimRole       types.String `tfsdk:"claim_role"`
+	DataScope       types.Object `tfsdk:"data_scope"`
+	RevisionNumber  types.Int64  `tfsdk:"revision_number"`
+	ReadOnly        types.Bool   `tfsdk:"read_only"`
+	Deprecated      types.Bool   `tfsdk:"deprecated"`
+	IsSystemDefined types.Bool   `tfsdk:"is_system_defined"`
 }
 
 // dataScopeModel maps the data_scope block schema.
@@ -186,6 +190,14 @@ func (r *policyResource) Schema(ctx context.Context, req resource.SchemaRequest,
 				MarkdownDescription: "Indicates if the policy is read-only (managed internally).",
 				Computed:            true,
 			},
+			"deprecated": schema.BoolAttribute{
+				MarkdownDescription: "Indicates if the policy is deprecated.",
+				Computed:            true,
+			},
+			"is_system_defined": schema.BoolAttribute{
+				MarkdownDescription: "Indicates if the policy is system-defined.",
+				Computed:            true,
+			},
 		},
 	}
 }
@@ -236,22 +248,25 @@ func (r *policyResource) Create(ctx context.Context, req resource.CreateRequest,
 
 	// Update state with computed values from SDK response
 	plan.UUID = types.StringValue(apiResponse.UUID)
-	plan.RevisionNumber = types.Int64Value(int64(apiResponse.RevisionNumber)) // Cast int32 to int64
-	plan.ReadOnly = types.BoolValue(apiResponse.ReadOnly)
+	// apiResponse.RevisionNumber, ReadOnly, Deprecated, IsSystemDefined do not exist on models.Policy
+	// plan.RevisionNumber = types.Int64Value(int64(apiResponse.RevisionNumber))
+	// plan.ReadOnly = types.BoolValue(apiResponse.ReadOnly)
+	// plan.Deprecated = types.BoolValue(apiResponse.Deprecated)
+	// plan.IsSystemDefined = types.BoolValue(apiResponse.IsSystemDefined)
 
-	// Update other fields from the API response to reflect the actual state
-	// (Name, Role, Description, ClaimRole, DataScope)
-	diags = mapPolicyApiResponseToModel(ctx, *apiResponse, &plan) // Map full response back to plan
+	// mapPolicyApiResponseToModel will now only map Name and UUID.
+	// Other fields from the plan (Description, ClaimRole, Role, DataScope)
+	// are desired state. If the API doesn't return them, we can't confirm them,
+	// but we set them in the state based on the plan.
+	diags = mapPolicyApiResponseToModel(ctx, *apiResponse, &plan)
 	resp.Diagnostics.Append(diags...)
 	if resp.Diagnostics.HasError() {
-		// If mapping fails, still set the essential computed fields, but log error
-		tflog.Error(ctx, "Failed to map full API response back to state after create", map[string]any{"uuid": apiResponse.UUID})
-		// Re-set essential computed fields just in case mapping overwrote them
+		tflog.Error(ctx, "Failed to map API response (UUID, Name) back to state after create", map[string]any{"uuid": apiResponse.UUID})
+		// Still set UUID if mapping failed for Name for some reason
 		plan.UUID = types.StringValue(apiResponse.UUID)
-		plan.RevisionNumber = types.Int64Value(int64(apiResponse.RevisionNumber))
-		plan.ReadOnly = types.BoolValue(apiResponse.ReadOnly)
-		// Keep plan values for user-settable fields as a fallback
 	}
+	// Persist other planned values (description, claim_role, role, data_scope)
+	// These were part of the plan and are not read back from the simple Policy response.
 
 	tflog.Info(ctx, "Saving new policy to state", map[string]any{"uuid": plan.UUID.ValueString()})
 	resp.Diagnostics.Append(resp.State.Set(ctx, &plan)...)
@@ -322,23 +337,22 @@ func (r *policyResource) Update(ctx context.Context, req resource.UpdateRequest,
 		}
 		return
 	}
-	tflog.Info(ctx, "Policy updated successfully via SDK", map[string]any{"uuid": apiResponse.UUID, "new_revision": apiResponse.RevisionNumber})
+	tflog.Info(ctx, "Policy updated successfully via SDK", map[string]any{"uuid": apiResponse.UUID})
 
 	// Update state (plan) from SDK Response
-	// Preserve UUID from state as SDK response might not always contain it (though it should for update)
-	plan.UUID = state.UUID
-	diags = mapPolicyApiResponseToModel(ctx, *apiResponse, &plan) // Map full response back to plan
+	plan.UUID = state.UUID // Preserve UUID from state
+	// apiResponse.RevisionNumber, ReadOnly, Deprecated, IsSystemDefined do not exist on models.Policy
+	// mapPolicyApiResponseToModel will now only map Name and UUID.
+	diags = mapPolicyApiResponseToModel(ctx, *apiResponse, &plan)
 	resp.Diagnostics.Append(diags...)
 	if resp.Diagnostics.HasError() {
-		// If mapping fails, still set the essential computed fields, but log error
-		tflog.Error(ctx, "Failed to map full API response back to state after update", map[string]any{"uuid": apiResponse.UUID})
-		// Re-set essential computed fields just in case mapping overwrote them
-		plan.UUID = state.UUID // Ensure UUID is preserved
-		plan.RevisionNumber = types.Int64Value(int64(apiResponse.RevisionNumber))
-		plan.ReadOnly = types.BoolValue(apiResponse.ReadOnly)
-		// Keep plan values for user-settable fields as a fallback? Or error out? Erroring out seems safer.
-		return // Stop if mapping fails after update
+		tflog.Error(ctx, "Failed to map API response (UUID, Name) back to state after update", map[string]any{"uuid": plan.UUID.ValueString()})
+		// If mapping fails, ensure UUID is still set. Name might be an issue.
+		// Depending on strictness, might want to return error here.
+		// For now, proceed to set state with potentially incomplete name mapping.
 	}
+	// Persist other planned values (description, claim_role, role, data_scope)
+	// These were part of the plan and are not read back from the simple Policy response.
 
 	tflog.Info(ctx, "Saving updated policy to state", map[string]any{"uuid": plan.UUID.ValueString()})
 	resp.Diagnostics.Append(resp.State.Set(ctx, &plan)...)
@@ -375,44 +389,38 @@ func (r *policyResource) Delete(ctx context.Context, req resource.DeleteRequest,
 // --- Helper Functions for Mapping ---
 
 // mapPolicyModelToApiCreateRequest converts Terraform model to SDK request struct for Create.
-func mapPolicyModelToApiCreateRequest(ctx context.Context, plan policyResourceModel) (sdkreq.CreatePolicyRequest, diag.Diagnostics) {
+func mapPolicyModelToApiCreateRequest(ctx context.Context, plan policyResourceModel) (*models.CreatePolicyRequest, diag.Diagnostics) {
 	var diags diag.Diagnostics
-	apiRequest := sdkreq.CreatePolicyRequest{
-		Name:        plan.Name.ValueString(),
-		Description: plan.Description.ValueStringPointer(),
-		ClaimRole:   plan.ClaimRole.ValueStringPointer(),
+	apiRequest := &models.CreatePolicyRequest{
+		Name:        plan.Name.ValueStringPointer(),
+		Description: plan.Description.ValueString(),
+		ClaimRole:   plan.ClaimRole.ValueString(),
 	}
 
 	// Map 'role' (sdkmodels.RoleMap is map[string]string)
-	apiRequest.Role = make(sdkreq.RoleMap) // Initialize map
-	if !plan.Role.IsNull() {
-		// Let ElementsAs populate the map directly from the plan
-		diags.Append(plan.Role.ElementsAs(ctx, &apiRequest.Role, false)...)
+	if !plan.Role.IsNull() && !plan.Role.IsUnknown() {
+		roleMap := make(models.RoleMap)
+		diags.Append(plan.Role.ElementsAs(ctx, &roleMap, false)...)
 		if diags.HasError() {
-			return apiRequest, diags
+			return nil, diags
 		}
-
-		// Check if the required role map is empty after reading from plan
-		if len(apiRequest.Role) == 0 {
-			diags.AddError("Validation Error", "The 'role' attribute is required and cannot be empty.")
-			return apiRequest, diags
-		}
-		// No need to manually populate keys with empty strings
+		apiRequest.Role = roleMap
 	} else {
-		// This case should ideally not be reached due to TF schema Required=true
-		diags.AddError("Validation Error", "The 'role' attribute is required but was found to be null in the plan.")
-		return apiRequest, diags
+		// If role is not specified or null in plan, what should be sent? Empty map or nil?
+		// Based on CreatePolicyRequest, Role is RoleMap (map[string]string), not *RoleMap.
+		// So, an empty map is appropriate if it's optional and not set.
+		apiRequest.Role = make(models.RoleMap) // Send empty map if not specified
 	}
 
 	// Map 'data_scope'
 	apiDataScope, dsDiags := mapModelDataScopeToApiDataScope(ctx, plan.DataScope)
 	diags.Append(dsDiags...)
 	if diags.HasError() {
-		return apiRequest, diags
+		return nil, diags
 	}
 	// If apiDataScope is not nil, dereference it and assign the struct value.
 	if apiDataScope != nil {
-		apiRequest.DataScope = *apiDataScope // Restore dereference
+		apiRequest.DataScope = apiDataScope // Restore dereference
 	}
 	// If apiDataScope is nil, apiRequest.DataScope retains its zero-value struct
 
@@ -420,36 +428,36 @@ func mapPolicyModelToApiCreateRequest(ctx context.Context, plan policyResourceMo
 }
 
 // mapPolicyModelToApiUpdateRequest converts Terraform model to SDK request struct for Update.
-func mapPolicyModelToApiUpdateRequest(ctx context.Context, plan policyResourceModel, revision int64) (sdkreq.UpdatePolicyRequest, diag.Diagnostics) {
+func mapPolicyModelToApiUpdateRequest(ctx context.Context, plan policyResourceModel, revision int64) (*models.UpdatePolicyRequest, diag.Diagnostics) {
 	var diags diag.Diagnostics
-	apiRequest := sdkreq.UpdatePolicyRequest{
-		Name:            plan.Name.ValueString(),
-		Description:     plan.Description.ValueStringPointer(),
-		ClaimRole:       plan.ClaimRole.ValueStringPointer(),
+	apiRequest := &models.UpdatePolicyRequest{
+		Name:            plan.Name.ValueStringPointer(),
+		Description:     plan.Description.ValueString(),
+		ClaimRole:       plan.ClaimRole.ValueString(),
 		CurrentRevision: int32(revision), // Cast int64 to int32 for SDK
 	}
 
 	// Map 'role' (sdkmodels.RoleMap is map[string]string)
-	roleMap := make(sdkreq.RoleMap) // Use SDK type directly
-	if !plan.Role.IsNull() {
+	roleMap := models.RoleMap{}
+	if !plan.Role.IsNull() && !plan.Role.IsUnknown() {
 		diags.Append(plan.Role.ElementsAs(ctx, &roleMap, false)...)
 		if diags.HasError() {
-			return apiRequest, diags
+			return nil, diags
 		}
 		apiRequest.Role = roleMap // Assign directly
 	} else {
-		apiRequest.Role = make(sdkreq.RoleMap) // Ensure non-nil map
+		apiRequest.Role = models.RoleMap{} // Ensure non-nil map
 	}
 
 	// Map 'data_scope'
 	apiDataScope, dsDiags := mapModelDataScopeToApiDataScope(ctx, plan.DataScope)
 	diags.Append(dsDiags...)
 	if diags.HasError() {
-		return apiRequest, diags
+		return nil, diags
 	}
 	// If apiDataScope is not nil, dereference it and assign the struct value.
 	if apiDataScope != nil {
-		apiRequest.DataScope = *apiDataScope // Restore dereference
+		apiRequest.DataScope = apiDataScope // Restore dereference
 	}
 	// If apiDataScope is nil, apiRequest.DataScope retains its zero-value struct
 
@@ -458,7 +466,7 @@ func mapPolicyModelToApiUpdateRequest(ctx context.Context, plan policyResourceMo
 }
 
 // mapModelDataScopeToApiDataScope converts the Terraform data_scope object to the SDK *sdkmodels.DataScope struct.
-func mapModelDataScopeToApiDataScope(ctx context.Context, modelDataScope types.Object) (*sdkreq.DataScope, diag.Diagnostics) {
+func mapModelDataScopeToApiDataScope(ctx context.Context, modelDataScope types.Object) (*models.DataScope, diag.Diagnostics) {
 	var diags diag.Diagnostics
 
 	if modelDataScope.IsNull() || modelDataScope.IsUnknown() {
@@ -472,7 +480,7 @@ func mapModelDataScopeToApiDataScope(ctx context.Context, modelDataScope types.O
 		return nil, diags
 	}
 
-	apiDataScope := &sdkreq.DataScope{} // Initialize with SDK type
+	apiDataScope := &models.DataScope{} // Initialize with SDK type
 
 	// Map 'simple' scope
 	if !dataScopePlan.Simple.IsNull() && !dataScopePlan.Simple.IsUnknown() {
@@ -484,7 +492,7 @@ func mapModelDataScopeToApiDataScope(ctx context.Context, modelDataScope types.O
 		}
 
 		apiSimpleScope := &sdkmodels.Group{ // Use SDK type
-			Operator: simplePlan.Operator.ValueString(),
+			Operator: sdkmodels.GroupOp(simplePlan.Operator.ValueString()), // Cast to models.GroupOp
 		}
 
 		// Map 'conditions'
@@ -495,14 +503,12 @@ func mapModelDataScopeToApiDataScope(ctx context.Context, modelDataScope types.O
 				return nil, diags
 			}
 
-			apiSimpleScope.Conditions = make([]sdkmodels.Condition, len(conditionsPlan)) // Use []*sdkmodels.Condition
+			apiSimpleScope.Conditions = make([]*sdkmodels.Condition, len(conditionsPlan)) // Slice of pointers
 			for i, condPlan := range conditionsPlan {
-				apiCondition := &sdkmodels.Condition{ // Use sdkmodels.Condition
-					Column: sdkmodels.Column{
-						Key:    condPlan.Key.ValueString(),
-						Origin: condPlan.Origin.ValueString(),
-						Type:   condPlan.Type.ValueString(),
-					},
+				apiCondition := &sdkmodels.Condition{ // Correctly assign Key, Origin, Type directly
+					Key:    condPlan.Key.ValueString(),
+					Origin: condPlan.Origin.ValueString(),
+					Type:   condPlan.Type.ValueString(),
 				}
 
 				// Map 'filters'
@@ -514,20 +520,20 @@ func mapModelDataScopeToApiDataScope(ctx context.Context, modelDataScope types.O
 						return nil, diags
 					}
 
-					apiCondition.Filters = make([]sdkmodels.Filter, len(filtersPlan)) // Use []*sdkmodels.Filter
+					apiCondition.Filters = make([]*sdkmodels.Filter, len(filtersPlan)) // Slice of pointers
 					for j, filterPlan := range filtersPlan {
-						apiCondition.Filters[j] = sdkmodels.Filter{ // Use sdkmodels.Filter
-							Op:    filterPlan.Op.ValueString(),
-							Value: filterPlan.Value.ValueString(),
+						apiCondition.Filters[j] = &sdkmodels.Filter{ // Assign pointer to Filter struct
+							Op:    sdkmodels.Op(filterPlan.Op.ValueString()), // Cast to models.Op
+							Value: filterPlan.Value.ValueString(),            // Assuming Value in SDK Filter is string or interface{}
 						}
 					}
 				} else {
-					apiCondition.Filters = make([]sdkmodels.Filter, 0) // Use []*sdkmodels.Filter
+					apiCondition.Filters = make([]*sdkmodels.Filter, 0) // Slice of pointers
 				}
-				apiSimpleScope.Conditions[i] = *apiCondition
+				apiSimpleScope.Conditions[i] = apiCondition // apiCondition is already a pointer
 			}
 		} else {
-			apiSimpleScope.Conditions = make([]sdkmodels.Condition, 0) // Use []*sdkmodels.Condition
+			apiSimpleScope.Conditions = make([]*sdkmodels.Condition, 0) // Slice of pointers
 		}
 		apiDataScope.Simple = apiSimpleScope // Assign pointer
 	}
@@ -543,43 +549,57 @@ func mapModelDataScopeToApiDataScope(ctx context.Context, modelDataScope types.O
 
 // mapPolicyApiResponseToModel maps the *sdkmodels.Policy from an API response
 // back into the Terraform state model (*policyResourceModel).
-func mapPolicyApiResponseToModel(ctx context.Context, apiResponse sdkreq.Policy, state *policyResourceModel) diag.Diagnostics {
+func mapPolicyApiResponseToModel(ctx context.Context, apiResponse models.Policy, state *policyResourceModel) diag.Diagnostics {
 	var diags diag.Diagnostics
 
 	tflog.Debug(ctx, "Mapping SDK Policy response to Terraform model", map[string]any{"uuid": apiResponse.UUID})
 
 	state.UUID = types.StringValue(apiResponse.UUID)
-	state.RevisionNumber = types.Int64Value(int64(apiResponse.RevisionNumber)) // Cast int32 to int64
-	state.ReadOnly = types.BoolValue(apiResponse.ReadOnly)
-	state.Name = types.StringValue(apiResponse.Name)
-	state.Description = types.StringPointerValue(apiResponse.Description) // Works for nil string pointers
-	state.ClaimRole = types.StringPointerValue(apiResponse.ClaimRole)     // Works for nil string pointers
-
-	// Map 'role' (sdkmodels.RoleMap is map[string]string)
-	roleMapValue, roleDiags := types.MapValueFrom(ctx, types.StringType, apiResponse.Role)
-	diags.Append(roleDiags...)
-	if diags.HasError() {
-		tflog.Error(ctx, "Failed to map Role from SDK response", map[string]any{"uuid": apiResponse.UUID})
-		return diags // Stop if role mapping fails
+	if apiResponse.Name != nil {
+		state.Name = types.StringValue(*apiResponse.Name)
+	} else {
+		// Name is required in the SDK model, but handle defensively
+		state.Name = types.StringNull()
+		// diags.AddWarning("API Response Warning", "Policy Name was unexpectedly nil in API response.")
 	}
-	state.Role = roleMapValue
 
-	// Map 'data_scope' from SDK response back to state model
-	dataScopeValue, dsDiags := mapApiResponseDataScopeToState(ctx, &apiResponse.DataScope) // Pass pointer to *sdkmodels.DataScope
-	diags.Append(dsDiags...)
-	if diags.HasError() {
-		tflog.Error(ctx, "Failed to map DataScope from SDK response", map[string]any{"uuid": apiResponse.UUID})
-		return diags // Stop if data scope mapping fails
-	}
-	state.DataScope = dataScopeValue
+	// The following fields are NOT in models.Policy, so they cannot be mapped from the response.
+	// They should be preserved from the plan/state if they are part of the Terraform resource schema
+	// and not read back from the API.
+	// state.RevisionNumber = types.Int64Value(int64(apiResponse.RevisionNumber))
+	// state.ReadOnly = types.BoolValue(apiResponse.ReadOnly)
+	// state.Description = types.StringPointerValue(apiResponse.Description)
+	// state.ClaimRole = types.StringPointerValue(apiResponse.ClaimRole)
+	// state.Deprecated = types.BoolValue(apiResponse.Deprecated)
+	// state.IsSystemDefined = types.BoolValue(apiResponse.IsSystemDefined)
 
-	tflog.Debug(ctx, "Successfully mapped SDK response to Terraform model", map[string]any{"uuid": apiResponse.UUID})
+	// Role and DataScope are complex objects. If they are part of the TF schema
+	// but not the response, they must be preserved from plan/state.
+	// For example, if state.Role was set from plan, it remains.
+
+	// roleMapValue, roleDiags := types.MapValueFrom(ctx, types.StringType, apiResponse.Role)
+	// diags.Append(roleDiags...)
+	// if diags.HasError() {
+	// 	tflog.Error(ctx, "Failed to map Role from SDK response", map[string]any{"uuid": apiResponse.UUID})
+	// 	return diags
+	// }
+	// state.Role = roleMapValue
+
+	// dataScopeValue, dsDiags := mapApiResponseDataScopeToState(ctx, &apiResponse.DataScope)
+	// diags.Append(dsDiags...)
+	// if diags.HasError() {
+	// 	tflog.Error(ctx, "Failed to map DataScope from SDK response", map[string]any{"uuid": apiResponse.UUID})
+	// 	return diags
+	// }
+	// state.DataScope = dataScopeValue
+
+	tflog.Debug(ctx, "Successfully mapped available SDK response fields (UUID, Name) to Terraform model", map[string]any{"uuid": apiResponse.UUID})
 	return diags
 }
 
 // mapApiResponseDataScopeToState converts the *sdkmodels.DataScope from an API response
 // back into the Terraform state object type (types.Object).
-func mapApiResponseDataScopeToState(ctx context.Context, apiDataScope *sdkreq.DataScope) (types.Object, diag.Diagnostics) {
+func mapApiResponseDataScopeToState(ctx context.Context, apiDataScope *models.DataScope) (types.Object, diag.Diagnostics) {
 	var diags diag.Diagnostics
 
 	// Get the target attribute types for the top-level data_scope block
@@ -598,14 +618,15 @@ func mapApiResponseDataScopeToState(ctx context.Context, apiDataScope *sdkreq.Da
 
 	if apiDataScope.Simple != nil {
 		tflog.Debug(ctx, "Mapping Simple scope from SDK response")
-		apiSimpleScope := apiDataScope.Simple // apiSimpleScope is *sdkmodels.SimpleDataScope
+		apiSimpleScope := apiDataScope.Simple // apiSimpleScope is *sdkmodels.Group
 		// Get target attribute types for the simple scope block
 		simpleAttrTypes := simpleDataScopeModel{}.attrTypes()
 		// Get target attribute types for nested lists/objects
-		conditionAttrTypes := conditionModel{}.attrTypes() // Corrected: get types from model instance
-		filtersAttrTypes := filtersModel{}.attrTypes()     // Corrected: get types from model instance
+		conditionAttrTypes := conditionModel{}.attrTypes()
+		filtersAttrTypes := filtersModel{}.attrTypes()
 
 		// Build the conditions list first
+		// Pass apiSimpleScope.Conditions directly as it's []*sdkmodels.Condition
 		conditionsList, condDiags := buildConditionsListFromApi(ctx, apiSimpleScope.Conditions, filtersAttrTypes, conditionAttrTypes)
 		diags.Append(condDiags...)
 		if diags.HasError() {
@@ -616,7 +637,7 @@ func mapApiResponseDataScopeToState(ctx context.Context, apiDataScope *sdkreq.Da
 
 		// Build the simple scope object itself
 		simpleScopeObj, simpleScopeDiags = types.ObjectValue(simpleAttrTypes, map[string]attr.Value{
-			"operator":   types.StringValue(apiSimpleScope.Operator),
+			"operator":   types.StringValue(string(apiSimpleScope.Operator)), // Cast models.GroupOp to string
 			"conditions": conditionsList,
 		})
 		diags.Append(simpleScopeDiags...)
@@ -649,7 +670,7 @@ func mapApiResponseDataScopeToState(ctx context.Context, apiDataScope *sdkreq.Da
 	return dataScopeObj, diags
 }
 
-func buildConditionsListFromApi(ctx context.Context, apiConditions []sdkmodels.Condition, filtersAttrTypes map[string]attr.Type, conditionAttrTypes map[string]attr.Type) (types.List, diag.Diagnostics) {
+func buildConditionsListFromApi(ctx context.Context, apiConditions []*sdkmodels.Condition, filtersAttrTypes map[string]attr.Type, conditionAttrTypes map[string]attr.Type) (types.List, diag.Diagnostics) { // Changed to accept []*sdkmodels.Condition
 	var diags diag.Diagnostics
 	var conditionsObjList []attr.Value
 
@@ -657,19 +678,21 @@ func buildConditionsListFromApi(ctx context.Context, apiConditions []sdkmodels.C
 	conditionsElemType := types.ObjectType{AttrTypes: conditionAttrTypes}
 
 	// Get the element type for the nested filters list
-	filtersListType := conditionAttrTypes["filters"].(types.ListType) // Assume type assertion is safe based on schema
-	filtersElemType := filtersListType.ElemType.(types.ObjectType)    // Assume type assertion is safe
+	filtersListType := conditionAttrTypes["filters"].(types.ListType)
+	filtersElemType := filtersListType.ElemType.(types.ObjectType)
 
 	tflog.Debug(ctx, "Building conditions list from SDK response", map[string]any{"count": len(apiConditions)})
 
 	if len(apiConditions) == 0 {
 		tflog.Debug(ctx, "No conditions in SDK response, returning empty list")
-		// Use the determined element type to create an empty list
 		return types.ListValueMust(conditionsElemType, []attr.Value{}), diags
 	}
 
 	conditionsObjList = make([]attr.Value, 0, len(apiConditions))
 	for i, apiCondition := range apiConditions {
+		if apiCondition == nil { // Nil check for individual condition pointer
+			continue
+		}
 		tflog.Debug(ctx, "Processing SDK condition", map[string]any{
 			"index":        i,
 			"key":          apiCondition.Key,
@@ -684,23 +707,27 @@ func buildConditionsListFromApi(ctx context.Context, apiConditions []sdkmodels.C
 		if len(apiCondition.Filters) > 0 {
 			filtersObjList := make([]attr.Value, 0, len(apiCondition.Filters))
 			for j, apiFilter := range apiCondition.Filters {
+				if apiFilter == nil { // Nil check for individual filter pointer
+					continue
+				}
 				tflog.Debug(ctx, "Processing SDK filter", map[string]any{
 					"conditionIndex": i,
 					"filterIndex":    j,
 					"op":             apiFilter.Op,
-					"value":          fmt.Sprintf("%v (%T)", apiFilter.Value, apiFilter.Value), // Log value and type
+					"value":          fmt.Sprintf("%v (%T)", apiFilter.Value, apiFilter.Value),
 				})
 
-				// Assert apiFilter.Value to string
 				filterValueStr, ok := apiFilter.Value.(string)
 				if !ok {
-					diags.AddError("Filter Value Type Error", fmt.Sprintf("Filter value at condition index %d, filter index %d is not a string (type: %T)", i, j, apiFilter.Value))
-					return types.ListNull(conditionsElemType), diags // Stop early
+					// If Value is not string, it might be another type or nil.
+					// For simplicity, if it's not string, treat as error or handle specific types.
+					// For now, error out if not string. SDK model says `interface{}` for Filter.Value
+					diags.AddError("Filter Value Type Error", fmt.Sprintf("Filter value at condition index %d, filter index %d is not a string (type: %T). SDK Value: %v", i, j, apiFilter.Value, apiFilter.Value))
+					return types.ListNull(conditionsElemType), diags
 				}
 
-				// Create filter object using the specific filtersAttrTypes
 				filterObj, fDiags := types.ObjectValue(filtersAttrTypes, map[string]attr.Value{
-					"op":    types.StringValue(apiFilter.Op),
+					"op":    types.StringValue(string(apiFilter.Op)), // Cast models.Op to string
 					"value": types.StringValue(filterValueStr),
 				})
 				diags.Append(fDiags...)
@@ -803,19 +830,7 @@ func (m dataScopeModel) attrTypes() map[string]attr.Type {
 	}
 }
 
-// TODO: Implement ImportState function using the ApiClient interface
-// func (r *policyResource) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {
-// 	 policyUUID := req.ID
-// 	 apiResponse, err := r.client.GetPolicy(ctx, policyUUID)
-// 	 if err != nil {
-// 		 // Handle error (e.g., Not Found)
-// 		 return
-// 	 }
-// 	 var state policyResourceModel
-// 	 diags := mapPolicyApiResponseToModel(ctx, *apiResponse, &state)
-// 	 resp.Diagnostics.Append(diags...)
-// 	 if resp.Diagnostics.HasError() {
-// 		 return
-// 	 }
-// 	 resp.Diagnostics.Append(resp.State.Set(ctx, &state)...)
-// }
+// Temporarily remove ImportState until fully implemented.
+func (r *policyResource) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {
+	resource.ImportStatePassthroughID(ctx, path.Root("uuid"), req, resp)
+}

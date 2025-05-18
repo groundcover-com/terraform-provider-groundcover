@@ -7,7 +7,6 @@ import (
 	"context"
 	"os"
 
-	"github.com/groundcover-com/groundcover-sdk-go/sdk/api"
 	"github.com/hashicorp/terraform-plugin-framework/datasource"
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/provider"
@@ -105,9 +104,7 @@ func (p *GroundcoverProvider) Configure(ctx context.Context, req provider.Config
 	}
 
 	tflog.Info(ctx, "Initializing Groundcover SDK client", map[string]any{"org_name": orgName, "api_url": apiUrl})
-	sdkClient := api.NewClient(apiUrl, apiKey, orgName)
-
-	clientWrapper, err := NewSdkClientWrapper(sdkClient)
+	clientWrapper, err := NewSdkClientWrapper(ctx, apiUrl, apiKey, orgName)
 	if err != nil {
 		resp.Diagnostics.AddError(
 			"Failed to Create API Client Wrapper",
