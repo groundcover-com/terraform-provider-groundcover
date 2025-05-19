@@ -94,14 +94,14 @@ var _ ApiClient = (*SdkClientWrapper)(nil)
 
 var getMonitorPathRegex = regexp.MustCompile(`^/api/monitors/[^/]+/?$`)
 
-// fixMonitorContentTypeTransport wraps an http.RoundTripper to ensure that
+// overrideYamlContextTypeTransport wraps an http.RoundTripper to ensure that
 // successful GET responses for specific monitor YAML endpoints have the
 // Content-Type header set to "application/x-yaml".
-type fixMonitorContentTypeTransport struct {
+type overrideYamlContextTypeTransport struct {
 	transport http.RoundTripper
 }
 
-func (f *fixMonitorContentTypeTransport) RoundTrip(req *http.Request) (*http.Response, error) {
+func (f *overrideYamlContextTypeTransport) RoundTrip(req *http.Request) (*http.Response, error) {
 	resp, err := f.transport.RoundTrip(req)
 	if err != nil {
 		return nil, err
@@ -171,7 +171,7 @@ func NewSdkClientWrapper(ctx context.Context, baseURLStr, apiKey, backendID stri
 		retryableStatuses,
 	)
 
-	monitorContentTypeFixer := &fixMonitorContentTypeTransport{
+	monitorContentTypeFixer := &overrideYamlContextTypeTransport{
 		transport: sdkTransportWrapper,
 	}
 
