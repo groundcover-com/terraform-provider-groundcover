@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
+	"os"
 	"regexp"
 	"strconv"
 	"strings"
@@ -118,20 +119,22 @@ func (f *fixMonitorContentTypeTransport) RoundTrip(req *http.Request) (*http.Res
 
 func NewSdkClientWrapper(ctx context.Context, baseURLStr, apiKey, backendID string) (ApiClient, error) {
 	if baseURLStr == "" {
-		return nil, errors.New("GC_BASE_URL (api_url) environment variable or provider config is required")
+		return nil, errors.New("GROUNDCOVER_API_URL (api_url) environment variable or provider config is required")
 	}
 	if apiKey == "" {
-		return nil, errors.New("GC_API_KEY (api_key) environment variable or provider config is required")
+		return nil, errors.New("GROUNDCOVER_API_KEY (api_key) environment variable or provider config is required")
 	}
 	if backendID == "" {
-		return nil, errors.New("GC_BACKEND_ID (org_name) environment variable or provider config is required")
+		return nil, errors.New("GROUNDCOVER_ORG_NAME (org_name) environment variable or provider config is required")
 	}
+
+	userEnabledDebug := os.Getenv("TF_LOG") == "debug"
 
 	tflog.Info(ctx, "Initializing Groundcover SDK v1.1.0 client", map[string]any{"baseURL": baseURLStr, "backendID": backendID})
 
 	parsedURL, err := url.Parse(baseURLStr)
 	if err != nil {
-		return nil, fmt.Errorf("error parsing GC_BASE_URL: %w", err)
+		return nil, fmt.Errorf("error parsing GROUNDCOVER_API_URL: %w", err)
 	}
 
 	host := parsedURL.Host
@@ -181,7 +184,7 @@ func NewSdkClientWrapper(ctx context.Context, baseURLStr, apiKey, backendID stri
 
 	// Configure go-openapi to use tflog for its debug messages
 	finalRuntimeTransport.SetLogger(&tflogAdapter{ctx: ctx})
-	finalRuntimeTransport.SetDebug(true)
+	finalRuntimeTransport.SetDebug(userEnabledDebug)
 
 	newSdkClient := goclient.New(finalRuntimeTransport, strfmt.Default)
 

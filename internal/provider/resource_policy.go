@@ -233,8 +233,11 @@ func (r *policyResource) Create(ctx context.Context, req resource.CreateRequest,
 	tflog.Debug(ctx, "CreatePolicy SDK Call Request constructed", map[string]any{"name": apiRequest.Name})
 	apiResponse, err := r.client.CreatePolicy(ctx, apiRequest)
 	if err != nil {
-		// Use the specific name from the request in the error message
-		resp.Diagnostics.AddError("SDK Client Create Error", fmt.Sprintf("failed to create policy '%s': %s", *apiRequest.Name, err.Error()))
+		policyNameForError := "<nil>"
+		if apiRequest.Name != nil {
+			policyNameForError = *apiRequest.Name
+		}
+		resp.Diagnostics.AddError("SDK Client Create Error", fmt.Sprintf("failed to create policy '%s': %s", policyNameForError, err.Error()))
 		return
 	}
 	tflog.Info(ctx, "Policy created successfully via SDK", map[string]any{"uuid": apiResponse.UUID})
