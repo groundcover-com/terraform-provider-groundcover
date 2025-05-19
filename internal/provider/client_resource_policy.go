@@ -4,59 +4,82 @@ import (
 	"context"
 	"errors"
 
-	sdkPoliciesReq "github.com/groundcover-com/groundcover-sdk-go/sdk/api/rbac/policies"
+	"github.com/groundcover-com/groundcover-sdk-go/pkg/client/policies"
+	"github.com/groundcover-com/groundcover-sdk-go/pkg/models"
+
 	"github.com/hashicorp/terraform-plugin-log/tflog"
 )
 
-func (c *SdkClientWrapper) CreatePolicy(ctx context.Context, req sdkPoliciesReq.CreatePolicyRequest) (*sdkPoliciesReq.Policy, error) {
-	logFields := map[string]any{"name": req.Name}
+func (c *SdkClientWrapper) CreatePolicy(ctx context.Context, policyReq *models.CreatePolicyRequest) (*models.Policy, error) {
+	logFields := map[string]any{"name": policyReq.Name}
 	tflog.Debug(ctx, "Executing SDK Call: Create Policy", logFields)
 
-	policy, err := c.sdkClient.Rbac.Policies.CreatePolicy(ctx, &req)
+	params := policies.NewCreatePolicyParams().
+		WithContext(ctx).
+		WithTimeout(defaultTimeout).
+		WithBody(policyReq)
+
+	resp, err := c.sdkClient.Policies.CreatePolicy(params, nil)
 	if err != nil {
-		return nil, handleApiError(ctx, err, "CreatePolicy", req.Name)
+		return nil, handleApiError(ctx, err, "CreatePolicy", *policyReq.Name)
 	}
 
-	tflog.Debug(ctx, "SDK Call Successful: Create Policy", map[string]any{"uuid": policy.UUID})
-	return policy, nil
+	tflog.Debug(ctx, "SDK Call Successful: Create Policy", map[string]any{"uuid": resp.Payload.UUID})
+	return resp.Payload, nil
 }
 
-func (c *SdkClientWrapper) GetPolicy(ctx context.Context, uuid string) (*sdkPoliciesReq.Policy, error) {
+func (c *SdkClientWrapper) GetPolicy(ctx context.Context, uuid string) (*models.Policy, error) {
 	logFields := map[string]any{"uuid": uuid}
 	tflog.Debug(ctx, "Executing SDK Call: Get Policy", logFields)
 
-	policy, err := c.sdkClient.Rbac.Policies.GetPolicy(ctx, uuid)
+	params := policies.NewGetPolicyParams().
+		WithContext(ctx).
+		WithTimeout(defaultTimeout).
+		WithID(uuid)
+
+	resp, err := c.sdkClient.Policies.GetPolicy(params, nil)
 	if err != nil {
 		return nil, handleApiError(ctx, err, "GetPolicy", uuid)
 	}
 
 	tflog.Debug(ctx, "SDK Call Successful: Get Policy", logFields)
-	return policy, nil
+	return resp.Payload, nil
 }
 
-func (c *SdkClientWrapper) UpdatePolicy(ctx context.Context, uuid string, req sdkPoliciesReq.UpdatePolicyRequest) (*sdkPoliciesReq.Policy, error) {
-	logFields := map[string]any{"uuid": uuid, "revision": req.CurrentRevision}
+func (c *SdkClientWrapper) UpdatePolicy(ctx context.Context, uuid string, policyReq *models.UpdatePolicyRequest) (*models.Policy, error) {
+	logFields := map[string]any{"uuid": uuid, "revision": policyReq.CurrentRevision}
 	tflog.Debug(ctx, "Executing SDK Call: Update Policy", logFields)
 
-	policy, err := c.sdkClient.Rbac.Policies.UpdatePolicy(ctx, uuid, &req)
+	params := policies.NewUpdatePolicyParams().
+		WithContext(ctx).
+		WithTimeout(defaultTimeout).
+		WithID(uuid).
+		WithBody(policyReq)
+
+	resp, err := c.sdkClient.Policies.UpdatePolicy(params, nil)
 	if err != nil {
 		return nil, handleApiError(ctx, err, "UpdatePolicy", uuid)
 	}
 
-	tflog.Debug(ctx, "SDK Call Successful: Update Policy", map[string]any{"uuid": uuid, "new_revision": policy.RevisionNumber})
-	return policy, nil
+	tflog.Debug(ctx, "SDK Call Successful: Update Policy", map[string]any{"uuid": uuid, "new_revision": resp.Payload.UUID})
+	return resp.Payload, nil
 }
 
 func (c *SdkClientWrapper) DeletePolicy(ctx context.Context, uuid string) error {
 	logFields := map[string]any{"uuid": uuid}
 	tflog.Debug(ctx, "Executing SDK Call: Delete Policy", logFields)
 
-	_, err := c.sdkClient.Rbac.Policies.DeletePolicy(ctx, uuid)
+	params := policies.NewDeletePolicyParams().
+		WithContext(ctx).
+		WithTimeout(defaultTimeout).
+		WithID(uuid)
+
+	_, err := c.sdkClient.Policies.DeletePolicy(params, nil)
 	if err != nil {
 		mappedErr := handleApiError(ctx, err, "DeletePolicy", uuid)
 		if errors.Is(mappedErr, ErrNotFound) {
 			tflog.Warn(ctx, "SDK Call Result: Policy Not Found during Delete (Idempotent Success)", logFields)
-			return nil // Treat NotFound as success
+			return nil
 		}
 		return mappedErr
 	}

@@ -4,74 +4,116 @@ import (
 	"context"
 	"errors"
 
-	sdkmonitor "github.com/groundcover-com/groundcover-sdk-go/sdk/api/monitors"
-	"github.com/groundcover-com/groundcover-sdk-go/sdk/models"
+	"github.com/groundcover-com/groundcover-sdk-go/pkg/client/monitors"
+	"github.com/groundcover-com/groundcover-sdk-go/pkg/models"
 	"github.com/hashicorp/terraform-plugin-log/tflog"
 )
 
-func (c *SdkClientWrapper) CreateMonitorYaml(ctx context.Context, monitorYaml []byte) (*sdkmonitor.CreateMonitorResponse, error) {
-	logFields := map[string]any{"yaml_length": len(monitorYaml)}
-	tflog.Debug(ctx, "Executing SDK Call: Create Monitor YAML", logFields)
+func (c *SdkClientWrapper) CreateMonitor(ctx context.Context, monitorReq *models.CreateMonitorRequest) (*models.CreateMonitorResponse, error) {
+	identifier := "<unknown_monitor>"
+	if monitorReq != nil && monitorReq.Title != nil {
+		identifier = *monitorReq.Title
+	}
+	logFields := map[string]any{"title": identifier}
+	tflog.Debug(ctx, "Executing SDK Call: Create Monitor", logFields)
 
-	// Pass the call directly to the SDK's monitor service
-	resp, err := c.sdkClient.Monitors.CreateMonitorYaml(ctx, monitorYaml)
+	params := monitors.NewCreateMonitorParams().
+		WithContext(ctx).
+		WithTimeout(defaultTimeout).
+		WithBody(monitorReq)
+
+	resp, err := c.sdkClient.Monitors.CreateMonitor(params, nil, monitors.WithContentTypeApplicationxYaml)
 	if err != nil {
-		return nil, handleApiError(ctx, err, "CreateMonitorYaml", "<from_yaml>") // ID is unknown during create
+		return nil, handleApiError(ctx, err, "CreateMonitor", identifier)
+	}
+
+	if resp == nil {
+		tflog.Error(ctx, "SDK CreateMonitor returned nil response and nil error, which is unexpected.", logFields)
+		return nil, errors.New("internal SDK error: CreateMonitor returned nil response without error")
 	}
 
 	respId := "<nil_or_empty_response>"
-	// Use the correct field MonitorID based on the provided struct definition
-	if resp != nil && resp.MonitorID != "" {
-		respId = resp.MonitorID
-	} else if resp != nil {
-		tflog.Warn(ctx, "CreateMonitorYaml response contained an empty MonitorID", logFields)
+	if resp.Payload != nil && resp.Payload.MonitorID != "" {
+		respId = resp.Payload.MonitorID
+	} else if resp.Payload != nil {
+		tflog.Warn(ctx, "CreateMonitor response payload contained an empty MonitorID", logFields)
 	} else {
-		tflog.Warn(ctx, "CreateMonitorYaml response was nil", logFields)
+		tflog.Warn(ctx, "CreateMonitor response payload was nil", logFields)
 	}
 
-	tflog.Debug(ctx, "SDK Call Successful: Create Monitor YAML", map[string]any{"id": respId})
-	return resp, nil
+	tflog.Debug(ctx, "SDK Call Successful: Create Monitor", map[string]any{"id": respId})
+	return resp.Payload, nil
 }
 
 func (c *SdkClientWrapper) GetMonitor(ctx context.Context, id string) ([]byte, error) {
 	logFields := map[string]any{"id": id}
 	tflog.Debug(ctx, "Executing SDK Call: Get Monitor YAML", logFields)
 
-	// Pass the call directly to the SDK's monitor service
-	resp, err := c.sdkClient.Monitors.GetMonitor(ctx, id)
+	params := monitors.NewGetMonitorParams().
+		WithContext(ctx).
+		WithTimeout(defaultTimeout).
+		WithID(id)
+
+	resp, err := c.sdkClient.Monitors.GetMonitor(params, nil)
 	if err != nil {
 		return nil, handleApiError(ctx, err, "GetMonitor", id)
 	}
 
-	tflog.Debug(ctx, "SDK Call Successful: Get Monitor YAML", map[string]any{"id": id, "yaml_length": len(resp)})
-	return resp, nil
-}
-
-func (c *SdkClientWrapper) UpdateMonitorYaml(ctx context.Context, id string, monitorYaml []byte) (*models.EmptyResponse, error) {
-	logFields := map[string]any{"id": id, "yaml_length": len(monitorYaml)}
-	tflog.Debug(ctx, "Executing SDK Call: Update Monitor YAML", logFields)
-
-	// Pass the call directly to the SDK's monitor service
-	resp, err := c.sdkClient.Monitors.UpdateMonitorYaml(ctx, id, monitorYaml)
-	if err != nil {
-		return nil, handleApiError(ctx, err, "UpdateMonitorYaml", id)
+	if resp == nil {
+		tflog.Error(ctx, "SDK GetMonitor returned nil response and nil error, which is unexpected.", logFields)
+		return nil, errors.New("internal SDK error: GetMonitor returned nil response without error")
 	}
 
-	tflog.Debug(ctx, "SDK Call Successful: Update Monitor YAML", logFields)
-	return resp, nil
+	var yamlLength int
+
+	if resp.Payload != nil {
+		yamlLength = len(resp.Payload)
+	} else {
+		tflog.Warn(ctx, "SDK GetMonitor returned nil payload", map[string]any{"id": id})
+	}
+
+	tflog.Debug(ctx, "SDK Call Successful: Get Monitor YAML", map[string]any{"id": id, "yaml_length": yamlLength})
+	return resp.Payload, nil
+}
+
+func (c *SdkClientWrapper) UpdateMonitor(ctx context.Context, id string, monitorReq *models.UpdateMonitorRequest) error {
+	identifier := "<unknown_monitor>"
+	if monitorReq != nil && monitorReq.Title != nil {
+		identifier = *monitorReq.Title
+	}
+	logFields := map[string]any{"id": id, "title": identifier}
+	tflog.Debug(ctx, "Executing SDK Call: Update Monitor", logFields)
+
+	params := monitors.NewUpdateMonitorParams().
+		WithContext(ctx).
+		WithTimeout(defaultTimeout).
+		WithID(id).
+		WithBody(monitorReq)
+
+	_, err := c.sdkClient.Monitors.UpdateMonitor(params, nil, monitors.WithContentTypeApplicationxYaml)
+	if err != nil {
+		return handleApiError(ctx, err, "UpdateMonitor", id)
+	}
+
+	tflog.Debug(ctx, "SDK Call Successful: Update Monitor", logFields)
+	return nil
 }
 
 func (c *SdkClientWrapper) DeleteMonitor(ctx context.Context, id string) error {
 	logFields := map[string]any{"id": id}
 	tflog.Debug(ctx, "Executing SDK Call: Delete Monitor", logFields)
 
-	// Pass the call directly to the SDK's monitor service
-	_, err := c.sdkClient.Monitors.DeleteMonitor(ctx, id)
+	params := monitors.NewDeleteMonitorParams().
+		WithContext(ctx).
+		WithTimeout(defaultTimeout).
+		WithID(id)
+
+	_, err := c.sdkClient.Monitors.DeleteMonitor(params, nil)
 	if err != nil {
 		mappedErr := handleApiError(ctx, err, "DeleteMonitor", id)
 		if errors.Is(mappedErr, ErrNotFound) {
 			tflog.Warn(ctx, "SDK Call Result: Monitor Not Found during Delete (Idempotent Success)", logFields)
-			return nil // Treat NotFound as success
+			return nil
 		}
 		return mappedErr
 	}

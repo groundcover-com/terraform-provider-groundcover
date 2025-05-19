@@ -2,59 +2,74 @@ package provider
 
 import (
 	"context"
-	"errors"
 	"fmt"
 
-	apikeys "github.com/groundcover-com/groundcover-sdk-go/sdk/api/rbac/apikeys"
+	"github.com/groundcover-com/groundcover-sdk-go/pkg/client/apikeys"
+	"github.com/groundcover-com/groundcover-sdk-go/pkg/models"
+
 	"github.com/hashicorp/terraform-plugin-log/tflog"
 )
 
 // --- API Key Methods ---
 
-func (c *SdkClientWrapper) CreateApiKey(ctx context.Context, req *apikeys.CreateApiKeyRequest) (*apikeys.CreateApiKeyResponse, error) {
-	logFields := map[string]any{"name": req.Name, "serviceAccountId": req.ServiceAccountId}
+func (c *SdkClientWrapper) CreateApiKey(ctx context.Context, apiKeyReq *models.CreateAPIKeyRequest) (*models.CreateAPIKeyResponse, error) {
+	var name string
+	if apiKeyReq != nil && apiKeyReq.Name != nil {
+		name = *apiKeyReq.Name
+	} else {
+		name = "<unknown_apikey_name>"
+		tflog.Warn(ctx, "CreateApiKey called with nil apiKeyReq or nil Name")
+	}
+	logFields := map[string]any{"name": name}
 	tflog.Debug(ctx, "Executing SDK Call: Create API Key", logFields)
 
-	// Add detailed debug log for the request payload
-	tflog.Debug(ctx, fmt.Sprintf("Sending CreateApiKeyRequest to SDK: %+v", req), logFields)
+	tflog.Debug(ctx, fmt.Sprintf("Sending CreateAPIKeyRequest to SDK: %+v", apiKeyReq), logFields)
 
-	resp, err := c.sdkClient.Rbac.Apikeys.CreateApiKey(ctx, req)
+	params := apikeys.NewCreateAPIKeyParams().
+		WithContext(ctx).
+		WithTimeout(defaultTimeout).
+		WithBody(apiKeyReq)
+
+	resp, err := c.sdkClient.Apikeys.CreateAPIKey(params, nil)
 	if err != nil {
-		return nil, handleApiError(ctx, err, "CreateApiKey", req.Name) // Use Name as identifier before ID is known
+		return nil, handleApiError(ctx, err, "CreateApiKey", name)
 	}
 
-	tflog.Debug(ctx, "SDK Call Successful: Create API Key", map[string]any{"id": resp.Id})
-	return resp, nil
+	tflog.Debug(ctx, "SDK Call Successful: Create API Key", map[string]any{"id": resp.Payload.ID})
+	return resp.Payload, nil
 }
 
-func (c *SdkClientWrapper) ListApiKeys(ctx context.Context, withRevoked *bool, withExpired *bool) ([]apikeys.ListApiKeysResponseItem, error) {
-	logFields := map[string]any{"withRevoked": withRevoked, "withExpired": withExpired}
-	tflog.Debug(ctx, "Executing SDK Call: List API Keys", logFields)
+func (c *SdkClientWrapper) ListApiKeys(ctx context.Context, withRevoked *bool, withExpired *bool) ([]*models.ListAPIKeysResponseItem, error) {
+	tflog.Debug(ctx, "Executing SDK Call: List API Keys", map[string]any{"withRevoked": withRevoked, "withExpired": withExpired})
 
-	resp, err := c.sdkClient.Rbac.Apikeys.ListApiKeys(ctx, withRevoked, withExpired)
+	params := apikeys.NewListAPIKeysParams().
+		WithContext(ctx).
+		WithTimeout(defaultTimeout).
+		WithWithRevoked(withRevoked).
+		WithWithExpired(withExpired)
+
+	resp, err := c.sdkClient.Apikeys.ListAPIKeys(params, nil)
 	if err != nil {
-		return nil, handleApiError(ctx, err, "ListApiKeys", "-") // No specific ID for list
+		return nil, handleApiError(ctx, err, "ListApiKeys", "")
 	}
 
-	tflog.Debug(ctx, "SDK Call Successful: List API Keys", map[string]any{"count": len(resp)})
-	return resp, nil
+	tflog.Debug(ctx, "SDK Call Successful: List API Keys", map[string]any{"count": len(resp.Payload)})
+	return resp.Payload, nil
 }
 
 func (c *SdkClientWrapper) DeleteApiKey(ctx context.Context, id string) error {
-	logFields := map[string]any{"id": id}
-	tflog.Debug(ctx, "Executing SDK Call: Delete API Key", logFields)
+	tflog.Debug(ctx, "Executing SDK Call: Delete API Key", map[string]any{"id": id})
 
-	_, err := c.sdkClient.Rbac.Apikeys.DeleteApiKey(ctx, id)
+	params := apikeys.NewDeleteAPIKeyParams().
+		WithContext(ctx).
+		WithTimeout(defaultTimeout).
+		WithID(id)
+
+	_, err := c.sdkClient.Apikeys.DeleteAPIKey(params, nil)
 	if err != nil {
-		mappedErr := handleApiError(ctx, err, "DeleteApiKey", id)
-		// Check if the error is NotFound, return nil in that case as deletion is idempotent
-		if errors.Is(mappedErr, ErrNotFound) {
-			tflog.Warn(ctx, "SDK Call Result: API Key Not Found during Delete (Idempotent Success)", logFields)
-			return nil
-		}
-		return mappedErr
+		return handleApiError(ctx, err, "DeleteApiKey", id)
 	}
 
-	tflog.Debug(ctx, "SDK Call Successful: Delete API Key", logFields)
+	tflog.Debug(ctx, "SDK Call Successful: Delete API Key", map[string]any{"id": id})
 	return nil
 }

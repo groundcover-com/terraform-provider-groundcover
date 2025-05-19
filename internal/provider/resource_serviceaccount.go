@@ -5,11 +5,10 @@ package provider
 
 import (
 	"context"
-	"errors"
 	"fmt"
 
 	// SDK Imports
-	sdkSA "github.com/groundcover-com/groundcover-sdk-go/sdk/api/rbac/serviceaccounts"
+	models "github.com/groundcover-com/groundcover-sdk-go/pkg/models"
 
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
@@ -110,9 +109,12 @@ func (r *serviceAccountResource) Create(ctx context.Context, req resource.Create
 		return
 	}
 
-	apiRequest := sdkSA.CreateServiceAccountRequest{
-		Name:        plan.Name.ValueString(),
-		Email:       plan.Email.ValueString(),
+	nameVal := plan.Name.ValueString()
+	emailVal := plan.Email.ValueString()
+
+	apiRequest := &models.CreateServiceAccountRequest{
+		Name:        &nameVal,
+		Email:       &emailVal,
 		PolicyUUIDs: policyUUIDs,
 	}
 
@@ -122,12 +124,16 @@ func (r *serviceAccountResource) Create(ctx context.Context, req resource.Create
 		resp.Diagnostics.AddError("SDK Client Create Service Account Error", fmt.Sprintf("Failed to create service account '%s': %s", plan.Name.ValueString(), err.Error()))
 		return
 	}
-	// Use ServiceAccountId (string) from response
-	saGeneratedId := apiResponse.ServiceAccountId
-	tflog.Info(ctx, "Service Account created successfully via SDK", map[string]any{"id": saGeneratedId})
+	// Use ServiceAccountID (string) from response
+	saGeneratedIdPtr := apiResponse.ServiceAccountID
+	tflog.Info(ctx, "Service Account created successfully via SDK", map[string]any{"id_ptr": saGeneratedIdPtr})
 
 	// Map response back to state
-	plan.ID = types.StringValue(saGeneratedId)
+	if saGeneratedIdPtr == nil {
+		resp.Diagnostics.AddError("SDK Client Create Service Account Error", "Create response missing ServiceAccountID")
+		return
+	}
+	plan.ID = types.StringValue(*saGeneratedIdPtr)
 	// Persist Name, Email, PolicyUUIDs, Description from the plan as they were the desired state
 
 	tflog.Info(ctx, "Saving new service account to state", map[string]any{"id": plan.ID.ValueString()})
@@ -151,11 +157,10 @@ func (r *serviceAccountResource) Read(ctx context.Context, req resource.ReadRequ
 		return
 	}
 
-	var foundSA *sdkSA.ListServiceAccountsResponseItem
+	var foundSA *models.ServiceAccountsWithPolicy
 	for _, item := range apiResponseList {
-		if item.ServiceAccountId == saID {
-			temp := item
-			foundSA = &temp
+		if item != nil && item.ServiceAccountID != "" && item.ServiceAccountID == saID {
+			foundSA = item
 			break
 		}
 	}
@@ -169,10 +174,11 @@ func (r *serviceAccountResource) Read(ctx context.Context, req resource.ReadRequ
 	tflog.Debug(ctx, "Service Account found via SDK List", map[string]any{"id": saID})
 
 	// Update state from the found service account info
-	state.ID = types.StringValue(foundSA.ServiceAccountId)
+	state.ID = types.StringValue(foundSA.ServiceAccountID)
 	state.Name = types.StringValue(foundSA.Name)
+	state.Email = types.StringValue(foundSA.Email)
 
-	tflog.Info(ctx, "Updating service account state after read", map[string]any{"id": state.ID.ValueString()})
+	tflog.Info(ctx, "Saving updated service account to state", map[string]any{"id": state.ID.ValueString()})
 	resp.Diagnostics.Append(resp.State.Set(ctx, &state)...)
 }
 
@@ -191,7 +197,6 @@ func (r *serviceAccountResource) Update(ctx context.Context, req resource.Update
 	saID := state.ID.ValueString()
 	tflog.Debug(ctx, "Updating Service Account", map[string]any{"id": saID})
 
-	// Map plan to SDK update request.
 	var policyUUIDs []string
 	diags := plan.PolicyUUIDs.ElementsAs(ctx, &policyUUIDs, false)
 	resp.Diagnostics.Append(diags...)
@@ -199,38 +204,27 @@ func (r *serviceAccountResource) Update(ctx context.Context, req resource.Update
 		return
 	}
 
-	apiRequest := sdkSA.UpdateServiceAccountRequest{
-		ServiceAccountId: saID,
-		Email:            plan.Email.ValueString(),
+	saIDForRequest := saID
+	emailVal := plan.Email.ValueString()
+
+	apiRequest := models.UpdateServiceAccountRequest{
+		ServiceAccountID: &saIDForRequest,
+		Email:            emailVal,
 		PolicyUUIDs:      policyUUIDs,
 	}
 
-	tflog.Warn(ctx, "UpdateServiceAccount request structure requires verification against SDK definition.",
-		map[string]any{
-			"id":                        saID,
-			"attempted_email_update":    apiRequest.Email,
-			"attempted_policies_update": apiRequest.PolicyUUIDs,
-		})
-
-	// Call client with ID as the second argument
-	_, err := r.client.UpdateServiceAccount(ctx, saID, apiRequest)
+	tflog.Debug(ctx, "UpdateServiceAccount SDK Call Request constructed", map[string]any{"id": saID})
+	_, err := r.client.UpdateServiceAccount(ctx, saID, &apiRequest)
 	if err != nil {
-		if errors.Is(err, ErrNotFound) {
-			resp.Diagnostics.AddError("Service Account Not Found",
-				fmt.Sprintf("Failed to update service account %s because it was not found.", saID))
-		} else {
-			resp.Diagnostics.AddError("Failed to update Service Account",
-				fmt.Sprintf("Error updating service account %s: %s", saID, err.Error()))
-		}
+		resp.Diagnostics.AddError("SDK Client Update Service Account Error", fmt.Sprintf("Failed to update service account ID %s: %s", saID, err.Error()))
 		return
 	}
+
 	tflog.Info(ctx, "Service Account updated successfully via SDK", map[string]any{"id": saID})
 
-	// Update successful. Save the final planned state.
-	// Retain ID from the current state.
-	plan.ID = state.ID
+	plan.ID = types.StringValue(saID)
 
-	tflog.Debug(ctx, "Saving updated Service Account to state", map[string]any{"id": plan.ID.ValueString()})
+	tflog.Info(ctx, "Saving updated service account to state", map[string]any{"id": plan.ID.ValueString()})
 	resp.Diagnostics.Append(resp.State.Set(ctx, &plan)...)
 }
 

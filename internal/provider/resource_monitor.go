@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/groundcover-com/groundcover-sdk-go/pkg/models"
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
@@ -12,7 +13,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/hashicorp/terraform-plugin-log/tflog"
-	// "gopkg.in/yaml.v3" // No longer directly needed here if only NormalizeMonitorYaml uses it
+	"gopkg.in/yaml.v3"
 )
 
 var _ resource.Resource = &monitorResource{}
@@ -95,18 +96,26 @@ func (r *monitorResource) Create(ctx context.Context, req resource.CreateRequest
 
 	monitorYamlBytesForApi := []byte(normalizedApiYaml)
 
-	createResp, err := r.client.CreateMonitorYaml(ctx, monitorYamlBytesForApi)
+	var createReq models.CreateMonitorRequest
+	err = yaml.Unmarshal(monitorYamlBytesForApi, &createReq)
 	if err != nil {
-		resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Unable to create monitor using YAML, got error: %s", err))
+		resp.Diagnostics.AddError("YAML Unmarshal Error", fmt.Sprintf("Unable to unmarshal monitor config into SDK request model: %s. YAML: %s", err.Error(), normalizedApiYaml))
 		return
 	}
 
-	if createResp == nil || createResp.MonitorID == "" {
+	tflog.Debug(ctx, "Creating monitor via SDK with unmarshalled request", map[string]any{"title_from_plan": createReq.Title})
+	apiResp, err := r.client.CreateMonitor(ctx, &createReq)
+	if err != nil {
+		resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Unable to create monitor, got error: %s", err.Error()))
+		return
+	}
+
+	if apiResp == nil || apiResp.MonitorID == "" {
 		resp.Diagnostics.AddError("API Error", "Monitor creation response did not contain a MonitorID")
 		return
 	}
 
-	data.Id = types.StringValue(createResp.MonitorID)
+	data.Id = types.StringValue(apiResp.MonitorID)
 	data.MonitorYaml = types.StringValue(userInputMonitorYaml)
 
 	tflog.Trace(ctx, "Created monitor resource from YAML", map[string]interface{}{"id": data.Id.ValueString()})
@@ -142,6 +151,14 @@ func (r *monitorResource) Read(ctx context.Context, req resource.ReadRequest, re
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
 }
 
+// Helper function to safely dereference a string pointer for logging
+func derefString(s *string) string {
+	if s == nil {
+		return "<nil>"
+	}
+	return *s
+}
+
 func (r *monitorResource) Update(ctx context.Context, req resource.UpdateRequest, resp *resource.UpdateResponse) {
 	var plan monitorResourceModel
 	var state monitorResourceModel
@@ -165,9 +182,17 @@ func (r *monitorResource) Update(ctx context.Context, req resource.UpdateRequest
 
 	monitorYamlBytesForApi := []byte(normalizedApiYaml)
 
-	_, err = r.client.UpdateMonitorYaml(ctx, monitorId, monitorYamlBytesForApi)
+	var updateReq models.UpdateMonitorRequest
+	err = yaml.Unmarshal(monitorYamlBytesForApi, &updateReq)
 	if err != nil {
-		resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Unable to update monitor %s using YAML, got error: %s", monitorId, err))
+		resp.Diagnostics.AddError("YAML Unmarshal Error", fmt.Sprintf("Unable to unmarshal monitor config into SDK update request model: %s. YAML: %s", err.Error(), normalizedApiYaml))
+		return
+	}
+
+	tflog.Debug(ctx, "Updating monitor via SDK with unmarshalled request", map[string]any{"id": monitorId, "title_from_yaml": derefString(updateReq.Title)})
+	err = r.client.UpdateMonitor(ctx, monitorId, &updateReq)
+	if err != nil {
+		resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Unable to update monitor %s, got error: %s", monitorId, err.Error()))
 		return
 	}
 
