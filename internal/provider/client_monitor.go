@@ -27,13 +27,18 @@ func (c *SdkClientWrapper) CreateMonitor(ctx context.Context, monitorReq *models
 		return nil, handleApiError(ctx, err, "CreateMonitor", identifier)
 	}
 
+	if resp == nil {
+		tflog.Error(ctx, "SDK CreateMonitor returned nil response and nil error, which is unexpected.", logFields)
+		return nil, errors.New("internal SDK error: CreateMonitor returned nil response without error")
+	}
+
 	respId := "<nil_or_empty_response>"
-	if resp != nil && resp.Payload != nil && resp.Payload.MonitorID != "" {
+	if resp.Payload != nil && resp.Payload.MonitorID != "" {
 		respId = resp.Payload.MonitorID
-	} else if resp != nil && resp.Payload != nil {
+	} else if resp.Payload != nil {
 		tflog.Warn(ctx, "CreateMonitor response payload contained an empty MonitorID", logFields)
 	} else {
-		tflog.Warn(ctx, "CreateMonitor response or payload was nil", logFields)
+		tflog.Warn(ctx, "CreateMonitor response payload was nil", logFields)
 	}
 
 	tflog.Debug(ctx, "SDK Call Successful: Create Monitor", map[string]any{"id": respId})
@@ -54,13 +59,20 @@ func (c *SdkClientWrapper) GetMonitor(ctx context.Context, id string) ([]byte, e
 		return nil, handleApiError(ctx, err, "GetMonitor", id)
 	}
 
-	if resp != nil && resp.Payload != nil {
-		tflog.Debug(ctx, "SDK GetMonitor Response YAML", map[string]any{"id": id, "yaml_content": string(resp.Payload)})
-	} else {
-		tflog.Warn(ctx, "SDK GetMonitor returned nil response or payload", map[string]any{"id": id})
+	if resp == nil {
+		tflog.Error(ctx, "SDK GetMonitor returned nil response and nil error, which is unexpected.", logFields)
+		return nil, errors.New("internal SDK error: GetMonitor returned nil response without error")
 	}
 
-	tflog.Debug(ctx, "SDK Call Successful: Get Monitor YAML", map[string]any{"id": id, "yaml_length": len(resp.Payload)})
+	var yamlLength int
+
+	if resp.Payload != nil {
+		yamlLength = len(resp.Payload)
+	} else {
+		tflog.Warn(ctx, "SDK GetMonitor returned nil payload", map[string]any{"id": id})
+	}
+
+	tflog.Debug(ctx, "SDK Call Successful: Get Monitor YAML", map[string]any{"id": id, "yaml_length": yamlLength})
 	return resp.Payload, nil
 }
 
