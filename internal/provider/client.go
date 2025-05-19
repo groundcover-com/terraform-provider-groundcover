@@ -19,10 +19,9 @@ import (
 	"github.com/groundcover-com/groundcover-sdk-go/pkg/models"                    // Assuming models are here
 	gcsdk_transport "github.com/groundcover-com/groundcover-sdk-go/pkg/transport" // Aliased to avoid conflict
 
-	"github.com/go-openapi/runtime"
-	apiruntime "github.com/go-openapi/runtime"            // Used for APIError type assertion
-	openapi_client "github.com/go-openapi/runtime/client" // Used for New() and transport debugging
-	"github.com/go-openapi/runtime/logger"                // Used for the logger.Logger interface
+	apiruntime "github.com/go-openapi/runtime"
+	openapi_client "github.com/go-openapi/runtime/client"
+	"github.com/go-openapi/runtime/logger"
 	"github.com/go-openapi/strfmt"
 
 	// Terraform specific imports
@@ -178,7 +177,7 @@ func NewSdkClientWrapper(ctx context.Context, baseURLStr, apiKey, backendID stri
 
 	// Add a consumer for application/x-yaml to handle raw YAML responses.
 	// This will be used if the Content-Type is correctly identified as application/x-yaml (due to our fixer).
-	finalRuntimeTransport.Consumers[yamlContentType] = runtime.ByteStreamConsumer()
+	finalRuntimeTransport.Consumers[yamlContentType] = apiruntime.ByteStreamConsumer()
 
 	// Configure go-openapi to use tflog for its debug messages
 	finalRuntimeTransport.SetLogger(&tflogAdapter{ctx: ctx})
@@ -243,7 +242,7 @@ func handleApiError(ctx context.Context, err error, operation string, resourceId
 
 	if operation == "CreatePolicy" && (statusCode == http.StatusConflict || strings.Contains(lowerErrStr, "conflict")) {
 		tflog.Warn(ctx, "Detected 409 Conflict during CreatePolicy, likely name collision.", logFields)
-		return fmt.Errorf("Policy name '%s' was previously used or is currently in use. Please choose a different name", resourceId)
+		return fmt.Errorf("policy name '%s' was previously used or is currently in use. Please choose a different name", resourceId)
 	}
 
 	if statusCode == http.StatusNotFound {

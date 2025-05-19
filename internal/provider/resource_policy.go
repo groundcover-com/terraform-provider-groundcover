@@ -8,7 +8,6 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/hashicorp/terraform-plugin-framework/attr"
 	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
@@ -21,9 +20,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-log/tflog"
 
 	// SDK Imports
-	"github.com/groundcover-com/groundcover-sdk-go/pkg/models"           // Consolidated to use "models"
-	sdkmodels "github.com/groundcover-com/groundcover-sdk-go/pkg/models" // Policy model types (Policy, DataScope, RoleMap)
-	// Policy request types (CreatePolicyRequest, etc.)
+	"github.com/groundcover-com/groundcover-sdk-go/pkg/models"
 )
 
 // Ensure provider defined types fully satisfy framework interfaces.
@@ -237,7 +234,7 @@ func (r *policyResource) Create(ctx context.Context, req resource.CreateRequest,
 	apiResponse, err := r.client.CreatePolicy(ctx, apiRequest)
 	if err != nil {
 		// Use the specific name from the request in the error message
-		resp.Diagnostics.AddError("SDK Client Create Error", fmt.Sprintf("Failed to create policy '%s': %s", apiRequest.Name, err.Error()))
+		resp.Diagnostics.AddError("SDK Client Create Error", fmt.Sprintf("failed to create policy '%s': %s", *apiRequest.Name, err.Error()))
 		return
 	}
 	tflog.Info(ctx, "Policy created successfully via SDK", map[string]any{"uuid": apiResponse.UUID})
@@ -571,8 +568,8 @@ func mapModelDataScopeToApiDataScope(ctx context.Context, modelDataScope types.O
 			return nil, diags
 		}
 
-		apiSimpleScope := &sdkmodels.Group{ // Use SDK type
-			Operator: sdkmodels.GroupOp(simplePlan.Operator.ValueString()), // Cast to models.GroupOp
+		apiSimpleScope := &models.Group{ // Use SDK type
+			Operator: models.GroupOp(simplePlan.Operator.ValueString()), // Cast to models.GroupOp
 		}
 
 		// Map 'conditions'
@@ -583,9 +580,9 @@ func mapModelDataScopeToApiDataScope(ctx context.Context, modelDataScope types.O
 				return nil, diags
 			}
 
-			apiSimpleScope.Conditions = make([]*sdkmodels.Condition, len(conditionsPlan)) // Slice of pointers
+			apiSimpleScope.Conditions = make([]*models.Condition, len(conditionsPlan)) // Slice of pointers
 			for i, condPlan := range conditionsPlan {
-				apiCondition := &sdkmodels.Condition{ // Correctly assign Key, Origin, Type directly
+				apiCondition := &models.Condition{ // Correctly assign Key, Origin, Type directly
 					Key:    condPlan.Key.ValueString(),
 					Origin: condPlan.Origin.ValueString(),
 					Type:   condPlan.Type.ValueString(),
@@ -600,20 +597,20 @@ func mapModelDataScopeToApiDataScope(ctx context.Context, modelDataScope types.O
 						return nil, diags
 					}
 
-					apiCondition.Filters = make([]*sdkmodels.Filter, len(filtersPlan)) // Slice of pointers
+					apiCondition.Filters = make([]*models.Filter, len(filtersPlan)) // Slice of pointers
 					for j, filterPlan := range filtersPlan {
-						apiCondition.Filters[j] = &sdkmodels.Filter{ // Assign pointer to Filter struct
-							Op:    sdkmodels.Op(filterPlan.Op.ValueString()), // Cast to models.Op
-							Value: filterPlan.Value.ValueString(),            // Assuming Value in SDK Filter is string or interface{}
+						apiCondition.Filters[j] = &models.Filter{ // Assign pointer to Filter struct
+							Op:    models.Op(filterPlan.Op.ValueString()), // Cast to models.Op
+							Value: filterPlan.Value.ValueString(),         // Assuming Value in SDK Filter is string or interface{}
 						}
 					}
 				} else {
-					apiCondition.Filters = make([]*sdkmodels.Filter, 0) // Slice of pointers
+					apiCondition.Filters = make([]*models.Filter, 0) // Slice of pointers
 				}
 				apiSimpleScope.Conditions[i] = apiCondition // apiCondition is already a pointer
 			}
 		} else {
-			apiSimpleScope.Conditions = make([]*sdkmodels.Condition, 0) // Slice of pointers
+			apiSimpleScope.Conditions = make([]*models.Condition, 0) // Slice of pointers
 		}
 		apiDataScope.Simple = apiSimpleScope // Assign pointer
 	}
@@ -643,271 +640,8 @@ func mapPolicyApiResponseToModel(ctx context.Context, apiResponse models.Policy,
 		// diags.AddWarning("API Response Warning", "Policy Name was unexpectedly nil in API response.")
 	}
 
-	// The following fields are NOT in models.Policy, so they cannot be mapped from the response.
-	// They should be preserved from the plan/state if they are part of the Terraform resource schema
-	// and not read back from the API.
-	// state.RevisionNumber = types.Int64Value(int64(apiResponse.RevisionNumber))
-	// state.ReadOnly = types.BoolValue(apiResponse.ReadOnly)
-	// state.Description = types.StringPointerValue(apiResponse.Description)
-	// state.ClaimRole = types.StringPointerValue(apiResponse.ClaimRole)
-	// state.Deprecated = types.BoolValue(apiResponse.Deprecated)
-	// state.IsSystemDefined = types.BoolValue(apiResponse.IsSystemDefined)
-
-	// Role and DataScope are complex objects. If they are part of the TF schema
-	// but not the response, they must be preserved from plan/state.
-	// For example, if state.Role was set from plan, it remains.
-
-	// roleMapValue, roleDiags := types.MapValueFrom(ctx, types.StringType, apiResponse.Role)
-	// diags.Append(roleDiags...)
-	// if diags.HasError() {
-	// 	tflog.Error(ctx, "Failed to map Role from SDK response", map[string]any{"uuid": apiResponse.UUID})
-	// 	return diags
-	// }
-	// state.Role = roleMapValue
-
-	// dataScopeValue, dsDiags := mapApiResponseDataScopeToState(ctx, &apiResponse.DataScope)
-	// diags.Append(dsDiags...)
-	// if diags.HasError() {
-	// 	tflog.Error(ctx, "Failed to map DataScope from SDK response", map[string]any{"uuid": apiResponse.UUID})
-	// 	return diags
-	// }
-	// state.DataScope = dataScopeValue
-
 	tflog.Debug(ctx, "Successfully mapped available SDK response fields (UUID, Name) to Terraform model", map[string]any{"uuid": apiResponse.UUID})
 	return diags
-}
-
-// mapApiResponseDataScopeToState converts the *sdkmodels.DataScope from an API response
-// back into the Terraform state object type (types.Object).
-func mapApiResponseDataScopeToState(ctx context.Context, apiDataScope *models.DataScope) (types.Object, diag.Diagnostics) {
-	var diags diag.Diagnostics
-
-	// Get the target attribute types for the top-level data_scope block
-	dataScopeAttrTypes := dataScopeModel{}.attrTypes()
-	tflog.Debug(ctx, "Mapping DataScope from SDK response to state object")
-
-	// If apiDataScope is nil or has no actual scope defined (e.g., Simple is nil), return null object.
-	if apiDataScope == nil || apiDataScope.Simple == nil /* && apiDataScope.Advanced == nil */ {
-		tflog.Debug(ctx, "SDK DataScope is nil or has no defined scope (Simple is nil), returning null object")
-		return types.ObjectNull(dataScopeAttrTypes), diags
-	}
-
-	// --- Map Simple Scope ---
-	var simpleScopeObj attr.Value = types.ObjectNull(dataScopeAttrTypes["simple"].(types.ObjectType).AttrTypes) // Default to null
-	var simpleScopeDiags diag.Diagnostics
-
-	if apiDataScope.Simple != nil {
-		tflog.Debug(ctx, "Mapping Simple scope from SDK response")
-		apiSimpleScope := apiDataScope.Simple // apiSimpleScope is *sdkmodels.Group
-		// Get target attribute types for the simple scope block
-		simpleAttrTypes := simpleDataScopeModel{}.attrTypes()
-		// Get target attribute types for nested lists/objects
-		conditionAttrTypes := conditionModel{}.attrTypes()
-		filtersAttrTypes := filtersModel{}.attrTypes()
-
-		// Build the conditions list first
-		// Pass apiSimpleScope.Conditions directly as it's []*sdkmodels.Condition
-		conditionsList, condDiags := buildConditionsListFromApi(ctx, apiSimpleScope.Conditions, filtersAttrTypes, conditionAttrTypes)
-		diags.Append(condDiags...)
-		if diags.HasError() {
-			tflog.Error(ctx, "Failed to build conditions list from SDK response")
-			// Return null for the entire data_scope if conditions fail
-			return types.ObjectNull(dataScopeAttrTypes), diags
-		}
-
-		// Build the simple scope object itself
-		simpleScopeObj, simpleScopeDiags = types.ObjectValue(simpleAttrTypes, map[string]attr.Value{
-			"operator":   types.StringValue(string(apiSimpleScope.Operator)), // Cast models.GroupOp to string
-			"conditions": conditionsList,
-		})
-		diags.Append(simpleScopeDiags...)
-		if diags.HasError() {
-			tflog.Error(ctx, "Failed to build simple scope object from SDK response")
-			// Return null for the entire data_scope if simple scope fails
-			return types.ObjectNull(dataScopeAttrTypes), diags
-		}
-		tflog.Debug(ctx, "Successfully built simple scope object")
-	}
-
-	// --- Map Advanced Scope (Placeholder) ---
-	// var advancedScopeObj attr.Value = types.ObjectNull(...) // Assuming schema exists
-	// if apiDataScope.Advanced != nil { ... }
-
-	// --- Build final data_scope object ---
-	dataScopeAttrMap := map[string]attr.Value{
-		"simple": simpleScopeObj,
-		// "advanced": advancedScopeObj,
-	}
-
-	dataScopeObj, objDiags := types.ObjectValue(dataScopeAttrTypes, dataScopeAttrMap)
-	diags.Append(objDiags...)
-	if diags.HasError() {
-		tflog.Error(ctx, "Failed to build final data scope object from SDK response")
-		return types.ObjectNull(dataScopeAttrTypes), diags
-	}
-
-	tflog.Debug(ctx, "Successfully mapped DataScope from SDK response to state object")
-	return dataScopeObj, diags
-}
-
-func buildConditionsListFromApi(ctx context.Context, apiConditions []*sdkmodels.Condition, filtersAttrTypes map[string]attr.Type, conditionAttrTypes map[string]attr.Type) (types.List, diag.Diagnostics) { // Changed to accept []*sdkmodels.Condition
-	var diags diag.Diagnostics
-	var conditionsObjList []attr.Value
-
-	// Define element type for the conditions list
-	conditionsElemType := types.ObjectType{AttrTypes: conditionAttrTypes}
-
-	// Get the element type for the nested filters list
-	filtersListType := conditionAttrTypes["filters"].(types.ListType)
-	filtersElemType := filtersListType.ElemType.(types.ObjectType)
-
-	tflog.Debug(ctx, "Building conditions list from SDK response", map[string]any{"count": len(apiConditions)})
-
-	if len(apiConditions) == 0 {
-		tflog.Debug(ctx, "No conditions in SDK response, returning empty list")
-		return types.ListValueMust(conditionsElemType, []attr.Value{}), diags
-	}
-
-	conditionsObjList = make([]attr.Value, 0, len(apiConditions))
-	for i, apiCondition := range apiConditions {
-		if apiCondition == nil { // Nil check for individual condition pointer
-			continue
-		}
-		tflog.Debug(ctx, "Processing SDK condition", map[string]any{
-			"index":        i,
-			"key":          apiCondition.Key,
-			"origin":       apiCondition.Origin,
-			"type":         apiCondition.Type,
-			"filtersCount": len(apiCondition.Filters),
-		})
-
-		// Build the filters list for this condition
-		var filtersList types.List
-		var filtersListDiags diag.Diagnostics
-		if len(apiCondition.Filters) > 0 {
-			filtersObjList := make([]attr.Value, 0, len(apiCondition.Filters))
-			for j, apiFilter := range apiCondition.Filters {
-				if apiFilter == nil { // Nil check for individual filter pointer
-					continue
-				}
-				tflog.Debug(ctx, "Processing SDK filter", map[string]any{
-					"conditionIndex": i,
-					"filterIndex":    j,
-					"op":             apiFilter.Op,
-					"value":          fmt.Sprintf("%v (%T)", apiFilter.Value, apiFilter.Value),
-				})
-
-				filterValueStr, ok := apiFilter.Value.(string)
-				if !ok {
-					// If Value is not string, it might be another type or nil.
-					// For simplicity, if it's not string, treat as error or handle specific types.
-					// For now, error out if not string. SDK model says `interface{}` for Filter.Value
-					diags.AddError("Filter Value Type Error", fmt.Sprintf("Filter value at condition index %d, filter index %d is not a string (type: %T). SDK Value: %v", i, j, apiFilter.Value, apiFilter.Value))
-					return types.ListNull(conditionsElemType), diags
-				}
-
-				filterObj, fDiags := types.ObjectValue(filtersAttrTypes, map[string]attr.Value{
-					"op":    types.StringValue(string(apiFilter.Op)), // Cast models.Op to string
-					"value": types.StringValue(filterValueStr),
-				})
-				diags.Append(fDiags...)
-				if diags.HasError() {
-					tflog.Error(ctx, "Failed to convert SDK filter to object", map[string]any{"conditionIndex": i, "filterIndex": j})
-					return types.ListNull(conditionsElemType), diags // Stop early
-				}
-				filtersObjList = append(filtersObjList, filterObj)
-			}
-
-			// Create the filters list using the determined element type
-			filtersList, filtersListDiags = types.ListValue(filtersElemType, filtersObjList)
-			diags.Append(filtersListDiags...)
-			if diags.HasError() {
-				tflog.Error(ctx, "Failed to create filters list from SDK response", map[string]any{"conditionIndex": i})
-				return types.ListNull(conditionsElemType), diags // Stop early
-			}
-		} else {
-			// Create an empty list with the correct element type
-			filtersList = types.ListValueMust(filtersElemType, []attr.Value{})
-		}
-
-		// Build the condition object using the specific conditionAttrTypes
-		conditionAttrMap := map[string]attr.Value{
-			"key":     types.StringValue(apiCondition.Key),
-			"origin":  types.StringValue(apiCondition.Origin),
-			"type":    types.StringValue(apiCondition.Type),
-			"filters": filtersList, // Assign the created list
-		}
-
-		conditionObj, cDiags := types.ObjectValue(conditionAttrTypes, conditionAttrMap)
-		diags.Append(cDiags...)
-		if diags.HasError() {
-			tflog.Error(ctx, "Failed to convert SDK condition to object", map[string]any{"conditionIndex": i})
-			return types.ListNull(conditionsElemType), diags // Stop early
-		}
-
-		tflog.Debug(ctx, "Successfully created condition object from SDK", map[string]any{"index": i})
-		conditionsObjList = append(conditionsObjList, conditionObj)
-	}
-
-	// Create the final conditions list
-	tflog.Debug(ctx, "Creating final conditions list from SDK response", map[string]any{"count": len(conditionsObjList)})
-	finalConditionsList, clistDiags := types.ListValue(conditionsElemType, conditionsObjList)
-	diags.Append(clistDiags...)
-
-	if diags.HasError() {
-		tflog.Error(ctx, "Failed to create final conditions list from SDK response")
-		return types.ListNull(conditionsElemType), diags
-	}
-
-	tflog.Debug(ctx, "Successfully created conditions list from SDK response")
-	return finalConditionsList, diags
-}
-
-// attrTypes returns attribute types for filtersModel
-func (m filtersModel) attrTypes() map[string]attr.Type {
-	return map[string]attr.Type{
-		"op":    types.StringType,
-		"value": types.StringType,
-	}
-}
-
-// attrTypes returns attribute types for conditionModel
-func (m conditionModel) attrTypes() map[string]attr.Type {
-	filterType := types.ObjectType{
-		AttrTypes: filtersModel{}.attrTypes(),
-	}
-
-	return map[string]attr.Type{
-		"key":    types.StringType,
-		"origin": types.StringType,
-		"type":   types.StringType,
-		"filters": types.ListType{
-			ElemType: filterType,
-		},
-	}
-}
-
-// attrTypes returns attribute types for simpleDataScopeModel
-func (m simpleDataScopeModel) attrTypes() map[string]attr.Type {
-	conditionType := types.ObjectType{
-		AttrTypes: conditionModel{}.attrTypes(),
-	}
-
-	return map[string]attr.Type{
-		"operator": types.StringType,
-		"conditions": types.ListType{
-			ElemType: conditionType,
-		},
-	}
-}
-
-// attrTypes returns attribute types for dataScopeModel
-func (m dataScopeModel) attrTypes() map[string]attr.Type {
-	return map[string]attr.Type{
-		"simple": types.ObjectType{
-			AttrTypes: simpleDataScopeModel{}.attrTypes(),
-		},
-	}
 }
 
 // Temporarily remove ImportState until fully implemented.
