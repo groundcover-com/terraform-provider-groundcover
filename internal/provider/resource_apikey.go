@@ -386,10 +386,10 @@ func (r *apiKeyResource) readApiKey(ctx context.Context, state *apiKeyResourceMo
 			continue
 		}
 		var policyNameValue types.String
-		if p.Name == nil {
+		if p.Name == "" {
 			policyNameValue = types.StringNull()
 		} else {
-			policyNameValue = types.StringValue(*p.Name)
+			policyNameValue = types.StringValue(p.Name)
 		}
 
 		policyAttrs := map[string]attr.Value{
