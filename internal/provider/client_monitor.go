@@ -4,16 +4,12 @@ import (
 	"context"
 	"errors"
 
-	// Updated SDK imports
 	"github.com/groundcover-com/groundcover-sdk-go/pkg/client/monitors"
 	"github.com/groundcover-com/groundcover-sdk-go/pkg/models"
 	"github.com/hashicorp/terraform-plugin-log/tflog"
 )
 
-// CreateMonitor now takes *models.CreateMonitorRequest and returns *models.CreateMonitorResponse (which contains the ID)
-// The provider will be responsible for unmarshaling YAML into models.CreateMonitorRequest before calling this.
 func (c *SdkClientWrapper) CreateMonitor(ctx context.Context, monitorReq *models.CreateMonitorRequest) (*models.CreateMonitorResponse, error) {
-	// The identifier for logging might need to come from monitorReq.Title or similar, assuming it's set.
 	identifier := "<unknown_monitor>"
 	if monitorReq != nil && monitorReq.Title != nil {
 		identifier = *monitorReq.Title
@@ -23,10 +19,9 @@ func (c *SdkClientWrapper) CreateMonitor(ctx context.Context, monitorReq *models
 
 	params := monitors.NewCreateMonitorParams().
 		WithContext(ctx).
-		WithTimeout(defaultTimeout). // Using defaultTimeout from client.go
-		WithBody(monitorReq)         // SDK will marshal this to YAML if Content-Type is application/x-yaml
+		WithTimeout(defaultTimeout).
+		WithBody(monitorReq)
 
-	// We must use WithContentTypeApplicationxYaml client option for the SDK to send YAML
 	resp, err := c.sdkClient.Monitors.CreateMonitor(params, nil, monitors.WithContentTypeApplicationxYaml)
 	if err != nil {
 		return nil, handleApiError(ctx, err, "CreateMonitor", identifier)
@@ -45,7 +40,6 @@ func (c *SdkClientWrapper) CreateMonitor(ctx context.Context, monitorReq *models
 	return resp.Payload, nil
 }
 
-// GetMonitor returns raw YAML bytes ([]byte)
 func (c *SdkClientWrapper) GetMonitor(ctx context.Context, id string) ([]byte, error) {
 	logFields := map[string]any{"id": id}
 	tflog.Debug(ctx, "Executing SDK Call: Get Monitor YAML", logFields)
@@ -55,14 +49,11 @@ func (c *SdkClientWrapper) GetMonitor(ctx context.Context, id string) ([]byte, e
 		WithTimeout(defaultTimeout).
 		WithID(id)
 
-	// GetMonitor in SDK produces "application/x-yaml"
-	// Revert to not explicitly setting Accept header, to match E2E test behavior.
 	resp, err := c.sdkClient.Monitors.GetMonitor(params, nil)
 	if err != nil {
 		return nil, handleApiError(ctx, err, "GetMonitor", id)
 	}
 
-	// Log the raw YAML response for debugging
 	if resp != nil && resp.Payload != nil {
 		tflog.Debug(ctx, "SDK GetMonitor Response YAML", map[string]any{"id": id, "yaml_content": string(resp.Payload)})
 	} else {
@@ -70,11 +61,9 @@ func (c *SdkClientWrapper) GetMonitor(ctx context.Context, id string) ([]byte, e
 	}
 
 	tflog.Debug(ctx, "SDK Call Successful: Get Monitor YAML", map[string]any{"id": id, "yaml_length": len(resp.Payload)})
-	return resp.Payload, nil // resp.Payload is []uint8
+	return resp.Payload, nil
 }
 
-// UpdateMonitor now takes *models.UpdateMonitorRequest and returns error (UpdateMonitorAccepted has no payload)
-// The provider will be responsible for unmarshaling YAML into models.UpdateMonitorRequest.
 func (c *SdkClientWrapper) UpdateMonitor(ctx context.Context, id string, monitorReq *models.UpdateMonitorRequest) error {
 	identifier := "<unknown_monitor>"
 	if monitorReq != nil && monitorReq.Title != nil {
@@ -87,9 +76,8 @@ func (c *SdkClientWrapper) UpdateMonitor(ctx context.Context, id string, monitor
 		WithContext(ctx).
 		WithTimeout(defaultTimeout).
 		WithID(id).
-		WithBody(monitorReq) // SDK will marshal this to YAML if Content-Type is application/x-yaml
+		WithBody(monitorReq)
 
-	// We must use WithContentTypeApplicationxYaml client option for the SDK to send YAML
 	_, err := c.sdkClient.Monitors.UpdateMonitor(params, nil, monitors.WithContentTypeApplicationxYaml)
 	if err != nil {
 		return handleApiError(ctx, err, "UpdateMonitor", id)
@@ -108,12 +96,12 @@ func (c *SdkClientWrapper) DeleteMonitor(ctx context.Context, id string) error {
 		WithTimeout(defaultTimeout).
 		WithID(id)
 
-	_, err := c.sdkClient.Monitors.DeleteMonitor(params, nil) // DeleteMonitorOK has an empty payload
+	_, err := c.sdkClient.Monitors.DeleteMonitor(params, nil)
 	if err != nil {
 		mappedErr := handleApiError(ctx, err, "DeleteMonitor", id)
 		if errors.Is(mappedErr, ErrNotFound) {
 			tflog.Warn(ctx, "SDK Call Result: Monitor Not Found during Delete (Idempotent Success)", logFields)
-			return nil // Treat NotFound as success
+			return nil
 		}
 		return mappedErr
 	}

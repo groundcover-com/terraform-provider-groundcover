@@ -5,14 +5,12 @@ import (
 	"errors"
 	"fmt"
 
-	// Updated SDK imports
 	"github.com/groundcover-com/groundcover-sdk-go/pkg/client/serviceaccounts"
 	"github.com/groundcover-com/groundcover-sdk-go/pkg/models"
 
 	"github.com/hashicorp/terraform-plugin-log/tflog"
 )
 
-// CreateServiceAccount now takes *models.CreateServiceAccountRequest and returns *models.ServiceAccountCreatePayload (which contains the ID)
 func (c *SdkClientWrapper) CreateServiceAccount(ctx context.Context, saReq *models.CreateServiceAccountRequest) (*models.ServiceAccountCreatePayload, error) {
 	identifier := "<unknown>"
 	if saReq.Name != nil {
@@ -23,7 +21,7 @@ func (c *SdkClientWrapper) CreateServiceAccount(ctx context.Context, saReq *mode
 
 	params := serviceaccounts.NewCreateServiceAccountParams().
 		WithContext(ctx).
-		WithTimeout(defaultTimeout). // Using defaultTimeout from client.go
+		WithTimeout(defaultTimeout).
 		WithBody(saReq)
 
 	resp, err := c.sdkClient.Serviceaccounts.CreateServiceAccount(params, nil)
@@ -43,7 +41,6 @@ func (c *SdkClientWrapper) CreateServiceAccount(ctx context.Context, saReq *mode
 	return resp.Payload, nil
 }
 
-// ListServiceAccounts now returns []*models.ServiceAccountsWithPolicy
 func (c *SdkClientWrapper) ListServiceAccounts(ctx context.Context) ([]*models.ServiceAccountsWithPolicy, error) {
 	tflog.Debug(ctx, "Executing SDK Call: List Service Accounts")
 
@@ -60,11 +57,7 @@ func (c *SdkClientWrapper) ListServiceAccounts(ctx context.Context) ([]*models.S
 	return resp.Payload, nil
 }
 
-// UpdateServiceAccount now takes *models.UpdateServiceAccountRequest. The ID for update is part of the request body.
-// It returns *models.ServiceAccountsWithPolicy (assuming UpdateServiceAccountOK.Payload is this type)
 func (c *SdkClientWrapper) UpdateServiceAccount(ctx context.Context, id string, saReq *models.UpdateServiceAccountRequest) (*models.ServiceAccountsWithPolicy, error) {
-	// Ensure the ID in the request body matches the ID parameter, or set it if not already.
-	// The SDK expects ServiceAccountID in the request body for updates.
 	if saReq.ServiceAccountID == nil || *saReq.ServiceAccountID == "" {
 		saReq.ServiceAccountID = &id
 	} else if *saReq.ServiceAccountID != id {
@@ -85,12 +78,9 @@ func (c *SdkClientWrapper) UpdateServiceAccount(ctx context.Context, id string, 
 	}
 
 	tflog.Debug(ctx, "SDK Call Successful: Update Service Account", logFields)
-	// The update response only contains the ID.
-	// The ApiClient interface expects *models.ServiceAccountsWithPolicy.
-	// We need to fetch the service account again to get the full details.
 
 	tflog.Debug(ctx, "Re-fetching service account after update to return full details", logFields)
-	saList, err := c.ListServiceAccounts(ctx) // Use existing List method
+	saList, err := c.ListServiceAccounts(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("failed to list service accounts after update for ID %s: %w", id, err)
 	}
@@ -103,9 +93,6 @@ func (c *SdkClientWrapper) UpdateServiceAccount(ctx context.Context, id string, 
 	}
 
 	tflog.Warn(ctx, "Updated service account not found in list after update", map[string]any{"id": id})
-	// This case is problematic. The update succeeded but we can't find the SA to return it as per interface.
-	// Returning an error here might be misleading if the update itself was fine.
-	// For now, return nil and an error indicating it wasn't found post-update.
 	return nil, fmt.Errorf("service account with ID '%s' updated but not found in subsequent list operation", id)
 }
 
@@ -118,12 +105,12 @@ func (c *SdkClientWrapper) DeleteServiceAccount(ctx context.Context, id string) 
 		WithTimeout(defaultTimeout).
 		WithID(id)
 
-	_, err := c.sdkClient.Serviceaccounts.DeleteServiceAccount(params, nil) // DeleteServiceAccountAccepted has empty payload
+	_, err := c.sdkClient.Serviceaccounts.DeleteServiceAccount(params, nil)
 	if err != nil {
 		mappedErr := handleApiError(ctx, err, "DeleteServiceAccount", id)
 		if errors.Is(mappedErr, ErrNotFound) {
 			tflog.Warn(ctx, "SDK Call Result: Service Account Not Found during Delete (Idempotent Success)", logFields)
-			return nil // Treat NotFound as success
+			return nil
 		}
 		return mappedErr
 	}

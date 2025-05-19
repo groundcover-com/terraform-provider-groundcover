@@ -13,7 +13,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/hashicorp/terraform-plugin-log/tflog"
-	"gopkg.in/yaml.v3" // Added for YAML unmarshalling
+	"gopkg.in/yaml.v3"
 )
 
 var _ resource.Resource = &monitorResource{}

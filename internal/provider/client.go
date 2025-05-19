@@ -34,12 +34,10 @@ type tflogAdapter struct {
 	ctx context.Context
 }
 
-// Printf implements the logger.Logger interface for go-openapi.
 func (tla *tflogAdapter) Printf(format string, args ...interface{}) {
 	tflog.Debug(tla.ctx, fmt.Sprintf(format, args...), map[string]interface{}{"library": "go-openapi", "level": "printf"})
 }
 
-// Debugf implements the logger.Logger interface for go-openapi.
 func (tla *tflogAdapter) Debugf(format string, args ...interface{}) {
 	tflog.Debug(tla.ctx, fmt.Sprintf(format, args...), map[string]interface{}{"library": "go-openapi", "level": "debugf"})
 }
@@ -62,8 +60,6 @@ const (
 )
 
 // ApiClient defines the interface for interacting with the Groundcover API for Terraform resources.
-// NOTE: The request and response types (e.g., policies.CreatePolicyRequest) will need to be updated
-// to use the new SDK's models. This will be done in subsequent steps.
 type ApiClient interface {
 	// Policies
 	CreatePolicy(ctx context.Context, req *models.CreatePolicyRequest) (*models.Policy, error)
@@ -96,7 +92,6 @@ type SdkClientWrapper struct {
 
 var _ ApiClient = (*SdkClientWrapper)(nil)
 
-// Matches /api/monitors/{id} or /api/monitors/{id}/
 var getMonitorPathRegex = regexp.MustCompile(`^/api/monitors/[^/]+/?$`)
 
 // fixMonitorContentTypeTransport wraps an http.RoundTripper to ensure that
@@ -104,7 +99,6 @@ var getMonitorPathRegex = regexp.MustCompile(`^/api/monitors/[^/]+/?$`)
 // Content-Type header set to "application/x-yaml".
 type fixMonitorContentTypeTransport struct {
 	transport http.RoundTripper
-	// ctx context.Context // Omitting dedicated context/logging for the fixer itself for now
 }
 
 func (f *fixMonitorContentTypeTransport) RoundTrip(req *http.Request) (*http.Response, error) {
@@ -113,12 +107,9 @@ func (f *fixMonitorContentTypeTransport) RoundTrip(req *http.Request) (*http.Res
 		return nil, err
 	}
 
-	// Check if this is the response we need to potentially fix
 	if req.Method == http.MethodGet && resp.StatusCode == http.StatusOK && getMonitorPathRegex.MatchString(req.URL.Path) {
 		currentContentType := resp.Header.Get("Content-Type")
-		// Only fix if Content-Type is missing or not already application/x-yaml (or a variant like with charset)
 		if currentContentType == "" || !strings.HasPrefix(currentContentType, yamlContentType) {
-			// The go-openapi debug logs (enabled further down) should show the effect of this change.
 			resp.Header.Set("Content-Type", yamlContentType)
 		}
 	}
@@ -126,7 +117,6 @@ func (f *fixMonitorContentTypeTransport) RoundTrip(req *http.Request) (*http.Res
 	return resp, nil
 }
 
-// NewSdkClientWrapper creates a new API client wrapper using the new SDK v1.1.0 initialization.
 func NewSdkClientWrapper(ctx context.Context, baseURLStr, apiKey, backendID string) (ApiClient, error) {
 	if baseURLStr == "" {
 		return nil, errors.New("GC_BASE_URL (api_url) environment variable or provider config is required")
@@ -147,7 +137,7 @@ func NewSdkClientWrapper(ctx context.Context, baseURLStr, apiKey, backendID stri
 
 	host := parsedURL.Host
 	basePath := parsedURL.Path
-	if basePath == "" || basePath == "/" { // DefaultBasePath is often "/"
+	if basePath == "" || basePath == "/" {
 		basePath = goclient.DefaultBasePath
 	}
 	if !strings.HasPrefix(basePath, "/") && basePath != "" {
@@ -159,12 +149,10 @@ func NewSdkClientWrapper(ctx context.Context, baseURLStr, apiKey, backendID stri
 		schemes = goclient.DefaultSchemes
 	}
 
-	// 1. Base HTTP Transport
 	baseHttpTransport := &http.Transport{
 		Proxy: http.ProxyFromEnvironment,
 	}
 
-	// 2. Custom SDK Transport (handles auth, Gzip, retries)
 	retryableStatuses := []int{
 		http.StatusServiceUnavailable,
 		http.StatusTooManyRequests,
@@ -181,13 +169,10 @@ func NewSdkClientWrapper(ctx context.Context, baseURLStr, apiKey, backendID stri
 		retryableStatuses,
 	)
 
-	// Wrap the SDK transport with our Content-Type fixer for monitors
 	monitorContentTypeFixer := &fixMonitorContentTypeTransport{
 		transport: sdkTransportWrapper,
 	}
 
-	// 3. Final OpenAPI Runtime Transport (from go-openapi/runtime/client)
-	// This transport will use our custom-chained transport (monitorContentTypeFixer).
 	finalRuntimeTransport := openapi_client.New(host, basePath, schemes)
 	finalRuntimeTransport.Transport = monitorContentTypeFixer // Inject our fixer here
 
@@ -199,7 +184,6 @@ func NewSdkClientWrapper(ctx context.Context, baseURLStr, apiKey, backendID stri
 	finalRuntimeTransport.SetLogger(&tflogAdapter{ctx: ctx})
 	finalRuntimeTransport.SetDebug(true)
 
-	// --- Client Initialization ---
 	newSdkClient := goclient.New(finalRuntimeTransport, strfmt.Default)
 
 	return &SdkClientWrapper{sdkClient: newSdkClient}, nil
@@ -210,7 +194,6 @@ var statusCodeRegex = regexp.MustCompile(`status code (\d+)`)
 
 // handleApiError maps SDK error strings to standard provider errors (ErrNotFound, etc.)
 // or returns a wrapped generic error if no specific mapping applies.
-// This function will likely need significant updates once we see the new error types from the SDK.
 func handleApiError(ctx context.Context, err error, operation string, resourceId string) error {
 	if err == nil {
 		return nil
@@ -239,8 +222,7 @@ func handleApiError(ctx context.Context, err error, operation string, resourceId
 			tflog.Warn(ctx, "Failed to parse status code from SDK error string via regex", logFields)
 		}
 	} else {
-		// Attempt to check for openapi/runtime.APIError if direct regex fails
-		var apiErr *apiruntime.APIError // Use the apiruntime alias for github.com/go-openapi/runtime
+		var apiErr *apiruntime.APIError
 		if errors.As(err, &apiErr) {
 			statusCode = apiErr.Code
 			logFields["extracted_status_code_runtime_api_error"] = statusCode

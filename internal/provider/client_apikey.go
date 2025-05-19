@@ -4,24 +4,20 @@ import (
 	"context"
 	"fmt"
 
-	// Updated SDK imports
-	"github.com/groundcover-com/groundcover-sdk-go/pkg/client/apikeys" // For params and service client
-	"github.com/groundcover-com/groundcover-sdk-go/pkg/models"         // For request/response body models
+	"github.com/groundcover-com/groundcover-sdk-go/pkg/client/apikeys"
+	"github.com/groundcover-com/groundcover-sdk-go/pkg/models"
 
 	"github.com/hashicorp/terraform-plugin-log/tflog"
 )
 
 // --- API Key Methods ---
 
-// CreateApiKey now takes *models.CreateAPIKeyRequest as input and returns *models.CreateAPIKeyResponse as output
 func (c *SdkClientWrapper) CreateApiKey(ctx context.Context, apiKeyReq *models.CreateAPIKeyRequest) (*models.CreateAPIKeyResponse, error) {
-	// Ensure apiKeyReq.Name is not nil before dereferencing
 	var name string
 	if apiKeyReq != nil && apiKeyReq.Name != nil {
 		name = *apiKeyReq.Name
 	} else {
 		name = "<unknown_apikey_name>"
-		// Potentially return an error or handle if Name is mandatory and nil
 		tflog.Warn(ctx, "CreateApiKey called with nil apiKeyReq or nil Name")
 	}
 	logFields := map[string]any{"name": name}
@@ -43,7 +39,6 @@ func (c *SdkClientWrapper) CreateApiKey(ctx context.Context, apiKeyReq *models.C
 	return resp.Payload, nil
 }
 
-// ListApiKeys now returns []*models.ListAPIKeysResponseItem
 func (c *SdkClientWrapper) ListApiKeys(ctx context.Context, withRevoked *bool, withExpired *bool) ([]*models.ListAPIKeysResponseItem, error) {
 	tflog.Debug(ctx, "Executing SDK Call: List API Keys", map[string]any{"withRevoked": withRevoked, "withExpired": withExpired})
 
@@ -62,7 +57,6 @@ func (c *SdkClientWrapper) ListApiKeys(ctx context.Context, withRevoked *bool, w
 	return resp.Payload, nil
 }
 
-// DeleteApiKey - Note: Method name in interface is DeleteApiKey, SDK might be DeleteAPIKey
 func (c *SdkClientWrapper) DeleteApiKey(ctx context.Context, id string) error {
 	tflog.Debug(ctx, "Executing SDK Call: Delete API Key", map[string]any{"id": id})
 
