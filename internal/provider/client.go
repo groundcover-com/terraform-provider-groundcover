@@ -59,16 +59,6 @@ const (
 	yamlContentType   = "application/x-yaml" // Added for consistency
 )
 
-// ConfigEntry represents a configuration entry in the groundcover system
-type ConfigEntry struct {
-	ID          string `json:"id,omitempty"`
-	Key         string `json:"key"`
-	Value       string `json:"value"`
-	Description string `json:"description,omitempty"`
-	CreatedAt   string `json:"createdAt,omitempty"`
-	UpdatedAt   string `json:"updatedAt,omitempty"`
-}
-
 // ApiClient defines the interface for interacting with the Groundcover API for Terraform resources.
 type ApiClient interface {
 	// Policies
