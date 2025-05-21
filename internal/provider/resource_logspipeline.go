@@ -158,7 +158,7 @@ func (r *logsPipelineResource) Update(ctx context.Context, req resource.UpdateRe
 		return
 	}
 
-	tflog.Debug(ctx, fmt.Sprintf("Updating LogsPipeline"))
+	tflog.Debug(ctx, "Updating LogsPipeline")
 
 	// Unmarshal to SDK type
 	updateReq := &models.CreateOrUpdateConfigRequest{
@@ -197,7 +197,7 @@ func (r *logsPipelineResource) Delete(ctx context.Context, req resource.DeleteRe
 		return
 	}
 
-	tflog.Debug(ctx, fmt.Sprintf("Deleting LogsPipeline resource"))
+	tflog.Debug(ctx, "Deleting LogsPipeline resource")
 
 	// Call API client to delete the logs pipeline
 	err := r.client.DeleteLogsPipeline(ctx)
@@ -209,7 +209,7 @@ func (r *logsPipelineResource) Delete(ctx context.Context, req resource.DeleteRe
 		return
 	}
 
-	tflog.Debug(ctx, fmt.Sprintf("Successfully deleted LogsPipeline resource"))
+	tflog.Debug(ctx, "Successfully deleted LogsPipeline resource")
 }
 
 func (r *logsPipelineResource) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {
