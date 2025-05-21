@@ -213,5 +213,20 @@ func (r *logsPipelineResource) Delete(ctx context.Context, req resource.DeleteRe
 }
 
 func (r *logsPipelineResource) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {
-	resource.ImportStatePassthroughID(ctx, path.Root(""), req, resp)
+	// For singleton resources, we don't need the ID for lookups
+	// But we need to implement a custom import rather than using ImportStatePassthroughID
+
+	// Fetch the current resource
+	configEntry, err := r.client.GetLogsPipeline(ctx)
+	if err != nil {
+		resp.Diagnostics.AddError(
+			"Error Importing LogsPipeline",
+			fmt.Sprintf("Could not import LogsPipeline: %s", err.Error()),
+		)
+		return
+	}
+
+	// Set the required attributes
+	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("value"), configEntry.Value)...)
+	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("updated_at"), configEntry.CreatedTimestamp.String())...)
 }
