@@ -33,22 +33,11 @@ variable "groundcover_org_name" {
 resource "groundcover_logspipeline" "example" {
   value = <<-EOT
 ottlRules:
-  - ruleName: extract-kubernetes-metadata
+  - ruleName: example-rule
     conditions:
-      - resource.attributes["k8s.pod.name"] != nil
-    conditionLogicOperator: and
+      - container_name == "nginx"
     statements:
-      - set(resource.attributes["service.name"], resource.attributes["k8s.pod.name"])
-      - set(resource.attributes["service.namespace"], resource.attributes["k8s.namespace.name"])
-    statementsErrorMode: ignore
-
-  - ruleName: extract-container-name
-    conditions:
-      - resource.attributes["container.name"] != nil
-    conditionLogicOperator: and
-    statements:
-      - set(resource.attributes["service.instance.id"], resource.attributes["container.name"]) 
-    statementsErrorMode: ignore
+      - set(attributes["test.key"], "test-value")
 EOT
 }
 
