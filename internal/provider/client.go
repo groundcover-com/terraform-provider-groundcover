@@ -59,6 +59,16 @@ const (
 	yamlContentType   = "application/x-yaml" // Added for consistency
 )
 
+// ConfigEntry represents a configuration entry in the groundcover system
+type ConfigEntry struct {
+	ID          string `json:"id,omitempty"`
+	Key         string `json:"key"`
+	Value       string `json:"value"`
+	Description string `json:"description,omitempty"`
+	CreatedAt   string `json:"createdAt,omitempty"`
+	UpdatedAt   string `json:"updatedAt,omitempty"`
+}
+
 // ApiClient defines the interface for interacting with the Groundcover API for Terraform resources.
 type ApiClient interface {
 	// Policies
@@ -83,6 +93,12 @@ type ApiClient interface {
 	CreateApiKey(ctx context.Context, req *models.CreateAPIKeyRequest) (*models.CreateAPIKeyResponse, error)
 	ListApiKeys(ctx context.Context, withRevoked *bool, withExpired *bool) ([]*models.ListAPIKeysResponseItem, error)
 	DeleteApiKey(ctx context.Context, id string) error
+
+	// Logs Pipeline
+	CreateLogsPipeline(ctx context.Context, config *ConfigEntry) (*ConfigEntry, error)
+	GetLogsPipeline(ctx context.Context, key string) (*ConfigEntry, error)
+	UpdateLogsPipeline(ctx context.Context, config *ConfigEntry) (*ConfigEntry, error)
+	DeleteLogsPipeline(ctx context.Context, key string) error
 }
 
 // SdkClientWrapper implements ApiClient using the Groundcover Go SDK.
