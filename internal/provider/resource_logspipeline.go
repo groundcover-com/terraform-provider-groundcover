@@ -2,8 +2,10 @@ package provider
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 
+	"github.com/groundcover-com/groundcover-sdk-go/pkg/models"
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
@@ -21,35 +23,20 @@ var (
 	_ resource.ResourceWithImportState = &logsPipelineResource{}
 )
 
-// ottl constants and types
-type LogicOperation string
-type ErrorMode string
-
-const (
-	LogicOperationAnd LogicOperation = "and"
-	LogicOperationOr  LogicOperation = "or"
-
-	ErrorModeIgnore    ErrorMode = "ignore"
-	ErrorModeSilent    ErrorMode = "silent"
-	ErrorModePropagate ErrorMode = "propagate"
-)
-
-// OttlRuleConfigList represents a list of OTTL rules configuration
+// OttlRuleConfigList represents a list of OTTL rules configuration for validation purposes
 type OttlRuleConfigList struct {
-	OttlRules []OttlRuleConfig `json:"ottlRules" yaml:"ottlRules"`
+	OttlRules []OttlRuleConfig `yaml:"ottlRules"`
 }
 
-// OttlRuleConfig represents a single OTTL rule configuration
+// OttlRuleConfig represents a single OTTL rule configuration for validation purposes
 type OttlRuleConfig struct {
-	RuleName               string         `json:"ruleName" yaml:"ruleName"`
-	RuleDisabled           bool           `json:"ruleDisabled,omitempty" yaml:"ruleDisabled,omitempty"`
-	Conditions             []string       `json:"conditions" yaml:"conditions"`
-	ConditionLogicOperator LogicOperation `json:"conditionLogicOperator" yaml:"conditionLogicOperator"`
-	Statements             []string       `json:"statements" yaml:"statements"`
-	StatementsErrorMode    ErrorMode      `json:"statementsErrorMode" yaml:"statementsErrorMode"`
+	RuleName               string   `yaml:"ruleName"`
+	RuleDisabled           bool     `yaml:"ruleDisabled,omitempty"`
+	Conditions             []string `yaml:"conditions"`
+	ConditionLogicOperator string   `yaml:"conditionLogicOperator"`
+	Statements             []string `yaml:"statements"`
+	StatementsErrorMode    string   `yaml:"statementsErrorMode"`
 }
-
-// Note: Using ConfigEntry from client.go
 
 func NewLogsPipelineResource() resource.Resource {
 	return &logsPipelineResource{}
@@ -147,15 +134,40 @@ func (r *logsPipelineResource) Create(ctx context.Context, req resource.CreateRe
 		return
 	}
 
-	// Prepare the config entry
-	configEntry := &ConfigEntry{
-		Key:         plan.Key.ValueString(),
-		Value:       plan.Value.ValueString(),
-		Description: plan.Description.ValueString(),
+	// Prepare the SDK request using the ConfigEntry fields
+	keyStr := plan.Key.ValueString()
+	valueStr := plan.Value.ValueString()
+	descStr := plan.Description.ValueString()
+
+	// Create a request using available fields (based on JSON serialization)
+	reqData := map[string]interface{}{
+		"key":         keyStr,
+		"value":       valueStr,
+		"description": descStr,
+	}
+
+	// Convert to SDK model via JSON
+	reqBytes, err := json.Marshal(reqData)
+	if err != nil {
+		resp.Diagnostics.AddError(
+			"Error Marshaling Request",
+			fmt.Sprintf("Could not marshal request: %s", err.Error()),
+		)
+		return
+	}
+
+	// Unmarshal to SDK type
+	var createReq models.CreateOrUpdateConfigRequest
+	if err := json.Unmarshal(reqBytes, &createReq); err != nil {
+		resp.Diagnostics.AddError(
+			"Error Creating Request",
+			fmt.Sprintf("Could not create request: %s", err.Error()),
+		)
+		return
 	}
 
 	// Call API client to create the logs pipeline
-	createdConfig, err := r.client.CreateLogsPipeline(ctx, configEntry)
+	createdConfig, err := r.client.CreateLogsPipeline(ctx, &createReq)
 	if err != nil {
 		resp.Diagnostics.AddError(
 			"Error Creating LogsPipeline",
@@ -164,10 +176,41 @@ func (r *logsPipelineResource) Create(ctx context.Context, req resource.CreateRe
 		return
 	}
 
-	// Update model with computed values from create response
-	plan.Id = types.StringValue(createdConfig.ID)
-	plan.CreatedAt = types.StringValue(createdConfig.CreatedAt)
-	plan.UpdatedAt = types.StringValue(createdConfig.UpdatedAt)
+	// Convert response to map to extract fields
+	respBytes, err := json.Marshal(createdConfig)
+	if err != nil {
+		resp.Diagnostics.AddError(
+			"Error Processing Response",
+			fmt.Sprintf("Could not process response: %s", err.Error()),
+		)
+		return
+	}
+
+	var respData map[string]interface{}
+	if err := json.Unmarshal(respBytes, &respData); err != nil {
+		resp.Diagnostics.AddError(
+			"Error Processing Response",
+			fmt.Sprintf("Could not process response: %s", err.Error()),
+		)
+		return
+	}
+
+	// Update model with computed values from the response map
+	if id, ok := respData["id"].(string); ok && id != "" {
+		plan.Id = types.StringValue(id)
+	}
+
+	plan.Key = types.StringValue(keyStr)
+	plan.Value = types.StringValue(valueStr)
+	plan.Description = types.StringValue(descStr)
+
+	if createdAt, ok := respData["createdAt"].(string); ok && createdAt != "" {
+		plan.CreatedAt = types.StringValue(createdAt)
+	}
+
+	if updatedAt, ok := respData["updatedAt"].(string); ok && updatedAt != "" {
+		plan.UpdatedAt = types.StringValue(updatedAt)
+	}
 
 	tflog.Debug(ctx, fmt.Sprintf("LogsPipeline created with ID: %s", plan.Id.ValueString()))
 
@@ -193,7 +236,7 @@ func (r *logsPipelineResource) Read(ctx context.Context, req resource.ReadReques
 	tflog.Debug(ctx, fmt.Sprintf("Reading LogsPipeline resource: %s", keyStr))
 
 	// Call API client to get the logs pipeline
-	configEntry, err := r.client.GetLogsPipeline(ctx, keyStr)
+	configEntry, err := r.client.GetLogsPipeline(ctx)
 	if err != nil {
 		if err == ErrNotFound {
 			tflog.Warn(ctx, fmt.Sprintf("LogsPipeline %s not found, removing from state.", keyStr))
@@ -207,13 +250,49 @@ func (r *logsPipelineResource) Read(ctx context.Context, req resource.ReadReques
 		return
 	}
 
-	// Update state with values from response
-	state.Id = types.StringValue(configEntry.ID)
-	state.Key = types.StringValue(configEntry.Key)
-	state.Value = types.StringValue(configEntry.Value)
-	state.Description = types.StringValue(configEntry.Description)
-	state.CreatedAt = types.StringValue(configEntry.CreatedAt)
-	state.UpdatedAt = types.StringValue(configEntry.UpdatedAt)
+	// Convert response to map to extract fields
+	respBytes, err := json.Marshal(configEntry)
+	if err != nil {
+		resp.Diagnostics.AddError(
+			"Error Processing Response",
+			fmt.Sprintf("Could not process response: %s", err.Error()),
+		)
+		return
+	}
+
+	var respData map[string]interface{}
+	if err := json.Unmarshal(respBytes, &respData); err != nil {
+		resp.Diagnostics.AddError(
+			"Error Processing Response",
+			fmt.Sprintf("Could not process response: %s", err.Error()),
+		)
+		return
+	}
+
+	// Update state with values from the response map
+	if id, ok := respData["id"].(string); ok && id != "" {
+		state.Id = types.StringValue(id)
+	}
+
+	if key, ok := respData["key"].(string); ok && key != "" {
+		state.Key = types.StringValue(key)
+	}
+
+	if value, ok := respData["value"].(string); ok {
+		state.Value = types.StringValue(value)
+	}
+
+	if description, ok := respData["description"].(string); ok {
+		state.Description = types.StringValue(description)
+	}
+
+	if createdAt, ok := respData["createdAt"].(string); ok && createdAt != "" {
+		state.CreatedAt = types.StringValue(createdAt)
+	}
+
+	if updatedAt, ok := respData["updatedAt"].(string); ok && updatedAt != "" {
+		state.UpdatedAt = types.StringValue(updatedAt)
+	}
 
 	// Set refreshed state
 	diags = resp.State.Set(ctx, &state)
@@ -248,15 +327,39 @@ func (r *logsPipelineResource) Update(ctx context.Context, req resource.UpdateRe
 		return
 	}
 
-	// Prepare the config entry
-	configEntry := &ConfigEntry{
-		Key:         keyStr,
-		Value:       plan.Value.ValueString(),
-		Description: plan.Description.ValueString(),
+	// Prepare the SDK request using the ConfigEntry fields
+	valueStr := plan.Value.ValueString()
+	descStr := plan.Description.ValueString()
+
+	// Create a request using available fields (based on JSON serialization)
+	reqData := map[string]interface{}{
+		"key":         keyStr,
+		"value":       valueStr,
+		"description": descStr,
+	}
+
+	// Convert to SDK model via JSON
+	reqBytes, err := json.Marshal(reqData)
+	if err != nil {
+		resp.Diagnostics.AddError(
+			"Error Marshaling Request",
+			fmt.Sprintf("Could not marshal request: %s", err.Error()),
+		)
+		return
+	}
+
+	// Unmarshal to SDK type
+	var updateReq models.CreateOrUpdateConfigRequest
+	if err := json.Unmarshal(reqBytes, &updateReq); err != nil {
+		resp.Diagnostics.AddError(
+			"Error Creating Request",
+			fmt.Sprintf("Could not create request: %s", err.Error()),
+		)
+		return
 	}
 
 	// Call API client to update the logs pipeline
-	updatedConfig, err := r.client.UpdateLogsPipeline(ctx, configEntry)
+	updatedConfig, err := r.client.UpdateLogsPipeline(ctx, &updateReq)
 	if err != nil {
 		resp.Diagnostics.AddError(
 			"Error Updating LogsPipeline",
@@ -265,10 +368,37 @@ func (r *logsPipelineResource) Update(ctx context.Context, req resource.UpdateRe
 		return
 	}
 
-	// Update model with computed values
-	plan.Id = types.StringValue(updatedConfig.ID)
-	plan.CreatedAt = types.StringValue(updatedConfig.CreatedAt)
-	plan.UpdatedAt = types.StringValue(updatedConfig.UpdatedAt)
+	// Convert response to map to extract fields
+	respBytes, err := json.Marshal(updatedConfig)
+	if err != nil {
+		resp.Diagnostics.AddError(
+			"Error Processing Response",
+			fmt.Sprintf("Could not process response: %s", err.Error()),
+		)
+		return
+	}
+
+	var respData map[string]interface{}
+	if err := json.Unmarshal(respBytes, &respData); err != nil {
+		resp.Diagnostics.AddError(
+			"Error Processing Response",
+			fmt.Sprintf("Could not process response: %s", err.Error()),
+		)
+		return
+	}
+
+	// Update model with computed values from the response map
+	if id, ok := respData["id"].(string); ok && id != "" {
+		plan.Id = types.StringValue(id)
+	}
+
+	if createdAt, ok := respData["createdAt"].(string); ok && createdAt != "" {
+		plan.CreatedAt = types.StringValue(createdAt)
+	}
+
+	if updatedAt, ok := respData["updatedAt"].(string); ok && updatedAt != "" {
+		plan.UpdatedAt = types.StringValue(updatedAt)
+	}
 
 	tflog.Debug(ctx, fmt.Sprintf("LogsPipeline updated: %s", keyStr))
 
@@ -295,7 +425,7 @@ func (r *logsPipelineResource) Delete(ctx context.Context, req resource.DeleteRe
 	tflog.Debug(ctx, fmt.Sprintf("Deleting LogsPipeline resource: %s", keyStr))
 
 	// Call API client to delete the logs pipeline
-	err := r.client.DeleteLogsPipeline(ctx, keyStr)
+	err := r.client.DeleteLogsPipeline(ctx)
 	if err != nil {
 		resp.Diagnostics.AddError(
 			"Error Deleting LogsPipeline",

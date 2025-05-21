@@ -10,34 +10,36 @@ import (
 	"os"
 	"strings"
 
+	"github.com/groundcover-com/groundcover-sdk-go/pkg/models"
 	"github.com/hashicorp/terraform-plugin-log/tflog"
 )
 
 const (
 	logsPipelineEndpoint = "/api/pipelines/logs/config"
+	resourceId           = "logs-pipeline"
 )
 
 // CreateLogsPipeline creates a new logs pipeline configuration
-func (c *SdkClientWrapper) CreateLogsPipeline(ctx context.Context, config *ConfigEntry) (*ConfigEntry, error) {
-	logFields := map[string]any{"key": config.Key}
+func (c *SdkClientWrapper) CreateLogsPipeline(ctx context.Context, req *models.CreateOrUpdateConfigRequest) (*models.ManageConfigResponseEntry, error) {
+	logFields := map[string]any{"req": "create_logs_pipeline"}
 	tflog.Debug(ctx, "Executing SDK Call: Create Logs Pipeline", logFields)
 
 	// Marshal the request to JSON
-	reqBody, err := json.Marshal(config)
+	reqBody, err := json.Marshal(req)
 	if err != nil {
 		return nil, fmt.Errorf("error marshaling logs pipeline config: %w", err)
 	}
 
 	// Prepare the HTTP request
-	req, err := c.prepareRequest(ctx, http.MethodPost, logsPipelineEndpoint, bytes.NewReader(reqBody))
+	httpReq, err := c.prepareRequest(ctx, http.MethodPost, logsPipelineEndpoint, bytes.NewReader(reqBody))
 	if err != nil {
 		return nil, err
 	}
 
 	// Execute the request
-	resp, err := c.executeRequest(req)
+	resp, err := c.executeRequest(httpReq)
 	if err != nil {
-		return nil, handleApiError(ctx, err, "CreateLogsPipeline", config.Key)
+		return nil, handleApiError(ctx, err, "CreateLogsPipeline", resourceId)
 	}
 	defer resp.Body.Close()
 
@@ -48,36 +50,36 @@ func (c *SdkClientWrapper) CreateLogsPipeline(ctx context.Context, config *Confi
 	}
 
 	// Check for error status codes
-	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+	if resp.StatusCode < http.StatusOK || resp.StatusCode >= http.StatusMultipleChoices {
 		err := parseErrorResponse(resp.StatusCode, respBody)
-		return nil, handleApiError(ctx, err, "CreateLogsPipeline", config.Key)
+		return nil, handleApiError(ctx, err, "CreateLogsPipeline", resourceId)
 	}
 
 	// Parse the response JSON
-	var createdConfig ConfigEntry
-	if err := json.Unmarshal(respBody, &createdConfig); err != nil {
+	var result models.ManageConfigResponseEntry
+	if err := json.Unmarshal(respBody, &result); err != nil {
 		return nil, fmt.Errorf("error parsing logs pipeline response: %w", err)
 	}
 
 	tflog.Debug(ctx, "SDK Call Successful: Create Logs Pipeline", logFields)
-	return &createdConfig, nil
+	return &result, nil
 }
 
 // GetLogsPipeline retrieves a logs pipeline configuration by key
-func (c *SdkClientWrapper) GetLogsPipeline(ctx context.Context, key string) (*ConfigEntry, error) {
-	logFields := map[string]any{"key": key}
+func (c *SdkClientWrapper) GetLogsPipeline(ctx context.Context) (*models.ManageConfigResponseEntry, error) {
+	logFields := map[string]any{}
 	tflog.Debug(ctx, "Executing SDK Call: Get Logs Pipeline", logFields)
 
 	// Prepare the HTTP request
-	req, err := c.prepareRequest(ctx, http.MethodGet, fmt.Sprintf("%s/%s", logsPipelineEndpoint, key), nil)
+	httpReq, err := c.prepareRequest(ctx, http.MethodGet, logsPipelineEndpoint, nil)
 	if err != nil {
 		return nil, err
 	}
 
 	// Execute the request
-	resp, err := c.executeRequest(req)
+	resp, err := c.executeRequest(httpReq)
 	if err != nil {
-		return nil, handleApiError(ctx, err, "GetLogsPipeline", key)
+		return nil, handleApiError(ctx, err, "GetLogsPipeline", resourceId)
 	}
 	defer resp.Body.Close()
 
@@ -88,45 +90,58 @@ func (c *SdkClientWrapper) GetLogsPipeline(ctx context.Context, key string) (*Co
 	}
 
 	// Check for error status codes
-	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+	if resp.StatusCode < http.StatusOK || resp.StatusCode >= http.StatusMultipleChoices {
 		if resp.StatusCode == http.StatusNotFound {
 			return nil, ErrNotFound
 		}
 		err := parseErrorResponse(resp.StatusCode, respBody)
-		return nil, handleApiError(ctx, err, "GetLogsPipeline", key)
+		return nil, handleApiError(ctx, err, "GetLogsPipeline", resourceId)
 	}
 
 	// Parse the response JSON
-	var config ConfigEntry
-	if err := json.Unmarshal(respBody, &config); err != nil {
+	var result models.ManageConfigResponseEntry
+	if err := json.Unmarshal(respBody, &result); err != nil {
 		return nil, fmt.Errorf("error parsing logs pipeline response: %w", err)
 	}
 
 	tflog.Debug(ctx, "SDK Call Successful: Get Logs Pipeline", logFields)
-	return &config, nil
+	return &result, nil
 }
 
 // UpdateLogsPipeline updates an existing logs pipeline configuration
-func (c *SdkClientWrapper) UpdateLogsPipeline(ctx context.Context, config *ConfigEntry) (*ConfigEntry, error) {
-	logFields := map[string]any{"key": config.Key}
+func (c *SdkClientWrapper) UpdateLogsPipeline(ctx context.Context, req *models.CreateOrUpdateConfigRequest) (*models.ManageConfigResponseEntry, error) {
+	// Safe logging
+	keyStr := "<unknown>"
+
+	logFields := map[string]any{"req": "update_logs_pipeline"}
 	tflog.Debug(ctx, "Executing SDK Call: Update Logs Pipeline", logFields)
 
 	// Marshal the request to JSON
-	reqBody, err := json.Marshal(config)
+	reqBody, err := json.Marshal(req)
 	if err != nil {
 		return nil, fmt.Errorf("error marshaling logs pipeline config: %w", err)
 	}
 
+	// Try to extract the key for better logging and path construction
+	var reqMap map[string]interface{}
+	if err := json.Unmarshal(reqBody, &reqMap); err == nil {
+		if k, ok := reqMap["key"].(string); ok && k != "" {
+			keyStr = k
+			logFields["key"] = keyStr
+		}
+	}
+
 	// Prepare the HTTP request
-	req, err := c.prepareRequest(ctx, http.MethodPut, fmt.Sprintf("%s/%s", logsPipelineEndpoint, config.Key), bytes.NewReader(reqBody))
+	path := fmt.Sprintf("%s/%s", logsPipelineEndpoint, keyStr)
+	httpReq, err := c.prepareRequest(ctx, http.MethodPut, path, bytes.NewReader(reqBody))
 	if err != nil {
 		return nil, err
 	}
 
 	// Execute the request
-	resp, err := c.executeRequest(req)
+	resp, err := c.executeRequest(httpReq)
 	if err != nil {
-		return nil, handleApiError(ctx, err, "UpdateLogsPipeline", config.Key)
+		return nil, handleApiError(ctx, err, "UpdateLogsPipeline", keyStr)
 	}
 	defer resp.Body.Close()
 
@@ -142,39 +157,39 @@ func (c *SdkClientWrapper) UpdateLogsPipeline(ctx context.Context, config *Confi
 			return nil, ErrNotFound
 		}
 		err := parseErrorResponse(resp.StatusCode, respBody)
-		return nil, handleApiError(ctx, err, "UpdateLogsPipeline", config.Key)
+		return nil, handleApiError(ctx, err, "UpdateLogsPipeline", keyStr)
 	}
 
 	// Parse the response JSON
-	var updatedConfig ConfigEntry
-	if err := json.Unmarshal(respBody, &updatedConfig); err != nil {
+	var result models.ManageConfigResponseEntry
+	if err := json.Unmarshal(respBody, &result); err != nil {
 		return nil, fmt.Errorf("error parsing logs pipeline response: %w", err)
 	}
 
 	tflog.Debug(ctx, "SDK Call Successful: Update Logs Pipeline", logFields)
-	return &updatedConfig, nil
+	return &result, nil
 }
 
 // DeleteLogsPipeline deletes a logs pipeline configuration by key
-func (c *SdkClientWrapper) DeleteLogsPipeline(ctx context.Context, key string) error {
-	logFields := map[string]any{"key": key}
+func (c *SdkClientWrapper) DeleteLogsPipeline(ctx context.Context) error {
+	logFields := map[string]any{}
 	tflog.Debug(ctx, "Executing SDK Call: Delete Logs Pipeline", logFields)
 
 	// Prepare the HTTP request
-	req, err := c.prepareRequest(ctx, http.MethodDelete, fmt.Sprintf("%s/%s", logsPipelineEndpoint, key), nil)
+	httpReq, err := c.prepareRequest(ctx, http.MethodDelete, logsPipelineEndpoint, nil)
 	if err != nil {
 		return err
 	}
 
 	// Execute the request
-	resp, err := c.executeRequest(req)
+	resp, err := c.executeRequest(httpReq)
 	if err != nil {
-		return handleApiError(ctx, err, "DeleteLogsPipeline", key)
+		return handleApiError(ctx, err, "DeleteLogsPipeline", resourceId)
 	}
 	defer resp.Body.Close()
 
 	// Check for error status codes
-	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+	if resp.StatusCode < http.StatusOK || resp.StatusCode >= http.StatusMultipleChoices {
 		// 404 is acceptable for delete (already deleted)
 		if resp.StatusCode == http.StatusNotFound {
 			tflog.Warn(ctx, "Resource not found during delete, treating as success", logFields)
@@ -183,7 +198,7 @@ func (c *SdkClientWrapper) DeleteLogsPipeline(ctx context.Context, key string) e
 
 		respBody, _ := io.ReadAll(resp.Body)
 		err := parseErrorResponse(resp.StatusCode, respBody)
-		return handleApiError(ctx, err, "DeleteLogsPipeline", key)
+		return handleApiError(ctx, err, "DeleteLogsPipeline", resourceId)
 	}
 
 	tflog.Debug(ctx, "SDK Call Successful: Delete Logs Pipeline", logFields)
