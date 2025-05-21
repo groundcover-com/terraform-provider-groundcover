@@ -79,7 +79,7 @@ func (r *logsPipelineResource) Create(ctx context.Context, req resource.CreateRe
 		return
 	}
 
-	tflog.Debug(ctx, fmt.Sprintf("Creating LogsPipeline"))
+	tflog.Debug(ctx, "Creating LogsPipeline")
 
 	// Unmarshal to SDK type
 	createReq := &models.CreateOrUpdateConfigRequest{
@@ -118,13 +118,13 @@ func (r *logsPipelineResource) Read(ctx context.Context, req resource.ReadReques
 		return
 	}
 
-	tflog.Debug(ctx, fmt.Sprintf("Reading LogsPipeline resource"))
+	tflog.Debug(ctx, "Reading LogsPipeline resource")
 
 	// Call API client to get the logs pipeline
 	configEntry, err := r.client.GetLogsPipeline(ctx)
 	if err != nil {
 		if err == ErrNotFound {
-			tflog.Warn(ctx, fmt.Sprintf("LogsPipeline not found, removing from state"))
+			tflog.Warn(ctx, "LogsPipeline not found, removing from state")
 			resp.State.RemoveResource(ctx)
 			return
 		}
