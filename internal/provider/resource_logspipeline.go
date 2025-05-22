@@ -135,9 +135,16 @@ func (r *logsPipelineResource) Read(ctx context.Context, req resource.ReadReques
 		return
 	}
 
+	value := ""
+	createdAt := ""
+	if configEntry != nil {
+		value = configEntry.Value
+		createdAt = configEntry.CreatedTimestamp.String()
+	}
+
 	// Update state
-	state.UpdatedAt = types.StringValue(configEntry.CreatedTimestamp.String())
-	state.Value = types.StringValue(configEntry.Value)
+	state.UpdatedAt = types.StringValue(createdAt)
+	state.Value = types.StringValue(value)
 
 	// Set refreshed state
 	diags = resp.State.Set(ctx, &state)
@@ -226,7 +233,14 @@ func (r *logsPipelineResource) ImportState(ctx context.Context, req resource.Imp
 		return
 	}
 
+	value := ""
+	createdAt := ""
+	if configEntry != nil {
+		value = configEntry.Value
+		createdAt = configEntry.CreatedTimestamp.String()
+	}
+
 	// Set the required attributes
-	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("value"), configEntry.Value)...)
-	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("updated_at"), configEntry.CreatedTimestamp.String())...)
+	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("value"), value)...)
+	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("updated_at"), createdAt)...)
 }
