@@ -83,6 +83,12 @@ type ApiClient interface {
 	CreateApiKey(ctx context.Context, req *models.CreateAPIKeyRequest) (*models.CreateAPIKeyResponse, error)
 	ListApiKeys(ctx context.Context, withRevoked *bool, withExpired *bool) ([]*models.ListAPIKeysResponseItem, error)
 	DeleteApiKey(ctx context.Context, id string) error
+
+	// Logs Pipeline
+	CreateLogsPipeline(ctx context.Context, req *models.CreateOrUpdateLogsPipelineConfigRequest) (*models.LogsPipelineConfig, error)
+	GetLogsPipeline(ctx context.Context) (*models.LogsPipelineConfig, error)
+	UpdateLogsPipeline(ctx context.Context, req *models.CreateOrUpdateLogsPipelineConfigRequest) (*models.LogsPipelineConfig, error)
+	DeleteLogsPipeline(ctx context.Context) error
 }
 
 // SdkClientWrapper implements ApiClient using the Groundcover Go SDK.
