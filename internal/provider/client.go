@@ -85,9 +85,9 @@ type ApiClient interface {
 	DeleteApiKey(ctx context.Context, id string) error
 
 	// Logs Pipeline
-	CreateLogsPipeline(ctx context.Context, req *models.CreateOrUpdateConfigRequest) (*models.ManageConfigResponseEntry, error)
-	GetLogsPipeline(ctx context.Context) (*models.ManageConfigResponseEntry, error)
-	UpdateLogsPipeline(ctx context.Context, req *models.CreateOrUpdateConfigRequest) (*models.ManageConfigResponseEntry, error)
+	CreateLogsPipeline(ctx context.Context, req *models.CreateOrUpdateLogsPipelineConfigRequest) (*models.LogsPipelineConfig, error)
+	GetLogsPipeline(ctx context.Context) (*models.LogsPipelineConfig, error)
+	UpdateLogsPipeline(ctx context.Context, req *models.CreateOrUpdateLogsPipelineConfigRequest) (*models.LogsPipelineConfig, error)
 	DeleteLogsPipeline(ctx context.Context) error
 }
 

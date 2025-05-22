@@ -82,7 +82,7 @@ func (r *logsPipelineResource) Create(ctx context.Context, req resource.CreateRe
 	tflog.Debug(ctx, "Creating LogsPipeline")
 
 	// Unmarshal to SDK type
-	createReq := &models.CreateOrUpdateConfigRequest{
+	createReq := &models.CreateOrUpdateLogsPipelineConfigRequest{
 		Value: plan.Value.ValueString(),
 	}
 
@@ -161,7 +161,7 @@ func (r *logsPipelineResource) Update(ctx context.Context, req resource.UpdateRe
 	tflog.Debug(ctx, "Updating LogsPipeline")
 
 	// Unmarshal to SDK type
-	updateReq := &models.CreateOrUpdateConfigRequest{
+	updateReq := &models.CreateOrUpdateLogsPipelineConfigRequest{
 		Value: plan.Value.ValueString(),
 	}
 

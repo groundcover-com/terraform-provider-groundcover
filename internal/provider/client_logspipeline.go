@@ -14,7 +14,7 @@ const (
 )
 
 // CreateLogsPipeline creates a new logs pipeline configuration
-func (c *SdkClientWrapper) CreateLogsPipeline(ctx context.Context, req *models.CreateOrUpdateConfigRequest) (*models.ManageConfigResponseEntry, error) {
+func (c *SdkClientWrapper) CreateLogsPipeline(ctx context.Context, req *models.CreateOrUpdateLogsPipelineConfigRequest) (*models.LogsPipelineConfig, error) {
 	logFields := map[string]any{"req": "create_logs_pipeline"}
 	tflog.Debug(ctx, "Executing SDK Call: Create Logs Pipeline", logFields)
 
@@ -29,7 +29,7 @@ func (c *SdkClientWrapper) CreateLogsPipeline(ctx context.Context, req *models.C
 }
 
 // GetLogsPipeline retrieves a logs pipeline configuration by key
-func (c *SdkClientWrapper) GetLogsPipeline(ctx context.Context) (*models.ManageConfigResponseEntry, error) {
+func (c *SdkClientWrapper) GetLogsPipeline(ctx context.Context) (*models.LogsPipelineConfig, error) {
 	logFields := map[string]any{"req": "get_logs_pipeline"}
 	tflog.Debug(ctx, "Executing SDK Call: Get Logs Pipeline", logFields)
 
@@ -39,7 +39,7 @@ func (c *SdkClientWrapper) GetLogsPipeline(ctx context.Context) (*models.ManageC
 		return nil, handleApiError(ctx, err, "GetLogsPipeline", resourceId)
 	}
 
-	var response *models.ManageConfigResponseEntry
+	var response *models.LogsPipelineConfig
 	if emptyGetResp == nil {
 		response = getResp.Payload
 	}
@@ -49,7 +49,7 @@ func (c *SdkClientWrapper) GetLogsPipeline(ctx context.Context) (*models.ManageC
 }
 
 // UpdateLogsPipeline updates an existing logs pipeline configuration
-func (c *SdkClientWrapper) UpdateLogsPipeline(ctx context.Context, req *models.CreateOrUpdateConfigRequest) (*models.ManageConfigResponseEntry, error) {
+func (c *SdkClientWrapper) UpdateLogsPipeline(ctx context.Context, req *models.CreateOrUpdateLogsPipelineConfigRequest) (*models.LogsPipelineConfig, error) {
 	logFields := map[string]any{"req": "update_logs_pipeline"}
 	tflog.Debug(ctx, "Executing SDK Call: Update Logs Pipeline", logFields)
 
