@@ -246,16 +246,13 @@ func (r *logsPipelineResource) ModifyPlan(ctx context.Context, req resource.Modi
 		return
 	}
 
-	/*
-		resp.Diagnostics.AddWarning(
-			"LogsPipeline is a Singleton",
-			fmt.Sprintf("Your plan should never include more than one logs pipeline."),
-		)
-		resp.Diagnostics.AddWarning(
-			"LogsPipeline can be edited outside of Terraform",
-			fmt.Sprintf("Make sure to import the resource, to work on the most up-to-date version."),
-		)
-	*/
+	resp.Diagnostics.AddWarning(
+		"LogsPipeline is a Singleton",
+		fmt.Sprintf(
+			"Your plan should never include more than one logs pipeline resource. If it does, only the latest will take place.\n"+
+				"Renaming the resource will show an incorrect plan.",
+		),
+	)
 }
 
 func (r *logsPipelineResource) checkAndImportExisting(ctx context.Context, state *tfsdk.State, diags *diag.Diagnostics) (*models.LogsPipelineConfig, error) {

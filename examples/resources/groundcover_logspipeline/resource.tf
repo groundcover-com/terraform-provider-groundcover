@@ -30,7 +30,7 @@ variable "groundcover_org_name" {
 }
 
 # Example Logs Pipeline
-resource "groundcover_logspipeline" "example" {
+resource "groundcover_logspipeline" "logspipeline" {
   value = <<-EOT
 ottlRules:
   - ruleName: example-rule
@@ -43,5 +43,5 @@ EOT
 
 output "logs_pipeline_updated_at" {
   description = "The timestamp when the logs pipeline was last updated."
-  value       = groundcover_logspipeline.example.updated_at
+  value       = groundcover_logspipeline.logspipeline.updated_at
 } 

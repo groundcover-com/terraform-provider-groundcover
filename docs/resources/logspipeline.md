@@ -22,7 +22,7 @@ This resource is implemented as a true singleton resource, meaning:
 ## Example Usage
 
 ```terraform
-resource "groundcover_logspipeline" "example" {
+resource "groundcover_logspipeline" "logspipeline" {
   value = <<-EOT
 ottlRules:
   - ruleName: example-rule
