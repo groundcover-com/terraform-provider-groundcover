@@ -13,6 +13,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/provider/schema"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/types"
+	"github.com/hashicorp/terraform-plugin-go/tfprotov5"
 	"github.com/hashicorp/terraform-plugin-log/tflog"
 )
 
@@ -125,11 +126,18 @@ func (p *GroundcoverProvider) Resources(ctx context.Context) []func() resource.R
 		NewServiceAccountResource,
 		NewMonitorResource,
 		NewApiKeyResource,
+		NewLogsPipelineResource,
 	}
 }
 
 func (p *GroundcoverProvider) DataSources(ctx context.Context) []func() datasource.DataSource {
 	return []func() datasource.DataSource{}
+}
+
+// CloseEphemeralResource closes an opened ephemeral resource.
+// This method is required by the tfprotov5.ProviderServer interface in recent versions of the framework.
+func (p *GroundcoverProvider) CloseEphemeralResource(ctx context.Context, req *tfprotov5.CloseEphemeralResourceRequest) (*tfprotov5.CloseEphemeralResourceResponse, error) {
+	return &tfprotov5.CloseEphemeralResourceResponse{}, nil
 }
 
 func New(version string) func() provider.Provider {
