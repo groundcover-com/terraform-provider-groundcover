@@ -11,6 +11,14 @@ The logs pipeline resource allows you to define and manage OTTL (Observability T
 
 OTTL rules allow you to transform, enrich, and route logs based on conditions. For example, you can extract Kubernetes metadata and add it to your logs for better observability.
 
+## Singleton Resource Behavior
+
+This resource is implemented as a true singleton resource, meaning:
+
+1. Only one logs pipeline configuration can exist in your groundcover backend at any time.
+2. When you run `terraform plan` and a logs pipeline already exists, Terraform will show that it will update the existing resource rather than creating a new one.
+3. If you have multiple Terraform configurations with this resource, they will all manage the same underlying pipeline configuration.
+
 ## Example Usage
 
 ```terraform
@@ -57,4 +65,4 @@ Since this is a singleton resource, you can import the existing logs pipeline co
 $ terraform import groundcover_logspipeline.example dummy
 ```
 
-The import ID is arbitrary for this singleton resource. 
+The import ID is arbitrary for this singleton resource, as the provider will automatically detect and manage the existing resource. 

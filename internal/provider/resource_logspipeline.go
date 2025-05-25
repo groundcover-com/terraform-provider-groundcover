@@ -5,9 +5,11 @@ import (
 	"fmt"
 
 	"github.com/groundcover-com/groundcover-sdk-go/pkg/models"
+	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
+	"github.com/hashicorp/terraform-plugin-framework/tfsdk"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/hashicorp/terraform-plugin-log/tflog"
 )
@@ -17,6 +19,7 @@ var (
 	_ resource.Resource                = &logsPipelineResource{}
 	_ resource.ResourceWithConfigure   = &logsPipelineResource{}
 	_ resource.ResourceWithImportState = &logsPipelineResource{}
+	_ resource.ResourceWithModifyPlan  = &logsPipelineResource{}
 )
 
 func NewLogsPipelineResource() resource.Resource {
@@ -38,7 +41,7 @@ func (r *logsPipelineResource) Metadata(_ context.Context, req resource.Metadata
 
 func (r *logsPipelineResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *resource.SchemaResponse) {
 	resp.Schema = schema.Schema{
-		Description: "Logs Pipeline resource.",
+		Description: "Logs Pipeline resource. This is a singleton resource.",
 		Attributes: map[string]schema.Attribute{
 			"value": schema.StringAttribute{
 				Description: "The YAML representation of the logs pipeline configuration.",
@@ -219,12 +222,22 @@ func (r *logsPipelineResource) Delete(ctx context.Context, req resource.DeleteRe
 	tflog.Debug(ctx, "Successfully deleted LogsPipeline resource")
 }
 
+// For singleton resources, we don't need the ID for lookups
+// But we need to implement a custom import rather than using ImportStatePassthroughID
 func (r *logsPipelineResource) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {
-	// For singleton resources, we don't need the ID for lookups
-	// But we need to implement a custom import rather than using ImportStatePassthroughID
+	_, err := r.checkAndImportExisting(ctx, &resp.State, &resp.Diagnostics)
+	if err != nil {
+		resp.Diagnostics.AddError(
+			"Error Importing LogsPipeline",
+			fmt.Sprintf("Could not import LogsPipeline: %s", err.Error()),
+		)
+	}
+}
 
-	// Fetch the current resource
-	configEntry, err := r.client.GetLogsPipeline(ctx)
+func (r *logsPipelineResource) ModifyPlan(ctx context.Context, req resource.ModifyPlanRequest, resp *resource.ModifyPlanResponse) {
+	tflog.Debug(ctx, "Modifying LogsPipeline plan")
+
+	_, err := r.checkAndImportExisting(ctx, &req.State, &resp.Diagnostics)
 	if err != nil {
 		resp.Diagnostics.AddError(
 			"Error Importing LogsPipeline",
@@ -233,14 +246,32 @@ func (r *logsPipelineResource) ImportState(ctx context.Context, req resource.Imp
 		return
 	}
 
-	value := ""
-	createdAt := ""
-	if configEntry != nil {
-		value = configEntry.Value
-		createdAt = configEntry.CreatedTimestamp.String()
+	/*
+		resp.Diagnostics.AddWarning(
+			"LogsPipeline is a Singleton",
+			fmt.Sprintf("Your plan should never include more than one logs pipeline."),
+		)
+		resp.Diagnostics.AddWarning(
+			"LogsPipeline can be edited outside of Terraform",
+			fmt.Sprintf("Make sure to import the resource, to work on the most up-to-date version."),
+		)
+	*/
+}
+
+func (r *logsPipelineResource) checkAndImportExisting(ctx context.Context, state *tfsdk.State, diags *diag.Diagnostics) (*models.LogsPipelineConfig, error) {
+	existingConfig, err := r.client.GetLogsPipeline(ctx)
+	if err != nil && err != ErrNotFound {
+		return nil, err
 	}
 
-	// Set the required attributes
-	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("value"), value)...)
-	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("updated_at"), createdAt)...)
+	value := ""
+	createdAt := ""
+	if existingConfig != nil {
+		value = existingConfig.Value
+		createdAt = existingConfig.CreatedTimestamp.String()
+	}
+
+	diags.Append(state.SetAttribute(ctx, path.Root("value"), value)...)
+	diags.Append(state.SetAttribute(ctx, path.Root("updated_at"), createdAt)...)
+	return existingConfig, nil
 }
