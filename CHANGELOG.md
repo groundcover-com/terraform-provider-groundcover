@@ -1,3 +1,3 @@
-## 0.1.0 (Unreleased)
+## 0.4.0
 
-FEATURES:
+* fixes a critical issue with monitor provisioning where some fields like `contextHeaderLabels` and `evaluationInterval` were not updated
