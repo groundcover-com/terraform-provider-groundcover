@@ -5,14 +5,14 @@ go 1.24.0
 require (
 	github.com/go-openapi/runtime v0.28.0
 	github.com/go-openapi/strfmt v0.23.0
-	github.com/hashicorp/terraform-plugin-framework v1.13.0
+	github.com/hashicorp/terraform-plugin-framework v1.15.0
 	github.com/hashicorp/terraform-plugin-log v0.9.0
 )
 
 require (
 	github.com/goccy/go-yaml v1.17.1
 	github.com/groundcover-com/groundcover-sdk-go v1.11.0
-	github.com/hashicorp/terraform-plugin-go v0.27.0
+	github.com/hashicorp/terraform-plugin-go v0.28.0
 	gopkg.in/yaml.v3 v3.0.1
 )
 
