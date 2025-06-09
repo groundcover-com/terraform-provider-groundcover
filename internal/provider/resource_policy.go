@@ -339,8 +339,23 @@ func (r *policyResource) Update(ctx context.Context, req resource.UpdateRequest,
 	}
 
 	policyUUID := state.UUID.ValueString()
-	// Use state's revision number for the update request
-	apiRequest, diags := mapPolicyModelToApiUpdateRequest(ctx, plan, state.RevisionNumber.ValueInt64())
+
+	// First, read the current state from the API to get the latest revision number
+	// This prevents concurrency conflicts when the resource was modified externally
+	tflog.Debug(ctx, "Reading current policy state before update to get latest revision", map[string]any{"uuid": policyUUID})
+	apiCurrentState, err := r.client.GetPolicy(ctx, policyUUID)
+	if err != nil {
+		if errors.Is(err, ErrNotFound) {
+			resp.Diagnostics.AddError("SDK Not Found Error", fmt.Sprintf("Failed to read policy %s before update because it was not found. It may have been deleted externally.", policyUUID))
+		} else {
+			resp.Diagnostics.AddError("SDK Client Read Error", fmt.Sprintf("Failed to read current policy state %s before update: %s", policyUUID, err.Error()))
+		}
+		return
+	}
+
+	// Use the current revision number from the API for the update request
+	currentRevision := int64(apiCurrentState.RevisionNumber)
+	apiRequest, diags := mapPolicyModelToApiUpdateRequest(ctx, plan, currentRevision)
 	resp.Diagnostics.Append(diags...)
 	if resp.Diagnostics.HasError() {
 		return
