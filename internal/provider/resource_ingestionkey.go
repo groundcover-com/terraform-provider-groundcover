@@ -21,7 +21,7 @@ var (
 )
 
 func NewIngestionKeyResource() resource.Resource {
-	return &apiKeyResource{}
+	return &ingestionKeyResource{}
 }
 
 type ingestionKeyResource struct {
@@ -29,7 +29,6 @@ type ingestionKeyResource struct {
 }
 
 type ingestionKeyResourceModel struct {
-	Id           types.String `tfsdk:"id"`
 	Name         types.String `tfsdk:"name"`
 	CreatedBy    types.String `tfsdk:"created_by"`
 	CreationDate types.String `tfsdk:"creation_date"`
@@ -47,13 +46,6 @@ func (r *ingestionKeyResource) Schema(_ context.Context, _ resource.SchemaReques
 	resp.Schema = schema.Schema{
 		Description: "Ingestion Key resource.",
 		Attributes: map[string]schema.Attribute{
-			"id": schema.StringAttribute{
-				Description: "The unique identifier of the ingestion key.",
-				Computed:    true,
-				PlanModifiers: []planmodifier.String{
-					stringplanmodifier.UseStateForUnknown(),
-				},
-			},
 			"name": schema.StringAttribute{
 				Description: "The name of the ingestion key.",
 				Required:    true,
@@ -75,15 +67,13 @@ func (r *ingestionKeyResource) Schema(_ context.Context, _ resource.SchemaReques
 			},
 			"type": schema.StringAttribute{
 				Description: "The type of the ingestion key (e.g., 'ingestion').",
-				Computed:    true,
+				Required:    true,
 			},
 			"remote_config": schema.BoolAttribute{
 				Description: "Indicates if the ingestion key is configured for remote configuration.",
-				Computed:    true,
 			},
 			"tags": schema.ListAttribute{
 				Description: "Tags associated with the ingestion key.",
-				Computed:    true,
 			},
 		},
 	}
@@ -99,7 +89,7 @@ func (r *ingestionKeyResource) Configure(_ context.Context, req resource.Configu
 	if !ok {
 		resp.Diagnostics.AddError(
 			"Unexpected Resource Configure Type",
-			"Expected provider.ApiClient, got: "+req.ProviderData.(string)+". Please report this issue to the provider developers.",
+			fmt.Sprintf("Expected provider.ApiClient, got: %T. Please report this issue to the provider developers.", req.ProviderData),
 		)
 		return
 	}
@@ -144,10 +134,9 @@ func (r *ingestionKeyResource) Create(ctx context.Context, req resource.CreateRe
 		return
 	}
 
-	tflog.Debug(ctx, fmt.Sprintf("Ingestion Key created %s", apiResponse.Name))
-
 	// Map response back to state
 	if apiResponse.Name != nil {
+		tflog.Debug(ctx, fmt.Sprintf("Ingestion Key created %s", *apiResponse.Name))
 		plan.Name = types.StringValue(*apiResponse.Name)
 	}
 
@@ -193,7 +182,6 @@ func (r *ingestionKeyResource) Read(ctx context.Context, req resource.ReadReques
 	// Update state with the first found key
 	ingestionKey := response[0]
 
-	state.Id = types.StringValue(ingestionKey.ID)
 	state.CreatedBy = types.StringValue(ingestionKey.CreatedBy)
 	state.CreationDate = types.StringValue(ingestionKey.CreationDate.String())
 	state.Key = types.StringValue(ingestionKey.Key)
@@ -256,5 +244,5 @@ func (r *ingestionKeyResource) Delete(ctx context.Context, req resource.DeleteRe
 
 // ImportState imports the resource from its ID.
 func (r *ingestionKeyResource) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {
-	resource.ImportStatePassthroughID(ctx, path.Root("id"), req, resp)
+	resource.ImportStatePassthroughID(ctx, path.Root("name"), req, resp)
 }
