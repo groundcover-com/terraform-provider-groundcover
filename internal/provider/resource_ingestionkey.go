@@ -5,6 +5,8 @@ import (
 	"fmt"
 
 	"github.com/groundcover-com/groundcover-sdk-go/pkg/models"
+	"github.com/hashicorp/terraform-plugin-framework/attr"
+	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
@@ -68,12 +70,20 @@ func (r *ingestionKeyResource) Schema(_ context.Context, _ resource.SchemaReques
 			"type": schema.StringAttribute{
 				Description: "The type of the ingestion key (e.g., 'ingestion').",
 				Required:    true,
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.RequiresReplace(),
+				},
 			},
 			"remote_config": schema.BoolAttribute{
 				Description: "Indicates if the ingestion key is configured for remote configuration.",
+				Optional:    true,
+				Computed:    true,
 			},
 			"tags": schema.ListAttribute{
 				Description: "Tags associated with the ingestion key.",
+				ElementType: types.StringType,
+				Optional:    true,
+				Computed:    true,
 			},
 		},
 	}
@@ -99,22 +109,25 @@ func (r *ingestionKeyResource) Configure(_ context.Context, req resource.Configu
 // Create creates the resource and sets the initial Terraform state.
 func (r *ingestionKeyResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
 	var plan ingestionKeyResourceModel
-	resp.Diagnostics.Append(req.Plan.Get(ctx, &plan)...)
-	if resp.Diagnostics.HasError() {
+	diags := req.Plan.Get(ctx, &plan)
+	if diags.HasError() {
+		resp.Diagnostics.Append(diags...)
 		return
 	}
 
 	tflog.Debug(ctx, fmt.Sprintf("Creating Ingestion key: %s", plan.Name.ValueString()))
+	tags, diags := r.tagsFromList(ctx, plan.Tags)
+	if diags.HasError() {
+		resp.Diagnostics.Append(diags...)
+		return
+	}
 
-	// Prepare the request for the SDK
 	nameStr := plan.Name.ValueString()
 	typeStr := plan.Type.ValueString()
-	remoteConfig := plan.RemoteConfig.ValueBoolPointer()
-	tags := []string{}
-	diags := plan.Tags.ElementsAs(ctx, &tags, false)
-	resp.Diagnostics.Append(diags...)
-	if resp.Diagnostics.HasError() {
-		return
+	var remoteConfig *bool
+	if !plan.RemoteConfig.IsNull() && !plan.RemoteConfig.IsUnknown() {
+		val := plan.RemoteConfig.ValueBool()
+		remoteConfig = &val
 	}
 
 	createReq := &models.CreateIngestionKeyRequest{
@@ -125,7 +138,7 @@ func (r *ingestionKeyResource) Create(ctx context.Context, req resource.CreateRe
 	}
 
 	tflog.Debug(ctx, "Sending CreateIngestionKeyRequest to SDK", map[string]any{"name": nameStr, "type": typeStr, "remote_config": remoteConfig, "tags": tags})
-	apiResponse, err := r.client.CreateIngestionKey(ctx, createReq)
+	result, err := r.client.CreateIngestionKey(ctx, createReq)
 	if err != nil {
 		resp.Diagnostics.AddError(
 			"Error Creating Ingestion Key",
@@ -135,27 +148,31 @@ func (r *ingestionKeyResource) Create(ctx context.Context, req resource.CreateRe
 	}
 
 	// Map response back to state
-	if apiResponse.Name != nil {
-		tflog.Debug(ctx, fmt.Sprintf("Ingestion Key created %s", *apiResponse.Name))
-		plan.Name = types.StringValue(*apiResponse.Name)
+	state := ingestionKeyResourceModel{
+		Name:         types.StringValue(result.Name),
+		CreatedBy:    types.StringValue(result.CreatedBy),
+		CreationDate: types.StringValue(result.CreationDate.String()),
+		Key:          types.StringValue(result.Key),
+		Type:         types.StringValue(result.Type),
+		RemoteConfig: types.BoolValue(result.RemoteConfig), // API always returns a bool
 	}
 
-	if apiResponse.Key != nil {
-		plan.Key = types.StringValue(*apiResponse.Key)
-	}
-
-	diags = resp.State.Set(ctx, plan)
+	state.Tags, diags = r.tagsToList(ctx, result.Tags)
 	if diags.HasError() {
-		tflog.Error(ctx, "Error setting state for Ingestion Key", map[string]any{"name": plan.Name.ValueString()})
+		resp.Diagnostics.Append(diags...)
+		return
 	}
+
+	diags = resp.State.Set(ctx, state)
+	resp.Diagnostics.Append(diags...)
 }
 
 // Read refreshes the Terraform state with the latest data.
 func (r *ingestionKeyResource) Read(ctx context.Context, req resource.ReadRequest, resp *resource.ReadResponse) {
 	var state ingestionKeyResourceModel
 	diags := req.State.Get(ctx, &state)
-	resp.Diagnostics.Append(diags...)
-	if resp.Diagnostics.HasError() {
+	if diags.HasError() {
+		resp.Diagnostics.Append(diags...)
 		return
 	}
 
@@ -181,27 +198,19 @@ func (r *ingestionKeyResource) Read(ctx context.Context, req resource.ReadReques
 
 	// Update state with the first found key
 	ingestionKey := response[0]
-
 	state.CreatedBy = types.StringValue(ingestionKey.CreatedBy)
 	state.CreationDate = types.StringValue(ingestionKey.CreationDate.String())
 	state.Key = types.StringValue(ingestionKey.Key)
 	state.Type = types.StringValue(ingestionKey.Type)
 	state.RemoteConfig = types.BoolValue(ingestionKey.RemoteConfig)
-	state.Tags, diags = types.ListValueFrom(ctx, types.StringType, ingestionKey.Tags)
+	state.Tags, diags = r.tagsToList(ctx, ingestionKey.Tags)
 	if diags.HasError() {
 		resp.Diagnostics.Append(diags...)
 		return
 	}
 
-	// Set the refreshed state
-	diags = resp.State.Set(ctx, &state)
+	diags = resp.State.Set(ctx, state)
 	resp.Diagnostics.Append(diags...)
-	if resp.Diagnostics.HasError() {
-		tflog.Error(ctx, "Error setting state for Ingestion Key", map[string]any{"name": state.Name.ValueString()})
-		return
-	}
-
-	tflog.Debug(ctx, fmt.Sprintf("Successfully read Ingestion Key resource: %s", state.Name.ValueString()))
 }
 
 func (r *ingestionKeyResource) Update(ctx context.Context, req resource.UpdateRequest, resp *resource.UpdateResponse) {
@@ -245,4 +254,37 @@ func (r *ingestionKeyResource) Delete(ctx context.Context, req resource.DeleteRe
 // ImportState imports the resource from its ID.
 func (r *ingestionKeyResource) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {
 	resource.ImportStatePassthroughID(ctx, path.Root("name"), req, resp)
+}
+
+func (r *ingestionKeyResource) tagsFromList(ctx context.Context, listVal types.List) ([]string, diag.Diagnostics) {
+	var diags diag.Diagnostics
+
+	if listVal.IsNull() || listVal.IsUnknown() {
+		return nil, diags
+	}
+
+	var tags []string
+	diags = listVal.ElementsAs(ctx, &tags, false)
+	return tags, diags
+}
+
+func (r *ingestionKeyResource) tagsToList(ctx context.Context, tags []string) (types.List, diag.Diagnostics) {
+	var diags diag.Diagnostics
+
+	if tags == nil {
+		return types.ListNull(types.StringType), diags
+	}
+
+	if len(tags) == 0 {
+		return types.ListValueMust(types.StringType, []attr.Value{}), diags
+	}
+
+	elements := make([]attr.Value, len(tags))
+	for i, tag := range tags {
+		elements[i] = types.StringValue(tag)
+	}
+
+	listVal, diagsNew := types.ListValue(types.StringType, elements)
+	diags.Append(diagsNew...)
+	return listVal, diags
 }

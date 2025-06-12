@@ -91,7 +91,7 @@ type ApiClient interface {
 	DeleteLogsPipeline(ctx context.Context) error
 
 	// Ingestion Keys
-	CreateIngestionKey(ctx context.Context, req *models.CreateIngestionKeyRequest) (*models.CreateIngestionKeyResponse, error)
+	CreateIngestionKey(ctx context.Context, req *models.CreateIngestionKeyRequest) (*models.IngestionKeyResult, error)
 	ListIngestionKeys(ctx context.Context, req *models.ListIngestionKeysRequest) ([]*models.IngestionKeyResult, error)
 	DeleteIngestionKey(ctx context.Context, req *models.DeleteIngestionKeyRequest) error
 }

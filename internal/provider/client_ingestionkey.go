@@ -11,7 +11,7 @@ import (
 )
 
 // --- API Key Methods ---
-func (c *SdkClientWrapper) CreateIngestionKey(ctx context.Context, req *models.CreateIngestionKeyRequest) (*models.CreateIngestionKeyResponse, error) {
+func (c *SdkClientWrapper) CreateIngestionKey(ctx context.Context, req *models.CreateIngestionKeyRequest) (*models.IngestionKeyResult, error) {
 	var name string
 	if req != nil && req.Name != nil {
 		name = *req.Name
