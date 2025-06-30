@@ -16,6 +16,15 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
+// Constants for drift detection
+const (
+	// Length ratio thresholds for distinguishing semantic vs formatting changes
+	MinSemanticChangeRatio = 0.7
+	MaxSemanticChangeRatio = 1.3
+	// Maximum sample length for debug logging to avoid excessive log output
+	MaxDebugSampleLength = 500
+)
+
 var _ resource.Resource = &monitorResource{}
 var _ resource.ResourceWithImportState = &monitorResource{}
 var _ resource.ResourceWithConfigure = &monitorResource{}
@@ -123,6 +132,106 @@ func (r *monitorResource) Create(ctx context.Context, req resource.CreateRequest
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
 }
 
+// Helper function to safely dereference a string pointer for logging
+func derefString(s *string) string {
+	if s == nil {
+		return "<nil>"
+	}
+	return *s
+}
+
+// detectAndHandleDrift performs drift detection between user and remote YAML
+// and updates the data model if significant semantic changes are detected
+func (r *monitorResource) detectAndHandleDrift(ctx context.Context, data *monitorResourceModel, remoteYamlBytes []byte) {
+	monitorId := data.Id.ValueString()
+	userOriginalYaml := data.MonitorYaml.ValueString()
+
+	if userOriginalYaml == "" || remoteYamlBytes == nil {
+		return
+	}
+
+	remoteYaml := string(remoteYamlBytes)
+
+	// Filter remote YAML to only include keys that exist in user's original YAML
+	filteredRemoteYaml, err := FilterYamlKeysBasedOnTemplate(ctx, remoteYaml, userOriginalYaml)
+	if err != nil {
+		tflog.Warn(ctx, "Failed to filter remote YAML for drift detection, skipping drift check", map[string]interface{}{
+			"id":    monitorId,
+			"error": err.Error(),
+		})
+		return
+	}
+
+	// Apply time normalization to both user and remote YAML before comparison
+	timeNormalizedUserYaml := NormalizeTimeStringsInYaml(userOriginalYaml)
+	timeNormalizedRemoteYaml := NormalizeTimeStringsInYaml(filteredRemoteYaml)
+
+	// Normalize both YAMLs using the same method as ModifyPlan for comparison
+	normalizedUserYaml, err := NormalizeMonitorYaml(ctx, timeNormalizedUserYaml)
+	if err != nil {
+		tflog.Warn(ctx, "Failed to normalize user YAML for drift detection, skipping drift check", map[string]interface{}{
+			"id":    monitorId,
+			"error": err.Error(),
+		})
+		return
+	}
+
+	normalizedRemoteYaml, err := NormalizeMonitorYaml(ctx, timeNormalizedRemoteYaml)
+	if err != nil {
+		tflog.Warn(ctx, "Failed to normalize remote YAML for drift detection, skipping drift check", map[string]interface{}{
+			"id":    monitorId,
+			"error": err.Error(),
+		})
+		return
+	}
+
+	// Compare normalized YAMLs
+	if normalizedUserYaml == normalizedRemoteYaml {
+		tflog.Debug(ctx, "No drift detected: Normalized YAMLs are identical", map[string]interface{}{
+			"id": monitorId,
+		})
+		return
+	}
+
+	tflog.Info(ctx, "Drift detected: Remote monitor state differs from Terraform state", map[string]interface{}{
+		"id":                 monitorId,
+		"user_yaml_length":   len(normalizedUserYaml),
+		"remote_yaml_length": len(normalizedRemoteYaml),
+	})
+
+	// For debugging: log the actual differences (truncated to avoid excessive logs)
+	userSample := normalizedUserYaml
+	remoteSample := normalizedRemoteYaml
+	if len(userSample) > MaxDebugSampleLength {
+		userSample = userSample[:MaxDebugSampleLength] + "..."
+	}
+	if len(remoteSample) > MaxDebugSampleLength {
+		remoteSample = remoteSample[:MaxDebugSampleLength] + "..."
+	}
+	tflog.Debug(ctx, "YAML drift details", map[string]interface{}{
+		"id":                 monitorId,
+		"user_yaml_sample":   userSample,
+		"remote_yaml_sample": remoteSample,
+	})
+
+	// Check if this is a significant semantic difference or just formatting
+	lengthDifference := float64(len(normalizedRemoteYaml)) / float64(len(normalizedUserYaml))
+	if lengthDifference < MinSemanticChangeRatio || lengthDifference > MaxSemanticChangeRatio {
+		// Significant size difference suggests real semantic changes
+		tflog.Info(ctx, "Significant semantic drift detected, updating state", map[string]interface{}{
+			"id":           monitorId,
+			"length_ratio": lengthDifference,
+		})
+		data.MonitorYaml = types.StringValue(normalizedRemoteYaml)
+	} else {
+		// Likely just formatting differences, log but don't update state
+		tflog.Info(ctx, "Minor formatting drift detected, not updating state", map[string]interface{}{
+			"id":           monitorId,
+			"length_ratio": lengthDifference,
+		})
+	}
+}
+
 func (r *monitorResource) Read(ctx context.Context, req resource.ReadRequest, resp *resource.ReadResponse) {
 	var data monitorResourceModel
 
@@ -135,7 +244,7 @@ func (r *monitorResource) Read(ctx context.Context, req resource.ReadRequest, re
 	monitorId := data.Id.ValueString()
 	tflog.Debug(ctx, "Reading monitor resource YAML", map[string]interface{}{"id": monitorId})
 
-	_, err := r.client.GetMonitor(ctx, monitorId)
+	remoteYamlBytes, err := r.client.GetMonitor(ctx, monitorId)
 	if err != nil {
 		if errors.Is(err, ErrNotFound) {
 			tflog.Warn(ctx, fmt.Sprintf("Monitor %s not found (handled via ErrNotFound), removing from state", monitorId))
@@ -148,15 +257,10 @@ func (r *monitorResource) Read(ctx context.Context, req resource.ReadRequest, re
 
 	tflog.Trace(ctx, "Read monitor resource YAML (confirmed existence)", map[string]interface{}{"id": monitorId})
 
-	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
-}
+	// Enhanced drift detection: compare remote state with user's original YAML
+	r.detectAndHandleDrift(ctx, &data, remoteYamlBytes)
 
-// Helper function to safely dereference a string pointer for logging
-func derefString(s *string) string {
-	if s == nil {
-		return "<nil>"
-	}
-	return *s
+	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
 }
 
 func (r *monitorResource) Update(ctx context.Context, req resource.UpdateRequest, resp *resource.UpdateResponse) {
@@ -267,7 +371,11 @@ func (r *monitorResource) ModifyPlan(ctx context.Context, req resource.ModifyPla
 		return
 	}
 
-	normalizedPlannedYaml, err := NormalizeMonitorYaml(ctx, plannedYamlString)
+	// Apply time normalization to both planned and state YAML before comparison
+	timeNormalizedPlannedYaml := NormalizeTimeStringsInYaml(plannedYamlString)
+	timeNormalizedStateYaml := NormalizeTimeStringsInYaml(stateYamlString)
+
+	normalizedPlannedYaml, err := NormalizeMonitorYaml(ctx, timeNormalizedPlannedYaml)
 	if err != nil {
 		resp.Diagnostics.AddAttributeError(
 			path.Root("monitor_yaml"),
@@ -277,7 +385,7 @@ func (r *monitorResource) ModifyPlan(ctx context.Context, req resource.ModifyPla
 		return
 	}
 
-	normalizedStateYaml, err := NormalizeMonitorYaml(ctx, stateYamlString)
+	normalizedStateYaml, err := NormalizeMonitorYaml(ctx, timeNormalizedStateYaml)
 	if err != nil {
 		resp.Diagnostics.AddAttributeError(
 			path.Root("monitor_yaml"),
