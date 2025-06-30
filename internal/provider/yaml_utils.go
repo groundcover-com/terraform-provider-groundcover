@@ -154,7 +154,7 @@ func extractKeysFromAstNode(ctx context.Context, node ast.Node) map[string]inter
 		// For arrays, extract keys from the first item (assuming array items have similar structure)
 		if len(n.Values) > 0 {
 			firstItemKeys := extractKeysFromAstNode(ctx, n.Values[0])
-			if firstItemKeys != nil && len(firstItemKeys) > 0 {
+			if len(firstItemKeys) > 0 {
 				return map[string]interface{}{SequenceMarker: true, ItemKeysField: firstItemKeys}
 			}
 		}
