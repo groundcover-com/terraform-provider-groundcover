@@ -23,7 +23,9 @@ const (
 
 // Pre-compiled regexes for time normalization
 var (
-	timeRegex      = regexp.MustCompile(`\b\d+(?:[hms]\d*)*[hms]\b`)
+	// Match valid Go duration patterns: h, m, s in proper order (not all required)
+	// Examples: "1h", "30m", "45s", "1h30m", "2h15m30s", "5m30s"
+	timeRegex      = regexp.MustCompile(`\d+h(?:\d+m)?(?:\d+s)?|\d+m(?:\d+s)?|\d+s`)
 	componentRegex = regexp.MustCompile(`(\d+)([hms])`)
 	zeroRegex      = regexp.MustCompile(`0[hms]`)
 )
@@ -292,13 +294,29 @@ func NormalizeTimeStringsInYaml(yamlString string) string {
 
 			normalized := strings.Join(filteredComponents, "")
 
-			return normalized
+			// Validate that the normalized string is still a valid duration
+			if _, err := time.ParseDuration(normalized); err == nil {
+				return normalized
+			}
+
+			// If normalized string is invalid, return original
+			return match
 		}
 		// If parsing fails, return original
 		return match
 	})
 
 	return result
+}
+
+// DefaultValueRule defines a rule for applying default values
+type DefaultValueRule struct {
+	// RequiredFields that must exist to trigger this rule
+	RequiredFields []string
+	// DefaultField is the field to add if missing
+	DefaultField string
+	// DefaultValue is the value to set for the default field
+	DefaultValue interface{}
 }
 
 // CompareYamlSemantically compares two YAML strings semantically, ignoring formatting differences
@@ -322,10 +340,18 @@ func CompareYamlSemantically(yaml1, yaml2 string) (bool, error) {
 	normalizedData1 := normalizeTimeInData(data1)
 	normalizedData2 := normalizeTimeInData(data2)
 
-	// Apply default values normalization
+	// Apply monitor-specific default values normalization
 	// This handles cases where the server omits default values (like isPaused: false)
-	normalizedData1 = applyDefaultValues(normalizedData1)
-	normalizedData2 = applyDefaultValues(normalizedData2)
+	monitorDefaultRules := []DefaultValueRule{
+		{
+			RequiredFields: []string{"title", "model"},
+			DefaultField:   "isPaused",
+			DefaultValue:   false,
+		},
+	}
+
+	normalizedData1 = applyDefaultValuesWithRules(normalizedData1, monitorDefaultRules)
+	normalizedData2 = applyDefaultValuesWithRules(normalizedData2, monitorDefaultRules)
 
 	// Deep compare the normalized data structures
 	result := deepEqual(normalizedData1, normalizedData2)
@@ -333,21 +359,30 @@ func CompareYamlSemantically(yaml1, yaml2 string) (bool, error) {
 	return result, nil
 }
 
-// applyDefaultValues adds default values that the server might omit
-func applyDefaultValues(data interface{}) interface{} {
+// applyDefaultValuesWithRules adds default values based on configurable rules
+func applyDefaultValuesWithRules(data interface{}, rules []DefaultValueRule) interface{} {
 	switch v := data.(type) {
 	case map[string]interface{}:
 		result := make(map[string]interface{})
 		for key, value := range v {
-			result[key] = applyDefaultValues(value)
+			result[key] = applyDefaultValuesWithRules(value, rules)
 		}
 
-		// Add isPaused: false if it's missing at the root level
-		if _, hasPaused := result["isPaused"]; !hasPaused {
-			// Check if this looks like a monitor root (has required fields)
-			if _, hasTitle := result["title"]; hasTitle {
-				if _, hasModel := result["model"]; hasModel {
-					result["isPaused"] = false
+		// Apply each default value rule
+		for _, rule := range rules {
+			// Check if this map has all required fields
+			hasAllRequiredFields := true
+			for _, requiredField := range rule.RequiredFields {
+				if _, exists := result[requiredField]; !exists {
+					hasAllRequiredFields = false
+					break
+				}
+			}
+
+			// If all required fields exist and default field is missing, add it
+			if hasAllRequiredFields {
+				if _, hasDefaultField := result[rule.DefaultField]; !hasDefaultField {
+					result[rule.DefaultField] = rule.DefaultValue
 				}
 			}
 		}
@@ -356,15 +391,38 @@ func applyDefaultValues(data interface{}) interface{} {
 	case map[interface{}]interface{}:
 		result := make(map[interface{}]interface{})
 		for key, value := range v {
-			result[key] = applyDefaultValues(value)
+			result[key] = applyDefaultValuesWithRules(value, rules)
 		}
 
-		// Add isPaused: false if it's missing at the root level
-		if _, hasPaused := result["isPaused"]; !hasPaused {
-			// Check if this looks like a monitor root (has required fields)
-			if _, hasTitle := result["title"]; hasTitle {
-				if _, hasModel := result["model"]; hasModel {
-					result["isPaused"] = false
+		// Apply each default value rule (convert interface{} keys to strings for comparison)
+		for _, rule := range rules {
+			// Check if this map has all required fields
+			hasAllRequiredFields := true
+			for _, requiredField := range rule.RequiredFields {
+				found := false
+				for key := range result {
+					if keyStr, ok := key.(string); ok && keyStr == requiredField {
+						found = true
+						break
+					}
+				}
+				if !found {
+					hasAllRequiredFields = false
+					break
+				}
+			}
+
+			// If all required fields exist and default field is missing, add it
+			if hasAllRequiredFields {
+				defaultFieldExists := false
+				for key := range result {
+					if keyStr, ok := key.(string); ok && keyStr == rule.DefaultField {
+						defaultFieldExists = true
+						break
+					}
+				}
+				if !defaultFieldExists {
+					result[rule.DefaultField] = rule.DefaultValue
 				}
 			}
 		}
@@ -373,7 +431,7 @@ func applyDefaultValues(data interface{}) interface{} {
 	case []interface{}:
 		result := make([]interface{}, len(v))
 		for i, item := range v {
-			result[i] = applyDefaultValues(item)
+			result[i] = applyDefaultValuesWithRules(item, rules)
 		}
 		return result
 	default:
@@ -434,7 +492,14 @@ func normalizeTimeString(s string) string {
 			}
 
 			result := strings.Join(filteredComponents, "")
-			return result
+
+			// Validate that the normalized string is still a valid duration
+			if _, err := time.ParseDuration(result); err == nil {
+				return result
+			}
+
+			// If normalized string is invalid, return original
+			return match
 		}
 		// If parsing fails, return original
 		return match
