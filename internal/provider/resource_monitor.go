@@ -16,15 +16,6 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
-// Constants for drift detection
-const (
-	// Length ratio thresholds for distinguishing semantic vs formatting changes
-	// Conservative thresholds to avoid false positives for formatting differences
-	MinSemanticChangeRatio = 0.7
-	MaxSemanticChangeRatio = 1.3
-	// Maximum sample length for debug logging to avoid excessive log output
-	MaxDebugSampleLength = 500
-)
 
 var _ resource.Resource = &monitorResource{}
 var _ resource.ResourceWithImportState = &monitorResource{}
@@ -144,14 +135,6 @@ func derefString(s *string) string {
 	return *s
 }
 
-// Helper function for min
-func min(a, b int) int {
-	if a < b {
-		return a
-	}
-	return b
-}
-
 // detectAndHandleDrift performs drift detection between state and remote YAML
 // Only updates state when there's actual semantic drift, not formatting differences
 func (r *monitorResource) detectAndHandleDrift(ctx context.Context, data *monitorResourceModel, remoteYamlBytes []byte) {
@@ -217,16 +200,6 @@ func (r *monitorResource) detectAndHandleDrift(ctx context.Context, data *monito
 			"id":                    monitorId,
 			"state_yaml_length":     len(normalizedStateYaml),
 			"remote_yaml_length":    len(normalizedFilteredRemoteYaml),
-		})
-		
-		// Log the differences for debugging
-		tflog.Debug(ctx, "State YAML (first 500 chars)", map[string]interface{}{
-			"id":   monitorId,
-			"yaml": normalizedStateYaml[:min(500, len(normalizedStateYaml))],
-		})
-		tflog.Debug(ctx, "Filtered Remote YAML (first 500 chars)", map[string]interface{}{
-			"id":   monitorId,
-			"yaml": normalizedFilteredRemoteYaml[:min(500, len(normalizedFilteredRemoteYaml))],
 		})
 		
 		// There's real drift - update state with the actual remote YAML
@@ -423,13 +396,5 @@ func (r *monitorResource) ModifyPlan(ctx context.Context, req resource.ModifyPla
 		resp.Diagnostics.Append(diags...)
 	} else {
 		tflog.Info(ctx, "ModifyPlan: YAMLs have semantic differences. Plan will proceed with update.")
-		
-		// Debug logging to understand the differences
-		tflog.Debug(ctx, "ModifyPlan: Planned YAML (first 500 chars)", map[string]interface{}{
-			"yaml": normalizedPlannedYaml[:min(500, len(normalizedPlannedYaml))],
-		})
-		tflog.Debug(ctx, "ModifyPlan: Filtered State YAML (first 500 chars)", map[string]interface{}{
-			"yaml": normalizedFilteredStateYaml[:min(500, len(normalizedFilteredStateYaml))],
-		})
 	}
 }
