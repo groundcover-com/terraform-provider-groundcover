@@ -39,7 +39,9 @@ func NormalizeMonitorYaml(ctx context.Context, yamlString string) (string, error
 	normalized, err := NormalizeYamlWithStandardLibrary(yamlString)
 	if err != nil {
 		tflog.Warn(ctx, "Standard library YAML normalization failed, falling back to AST approach", map[string]interface{}{
-			"error": err.Error(),
+			"error":       err.Error(),
+			"yaml_length": len(yamlString),
+			"error_type":  fmt.Sprintf("%T", err),
 		})
 
 		// Fallback to the original AST approach
@@ -344,21 +346,43 @@ func NormalizeYamlWithStandardLibrary(yamlString string) (string, error) {
 func sortYamlData(data interface{}) interface{} {
 	switch v := data.(type) {
 	case map[string]interface{}:
-		// Sort map keys
+		// Extract and sort map keys to ensure deterministic processing
+		keys := make([]string, 0, len(v))
+		for key := range v {
+			keys = append(keys, key)
+		}
+		sort.Strings(keys)
+
+		// Build new map with recursively sorted values
 		sortedMap := make(map[string]interface{})
-		for key, value := range v {
-			sortedMap[key] = sortYamlData(value)
+		for _, key := range keys {
+			sortedMap[key] = sortYamlData(v[key])
 		}
 		return sortedMap
 	case map[interface{}]interface{}:
-		// Convert interface{} keys to strings and sort
-		sortedMap := make(map[string]interface{})
+		// Convert interface{} keys to strings, collect them, and sort
+		keyMap := make(map[string]interface{})
+		var keys []string
+
+		// First pass: convert keys to strings and collect them
 		for key, value := range v {
-			if strKey, ok := key.(string); ok {
-				sortedMap[strKey] = sortYamlData(value)
+			var strKey string
+			if sk, ok := key.(string); ok {
+				strKey = sk
 			} else {
-				sortedMap[fmt.Sprintf("%v", key)] = sortYamlData(value)
+				strKey = fmt.Sprintf("%v", key)
 			}
+			keyMap[strKey] = value
+			keys = append(keys, strKey)
+		}
+
+		// Sort the keys
+		sort.Strings(keys)
+
+		// Build new map with recursively sorted values in key order
+		sortedMap := make(map[string]interface{})
+		for _, key := range keys {
+			sortedMap[key] = sortYamlData(keyMap[key])
 		}
 		return sortedMap
 	case []interface{}:

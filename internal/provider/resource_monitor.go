@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strings"
 
 	"github.com/groundcover-com/groundcover-sdk-go/pkg/models"
 	"github.com/hashicorp/terraform-plugin-framework/path"
@@ -15,7 +16,6 @@ import (
 	"github.com/hashicorp/terraform-plugin-log/tflog"
 	"gopkg.in/yaml.v3"
 )
-
 
 var _ resource.Resource = &monitorResource{}
 var _ resource.ResourceWithImportState = &monitorResource{}
@@ -117,7 +117,7 @@ func (r *monitorResource) Create(ctx context.Context, req resource.CreateRequest
 	}
 
 	data.Id = types.StringValue(apiResp.MonitorID)
-	
+
 	// Store the user's original YAML to avoid Terraform consistency check errors
 	// The normalization will be handled in Read and ModifyPlan
 	data.MonitorYaml = types.StringValue(userInputMonitorYaml)
@@ -151,7 +151,16 @@ func (r *monitorResource) detectAndHandleDrift(ctx context.Context, data *monito
 	// This prevents drift detection from triggering on server-added default fields
 	filteredRemoteYaml, err := FilterYamlKeysBasedOnTemplate(ctx, remoteYaml, stateYaml)
 	if err != nil {
-		tflog.Warn(ctx, "Failed to filter remote YAML based on state template", map[string]interface{}{
+		// If the error is due to unparseable state YAML, that's a more serious issue
+		if strings.Contains(err.Error(), "failed to parse template YAML") {
+			tflog.Error(ctx, "State YAML is unparseable - this indicates a serious issue", map[string]interface{}{
+				"id":    monitorId,
+				"error": err.Error(),
+			})
+			// For now, continue with fallback but this might warrant failing fast in the future
+		}
+
+		tflog.Warn(ctx, "Failed to filter remote YAML based on state template, using unfiltered remote YAML", map[string]interface{}{
 			"id":    monitorId,
 			"error": err.Error(),
 		})
@@ -197,11 +206,11 @@ func (r *monitorResource) detectAndHandleDrift(ctx context.Context, data *monito
 		return
 	} else {
 		tflog.Info(ctx, "Semantic configuration drift detected", map[string]interface{}{
-			"id":                    monitorId,
-			"state_yaml_length":     len(normalizedStateYaml),
-			"remote_yaml_length":    len(normalizedFilteredRemoteYaml),
+			"id":                 monitorId,
+			"state_yaml_length":  len(normalizedStateYaml),
+			"remote_yaml_length": len(normalizedFilteredRemoteYaml),
 		})
-		
+
 		// There's real drift - update state with the actual remote YAML
 		// Use the raw remote YAML to preserve the server's format
 		data.MonitorYaml = types.StringValue(remoteYaml)
@@ -283,7 +292,7 @@ func (r *monitorResource) Update(ctx context.Context, req resource.UpdateRequest
 
 	updatedState := plan
 	updatedState.Id = state.Id
-	
+
 	// Store the user's original YAML to avoid Terraform consistency check errors
 	// The normalization will be handled in Read and ModifyPlan
 	updatedState.MonitorYaml = types.StringValue(userInputMonitorYaml)
@@ -357,7 +366,15 @@ func (r *monitorResource) ModifyPlan(ctx context.Context, req resource.ModifyPla
 	// This prevents ModifyPlan from triggering on server-added default fields
 	filteredStateYaml, err := FilterYamlKeysBasedOnTemplate(ctx, stateYamlString, plannedYamlString)
 	if err != nil {
-		tflog.Warn(ctx, "ModifyPlan: Failed to filter state YAML based on planned template", map[string]interface{}{
+		// If the error is due to unparseable planned YAML, that's concerning
+		if strings.Contains(err.Error(), "failed to parse template YAML") {
+			tflog.Error(ctx, "ModifyPlan: Planned YAML is unparseable - this indicates a serious issue", map[string]interface{}{
+				"error": err.Error(),
+			})
+			// For now, continue with fallback but this might warrant failing fast in the future
+		}
+
+		tflog.Warn(ctx, "ModifyPlan: Failed to filter state YAML based on planned template, using unfiltered state YAML", map[string]interface{}{
 			"error": err.Error(),
 		})
 		filteredStateYaml = stateYamlString
