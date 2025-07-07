@@ -19,6 +19,7 @@ import (
 // Constants for drift detection
 const (
 	// Length ratio thresholds for distinguishing semantic vs formatting changes
+	// Conservative thresholds to avoid false positives for formatting differences
 	MinSemanticChangeRatio = 0.7
 	MaxSemanticChangeRatio = 1.3
 	// Maximum sample length for debug logging to avoid excessive log output
@@ -125,6 +126,9 @@ func (r *monitorResource) Create(ctx context.Context, req resource.CreateRequest
 	}
 
 	data.Id = types.StringValue(apiResp.MonitorID)
+	
+	// Store the user's original YAML to avoid Terraform consistency check errors
+	// The normalization will be handled in Read and ModifyPlan
 	data.MonitorYaml = types.StringValue(userInputMonitorYaml)
 
 	tflog.Trace(ctx, "Created monitor resource from YAML", map[string]interface{}{"id": data.Id.ValueString()})
@@ -140,94 +144,96 @@ func derefString(s *string) string {
 	return *s
 }
 
-// detectAndHandleDrift performs drift detection between user and remote YAML
-// and updates the data model if significant semantic changes are detected
+// Helper function for min
+func min(a, b int) int {
+	if a < b {
+		return a
+	}
+	return b
+}
+
+// detectAndHandleDrift performs drift detection between state and remote YAML
+// Only updates state when there's actual semantic drift, not formatting differences
 func (r *monitorResource) detectAndHandleDrift(ctx context.Context, data *monitorResourceModel, remoteYamlBytes []byte) {
 	monitorId := data.Id.ValueString()
-	userOriginalYaml := data.MonitorYaml.ValueString()
+	stateYaml := data.MonitorYaml.ValueString()
 
-	if userOriginalYaml == "" || remoteYamlBytes == nil {
+	if stateYaml == "" || remoteYamlBytes == nil {
 		return
 	}
 
 	remoteYaml := string(remoteYamlBytes)
 
-	// Filter remote YAML to only include keys that exist in user's original YAML
-	filteredRemoteYaml, err := FilterYamlKeysBasedOnTemplate(ctx, remoteYaml, userOriginalYaml)
+	// Filter remote YAML to only include keys that exist in the state
+	// This prevents drift detection from triggering on server-added default fields
+	filteredRemoteYaml, err := FilterYamlKeysBasedOnTemplate(ctx, remoteYaml, stateYaml)
 	if err != nil {
-		tflog.Warn(ctx, "Failed to filter remote YAML for drift detection, skipping drift check", map[string]interface{}{
+		tflog.Warn(ctx, "Failed to filter remote YAML based on state template", map[string]interface{}{
 			"id":    monitorId,
 			"error": err.Error(),
 		})
-		return
+		filteredRemoteYaml = remoteYaml
 	}
 
-	// Apply time normalization to both user and remote YAML before comparison
-	timeNormalizedUserYaml := NormalizeTimeStringsInYaml(userOriginalYaml)
-	timeNormalizedRemoteYaml := NormalizeTimeStringsInYaml(filteredRemoteYaml)
-
-	// Normalize both YAMLs using the same method as ModifyPlan for comparison
-	normalizedUserYaml, err := NormalizeMonitorYaml(ctx, timeNormalizedUserYaml)
+	// Normalize both YAMLs for comparison
+	normalizedStateYaml, err := NormalizeMonitorYaml(ctx, stateYaml)
 	if err != nil {
-		tflog.Warn(ctx, "Failed to normalize user YAML for drift detection, skipping drift check", map[string]interface{}{
+		tflog.Warn(ctx, "Failed to normalize state YAML", map[string]interface{}{
 			"id":    monitorId,
 			"error": err.Error(),
 		})
-		return
+		normalizedStateYaml = stateYaml
 	}
 
-	normalizedRemoteYaml, err := NormalizeMonitorYaml(ctx, timeNormalizedRemoteYaml)
+	normalizedFilteredRemoteYaml, err := NormalizeMonitorYaml(ctx, filteredRemoteYaml)
 	if err != nil {
-		tflog.Warn(ctx, "Failed to normalize remote YAML for drift detection, skipping drift check", map[string]interface{}{
+		tflog.Warn(ctx, "Failed to normalize filtered remote YAML", map[string]interface{}{
 			"id":    monitorId,
 			"error": err.Error(),
 		})
-		return
+		normalizedFilteredRemoteYaml = filteredRemoteYaml
 	}
 
-	// Compare normalized YAMLs
-	if normalizedUserYaml == normalizedRemoteYaml {
-		tflog.Debug(ctx, "No drift detected: Normalized YAMLs are identical", map[string]interface{}{
+	// Use semantic comparison to detect real drift vs formatting differences
+	areSemanticallySame, err := CompareYamlSemantically(normalizedStateYaml, normalizedFilteredRemoteYaml)
+	if err != nil {
+		tflog.Warn(ctx, "Failed to perform semantic YAML comparison, falling back to string comparison", map[string]interface{}{
+			"id":    monitorId,
+			"error": err.Error(),
+		})
+		// Fallback to string comparison of normalized YAMLs
+		areSemanticallySame = (normalizedStateYaml == normalizedFilteredRemoteYaml)
+	}
+
+	if areSemanticallySame {
+		tflog.Debug(ctx, "No semantic drift detected between state and remote YAML", map[string]interface{}{
 			"id": monitorId,
 		})
+		// Keep the current state YAML format since there's no semantic difference
+		// This preserves the user's formatting preferences
 		return
-	}
-
-	tflog.Info(ctx, "Drift detected: Remote monitor state differs from Terraform state", map[string]interface{}{
-		"id":                 monitorId,
-		"user_yaml_length":   len(normalizedUserYaml),
-		"remote_yaml_length": len(normalizedRemoteYaml),
-	})
-
-	// For debugging: log the actual differences (truncated to avoid excessive logs)
-	userSample := normalizedUserYaml
-	remoteSample := normalizedRemoteYaml
-	if len(userSample) > MaxDebugSampleLength {
-		userSample = userSample[:MaxDebugSampleLength] + "..."
-	}
-	if len(remoteSample) > MaxDebugSampleLength {
-		remoteSample = remoteSample[:MaxDebugSampleLength] + "..."
-	}
-	tflog.Debug(ctx, "YAML drift details", map[string]interface{}{
-		"id":                 monitorId,
-		"user_yaml_sample":   userSample,
-		"remote_yaml_sample": remoteSample,
-	})
-
-	// Check if this is a significant semantic difference or just formatting
-	lengthDifference := float64(len(normalizedRemoteYaml)) / float64(len(normalizedUserYaml))
-	if lengthDifference < MinSemanticChangeRatio || lengthDifference > MaxSemanticChangeRatio {
-		// Significant size difference suggests real semantic changes
-		tflog.Info(ctx, "Significant semantic drift detected, updating state", map[string]interface{}{
-			"id":           monitorId,
-			"length_ratio": lengthDifference,
-		})
-		data.MonitorYaml = types.StringValue(normalizedRemoteYaml)
 	} else {
-		// Likely just formatting differences, log but don't update state
-		tflog.Info(ctx, "Minor formatting drift detected, not updating state", map[string]interface{}{
-			"id":           monitorId,
-			"length_ratio": lengthDifference,
+		tflog.Info(ctx, "Semantic configuration drift detected", map[string]interface{}{
+			"id":                    monitorId,
+			"state_yaml_length":     len(normalizedStateYaml),
+			"remote_yaml_length":    len(normalizedFilteredRemoteYaml),
+		})
+		
+		// Log the differences for debugging
+		tflog.Debug(ctx, "State YAML (first 500 chars)", map[string]interface{}{
+			"id":   monitorId,
+			"yaml": normalizedStateYaml[:min(500, len(normalizedStateYaml))],
+		})
+		tflog.Debug(ctx, "Filtered Remote YAML (first 500 chars)", map[string]interface{}{
+			"id":   monitorId,
+			"yaml": normalizedFilteredRemoteYaml[:min(500, len(normalizedFilteredRemoteYaml))],
+		})
+		
+		// There's real drift - update state with the actual remote YAML
+		// Use the raw remote YAML to preserve the server's format
+		data.MonitorYaml = types.StringValue(remoteYaml)
+		tflog.Debug(ctx, "Updated state with remote YAML due to drift", map[string]interface{}{
+			"id": monitorId,
 		})
 	}
 }
@@ -304,6 +310,9 @@ func (r *monitorResource) Update(ctx context.Context, req resource.UpdateRequest
 
 	updatedState := plan
 	updatedState.Id = state.Id
+	
+	// Store the user's original YAML to avoid Terraform consistency check errors
+	// The normalization will be handled in Read and ModifyPlan
 	updatedState.MonitorYaml = types.StringValue(userInputMonitorYaml)
 
 	resp.Diagnostics.Append(resp.State.Set(ctx, &updatedState)...)
@@ -371,35 +380,56 @@ func (r *monitorResource) ModifyPlan(ctx context.Context, req resource.ModifyPla
 		return
 	}
 
-	// Apply time normalization to both planned and state YAML before comparison
-	timeNormalizedPlannedYaml := NormalizeTimeStringsInYaml(plannedYamlString)
-	timeNormalizedStateYaml := NormalizeTimeStringsInYaml(stateYamlString)
-
-	normalizedPlannedYaml, err := NormalizeMonitorYaml(ctx, timeNormalizedPlannedYaml)
+	// Filter state YAML to only include keys that exist in the planned YAML
+	// This prevents ModifyPlan from triggering on server-added default fields
+	filteredStateYaml, err := FilterYamlKeysBasedOnTemplate(ctx, stateYamlString, plannedYamlString)
 	if err != nil {
-		resp.Diagnostics.AddAttributeError(
-			path.Root("monitor_yaml"),
-			"Plan YAML Normalization Error",
-			fmt.Sprintf("Failed to normalize planned monitor_yaml: %s. Input: %s", err, plannedYamlString),
-		)
+		tflog.Warn(ctx, "ModifyPlan: Failed to filter state YAML based on planned template", map[string]interface{}{
+			"error": err.Error(),
+		})
+		filteredStateYaml = stateYamlString
+	}
+
+	// Normalize both YAMLs for comparison
+	normalizedPlannedYaml, err := NormalizeMonitorYaml(ctx, plannedYamlString)
+	if err != nil {
+		tflog.Warn(ctx, "ModifyPlan: Failed to normalize planned YAML", map[string]interface{}{
+			"error": err.Error(),
+		})
+		normalizedPlannedYaml = plannedYamlString
+	}
+
+	normalizedFilteredStateYaml, err := NormalizeMonitorYaml(ctx, filteredStateYaml)
+	if err != nil {
+		tflog.Warn(ctx, "ModifyPlan: Failed to normalize filtered state YAML", map[string]interface{}{
+			"error": err.Error(),
+		})
+		normalizedFilteredStateYaml = filteredStateYaml
+	}
+
+	// Use semantic comparison to detect real changes vs formatting differences
+	areSemanticallySame, err := CompareYamlSemantically(normalizedPlannedYaml, normalizedFilteredStateYaml)
+	if err != nil {
+		tflog.Warn(ctx, "ModifyPlan: Failed to perform semantic YAML comparison, allowing update", map[string]interface{}{
+			"error": err.Error(),
+		})
 		return
 	}
 
-	normalizedStateYaml, err := NormalizeMonitorYaml(ctx, timeNormalizedStateYaml)
-	if err != nil {
-		resp.Diagnostics.AddAttributeError(
-			path.Root("monitor_yaml"),
-			"State YAML Normalization Error",
-			fmt.Sprintf("Failed to normalize state monitor_yaml: %s. Input: %s", err, stateYamlString),
-		)
-		return
-	}
-
-	if normalizedPlannedYaml == normalizedStateYaml {
-		tflog.Info(ctx, "ModifyPlan: Normalized YAMLs are identical. Setting plan's monitor_yaml to state's monitor_yaml to suppress diff.")
+	if areSemanticallySame {
+		tflog.Info(ctx, "ModifyPlan: YAMLs are semantically identical. Suppressing diff.")
+		// Keep the state YAML to suppress the diff since they're semantically the same
 		diags := resp.Plan.SetAttribute(ctx, path.Root("monitor_yaml"), stateYaml)
 		resp.Diagnostics.Append(diags...)
 	} else {
-		tflog.Info(ctx, "ModifyPlan: Normalized YAMLs differ. Plan will proceed with update for monitor_yaml.")
+		tflog.Info(ctx, "ModifyPlan: YAMLs have semantic differences. Plan will proceed with update.")
+		
+		// Debug logging to understand the differences
+		tflog.Debug(ctx, "ModifyPlan: Planned YAML (first 500 chars)", map[string]interface{}{
+			"yaml": normalizedPlannedYaml[:min(500, len(normalizedPlannedYaml))],
+		})
+		tflog.Debug(ctx, "ModifyPlan: Filtered State YAML (first 500 chars)", map[string]interface{}{
+			"yaml": normalizedFilteredStateYaml[:min(500, len(normalizedFilteredStateYaml))],
+		})
 	}
 }
