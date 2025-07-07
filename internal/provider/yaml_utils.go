@@ -297,7 +297,6 @@ func NormalizeTimeStringsInYaml(yamlString string) string {
 
 			normalized := strings.Join(filteredComponents, "")
 
-
 			return normalized
 		}
 		// If parsing fails, return original
@@ -329,11 +328,13 @@ func NormalizeYamlWithStandardLibrary(yamlString string) (string, error) {
 	encoder.SetIndent(2) // Use 2-space indentation consistently
 
 	if err := encoder.Encode(sortedData); err != nil {
-		encoder.Close()
+		_ = encoder.Close()
 		return "", fmt.Errorf("failed to encode YAML: %w", err)
 	}
 
-	encoder.Close()
+	if err := encoder.Close(); err != nil {
+		return "", fmt.Errorf("failed to close YAML encoder: %w", err)
+	}
 
 	result := strings.TrimSpace(buf.String())
 	return result, nil
@@ -402,7 +403,6 @@ func CompareYamlSemantically(yaml1, yaml2 string) (bool, error) {
 	// Deep compare the normalized data structures
 	result := deepEqual(normalizedData1, normalizedData2)
 
-
 	return result, nil
 }
 
@@ -414,7 +414,7 @@ func applyDefaultValues(data interface{}) interface{} {
 		for key, value := range v {
 			result[key] = applyDefaultValues(value)
 		}
-		
+
 		// Add isPaused: false if it's missing at the root level
 		if _, hasPaused := result["isPaused"]; !hasPaused {
 			// Check if this looks like a monitor root (has required fields)
@@ -424,14 +424,14 @@ func applyDefaultValues(data interface{}) interface{} {
 				}
 			}
 		}
-		
+
 		return result
 	case map[interface{}]interface{}:
 		result := make(map[interface{}]interface{})
 		for key, value := range v {
 			result[key] = applyDefaultValues(value)
 		}
-		
+
 		// Add isPaused: false if it's missing at the root level
 		if _, hasPaused := result["isPaused"]; !hasPaused {
 			// Check if this looks like a monitor root (has required fields)
@@ -441,7 +441,7 @@ func applyDefaultValues(data interface{}) interface{} {
 				}
 			}
 		}
-		
+
 		return result
 	case []interface{}:
 		result := make([]interface{}, len(v))
@@ -572,4 +572,3 @@ func deepEqual(a, b interface{}) bool {
 		return av == b
 	}
 }
-
