@@ -28,42 +28,35 @@ var (
 	zeroRegex      = regexp.MustCompile(`0[hms]`)
 )
 
-// NormalizeMonitorYaml sorts keys in a YAML string alphabetically using standard library.
-// This approach is more reliable for nested field ordering than AST manipulation.
+// NormalizeMonitorYaml sorts keys in a YAML string alphabetically using AST manipulation.
+// This approach preserves comments and handles complex YAML structures consistently.
 func NormalizeMonitorYaml(ctx context.Context, yamlString string) (string, error) {
 	if yamlString == "" {
 		return "", nil
 	}
 
-	// Try the standard library approach first as it's more reliable
-	normalized, err := NormalizeYamlWithStandardLibrary(yamlString)
+	// Parse with AST approach to preserve comments and handle complex structures
+	file, err := parser.ParseBytes([]byte(yamlString), parser.ParseComments)
 	if err != nil {
-		tflog.Warn(ctx, "Standard library YAML normalization failed, falling back to AST approach", map[string]interface{}{
+		tflog.Error(ctx, "Failed to parse YAML in NormalizeMonitorYaml", map[string]interface{}{
 			"error":       err.Error(),
 			"yaml_length": len(yamlString),
-			"error_type":  fmt.Sprintf("%T", err),
 		})
-
-		// Fallback to the original AST approach
-		file, err := parser.ParseBytes([]byte(yamlString), parser.ParseComments)
-		if err != nil {
-			tflog.Error(ctx, "Failed to parse YAML with goccy/go-yaml", map[string]interface{}{"error": err, "yaml": yamlString})
-			return "", fmt.Errorf("failed to parse YAML with goccy/go-yaml: %w", err)
-		}
-
-		for _, doc := range file.Docs {
-			sortAstNodeGoccy(doc.Body)
-		}
-
-		outputString := file.String()
-		if yamlString == "" && outputString == "\n" {
-			return "", nil
-		}
-
-		return outputString, nil
+		return "", fmt.Errorf("failed to parse YAML: %w", err)
 	}
 
-	return normalized, nil
+	// Sort all documents
+	for _, doc := range file.Docs {
+		sortAstNodeGoccy(doc.Body)
+	}
+
+	// Generate normalized output
+	outputString := file.String()
+	if yamlString == "" && outputString == "\n" {
+		return "", nil
+	}
+
+	return outputString, nil
 }
 
 // sortAstNodeGoccy recursively sorts nodes in the AST provided by goccy/go-yaml.
@@ -306,96 +299,6 @@ func NormalizeTimeStringsInYaml(yamlString string) string {
 	})
 
 	return result
-}
-
-// NormalizeYamlWithStandardLibrary normalizes YAML using standard library for consistent ordering
-func NormalizeYamlWithStandardLibrary(yamlString string) (string, error) {
-	if yamlString == "" {
-		return "", nil
-	}
-
-	var data interface{}
-	if err := yaml.Unmarshal([]byte(yamlString), &data); err != nil {
-		return "", fmt.Errorf("failed to unmarshal YAML: %w", err)
-	}
-
-	// Recursively sort all maps
-	sortedData := sortYamlData(data)
-
-	// Create a buffer for consistent formatting
-	var buf strings.Builder
-	encoder := yaml.NewEncoder(&buf)
-
-	// Set consistent formatting options for proper array indentation
-	encoder.SetIndent(2) // Use 2-space indentation consistently
-
-	if err := encoder.Encode(sortedData); err != nil {
-		_ = encoder.Close()
-		return "", fmt.Errorf("failed to encode YAML: %w", err)
-	}
-
-	if err := encoder.Close(); err != nil {
-		return "", fmt.Errorf("failed to close YAML encoder: %w", err)
-	}
-
-	result := strings.TrimSpace(buf.String())
-	return result, nil
-}
-
-// sortYamlData recursively sorts maps and slices in YAML data
-func sortYamlData(data interface{}) interface{} {
-	switch v := data.(type) {
-	case map[string]interface{}:
-		// Extract and sort map keys to ensure deterministic processing
-		keys := make([]string, 0, len(v))
-		for key := range v {
-			keys = append(keys, key)
-		}
-		sort.Strings(keys)
-
-		// Build new map with recursively sorted values
-		sortedMap := make(map[string]interface{})
-		for _, key := range keys {
-			sortedMap[key] = sortYamlData(v[key])
-		}
-		return sortedMap
-	case map[interface{}]interface{}:
-		// Convert interface{} keys to strings, collect them, and sort
-		keyMap := make(map[string]interface{})
-		var keys []string
-
-		// First pass: convert keys to strings and collect them
-		for key, value := range v {
-			var strKey string
-			if sk, ok := key.(string); ok {
-				strKey = sk
-			} else {
-				strKey = fmt.Sprintf("%v", key)
-			}
-			keyMap[strKey] = value
-			keys = append(keys, strKey)
-		}
-
-		// Sort the keys
-		sort.Strings(keys)
-
-		// Build new map with recursively sorted values in key order
-		sortedMap := make(map[string]interface{})
-		for _, key := range keys {
-			sortedMap[key] = sortYamlData(keyMap[key])
-		}
-		return sortedMap
-	case []interface{}:
-		// Recursively sort each element in the slice
-		sortedSlice := make([]interface{}, len(v))
-		for i, item := range v {
-			sortedSlice[i] = sortYamlData(item)
-		}
-		return sortedSlice
-	default:
-		// Return primitive values as-is
-		return v
-	}
 }
 
 // CompareYamlSemantically compares two YAML strings semantically, ignoring formatting differences
