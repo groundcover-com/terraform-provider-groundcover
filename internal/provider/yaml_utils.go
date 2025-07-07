@@ -82,7 +82,9 @@ func sortAstNodeGoccy(node ast.Node) {
 			}
 		}
 	case *ast.SequenceNode:
-		// Recursively sort each element in the sequence
+		// NOTE: We do NOT sort the sequence elements themselves (n.Values slice)
+		// because array order often matters semantically in configuration files.
+		// We only recursively sort the internal structure of each element.
 		for _, valNode := range n.Values {
 			sortAstNodeGoccy(valNode)
 		}
