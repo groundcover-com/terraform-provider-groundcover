@@ -3,6 +3,7 @@ package provider
 import (
 	"context"
 	"fmt"
+	"time"
 
 	"github.com/groundcover-com/groundcover-sdk-go/pkg/models"
 	"github.com/hashicorp/terraform-plugin-framework/attr"
@@ -31,6 +32,7 @@ type ingestionKeyResource struct {
 }
 
 type ingestionKeyResourceModel struct {
+	ID           types.String `tfsdk:"id"`
 	Name         types.String `tfsdk:"name"`
 	CreatedBy    types.String `tfsdk:"created_by"`
 	CreationDate types.String `tfsdk:"creation_date"`
@@ -48,6 +50,13 @@ func (r *ingestionKeyResource) Schema(_ context.Context, _ resource.SchemaReques
 	resp.Schema = schema.Schema{
 		Description: "Ingestion Key resource.",
 		Attributes: map[string]schema.Attribute{
+			"id": schema.StringAttribute{
+				Description: "The unique identifier of the ingestion key.",
+				Computed:    true,
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.UseStateForUnknown(),
+				},
+			},
 			"name": schema.StringAttribute{
 				Description: "The name of the ingestion key.",
 				Required:    true,
@@ -149,6 +158,7 @@ func (r *ingestionKeyResource) Create(ctx context.Context, req resource.CreateRe
 
 	// Map response back to state
 	state := ingestionKeyResourceModel{
+		ID:           types.StringValue(result.Name), // Use name as ID for ingestion keys
 		Name:         types.StringValue(result.Name),
 		CreatedBy:    types.StringValue(result.CreatedBy),
 		CreationDate: types.StringValue(result.CreationDate.String()),
@@ -177,19 +187,39 @@ func (r *ingestionKeyResource) Read(ctx context.Context, req resource.ReadReques
 	}
 
 	tflog.Debug(ctx, fmt.Sprintf("Reading Ingestion Key resource: %s", state.Name.ValueString()))
-	response, err := r.client.ListIngestionKeys(ctx, &models.ListIngestionKeysRequest{
-		Name: state.Name.ValueString(),
-	})
-	if err != nil {
-		resp.Diagnostics.AddError(
-			"Error Reading Ingestion Key",
-			fmt.Sprintf("Could not read Ingestion Key: %s", err.Error()),
-		)
-		return
+	
+	// Retry logic to handle timing issues - match SDK e2e pattern exactly
+	targetName := state.Name.ValueString()
+	
+	// Retry logic for API consistency - use 10 seconds like SDK e2e pattern
+	timeout := time.Now().Add(10 * time.Second)
+	var response []*models.IngestionKeyResult
+	
+	for {
+		// List ingestion keys by name like the SDK e2e test
+		listResp, err := r.client.ListIngestionKeys(ctx, &models.ListIngestionKeysRequest{
+			Name: targetName,
+		})
+		
+		if err != nil {
+			resp.Diagnostics.AddError(
+				"Error Reading Ingestion Key",
+				fmt.Sprintf("Could not read Ingestion Key: %s", err.Error()),
+			)
+			return
+		}
+		
+		if len(listResp) > 0 || time.Now().After(timeout) {
+			response = listResp
+			break
+		}
+		
+		tflog.Debug(ctx, fmt.Sprintf("Waiting for Ingestion Key %s to be listed, retrying...", targetName))
+		time.Sleep(1 * time.Second)
 	}
 
 	if len(response) == 0 {
-		tflog.Warn(ctx, fmt.Sprintf("Ingestion Key not found: %s", state.Name.ValueString()))
+		tflog.Warn(ctx, fmt.Sprintf("Ingestion Key not found after timeout: %s", state.Name.ValueString()))
 		resp.State.RemoveResource(ctx)
 		return
 	}
@@ -198,6 +228,7 @@ func (r *ingestionKeyResource) Read(ctx context.Context, req resource.ReadReques
 
 	// Update state with the first found key
 	ingestionKey := response[0]
+	state.ID = types.StringValue(ingestionKey.Name) // Ensure ID is set
 	state.CreatedBy = types.StringValue(ingestionKey.CreatedBy)
 	state.CreationDate = types.StringValue(ingestionKey.CreationDate.String())
 	state.Key = types.StringValue(ingestionKey.Key)

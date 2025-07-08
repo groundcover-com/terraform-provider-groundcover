@@ -10,6 +10,8 @@ import (
 	// SDK Imports
 	models "github.com/groundcover-com/groundcover-sdk-go/pkg/models"
 
+	"github.com/hashicorp/terraform-plugin-framework/attr"
+	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
@@ -20,6 +22,7 @@ import (
 
 var _ resource.Resource = &serviceAccountResource{}
 var _ resource.ResourceWithConfigure = &serviceAccountResource{}
+var _ resource.ResourceWithImportState = &serviceAccountResource{}
 
 func NewServiceAccountResource() resource.Resource {
 	return &serviceAccountResource{}
@@ -177,8 +180,22 @@ func (r *serviceAccountResource) Read(ctx context.Context, req resource.ReadRequ
 	state.ID = types.StringValue(foundSA.ServiceAccountID)
 	state.Name = types.StringValue(foundSA.Name)
 	state.Email = types.StringValue(foundSA.Email)
+	
+	// Extract policy UUIDs from the service account policies
+	var policyUUIDs []attr.Value
+	for _, policy := range foundSA.Policies {
+		if policy.UUID != "" {
+			policyUUIDs = append(policyUUIDs, types.StringValue(policy.UUID))
+		}
+	}
+	policyList, diags := types.ListValue(types.StringType, policyUUIDs)
+	resp.Diagnostics.Append(diags...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+	state.PolicyUUIDs = policyList
 
-	tflog.Info(ctx, "Saving updated service account to state", map[string]any{"id": state.ID.ValueString()})
+	tflog.Info(ctx, "Saving updated service account to state", map[string]any{"id": state.ID.ValueString(), "policies_count": len(policyUUIDs)})
 	resp.Diagnostics.Append(resp.State.Set(ctx, &state)...)
 }
 
@@ -247,4 +264,8 @@ func (r *serviceAccountResource) Delete(ctx context.Context, req resource.Delete
 
 	tflog.Info(ctx, "Service Account deleted successfully via SDK (or was already gone)", map[string]any{"id": saID})
 	// Terraform automatically removes the resource from state when Delete returns no error.
+}
+
+func (r *serviceAccountResource) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {
+	resource.ImportStatePassthroughID(ctx, path.Root("id"), req, resp)
 }

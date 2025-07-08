@@ -246,15 +246,17 @@ func (r *apiKeyResource) Read(ctx context.Context, req resource.ReadRequest, res
 	// Read the latest API key data
 	diags = r.readApiKey(ctx, &state)
 	resp.Diagnostics.Append(diags...)
-	if resp.Diagnostics.HasError() {
-		// If read failed, it might mean the resource was deleted outside Terraform
-		for _, diag := range diags {
-			if diag.Summary() == "API Key Not Found" {
-				tflog.Warn(ctx, fmt.Sprintf("API Key %s not found, removing from state.", state.Id.ValueString()))
-				resp.State.RemoveResource(ctx)
-				return
-			}
+	
+	// Check if the API key was not found (either as error or warning)
+	for _, diag := range diags {
+		if diag.Summary() == "API Key Not Found" {
+			tflog.Warn(ctx, fmt.Sprintf("API Key %s not found, removing from state.", state.Id.ValueString()))
+			resp.State.RemoveResource(ctx)
+			return
 		}
+	}
+	
+	if resp.Diagnostics.HasError() {
 		return
 	}
 
@@ -348,8 +350,13 @@ func (r *apiKeyResource) readApiKey(ctx context.Context, state *apiKeyResourceMo
 		}
 	}
 
-	if foundKey == nil {
-		diags.AddWarning("API Key Not Found", fmt.Sprintf("API Key with ID %s not found during list operation (checked active and filtered).", apiKeyId))
+	if foundKey == nil || !foundKey.RevokedAt.IsZero() || !foundKey.ExpiredAt.IsZero() {
+		// Return a special warning that indicates the resource should be removed from state
+		if foundKey == nil {
+			diags.AddWarning("API Key Not Found", fmt.Sprintf("API Key with ID %s not found during list operation (checked active and filtered).", apiKeyId))
+		} else {
+			diags.AddWarning("API Key Not Found", fmt.Sprintf("API Key with ID %s is revoked or expired and should be removed from state.", apiKeyId))
+		}
 		return diags
 	}
 
