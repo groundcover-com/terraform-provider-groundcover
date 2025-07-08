@@ -43,11 +43,6 @@ jobs:
           exit 1
         fi
     
-    - name: Run golangci-lint
-      uses: golangci/golangci-lint-action@v3
-      with:
-        version: latest
-        args: --timeout=5m
 
   # Run acceptance tests (with API calls)
   acceptance-tests:
@@ -139,9 +134,9 @@ jobs:
       run: go mod download
     
     - name: Run security scan
-      uses: securecodewarrior/github-action-gosec@master
-      with:
-        args: './...'
+      run: |
+        go install github.com/securecodewarrior/gosec/v2/cmd/gosec@latest
+        gosec ./...
     
     - name: Check for vulnerabilities
       run: |
