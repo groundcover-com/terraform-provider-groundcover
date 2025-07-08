@@ -23,7 +23,7 @@ func TestAccIngestionKeyResource(t *testing.T) {
 	updatedName := acctest.RandomWithPrefix("test-ingestionkey-updated")
 
 	resource.Test(t, resource.TestCase{
-		PreCheck: func() { 
+		PreCheck: func() {
 			testAccPreCheckIngestionKey(t)
 		},
 		ProtoV6ProviderFactories: testAccProtoV6ProviderFactoriesWithCloudOrg(t),
@@ -44,7 +44,7 @@ func TestAccIngestionKeyResource(t *testing.T) {
 				ResourceName:            "groundcover_ingestionkey.test",
 				ImportState:             true,
 				ImportStateVerify:       true,
-				ImportStateVerifyIgnore: []string{"key"}, // Ingestion key is sensitive and not returned on import
+				ImportStateVerifyIgnore: []string{"key"},                         // Ingestion key is sensitive and not returned on import
 				Config:                  testAccIngestionKeyResourceConfig(name), // Ensure same config for import
 			},
 			// Update and Read testing
@@ -63,7 +63,7 @@ func TestAccIngestionKeyResource_disappears(t *testing.T) {
 	name := acctest.RandomWithPrefix("test-ingestionkey")
 
 	resource.Test(t, resource.TestCase{
-		PreCheck: func() { 
+		PreCheck: func() {
 			testAccPreCheckIngestionKey(t)
 		},
 		ProtoV6ProviderFactories: testAccProtoV6ProviderFactoriesWithCloudOrg(t),
@@ -117,7 +117,7 @@ func testAccCheckIngestionKeyResourceDisappears(n string) resource.TestCheckFunc
 
 		// Create a provider client to delete the resource
 		ctx := context.Background()
-		
+
 		// Get environment variables for client configuration
 		apiKey := os.Getenv("GROUNDCOVER_API_KEY")
 		orgName := os.Getenv("GROUNDCOVER_ORG_NAME") // Use current org name (which should be set to cloud org during test)
@@ -134,7 +134,7 @@ func testAccCheckIngestionKeyResourceDisappears(n string) resource.TestCheckFunc
 
 		// For ingestion keys, the ID is the name (see ImportState implementation)
 		ingestionKeyName := rs.Primary.ID
-		
+
 		// Create delete request using the SDK pattern
 		deleteReq := &models.DeleteIngestionKeyRequest{
 			Name: &ingestionKeyName,
@@ -169,16 +169,16 @@ func testAccProtoV6ProviderFactoriesWithCloudOrg(t *testing.T) map[string]func()
 	if os.Getenv("TF_ACC") == "" {
 		return testAccProtoV6ProviderFactories
 	}
-	
+
 	// Temporarily override GROUNDCOVER_ORG_NAME with the cloud org name
 	cloudOrgName := os.Getenv("GROUNDCOVER_CLOUD_ORG_NAME")
 	if cloudOrgName == "" {
 		t.Fatal("GROUNDCOVER_CLOUD_ORG_NAME must be set for ingestion key tests")
 	}
-	
+
 	// Store original value to restore later
 	originalOrgName := os.Getenv("GROUNDCOVER_ORG_NAME")
-	
+
 	// Set the cloud org name and set up cleanup ONCE for the entire test
 	if err := os.Setenv("GROUNDCOVER_ORG_NAME", cloudOrgName); err != nil {
 		t.Fatalf("Failed to set GROUNDCOVER_ORG_NAME: %v", err)
@@ -194,13 +194,13 @@ func testAccProtoV6ProviderFactoriesWithCloudOrg(t *testing.T) map[string]func()
 			}
 		}
 	})
-	
+
 	// Create provider factory
 	factories := map[string]func() (tfprotov6.ProviderServer, error){
 		"groundcover": func() (tfprotov6.ProviderServer, error) {
 			return providerserver.NewProtocol6WithError(New("test")())()
 		},
 	}
-	
+
 	return factories
 }

@@ -246,7 +246,7 @@ func (r *apiKeyResource) Read(ctx context.Context, req resource.ReadRequest, res
 	// Read the latest API key data
 	diags = r.readApiKey(ctx, &state)
 	resp.Diagnostics.Append(diags...)
-	
+
 	// Check if the API key was not found (either as error or warning)
 	for _, diag := range diags {
 		if diag.Summary() == "API Key Not Found" {
@@ -255,7 +255,7 @@ func (r *apiKeyResource) Read(ctx context.Context, req resource.ReadRequest, res
 			return
 		}
 	}
-	
+
 	if resp.Diagnostics.HasError() {
 		return
 	}

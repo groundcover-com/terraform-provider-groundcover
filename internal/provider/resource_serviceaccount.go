@@ -180,7 +180,7 @@ func (r *serviceAccountResource) Read(ctx context.Context, req resource.ReadRequ
 	state.ID = types.StringValue(foundSA.ServiceAccountID)
 	state.Name = types.StringValue(foundSA.Name)
 	state.Email = types.StringValue(foundSA.Email)
-	
+
 	// Extract policy UUIDs from the service account policies
 	var policyUUIDs []attr.Value
 	for _, policy := range foundSA.Policies {

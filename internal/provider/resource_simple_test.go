@@ -30,9 +30,9 @@ func TestAccPolicyResourceSimple(t *testing.T) {
 			},
 			// ImportState testing
 			{
-				ResourceName:      "groundcover_policy.test",
-				ImportState:       true,
-				ImportStateVerify: true,
+				ResourceName:            "groundcover_policy.test",
+				ImportState:             true,
+				ImportStateVerify:       true,
 				ImportStateVerifyIgnore: []string{"deprecated", "is_system_defined", "read_only", "revision_number", "description", "role"},
 			},
 			// Update testing

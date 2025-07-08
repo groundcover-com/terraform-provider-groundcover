@@ -175,7 +175,7 @@ func testAccCheckPolicyResourceDisappears(n string) resource.TestCheckFunc {
 
 		// Create a provider client to delete the resource
 		ctx := context.Background()
-		
+
 		// Get environment variables for client configuration
 		apiKey := os.Getenv("GROUNDCOVER_API_KEY")
 		orgName := os.Getenv("GROUNDCOVER_ORG_NAME")

@@ -187,20 +187,20 @@ func (r *ingestionKeyResource) Read(ctx context.Context, req resource.ReadReques
 	}
 
 	tflog.Debug(ctx, fmt.Sprintf("Reading Ingestion Key resource: %s", state.Name.ValueString()))
-	
+
 	// Retry logic to handle timing issues - match SDK e2e pattern exactly
 	targetName := state.Name.ValueString()
-	
+
 	// Retry logic for API consistency - use 10 seconds like SDK e2e pattern
 	timeout := time.Now().Add(10 * time.Second)
 	var response []*models.IngestionKeyResult
-	
+
 	for {
 		// List ingestion keys by name like the SDK e2e test
 		listResp, err := r.client.ListIngestionKeys(ctx, &models.ListIngestionKeysRequest{
 			Name: targetName,
 		})
-		
+
 		if err != nil {
 			resp.Diagnostics.AddError(
 				"Error Reading Ingestion Key",
@@ -208,12 +208,12 @@ func (r *ingestionKeyResource) Read(ctx context.Context, req resource.ReadReques
 			)
 			return
 		}
-		
+
 		if len(listResp) > 0 || time.Now().After(timeout) {
 			response = listResp
 			break
 		}
-		
+
 		tflog.Debug(ctx, fmt.Sprintf("Waiting for Ingestion Key %s to be listed, retrying...", targetName))
 		time.Sleep(1 * time.Second)
 	}
