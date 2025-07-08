@@ -79,17 +79,6 @@ jobs:
       run: |
         echo "Running acceptance tests..."
         go test ./internal/provider -v -timeout 30m
-    
-    - name: Upload test results
-      uses: actions/upload-artifact@v3
-      if: always()
-      with:
-        name: test-results
-        path: |
-          *.log
-          *.xml
-          coverage.out
-        retention-days: 7
 
   # Build test to ensure the provider compiles
   build-test:
