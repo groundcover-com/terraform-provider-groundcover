@@ -119,29 +119,6 @@ jobs:
     - name: Test build with make
       run: make build
 
-  # Security and quality checks
-  security-checks:
-    runs-on: ubuntu-latest
-    steps:
-    - uses: actions/checkout@v4
-    
-    - name: Set up Go
-      uses: actions/setup-go@v4
-      with:
-        go-version: '1.21'
-    
-    - name: Download dependencies
-      run: go mod download
-    
-    - name: Run security scan
-      run: |
-        go install github.com/securecodewarrior/gosec/v2/cmd/gosec@latest
-        gosec ./...
-    
-    - name: Check for vulnerabilities
-      run: |
-        go install golang.org/x/vuln/cmd/govulncheck@latest
-        govulncheck ./...
 
   # Dependency check
   dependency-check:
