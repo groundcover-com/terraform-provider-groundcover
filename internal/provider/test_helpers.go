@@ -21,7 +21,10 @@ func TestProvider() provider.Provider {
 func testAccResourceName(prefix string) string {
 	// Generate a unique ID using timestamp and random number
 	timestamp := time.Now().Unix()
-	randomNum, _ := rand.Int(rand.Reader, big.NewInt(1000000))
+	randomNum, err := rand.Int(rand.Reader, big.NewInt(1000000))
+	if err != nil {
+		panic(fmt.Sprintf("failed to generate random number for test resource name: %v", err))
+	}
 	return fmt.Sprintf("%s-%d-%s", prefix, timestamp, randomNum.String())
 }
 
