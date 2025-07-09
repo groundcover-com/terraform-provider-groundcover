@@ -167,6 +167,54 @@ provider "groundcover" {
 *   `api_key` (String, Required, Sensitive): Your groundcover API key. It is strongly recommended to configure this using the `TF_VAR_groundcover_api_key` environment variable rather than hardcoding it.
 *   `base_url` (String, Optional): The base URL for the groundcover API. Defaults to `api.groundcover.com` if not specified.
 
+## Testing
+
+The provider includes comprehensive acceptance tests for all resources. To run the tests:
+
+### Prerequisites
+
+Set the required environment variables:
+
+```bash
+export GROUNDCOVER_API_KEY="your-api-key-here"
+export GROUNDCOVER_API_URL="https://api.main.groundcover.com/"
+export GROUNDCOVER_ORG_NAME="your-org-name"
+
+# For ingestion key tests (requires cloud backend):
+export GROUNDCOVER_CLOUD_ORG_NAME="your-cloud-org-name"
+```
+
+### Running Tests
+
+```bash
+# Run all tests
+TF_ACC=1 go test ./internal/provider -v
+
+# Run specific resource tests
+TF_ACC=1 go test ./internal/provider -v -run TestAccPolicyResource
+TF_ACC=1 go test ./internal/provider -v -run TestAccServiceAccountResource
+TF_ACC=1 go test ./internal/provider -v -run TestAccIngestionKeyResource
+
+# Run unit tests only (no API calls)
+go test ./internal/provider -v
+```
+
+### Test Features
+
+- **Create, Read, Update, Delete (CRUD)** testing for all resources
+- **Import functionality** testing to ensure resources can be imported into Terraform state
+- **Disappears testing** to verify proper handling when resources are deleted outside Terraform
+- **Error handling** validation for various API error conditions
+- **Cloud backend support** for ingestion key operations
+
+### Test Architecture
+
+The test suite includes:
+- **Unit tests** for utility functions and error handling
+- **Acceptance tests** that interact with real API endpoints
+- **Retry logic** to handle eventual consistency in cloud APIs
+- **Environment-specific configurations** for different backend types
+
 ## Resource Reference
 
 See the [REFERENCE.md](./REFERENCE.md) file for detailed documentation of each resource.

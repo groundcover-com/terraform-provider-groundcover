@@ -2,6 +2,7 @@ package provider
 
 import (
 	"context"
+	"errors"
 	"fmt"
 
 	"github.com/groundcover-com/groundcover-sdk-go/pkg/client/ingestionkeys"
@@ -72,7 +73,12 @@ func (c *SdkClientWrapper) DeleteIngestionKey(ctx context.Context, req *models.D
 		WithBody(req)
 
 	if _, err := c.sdkClient.Ingestionkeys.DeleteIngestionKey(params, nil); err != nil {
-		return handleApiError(ctx, err, "DeleteIngestionKey", name)
+		mappedErr := handleApiError(ctx, err, "DeleteIngestionKey", name)
+		if errors.Is(mappedErr, ErrNotFound) {
+			tflog.Warn(ctx, "SDK Call Result: Ingestion Key Not Found during Delete (Idempotent Success)", logFields)
+			return nil
+		}
+		return mappedErr
 	}
 
 	tflog.Debug(ctx, "SDK Call Successful: Delete Ingestion Key", logFields)

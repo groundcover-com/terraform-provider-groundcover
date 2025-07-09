@@ -1,0 +1,143 @@
+name: Tests
+
+on:
+  pull_request:
+    branches: [ main ]
+  push:
+    branches: [ main ]
+
+jobs:
+  # Run unit tests (no API calls)
+  unit-tests:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Set up Go
+      uses: actions/setup-go@v4
+      with:
+        go-version: '1.21'
+    
+    - name: Cache Go modules
+      uses: actions/cache@v3
+      with:
+        path: ~/go/pkg/mod
+        key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
+        restore-keys: |
+          ${{ runner.os }}-go-
+    
+    - name: Download dependencies
+      run: go mod download
+    
+    - name: Run unit tests
+      run: go test ./internal/provider -v -short
+    
+    - name: Run go vet
+      run: go vet ./...
+    
+    - name: Check code formatting
+      run: |
+        if [ "$(gofmt -s -l . | wc -l)" -gt 0 ]; then
+          echo "Code is not formatted. Please run 'go fmt ./...'"
+          gofmt -s -l .
+          exit 1
+        fi
+    
+
+  # Run acceptance tests (with API calls)
+  acceptance-tests:
+    runs-on: ubuntu-latest
+    needs: unit-tests
+    environment: testing
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Set up Go
+      uses: actions/setup-go@v4
+      with:
+        go-version: '1.21'
+    
+    - name: Cache Go modules
+      uses: actions/cache@v3
+      with:
+        path: ~/go/pkg/mod
+        key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
+        restore-keys: |
+          ${{ runner.os }}-go-
+    
+    - name: Download dependencies
+      run: go mod download
+    
+    - name: Check if secrets are available
+      id: check-secrets
+      run: |
+        if [ -n "${{ secrets.GROUNDCOVER_API_KEY }}" ] && [ -n "${{ secrets.GROUNDCOVER_ORG_NAME }}" ]; then
+          echo "secrets-available=true" >> $GITHUB_OUTPUT
+        else
+          echo "secrets-available=false" >> $GITHUB_OUTPUT
+        fi
+    
+    - name: Skip acceptance tests (secrets not available)
+      if: steps.check-secrets.outputs.secrets-available == 'false'
+      run: |
+        echo "⚠️  Skipping acceptance tests - repository secrets not available"
+        echo "This is expected for PRs from forks and doesn't indicate a failure"
+        echo "Acceptance tests will run when the PR is merged or pushed to main"
+    
+    - name: Run acceptance tests
+      if: steps.check-secrets.outputs.secrets-available == 'true'
+      env:
+        TF_ACC: 1
+        GROUNDCOVER_API_KEY: ${{ secrets.GROUNDCOVER_API_KEY }}
+        GROUNDCOVER_API_URL: ${{ secrets.GROUNDCOVER_API_URL }}
+        GROUNDCOVER_ORG_NAME: ${{ secrets.GROUNDCOVER_ORG_NAME }}
+        GROUNDCOVER_CLOUD_ORG_NAME: ${{ secrets.GROUNDCOVER_CLOUD_ORG_NAME }}
+      run: |
+        echo "✅ Running acceptance tests with available secrets..."
+        go test ./internal/provider -v -timeout 30m
+
+  # Build test to ensure the provider compiles
+  build-test:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Set up Go
+      uses: actions/setup-go@v4
+      with:
+        go-version: '1.21'
+    
+    - name: Cache Go modules
+      uses: actions/cache@v3
+      with:
+        path: ~/go/pkg/mod
+        key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
+        restore-keys: |
+          ${{ runner.os }}-go-
+    
+    - name: Download dependencies
+      run: go mod download
+    
+    - name: Build provider
+      run: go build -v .
+    
+    - name: Test build with make
+      run: make build
+
+
+  # Dependency check
+  dependency-check:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Set up Go
+      uses: actions/setup-go@v4
+      with:
+        go-version: '1.21'
+    
+    - name: Verify dependencies
+      run: |
+        go mod verify
+        go mod tidy
+        git diff --exit-code go.mod go.sum
