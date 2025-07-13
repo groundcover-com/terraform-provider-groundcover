@@ -350,13 +350,15 @@ func (r *apiKeyResource) readApiKey(ctx context.Context, state *apiKeyResourceMo
 		}
 	}
 
-	if foundKey == nil || !foundKey.RevokedAt.IsZero() || !foundKey.ExpiredAt.IsZero() {
-		// Return a special warning that indicates the resource should be removed from state
-		if foundKey == nil {
-			diags.AddWarning("API Key Not Found", fmt.Sprintf("API Key with ID %s not found during list operation (checked active and filtered).", apiKeyId))
-		} else {
-			diags.AddWarning("API Key Not Found", fmt.Sprintf("API Key with ID %s is revoked or expired and should be removed from state.", apiKeyId))
-		}
+	// Check if the key was not found first
+	if foundKey == nil {
+		diags.AddWarning("API Key Not Found", fmt.Sprintf("API Key with ID %s not found during list operation (checked active and filtered).", apiKeyId))
+		return diags
+	}
+
+	// Check if the key is revoked or expired
+	if !foundKey.RevokedAt.IsZero() || !foundKey.ExpiredAt.IsZero() {
+		diags.AddWarning("API Key Not Found", fmt.Sprintf("API Key with ID %s is revoked or expired and should be removed from state.", apiKeyId))
 		return diags
 	}
 
