@@ -27,7 +27,7 @@ import (
 var _ resource.Resource = &policyResource{}
 var _ resource.ResourceWithConfigure = &policyResource{}
 
-// var _ resource.ResourceWithImportState = &policyResource{} // Temporarily remove ImportState
+var _ resource.ResourceWithImportState = &policyResource{}
 
 // policyResource defines the resource implementation.
 type policyResource struct {
@@ -36,6 +36,7 @@ type policyResource struct {
 
 // policyResourceModel describes the resource data model.
 type policyResourceModel struct {
+	ID              types.String `tfsdk:"id"`
 	UUID            types.String `tfsdk:"uuid"`
 	Name            types.String `tfsdk:"name"`
 	Role            types.Map    `tfsdk:"role"`
@@ -127,6 +128,13 @@ func (r *policyResource) Schema(ctx context.Context, req resource.SchemaRequest,
 	resp.Schema = schema.Schema{
 		MarkdownDescription: "Manages a groundcover RBAC policy.",
 		Attributes: map[string]schema.Attribute{
+			"id": schema.StringAttribute{
+				MarkdownDescription: "The unique identifier (ID) of the policy. Same as UUID.",
+				Computed:            true,
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.UseStateForUnknown(),
+				},
+			},
 			"uuid": schema.StringAttribute{
 				MarkdownDescription: "The unique identifier (UUID) of the policy.",
 				Computed:            true,
@@ -243,6 +251,7 @@ func (r *policyResource) Create(ctx context.Context, req resource.CreateRequest,
 	tflog.Info(ctx, "Policy created successfully via SDK", map[string]any{"uuid": apiResponse.UUID})
 
 	// Update state with computed values from SDK response
+	plan.ID = types.StringValue(apiResponse.UUID)
 	plan.UUID = types.StringValue(apiResponse.UUID)
 	plan.RevisionNumber = types.Int64Value(int64(apiResponse.RevisionNumber))
 
@@ -304,7 +313,7 @@ func (r *policyResource) Read(ctx context.Context, req resource.ReadRequest, res
 		return
 	}
 
-	policyUUID := state.UUID.ValueString()
+	policyUUID := state.ID.ValueString()
 	tflog.Debug(ctx, "GetPolicy SDK Call Request", map[string]any{"uuid": policyUUID})
 	apiResponse, err := r.client.GetPolicy(ctx, policyUUID)
 	if err != nil {
@@ -338,7 +347,7 @@ func (r *policyResource) Update(ctx context.Context, req resource.UpdateRequest,
 		return
 	}
 
-	policyUUID := state.UUID.ValueString()
+	policyUUID := state.ID.ValueString()
 
 	// First, read the current state from the API to get the latest revision number
 	// This prevents concurrency conflicts when the resource was modified externally
@@ -380,6 +389,7 @@ func (r *policyResource) Update(ctx context.Context, req resource.UpdateRequest,
 
 	// Update state (plan) from SDK Response
 	// Preserve UUID from state, as it's the identifier and shouldn't change.
+	plan.ID = state.ID
 	plan.UUID = state.UUID
 
 	// Populate known fields from the API response into the plan.
@@ -461,7 +471,7 @@ func (r *policyResource) Delete(ctx context.Context, req resource.DeleteRequest,
 		return
 	}
 
-	policyUUID := state.UUID.ValueString()
+	policyUUID := state.ID.ValueString()
 	tflog.Debug(ctx, "DeletePolicy SDK Call Request", map[string]any{"uuid": policyUUID})
 	err := r.client.DeletePolicy(ctx, policyUUID)
 	if err != nil {
@@ -649,6 +659,7 @@ func mapPolicyApiResponseToModel(ctx context.Context, apiResponse models.Policy,
 
 	tflog.Debug(ctx, "Mapping SDK Policy response to Terraform model", map[string]any{"uuid": apiResponse.UUID})
 
+	state.ID = types.StringValue(apiResponse.UUID)
 	state.UUID = types.StringValue(apiResponse.UUID)
 	if apiResponse.Name != nil {
 		state.Name = types.StringValue(*apiResponse.Name)
@@ -664,5 +675,5 @@ func mapPolicyApiResponseToModel(ctx context.Context, apiResponse models.Policy,
 
 // Temporarily remove ImportState until fully implemented.
 func (r *policyResource) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {
-	resource.ImportStatePassthroughID(ctx, path.Root("uuid"), req, resp)
+	resource.ImportStatePassthroughID(ctx, path.Root("id"), req, resp)
 }
