@@ -77,9 +77,13 @@ func (p *GroundcoverProvider) Configure(ctx context.Context, req provider.Config
 		orgName = config.OrgName.ValueString()
 	}
 
-	apiUrl := os.Getenv("GROUNDCOVER_API_URL") // Default handled by SDK if empty
+	apiUrl := os.Getenv("GROUNDCOVER_API_URL")
 	if !config.ApiUrl.IsNull() {
 		apiUrl = config.ApiUrl.ValueString()
+	}
+	// Set default API URL if not provided
+	if apiUrl == "" {
+		apiUrl = "https://api.groundcover.com"
 	}
 
 	if apiKey == "" {

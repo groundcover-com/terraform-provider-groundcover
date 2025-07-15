@@ -11,7 +11,7 @@ require (
 
 require (
 	github.com/goccy/go-yaml v1.17.1
-	github.com/groundcover-com/groundcover-sdk-go v1.20.0
+	github.com/groundcover-com/groundcover-sdk-go v1.41.0
 	github.com/hashicorp/terraform-plugin-go v0.28.0
 	github.com/hashicorp/terraform-plugin-testing v1.13.2
 	github.com/stretchr/testify v1.10.0
