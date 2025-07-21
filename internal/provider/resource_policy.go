@@ -767,7 +767,7 @@ func (r *policyResource) UpgradeState(ctx context.Context) map[int64]resource.St
 					Deprecated      types.Bool   `tfsdk:"deprecated"`
 					IsSystemDefined types.Bool   `tfsdk:"is_system_defined"`
 				}
-				
+
 				resp.Diagnostics.Append(req.State.Get(ctx, &priorStateData)...)
 				if resp.Diagnostics.HasError() {
 					return
