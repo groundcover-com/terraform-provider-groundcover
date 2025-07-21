@@ -12,7 +12,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/attr"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/hashicorp/terraform-plugin-testing/helper/acctest"
-	testresource "github.com/hashicorp/terraform-plugin-testing/helper/resource"
+	"github.com/hashicorp/terraform-plugin-testing/helper/resource"
 	"github.com/hashicorp/terraform-plugin-testing/terraform"
 )
 
@@ -20,18 +20,18 @@ func TestAccPolicyResource(t *testing.T) {
 	name := acctest.RandomWithPrefix("test-policy")
 	updatedName := acctest.RandomWithPrefix("test-policy-updated")
 
-	testresource.Test(t, testresource.TestCase{
+	resource.Test(t, resource.TestCase{
 		PreCheck:                 func() { testAccPreCheck(t) },
 		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
-		Steps: []testresource.TestStep{
+		Steps: []resource.TestStep{
 			// Create and Read testing
 			{
 				Config: testAccPolicyResourceConfig(name),
-				Check: testresource.ComposeAggregateTestCheckFunc(
-					testresource.TestCheckResourceAttr("groundcover_policy.test", "name", name),
-					testresource.TestCheckResourceAttrSet("groundcover_policy.test", "id"),
-					testresource.TestCheckResourceAttrSet("groundcover_policy.test", "uuid"),
-					testresource.TestCheckResourceAttr("groundcover_policy.test", "role.read", "read"),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					resource.TestCheckResourceAttr("groundcover_policy.test", "name", name),
+					resource.TestCheckResourceAttrSet("groundcover_policy.test", "id"),
+					resource.TestCheckResourceAttrSet("groundcover_policy.test", "uuid"),
+					resource.TestCheckResourceAttr("groundcover_policy.test", "role.read", "read"),
 				),
 			},
 			// ImportState testing
@@ -44,9 +44,9 @@ func TestAccPolicyResource(t *testing.T) {
 			// Update and Read testing
 			{
 				Config: testAccPolicyResourceConfigUpdated(updatedName),
-				Check: testresource.ComposeAggregateTestCheckFunc(
-					testresource.TestCheckResourceAttr("groundcover_policy.test", "name", updatedName),
-					testresource.TestCheckResourceAttr("groundcover_policy.test", "role.admin", "admin"),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					resource.TestCheckResourceAttr("groundcover_policy.test", "name", updatedName),
+					resource.TestCheckResourceAttr("groundcover_policy.test", "role.admin", "admin"),
 				),
 			},
 			// Delete testing automatically occurs in TestCase
@@ -57,18 +57,18 @@ func TestAccPolicyResource(t *testing.T) {
 func TestAccPolicyResource_complex(t *testing.T) {
 	name := acctest.RandomWithPrefix("test-policy-complex")
 
-	testresource.Test(t, testresource.TestCase{
+	resource.Test(t, resource.TestCase{
 		PreCheck:                 func() { testAccPreCheck(t) },
 		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
-		Steps: []testresource.TestStep{
+		Steps: []resource.TestStep{
 			// Create with multiple roles
 			{
 				Config: testAccPolicyResourceConfigComplex(name),
-				Check: testresource.ComposeAggregateTestCheckFunc(
-					testresource.TestCheckResourceAttr("groundcover_policy.test", "name", name),
-					testresource.TestCheckResourceAttr("groundcover_policy.test", "role.admin", "admin"),
-					testresource.TestCheckResourceAttr("groundcover_policy.test", "claim_role", "sso-test-role"),
-					testresource.TestCheckResourceAttrSet("groundcover_policy.test", "data_scope.simple.operator"),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					resource.TestCheckResourceAttr("groundcover_policy.test", "name", name),
+					resource.TestCheckResourceAttr("groundcover_policy.test", "role.admin", "admin"),
+					resource.TestCheckResourceAttr("groundcover_policy.test", "claim_role", "sso-test-role"),
+					resource.TestCheckResourceAttrSet("groundcover_policy.test", "data_scope.simple.operator"),
 				),
 			},
 		},
@@ -78,13 +78,13 @@ func TestAccPolicyResource_complex(t *testing.T) {
 func TestAccPolicyResource_disappears(t *testing.T) {
 	name := acctest.RandomWithPrefix("test-policy")
 
-	testresource.Test(t, testresource.TestCase{
+	resource.Test(t, resource.TestCase{
 		PreCheck:                 func() { testAccPreCheck(t) },
 		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
-		Steps: []testresource.TestStep{
+		Steps: []resource.TestStep{
 			{
 				Config: testAccPolicyResourceConfig(name),
-				Check: testresource.ComposeAggregateTestCheckFunc(
+				Check: resource.ComposeAggregateTestCheckFunc(
 					testAccCheckPolicyResourceExists("groundcover_policy.test"),
 					testAccCheckPolicyResourceDisappears("groundcover_policy.test"),
 				),
@@ -149,7 +149,7 @@ resource "groundcover_policy" "test" {
 `, name)
 }
 
-func testAccCheckPolicyResourceExists(n string) testresource.TestCheckFunc {
+func testAccCheckPolicyResourceExists(n string) resource.TestCheckFunc {
 	return func(s *terraform.State) error {
 		rs, ok := s.RootModule().Resources[n]
 		if !ok {
@@ -164,7 +164,7 @@ func testAccCheckPolicyResourceExists(n string) testresource.TestCheckFunc {
 	}
 }
 
-func testAccCheckPolicyResourceDisappears(n string) testresource.TestCheckFunc {
+func testAccCheckPolicyResourceDisappears(n string) resource.TestCheckFunc {
 	return func(s *terraform.State) error {
 		rs, ok := s.RootModule().Resources[n]
 		if !ok {
