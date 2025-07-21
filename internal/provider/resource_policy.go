@@ -28,6 +28,7 @@ var _ resource.Resource = &policyResource{}
 var _ resource.ResourceWithConfigure = &policyResource{}
 
 var _ resource.ResourceWithImportState = &policyResource{}
+var _ resource.ResourceWithUpgradeState = &policyResource{}
 
 // policyResource defines the resource implementation.
 type policyResource struct {
@@ -127,6 +128,7 @@ func (r *policyResource) Metadata(ctx context.Context, req resource.MetadataRequ
 func (r *policyResource) Schema(ctx context.Context, req resource.SchemaRequest, resp *resource.SchemaResponse) {
 	resp.Schema = schema.Schema{
 		MarkdownDescription: "Manages a groundcover RBAC policy.",
+		Version:             1,
 		Attributes: map[string]schema.Attribute{
 			"id": schema.StringAttribute{
 				MarkdownDescription: "The unique identifier (ID) of the policy. Same as UUID.",
@@ -671,6 +673,126 @@ func mapPolicyApiResponseToModel(ctx context.Context, apiResponse models.Policy,
 
 	tflog.Debug(ctx, "Successfully mapped available SDK response fields (UUID, Name) to Terraform model", map[string]any{"uuid": apiResponse.UUID})
 	return diags
+}
+
+func (r *policyResource) UpgradeState(ctx context.Context) map[int64]resource.StateUpgrader {
+	return map[int64]resource.StateUpgrader{
+		0: {
+			PriorSchema: &schema.Schema{
+				Attributes: map[string]schema.Attribute{
+					"uuid": schema.StringAttribute{
+						Computed: true,
+					},
+					"name": schema.StringAttribute{
+						Required: true,
+					},
+					"role": schema.MapAttribute{
+						ElementType: types.StringType,
+						Required:    true,
+					},
+					"description": schema.StringAttribute{
+						Optional: true,
+					},
+					"claim_role": schema.StringAttribute{
+						Optional: true,
+					},
+					"data_scope": schema.SingleNestedAttribute{
+						Optional: true,
+						Attributes: map[string]schema.Attribute{
+							"simple": schema.SingleNestedAttribute{
+								Optional: true,
+								Attributes: map[string]schema.Attribute{
+									"operator": schema.StringAttribute{
+										Optional: true,
+									},
+									"conditions": schema.ListNestedAttribute{
+										Optional: true,
+										NestedObject: schema.NestedAttributeObject{
+											Attributes: map[string]schema.Attribute{
+												"key": schema.StringAttribute{
+													Required: true,
+												},
+												"origin": schema.StringAttribute{
+													Required: true,
+												},
+												"type": schema.StringAttribute{
+													Required: true,
+												},
+												"filters": schema.ListNestedAttribute{
+													Optional: true,
+													NestedObject: schema.NestedAttributeObject{
+														Attributes: map[string]schema.Attribute{
+															"op": schema.StringAttribute{
+																Required: true,
+															},
+															"value": schema.StringAttribute{
+																Required: true,
+															},
+														},
+													},
+												},
+											},
+										},
+									},
+								},
+							},
+						},
+					},
+					"revision_number": schema.Int64Attribute{
+						Computed: true,
+					},
+					"read_only": schema.BoolAttribute{
+						Computed: true,
+					},
+					"deprecated": schema.BoolAttribute{
+						Computed: true,
+					},
+					"is_system_defined": schema.BoolAttribute{
+						Computed: true,
+					},
+				},
+			},
+			StateUpgrader: func(ctx context.Context, req resource.UpgradeStateRequest, resp *resource.UpgradeStateResponse) {
+				// Define a struct for v0 schema (without ID field)
+				var priorStateData struct {
+					// Note: No ID field in v0
+					UUID            types.String `tfsdk:"uuid"`
+					Name            types.String `tfsdk:"name"`
+					Role            types.Map    `tfsdk:"role"`
+					Description     types.String `tfsdk:"description"`
+					ClaimRole       types.String `tfsdk:"claim_role"`
+					DataScope       types.Object `tfsdk:"data_scope"`
+					RevisionNumber  types.Int64  `tfsdk:"revision_number"`
+					ReadOnly        types.Bool   `tfsdk:"read_only"`
+					Deprecated      types.Bool   `tfsdk:"deprecated"`
+					IsSystemDefined types.Bool   `tfsdk:"is_system_defined"`
+				}
+				
+				resp.Diagnostics.Append(req.State.Get(ctx, &priorStateData)...)
+				if resp.Diagnostics.HasError() {
+					return
+				}
+
+				// Initialize the upgraded state data
+				// The key change: copy UUID to ID field
+				upgradedStateData := policyResourceModel{
+					ID:              priorStateData.UUID, // Set ID from UUID - this is the key migration
+					UUID:            priorStateData.UUID,
+					Name:            priorStateData.Name,
+					Role:            priorStateData.Role,
+					Description:     priorStateData.Description,
+					ClaimRole:       priorStateData.ClaimRole,
+					DataScope:       priorStateData.DataScope,
+					RevisionNumber:  priorStateData.RevisionNumber,
+					ReadOnly:        priorStateData.ReadOnly,
+					Deprecated:      priorStateData.Deprecated,
+					IsSystemDefined: priorStateData.IsSystemDefined,
+				}
+
+				resp.Diagnostics.Append(resp.State.Set(ctx, upgradedStateData)...)
+			},
+		},
+	}
 }
 
 // Temporarily remove ImportState until fully implemented.
