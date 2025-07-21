@@ -700,13 +700,13 @@ func (r *policyResource) UpgradeState(ctx context.Context) map[int64]resource.St
 						Optional: true,
 						Attributes: map[string]schema.Attribute{
 							"simple": schema.SingleNestedAttribute{
-								Optional: true,
+								Required: true,
 								Attributes: map[string]schema.Attribute{
 									"operator": schema.StringAttribute{
-										Optional: true,
+										Required: true,
 									},
 									"conditions": schema.ListNestedAttribute{
-										Optional: true,
+										Required: true,
 										NestedObject: schema.NestedAttributeObject{
 											Attributes: map[string]schema.Attribute{
 												"key": schema.StringAttribute{
@@ -719,7 +719,7 @@ func (r *policyResource) UpgradeState(ctx context.Context) map[int64]resource.St
 													Required: true,
 												},
 												"filters": schema.ListNestedAttribute{
-													Optional: true,
+													Required: true,
 													NestedObject: schema.NestedAttributeObject{
 														Attributes: map[string]schema.Attribute{
 															"op": schema.StringAttribute{
