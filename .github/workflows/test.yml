@@ -80,7 +80,7 @@ jobs:
       run: |
         echo "⚠️  Skipping acceptance tests - repository secrets not available"
         echo "This is expected for PRs from forks and doesn't indicate a failure"
-        echo "Acceptance tests will run when the PR is merged or pushed to main"
+        echo "Acceptance tests will run when the PR is merged"
     
     - name: Run acceptance tests
       if: steps.check-secrets.outputs.secrets-available == 'true'
