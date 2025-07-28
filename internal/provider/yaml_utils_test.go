@@ -328,6 +328,260 @@ func normalizeYamlForComparison(yaml string) string {
 	return strings.Join(trimmedLines, "\n")
 }
 
+// TestNormalizeTimeString tests the time string normalization function directly
+func TestNormalizeTimeString(t *testing.T) {
+	tests := []struct {
+		name     string
+		input    string
+		expected string
+	}{
+		{
+			name:     "5m0s should normalize to 5m",
+			input:    "5m0s",
+			expected: "5m",
+		},
+		{
+			name:     "30m0s should normalize to 30m",
+			input:    "30m0s",
+			expected: "30m",
+		},
+		{
+			name:     "5m should remain 5m",
+			input:    "5m",
+			expected: "5m",
+		},
+		{
+			name:     "30m should remain 30m",
+			input:    "30m",
+			expected: "30m",
+		},
+		{
+			name:     "1h0m0s should normalize to 1h",
+			input:    "1h0m0s",
+			expected: "1h",
+		},
+		{
+			name:     "1h30m0s should normalize to 1h30m",
+			input:    "1h30m0s",
+			expected: "1h30m",
+		},
+		{
+			name:     "non-time strings should be unchanged",
+			input:    "hello world",
+			expected: "hello world",
+		},
+		{
+			name:     "mixed content with time strings",
+			input:    "interval: 5m0s and pendingFor: 30m0s",
+			expected: "interval: 5m and pendingFor: 30m",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := normalizeTimeString(tt.input)
+			if result != tt.expected {
+				t.Errorf("normalizeTimeString(%q) = %q, want %q", tt.input, result, tt.expected)
+			}
+		})
+	}
+}
+
+// TestCompareYamlSemantically_EmptyFields tests that server-added empty fields
+// don't cause false drift detection (regression test for apply-loop issue)
+func TestCompareYamlSemantically_EmptyFields(t *testing.T) {
+	tests := []struct {
+		name   string
+		yaml1  string
+		yaml2  string
+		expect bool
+	}{
+		{
+			name: "empty annotations should be ignored",
+			yaml1: `title: Test Monitor
+display:
+  header: test
+  description: test`,
+			yaml2: `title: Test Monitor
+display:
+  header: test
+  description: test
+annotations: {}`,
+			expect: true,
+		},
+		{
+			name: "nil resourceHeaderLabels should be ignored",
+			yaml1: `title: Test Monitor
+display:
+  header: test
+  contextHeaderLabels:
+  - cluster`,
+			yaml2: `title: Test Monitor
+display:
+  header: test
+  resourceHeaderLabels:
+  contextHeaderLabels:
+  - cluster`,
+			expect: true,
+		},
+		{
+			name: "complete pod crashloopbackoff scenario with all differences",
+			yaml1: `title: Terraform - Pod CrashLoopBackOff Detection
+display:
+  header: 'Pod Crashlooping: {{ alert.labels.namespace }}/{{ alert.labels.pod }}'
+  description: Kubernetes pod is on a CrashLoopBackOff
+  contextHeaderLabels:
+  - cluster
+  - namespace
+  - workload
+  - pod
+severity: S2
+measurementType: state
+model:
+  queries:
+  - name: threshold_input_query
+    expression: last_over_time(avg(groundcover_kube_pod_container_status_waiting_reason{reason="CrashLoopBackOff"})
+      by (cluster, namespace, pod, workload)[30m])
+    datasourceType: prometheus
+    queryType: instant
+  thresholds:
+  - name: threshold_1
+    inputName: threshold_input_query
+    operator: gt
+    values:
+    - 0
+labels:
+  alert_prod: "true"
+  alert_stage: "true"
+executionErrorState: OK
+noDataState: OK
+evaluationInterval:
+  interval: 5m0s
+  pendingFor: 30m0s`,
+			yaml2: `title: Terraform - Pod CrashLoopBackOff Detection
+display:
+  header: "Pod Crashlooping: {{ alert.labels.namespace }}/{{ alert.labels.pod }}"
+  description: Kubernetes pod is on a CrashLoopBackOff
+  resourceHeaderLabels:
+  contextHeaderLabels:
+    - cluster
+    - namespace
+    - workload
+    - pod
+severity: S2
+measurementType: state
+model:
+  queries:
+    - name: threshold_input_query
+      expression: last_over_time(avg(groundcover_kube_pod_container_status_waiting_reason{reason="CrashLoopBackOff"}) by (cluster, namespace, pod, workload)[30m])
+      queryType: instant
+      datasourceType: prometheus
+  thresholds:
+    - name: threshold_1
+      inputName: threshold_input_query
+      operator: gt
+      values:
+        - 0
+labels:
+  alert_prod: "true"
+  alert_stage: "true"
+executionErrorState: OK
+noDataState: OK
+evaluationInterval:
+  interval: 5m
+  pendingFor: 30m
+annotations: {}`,
+			expect: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result, err := CompareYamlSemantically(tt.yaml1, tt.yaml2)
+			if err != nil {
+				t.Errorf("CompareYamlSemantically() error = %v", err)
+				return
+			}
+			if result != tt.expect {
+				t.Errorf("CompareYamlSemantically() = %v, want %v", result, tt.expect)
+			}
+		})
+	}
+}
+
+// TestCompareYamlSemantically_TimeNormalization tests that time format differences
+// don't cause false drift detection (regression test for apply-loop issue)
+func TestCompareYamlSemantically_TimeNormalization(t *testing.T) {
+	tests := []struct {
+		name   string
+		yaml1  string
+		yaml2  string
+		expect bool
+	}{
+		{
+			name: "5m0s vs 5m should be semantically equal",
+			yaml1: `evaluationInterval:
+  interval: 5m0s
+  pendingFor: 30m0s`,
+			yaml2: `evaluationInterval:
+  interval: 5m
+  pendingFor: 30m`,
+			expect: true,
+		},
+		{
+			name: "different time values should not be equal",
+			yaml1: `evaluationInterval:
+  interval: 5m
+  pendingFor: 30m`,
+			yaml2: `evaluationInterval:
+  interval: 10m
+  pendingFor: 30m`,
+			expect: false,
+		},
+		{
+			name: "complex YAML with time normalization",
+			yaml1: `title: Test Monitor
+evaluationInterval:
+  interval: 5m0s
+  pendingFor: 30m0s
+model:
+  queries:
+    - name: test
+      pipeline:
+        function:
+          name: sum_over_time
+          args:
+            - 10m0s`,
+			yaml2: `title: Test Monitor
+evaluationInterval:
+  interval: 5m
+  pendingFor: 30m
+model:
+  queries:
+    - name: test
+      pipeline:
+        function:
+          name: sum_over_time
+          args:
+            - 10m`,
+			expect: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result, err := CompareYamlSemantically(tt.yaml1, tt.yaml2)
+			if err != nil {
+				t.Errorf("CompareYamlSemantically() error = %v", err)
+				return
+			}
+			if result != tt.expect {
+				t.Errorf("CompareYamlSemantically() = %v, want %v", result, tt.expect)
+			}
+		})
+	}
+}
+
 // Test for edge cases and specific functionality
 func TestFilterYamlKeysBasedOnTemplate_EdgeCases(t *testing.T) {
 	ctx := context.Background()
