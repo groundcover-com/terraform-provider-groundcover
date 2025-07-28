@@ -27,7 +27,7 @@ var (
 	// Examples: "1h", "30m", "45s", "1h30m", "2h15m30s", "5m30s"
 	timeRegex      = regexp.MustCompile(`\d+h(?:\d+m)?(?:\d+s)?|\d+m(?:\d+s)?|\d+s`)
 	componentRegex = regexp.MustCompile(`(\d+)([hms])`)
-	zeroRegex      = regexp.MustCompile(`0[hms]`)
+	zeroRegex      = regexp.MustCompile(`^0[hms]$`)
 )
 
 // NormalizeMonitorYaml sorts keys in a YAML string alphabetically using AST manipulation.
@@ -342,6 +342,10 @@ func CompareYamlSemantically(yaml1, yaml2 string) (bool, error) {
 	normalizedData1 := normalizeTimeInData(data1)
 	normalizedData2 := normalizeTimeInData(data2)
 
+	// Remove empty fields that the server commonly adds
+	normalizedData1 = removeEmptyFields(normalizedData1)
+	normalizedData2 = removeEmptyFields(normalizedData2)
+
 	// Apply monitor-specific default values normalization
 	// This handles cases where the server omits default values (like isPaused: false)
 	monitorDefaultRules := []DefaultValueRule{
@@ -438,6 +442,64 @@ func applyDefaultValuesWithRules(data interface{}, rules []DefaultValueRule) int
 		return result
 	default:
 		return v
+	}
+}
+
+// removeEmptyFields recursively removes empty maps, nil values, and empty slices from data structures
+// This helps ignore server-added fields that are empty/nil
+func removeEmptyFields(data interface{}) interface{} {
+	switch v := data.(type) {
+	case map[string]interface{}:
+		result := make(map[string]interface{})
+		for key, value := range v {
+			cleaned := removeEmptyFields(value)
+			// Only keep non-empty values
+			if !isEmpty(cleaned) {
+				result[key] = cleaned
+			}
+		}
+		return result
+	case map[interface{}]interface{}:
+		result := make(map[interface{}]interface{})
+		for key, value := range v {
+			cleaned := removeEmptyFields(value)
+			// Only keep non-empty values
+			if !isEmpty(cleaned) {
+				result[key] = cleaned
+			}
+		}
+		return result
+	case []interface{}:
+		result := make([]interface{}, 0, len(v))
+		for _, item := range v {
+			cleaned := removeEmptyFields(item)
+			if !isEmpty(cleaned) {
+				result = append(result, cleaned)
+			}
+		}
+		return result
+	default:
+		return v
+	}
+}
+
+// isEmpty checks if a value is considered empty (nil, empty map, empty slice)
+func isEmpty(value interface{}) bool {
+	if value == nil {
+		return true
+	}
+
+	switch v := value.(type) {
+	case map[string]interface{}:
+		return len(v) == 0
+	case map[interface{}]interface{}:
+		return len(v) == 0
+	case []interface{}:
+		return len(v) == 0
+	case string:
+		return v == ""
+	default:
+		return false
 	}
 }
 
