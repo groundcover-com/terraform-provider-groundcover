@@ -12,9 +12,9 @@ terraform {
 provider "groundcover" {
   # Configure API key and Org Name via environment variables
   # export TF_VAR_groundcover_api_key="YOUR_API_KEY"
-  # export TF_VAR_groundcover_org_name="YOUR_ORG_NAME"
+  # export TF_VAR_groundcover_backend_id="YOUR_BACKEND_ID"
   api_key  = var.groundcover_api_key
-  org_name = var.groundcover_org_name
+  backend_id = var.groundcover_backend_id
   # api_url = "..." # Optional: Override default API URL
 }
 
@@ -24,9 +24,9 @@ variable "groundcover_api_key" {
   sensitive   = true
 }
 
-variable "groundcover_org_name" {
+variable "groundcover_backend_id" {
   type        = string
-  description = "Groundcover Organization Name"
+  description = "Groundcover Backend ID"
 }
 
 # Example Ingestion Key

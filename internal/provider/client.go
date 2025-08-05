@@ -136,7 +136,7 @@ func NewSdkClientWrapper(ctx context.Context, baseURLStr, apiKey, backendID stri
 		return nil, errors.New("GROUNDCOVER_API_KEY (api_key) environment variable or provider config is required")
 	}
 	if backendID == "" {
-		return nil, errors.New("GROUNDCOVER_ORG_NAME (org_name) environment variable or provider config is required")
+		return nil, errors.New("GROUNDCOVER_BACKEND_ID (backend_id) environment variable or provider config is required")
 	}
 
 	userEnabledDebug := os.Getenv("TF_LOG") == "debug"

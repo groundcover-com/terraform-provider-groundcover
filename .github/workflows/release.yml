@@ -30,7 +30,7 @@ jobs:
           TF_ACC: 1
           GROUNDCOVER_API_KEY: ${{ secrets.GROUNDCOVER_API_KEY }}
           GROUNDCOVER_API_URL: ${{ secrets.GROUNDCOVER_API_URL }}
-          GROUNDCOVER_ORG_NAME: ${{ secrets.GROUNDCOVER_ORG_NAME }}
+          GROUNDCOVER_BACKEND_ID: ${{ secrets.GROUNDCOVER_ORG_NAME }}
           GROUNDCOVER_CLOUD_ORG_NAME: ${{ secrets.GROUNDCOVER_CLOUD_ORG_NAME }}
         run: go test ./internal/provider -v -timeout 30m
       - name: Import GPG key
