@@ -27,9 +27,10 @@ type GroundcoverProvider struct {
 
 // GroundcoverProviderModel describes the provider data model.
 type GroundcoverProviderModel struct {
-	ApiKey  types.String `tfsdk:"api_key"`
-	OrgName types.String `tfsdk:"org_name"`
-	ApiUrl  types.String `tfsdk:"api_url"`
+	ApiKey    types.String `tfsdk:"api_key"`
+	OrgName   types.String `tfsdk:"org_name"` // Kept for backwards compatibility
+	BackendId types.String `tfsdk:"backend_id"`
+	ApiUrl    types.String `tfsdk:"api_url"`
 }
 
 func (p *GroundcoverProvider) Metadata(ctx context.Context, req provider.MetadataRequest, resp *provider.MetadataResponse) {
@@ -47,7 +48,11 @@ func (p *GroundcoverProvider) Schema(ctx context.Context, req provider.SchemaReq
 				Sensitive:           true,
 			},
 			"org_name": schema.StringAttribute{
-				MarkdownDescription: "Groundcover Organization Name. Can also be set via the GROUNDCOVER_ORG_NAME environment variable.",
+				MarkdownDescription: "Groundcover Organization Name. Can also be set via the GROUNDCOVER_ORG_NAME environment variable. Deprecated: Use backend_id instead.",
+				Optional:            true,
+			},
+			"backend_id": schema.StringAttribute{
+				MarkdownDescription: "Groundcover Backend ID. Can also be set via the GROUNDCOVER_BACKEND_ID environment variable.",
 				Optional:            true,
 			},
 			"api_url": schema.StringAttribute{
@@ -72,9 +77,21 @@ func (p *GroundcoverProvider) Configure(ctx context.Context, req provider.Config
 		apiKey = config.ApiKey.ValueString()
 	}
 
+	// Handle backwards compatibility: org_name is kept for backwards compatibility
 	orgName := os.Getenv("GROUNDCOVER_ORG_NAME")
 	if !config.OrgName.IsNull() {
 		orgName = config.OrgName.ValueString()
+	}
+
+	// Check for backend_id (new preferred option)
+	backendId := os.Getenv("GROUNDCOVER_BACKEND_ID")
+	if !config.BackendId.IsNull() {
+		backendId = config.BackendId.ValueString()
+	}
+
+	// Use backend_id if provided, otherwise fall back to org_name
+	if backendId != "" {
+		orgName = backendId
 	}
 
 	apiUrl := os.Getenv("GROUNDCOVER_API_URL")
@@ -97,10 +114,11 @@ func (p *GroundcoverProvider) Configure(ctx context.Context, req provider.Config
 
 	if orgName == "" {
 		resp.Diagnostics.AddAttributeError(
-			path.Root("org_name"),
-			"Missing Groundcover Organization Name",
-			"The provider cannot create the Groundcover API client as no Organization Name was found.\n\n"+
-				"Either set the `org_name` provider configuration argument or set the GROUNDCOVER_ORG_NAME environment variable. If both are set, the provider configuration argument takes precedence.",
+			path.Root("backend_id"),
+			"Missing Groundcover Backend ID",
+			"The provider cannot create the Groundcover API client as no Backend ID was found.\n\n"+
+				"Either set the `backend_id` provider configuration argument or set the GROUNDCOVER_BACKEND_ID environment variable.\n"+
+				"For backwards compatibility, you can also use `org_name` or GROUNDCOVER_ORG_NAME environment variable.",
 		)
 	}
 
@@ -108,7 +126,7 @@ func (p *GroundcoverProvider) Configure(ctx context.Context, req provider.Config
 		return
 	}
 
-	tflog.Info(ctx, "Initializing Groundcover SDK client", map[string]any{"org_name": orgName, "api_url": apiUrl})
+	tflog.Info(ctx, "Initializing Groundcover SDK client", map[string]any{"backend_id": orgName, "api_url": apiUrl})
 	clientWrapper, err := NewSdkClientWrapper(ctx, apiUrl, apiKey, orgName)
 	if err != nil {
 		resp.Diagnostics.AddError(

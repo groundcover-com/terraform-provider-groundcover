@@ -171,7 +171,7 @@ func testAccCheckServiceAccountResourceDisappears(n string) resource.TestCheckFu
 
 		// Get environment variables for client configuration
 		apiKey := os.Getenv("GROUNDCOVER_API_KEY")
-		orgName := os.Getenv("GROUNDCOVER_ORG_NAME")
+		orgName := os.Getenv("GROUNDCOVER_BACKEND_ID")
 		apiURL := os.Getenv("GROUNDCOVER_API_URL")
 		if apiURL == "" {
 			apiURL = "https://api.groundcover.io"

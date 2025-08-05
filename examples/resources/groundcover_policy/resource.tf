@@ -5,7 +5,7 @@ provider "groundcover" {
   # Or uncomment and set directly (less secure):
   # api_key = "YOUR_API_KEY_HERE"
 
-  org_name = "groundcover" # your organization ID as provided in the installation
+  backend_id = "groundcover" # your backend ID as provided in the installation
   # Optionally override the base URL (defaults to api.groundcover.com)
   # api_url = "https://api.your-instance.groundcover.com"
 }

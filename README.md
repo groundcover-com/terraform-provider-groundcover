@@ -84,7 +84,8 @@ To use this provider locally before it is published to the Terraform Registry, f
 
           # Base URL is optional, defaults to api.groundcover.com in the provider code
           api_url = "https://api.main.groundcover.com" # defaults to https://api.groundcover.com
-          org_name = "groundcover"                     # your organization ID as provided in the installation
+          backend_id = "groundcover"                   # Your Backend ID can be found in the groundcover UI under Settings->Access->API Keys
+          # org_name = "groundcover"                   # deprecated: use backend_id instead
         }
 
         # (Optional but recommended) Define input variables
@@ -157,15 +158,17 @@ Configure the groundcover provider in your Terraform configuration:
 
 ```hcl
 provider "groundcover" {
-  # api_key  = "YOUR_API_KEY" # Required
-  # base_url = "https://api.your-instance.groundcover.com" # Optional
+  # api_key    = "YOUR_API_KEY" # Required
+  # backend_id = "YOUR_BACKEND_ID" # Required - can be found in the groundcover UI under Settings->Access->API Keys
+  # api_url    = "https://api.your-instance.groundcover.com" # Optional
 }
 ```
 
 ### Arguments
 
-*   `api_key` (String, Required, Sensitive): Your groundcover API key. It is strongly recommended to configure this using the `TF_VAR_groundcover_api_key` environment variable rather than hardcoding it.
-*   `base_url` (String, Optional): The base URL for the groundcover API. Defaults to `api.groundcover.com` if not specified.
+*   `api_key` (String, Required, Sensitive): Your groundcover API key. It is strongly recommended to configure this using the `GROUNDCOVER_API_KEY` environment variable rather than hardcoding it.
+*   `backend_id` (String, Required): Your groundcover Backend ID. Can be found in the groundcover UI under Settings->Access->API Keys. Can also be set via the `GROUNDCOVER_BACKEND_ID` environment variable.
+*   `api_url` (String, Optional): The base URL for the groundcover API. Defaults to `https://api.groundcover.com` if not specified. Can also be set via the `GROUNDCOVER_API_URL` environment variable.
 
 ## Testing
 
@@ -178,10 +181,11 @@ Set the required environment variables:
 ```bash
 export GROUNDCOVER_API_KEY="your-api-key-here"
 export GROUNDCOVER_API_URL="https://api.main.groundcover.com/"
-export GROUNDCOVER_ORG_NAME="your-org-name"
+export GROUNDCOVER_BACKEND_ID="your-backend-id"
+# export GROUNDCOVER_ORG_NAME="your-org-name"  # deprecated: use GROUNDCOVER_BACKEND_ID
 
-# For ingestion key tests (requires cloud backend):
-export GROUNDCOVER_CLOUD_ORG_NAME="your-cloud-org-name"
+# For ingestion key tests (requires in-cloud backend):
+export GROUNDCOVER_INCLOUD_BACKEND_ID="your-in-cloud-backend-id"
 ```
 
 ### Running Tests

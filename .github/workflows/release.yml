@@ -30,8 +30,8 @@ jobs:
           TF_ACC: 1
           GROUNDCOVER_API_KEY: ${{ secrets.GROUNDCOVER_API_KEY }}
           GROUNDCOVER_API_URL: ${{ secrets.GROUNDCOVER_API_URL }}
-          GROUNDCOVER_ORG_NAME: ${{ secrets.GROUNDCOVER_ORG_NAME }}
-          GROUNDCOVER_CLOUD_ORG_NAME: ${{ secrets.GROUNDCOVER_CLOUD_ORG_NAME }}
+          GROUNDCOVER_BACKEND_ID: ${{ secrets.GROUNDCOVER_BACKEND_ID }}
+          GROUNDCOVER_INCLOUD_BACKEND_ID: ${{ secrets.GROUNDCOVER_INCLOUD_BACKEND_ID }}
         run: go test ./internal/provider -v -timeout 30m
       - name: Import GPG key
         uses: crazy-max/ghaction-import-gpg@e89d40939c28e39f97cf32126055eeae86ba74ec # v6.3.0
