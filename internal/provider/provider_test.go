@@ -25,7 +25,7 @@ func testAccPreCheck(t *testing.T) {
 	if v := os.Getenv("GROUNDCOVER_API_KEY"); v == "" {
 		t.Fatal("GROUNDCOVER_API_KEY must be set for acceptance tests")
 	}
-	if v := os.Getenv("GROUNDCOVER_ORG_NAME"); v == "" {
-		t.Fatal("GROUNDCOVER_ORG_NAME must be set for acceptance tests")
+	if v := os.Getenv("GROUNDCOVER_BACKEND_ID"); v == "" {
+		t.Fatal("GROUNDCOVER_BACKEND_ID must be set for acceptance tests")
 	}
 }

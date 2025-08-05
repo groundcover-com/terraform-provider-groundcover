@@ -120,7 +120,7 @@ func testAccCheckIngestionKeyResourceDisappears(n string) resource.TestCheckFunc
 
 		// Get environment variables for client configuration
 		apiKey := os.Getenv("GROUNDCOVER_API_KEY")
-		orgName := os.Getenv("GROUNDCOVER_ORG_NAME") // Use current org name (which should be set to cloud org during test)
+		orgName := os.Getenv("GROUNDCOVER_BACKEND_ID") // Use current backend ID (which should be set to cloud org during test)
 		apiURL := os.Getenv("GROUNDCOVER_API_URL")
 		if apiURL == "" {
 			apiURL = "https://api.groundcover.io"
@@ -170,27 +170,27 @@ func testAccProtoV6ProviderFactoriesWithCloudOrg(t *testing.T) map[string]func()
 		return testAccProtoV6ProviderFactories
 	}
 
-	// Temporarily override GROUNDCOVER_ORG_NAME with the cloud org name
+	// Temporarily override GROUNDCOVER_BACKEND_ID with the cloud org name
 	cloudOrgName := os.Getenv("GROUNDCOVER_CLOUD_ORG_NAME")
 	if cloudOrgName == "" {
 		t.Fatal("GROUNDCOVER_CLOUD_ORG_NAME must be set for ingestion key tests")
 	}
 
 	// Store original value to restore later
-	originalOrgName := os.Getenv("GROUNDCOVER_ORG_NAME")
+	originalBackendID := os.Getenv("GROUNDCOVER_BACKEND_ID")
 
 	// Set the cloud org name and set up cleanup ONCE for the entire test
-	if err := os.Setenv("GROUNDCOVER_ORG_NAME", cloudOrgName); err != nil {
-		t.Fatalf("Failed to set GROUNDCOVER_ORG_NAME: %v", err)
+	if err := os.Setenv("GROUNDCOVER_BACKEND_ID", cloudOrgName); err != nil {
+		t.Fatalf("Failed to set GROUNDCOVER_BACKEND_ID: %v", err)
 	}
 	t.Cleanup(func() {
-		if originalOrgName != "" {
-			if err := os.Setenv("GROUNDCOVER_ORG_NAME", originalOrgName); err != nil {
-				t.Errorf("Failed to restore GROUNDCOVER_ORG_NAME: %v", err)
+		if originalBackendID != "" {
+			if err := os.Setenv("GROUNDCOVER_BACKEND_ID", originalBackendID); err != nil {
+				t.Errorf("Failed to restore GROUNDCOVER_BACKEND_ID: %v", err)
 			}
 		} else {
-			if err := os.Unsetenv("GROUNDCOVER_ORG_NAME"); err != nil {
-				t.Errorf("Failed to unset GROUNDCOVER_ORG_NAME: %v", err)
+			if err := os.Unsetenv("GROUNDCOVER_BACKEND_ID"); err != nil {
+				t.Errorf("Failed to unset GROUNDCOVER_BACKEND_ID: %v", err)
 			}
 		}
 	})
