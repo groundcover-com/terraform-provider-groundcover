@@ -184,8 +184,8 @@ export GROUNDCOVER_API_URL="https://api.main.groundcover.com/"
 export GROUNDCOVER_BACKEND_ID="your-backend-id"
 # export GROUNDCOVER_ORG_NAME="your-org-name"  # deprecated: use GROUNDCOVER_BACKEND_ID
 
-# For ingestion key tests (requires cloud backend):
-export GROUNDCOVER_CLOUD_ORG_NAME="your-cloud-org-name"
+# For ingestion key tests (requires in-cloud backend):
+export GROUNDCOVER_INCLOUD_BACKEND_ID="your-in-cloud-backend-id"
 ```
 
 ### Running Tests

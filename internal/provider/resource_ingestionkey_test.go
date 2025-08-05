@@ -26,7 +26,7 @@ func TestAccIngestionKeyResource(t *testing.T) {
 		PreCheck: func() {
 			testAccPreCheckIngestionKey(t)
 		},
-		ProtoV6ProviderFactories: testAccProtoV6ProviderFactoriesWithCloudOrg(t),
+		ProtoV6ProviderFactories: testAccProtoV6ProviderFactoriesWithInCloudBackend(t),
 		Steps: []resource.TestStep{
 			// Create and Read testing
 			{
@@ -66,7 +66,7 @@ func TestAccIngestionKeyResource_disappears(t *testing.T) {
 		PreCheck: func() {
 			testAccPreCheckIngestionKey(t)
 		},
-		ProtoV6ProviderFactories: testAccProtoV6ProviderFactoriesWithCloudOrg(t),
+		ProtoV6ProviderFactories: testAccProtoV6ProviderFactoriesWithInCloudBackend(t),
 		Steps: []resource.TestStep{
 			{
 				Config: testAccIngestionKeyResourceConfig(name),
@@ -120,7 +120,7 @@ func testAccCheckIngestionKeyResourceDisappears(n string) resource.TestCheckFunc
 
 		// Get environment variables for client configuration
 		apiKey := os.Getenv("GROUNDCOVER_API_KEY")
-		orgName := os.Getenv("GROUNDCOVER_BACKEND_ID") // Use current backend ID (which should be set to cloud org during test)
+		orgName := os.Getenv("GROUNDCOVER_BACKEND_ID") // Use current backend ID (which should be set to in-cloud backend during test)
 		apiURL := os.Getenv("GROUNDCOVER_API_URL")
 		if apiURL == "" {
 			apiURL = "https://api.groundcover.io"
@@ -158,29 +158,29 @@ func testAccPreCheckIngestionKey(t *testing.T) {
 	if v := os.Getenv("GROUNDCOVER_API_KEY"); v == "" {
 		t.Fatal("GROUNDCOVER_API_KEY must be set for acceptance tests")
 	}
-	if v := os.Getenv("GROUNDCOVER_CLOUD_ORG_NAME"); v == "" {
-		t.Skip("Ingestion key tests require GROUNDCOVER_CLOUD_ORG_NAME env var for cloud backend - skipping")
+	if v := os.Getenv("GROUNDCOVER_INCLOUD_BACKEND_ID"); v == "" {
+		t.Skip("Ingestion key tests require GROUNDCOVER_INCLOUD_BACKEND_ID env var for in-cloud backend - skipping")
 	}
 }
 
-// testAccProtoV6ProviderFactoriesWithCloudOrg creates provider factories that use the cloud organization
-func testAccProtoV6ProviderFactoriesWithCloudOrg(t *testing.T) map[string]func() (tfprotov6.ProviderServer, error) {
+// testAccProtoV6ProviderFactoriesWithInCloudBackend creates provider factories that use the in-cloud backend
+func testAccProtoV6ProviderFactoriesWithInCloudBackend(t *testing.T) map[string]func() (tfprotov6.ProviderServer, error) {
 	// Skip if not running acceptance tests
 	if os.Getenv("TF_ACC") == "" {
 		return testAccProtoV6ProviderFactories
 	}
 
-	// Temporarily override GROUNDCOVER_BACKEND_ID with the cloud org name
-	cloudOrgName := os.Getenv("GROUNDCOVER_CLOUD_ORG_NAME")
-	if cloudOrgName == "" {
-		t.Fatal("GROUNDCOVER_CLOUD_ORG_NAME must be set for ingestion key tests")
+	// Temporarily override GROUNDCOVER_BACKEND_ID with the in-cloud backend ID
+	inCloudBackendId := os.Getenv("GROUNDCOVER_INCLOUD_BACKEND_ID")
+	if inCloudBackendId == "" {
+		t.Fatal("GROUNDCOVER_INCLOUD_BACKEND_ID must be set for ingestion key tests")
 	}
 
 	// Store original value to restore later
 	originalBackendID := os.Getenv("GROUNDCOVER_BACKEND_ID")
 
-	// Set the cloud org name and set up cleanup ONCE for the entire test
-	if err := os.Setenv("GROUNDCOVER_BACKEND_ID", cloudOrgName); err != nil {
+	// Set the in-cloud backend ID and set up cleanup ONCE for the entire test
+	if err := os.Setenv("GROUNDCOVER_BACKEND_ID", inCloudBackendId); err != nil {
 		t.Fatalf("Failed to set GROUNDCOVER_BACKEND_ID: %v", err)
 	}
 	t.Cleanup(func() {

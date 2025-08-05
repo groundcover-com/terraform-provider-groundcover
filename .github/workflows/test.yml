@@ -89,7 +89,7 @@ jobs:
         GROUNDCOVER_API_KEY: ${{ secrets.GROUNDCOVER_API_KEY }}
         GROUNDCOVER_API_URL: ${{ secrets.GROUNDCOVER_API_URL }}
         GROUNDCOVER_BACKEND_ID: ${{ secrets.GROUNDCOVER_BACKEND_ID }}
-        GROUNDCOVER_CLOUD_ORG_NAME: ${{ secrets.GROUNDCOVER_CLOUD_ORG_NAME }}
+        GROUNDCOVER_INCLOUD_BACKEND_ID: ${{ secrets.GROUNDCOVER_INCLOUD_BACKEND_ID }}
       run: |
         echo "✅ Running acceptance tests with available secrets..."
         go test ./internal/provider -v -timeout 30m
