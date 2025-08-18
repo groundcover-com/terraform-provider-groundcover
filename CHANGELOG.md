@@ -1,3 +1,6 @@
+## 1.0.0
+
+* Aligned and improved documentation for the first stable release milestone
 ## 0.8.0
 
 * Added `backend_id` as the new standard configuration option (replaces `org_name`, which remains supported for backwards compatibility)
