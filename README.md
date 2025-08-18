@@ -185,9 +185,9 @@ Set the required environment variables:
 
 ```bash
 # Required for all tests
-export GROUNDCOVER_API_KEY="your-api-key-here"        # Your groundcover API key
+export GROUNDCOVER_API_KEY="your-api-key-here"             # Your groundcover API key
 export GROUNDCOVER_API_URL="https://api.groundcover.com/"  # groundcover API URL
-export GROUNDCOVER_BACKEND_ID="your-backend-id"        # Your groundcover Backend ID
+export GROUNDCOVER_BACKEND_ID="your-backend-id"            # Your groundcover Backend ID
 
 # Required only for Ingestion Key resource tests (requires in-cloud backend)
 export GROUNDCOVER_INCLOUD_BACKEND_ID="your-in-cloud-backend-id"  # In-cloud backend ID for ingestion key tests
