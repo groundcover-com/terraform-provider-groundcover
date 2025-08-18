@@ -83,9 +83,9 @@ To use this provider locally before it is published to the Terraform Registry, f
           api_key = var.groundcover_api_key # Use this if defining a variable below
 
           # Base URL is optional, defaults to api.groundcover.com in the provider code
-          api_url = "https://api.main.groundcover.com" # defaults to https://api.groundcover.com
-          backend_id = "groundcover"                   # Your Backend ID can be found in the groundcover UI under Settings->Access->API Keys
-          # org_name = "groundcover"                   # deprecated: use backend_id instead
+          api_url = "https://api.groundcover.com" # optional, defaults to https://api.groundcover.com - required only for on-prem backends
+          backend_id = "groundcover"              # Your Backend ID can be found in the groundcover UI under Settings->Access->API Keys
+          # org_name = "groundcover"              # deprecated: use backend_id instead
         }
 
         # (Optional but recommended) Define input variables
@@ -186,7 +186,7 @@ Set the required environment variables:
 ```bash
 # Required for all tests
 export GROUNDCOVER_API_KEY="your-api-key-here"        # Your groundcover API key
-export GROUNDCOVER_API_URL="https://api.main.groundcover.com/"  # groundcover API URL
+export GROUNDCOVER_API_URL="https://api.groundcover.com/"  # groundcover API URL
 export GROUNDCOVER_BACKEND_ID="your-backend-id"        # Your groundcover Backend ID
 
 # Required only for Ingestion Key resource tests (requires in-cloud backend)
