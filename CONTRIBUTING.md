@@ -57,9 +57,11 @@ go test ./internal/provider -v
 
 # Run acceptance tests (requires groundcover environment)
 export GROUNDCOVER_API_KEY="your-api-key"
-export GROUNDCOVER_API_URL="https://api.main.groundcover.com/"
+export GROUNDCOVER_API_URL="https://api.groundcover.com/"
 export GROUNDCOVER_BACKEND_ID="your-backend-id"
-export GROUNDCOVER_INCLOUD_BACKEND_ID="your-in-cloud-backend-id"  # For ingestion key tests
+
+# For ingestion key tests, required only if the main backend is not an in-cloud deployment
+export GROUNDCOVER_INCLOUD_BACKEND_ID="your-in-cloud-backend-id"
 TF_ACC=1 go test ./internal/provider -v
 ```
 
