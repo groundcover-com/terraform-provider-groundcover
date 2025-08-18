@@ -3,12 +3,12 @@
 page_title: "groundcover Provider"
 subcategory: ""
 description: |-
-  Terraform provider for managing Groundcover resources.
+  Terraform provider for managing groundcover resources.
 ---
 
 # groundcover Provider
 
-Terraform provider for managing Groundcover resources.
+Terraform provider for managing groundcover resources.
 
 
 
@@ -17,6 +17,7 @@ Terraform provider for managing Groundcover resources.
 
 ### Optional
 
-- `api_key` (String, Sensitive) Groundcover API Key. Can also be set via the GROUNDCOVER_API_KEY environment variable.
-- `api_url` (String) Groundcover API URL. Defaults to the Groundcover production URL. Can also be set via the GROUNDCOVER_API_URL environment variable.
-- `org_name` (String) Groundcover Organization Name. Can also be set via the GROUNDCOVER_ORG_NAME environment variable.
+- `api_key` (String, Sensitive) groundcover API Key. Can also be set via the GROUNDCOVER_API_KEY environment variable.
+- `api_url` (String) groundcover API URL. Defaults to the groundcover production URL. Can also be set via the GROUNDCOVER_API_URL environment variable.
+- `backend_id` (String) groundcover Backend ID. Can also be set via the GROUNDCOVER_BACKEND_ID environment variable.
+- `org_name` (String) groundcover Organization Name. Can also be set via the GROUNDCOVER_ORG_NAME environment variable. Deprecated: Use backend_id instead.

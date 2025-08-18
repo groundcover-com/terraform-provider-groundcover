@@ -172,52 +172,77 @@ provider "groundcover" {
 
 ## Testing
 
-The provider includes comprehensive acceptance tests for all resources. To run the tests:
+The provider includes comprehensive acceptance tests for all resources. To run the tests, you'll need access to a groundcover environment.
 
 ### Prerequisites
+
+To run groundcover tests, you'll need at minimum:
+- A valid groundcover Backend ID
+- The groundcover API URL 
+- A valid groundcover API Key
 
 Set the required environment variables:
 
 ```bash
-export GROUNDCOVER_API_KEY="your-api-key-here"
-export GROUNDCOVER_API_URL="https://api.main.groundcover.com/"
-export GROUNDCOVER_BACKEND_ID="your-backend-id"
-# export GROUNDCOVER_ORG_NAME="your-org-name"  # deprecated: use GROUNDCOVER_BACKEND_ID
+# Required for all tests
+export GROUNDCOVER_API_KEY="your-api-key-here"        # Your groundcover API key
+export GROUNDCOVER_API_URL="https://api.main.groundcover.com/"  # groundcover API URL
+export GROUNDCOVER_BACKEND_ID="your-backend-id"        # Your groundcover Backend ID
 
-# For ingestion key tests (requires in-cloud backend):
-export GROUNDCOVER_INCLOUD_BACKEND_ID="your-in-cloud-backend-id"
+# Required only for Ingestion Key resource tests (requires in-cloud backend)
+export GROUNDCOVER_INCLOUD_BACKEND_ID="your-in-cloud-backend-id"  # In-cloud backend ID for ingestion key tests
 ```
+
+Note: The `GROUNDCOVER_ORG_NAME` environment variable is deprecated. Use `GROUNDCOVER_BACKEND_ID` instead.
 
 ### Running Tests
 
 ```bash
-# Run all tests
+# Run all acceptance tests
 TF_ACC=1 go test ./internal/provider -v
+
+# Run acceptance tests with coverage reporting
+TF_ACC=1 go test ./internal/provider -v -cover
 
 # Run specific resource tests
 TF_ACC=1 go test ./internal/provider -v -run TestAccPolicyResource
 TF_ACC=1 go test ./internal/provider -v -run TestAccServiceAccountResource
+TF_ACC=1 go test ./internal/provider -v -run TestAccMonitorResource
+TF_ACC=1 go test ./internal/provider -v -run TestAccApiKeyResource
+TF_ACC=1 go test ./internal/provider -v -run TestAccLogsPipelineResource
 TF_ACC=1 go test ./internal/provider -v -run TestAccIngestionKeyResource
 
-# Run unit tests only (no API calls)
+# Run unit tests only (no API calls required)
 go test ./internal/provider -v
 ```
 
-### Test Features
+### Test Coverage
 
-- **Create, Read, Update, Delete (CRUD)** testing for all resources
-- **Import functionality** testing to ensure resources can be imported into Terraform state
+The provider includes comprehensive acceptance tests for all resources:
+
+| Resource | Basic CRUD | Import | Disappears | Complex Configs |
+|----------|------------|--------|------------|-----------------|
+| Policy | ✅ | ✅ | ✅ | ✅ |
+| Service Account | ✅ | ✅ | ✅ | ✅ |
+| API Key | ✅ | ✅ | ✅ | - |
+| Monitor | ✅ | ✅ | ✅ | ✅ |
+| Logs Pipeline | ✅ | ✅ | - | ✅ |
+| Ingestion Key | ✅ | ✅ | ✅ | - |
+
+**Total: 16 acceptance tests** covering:
+- **Create, Read, Update, Delete (CRUD)** operations for all resources
+- **Import functionality** to ensure resources can be imported into Terraform state
 - **Disappears testing** to verify proper handling when resources are deleted outside Terraform
+- **Complex configurations** including resource relationships and advanced features
 - **Error handling** validation for various API error conditions
-- **Cloud backend support** for ingestion key operations
 
 ### Test Architecture
 
 The test suite includes:
-- **Unit tests** for utility functions and error handling
-- **Acceptance tests** that interact with real API endpoints
+- **Acceptance tests** that interact with real groundcover API endpoints
+- **Unit tests** for utility functions (YAML parsing, error handling)
 - **Retry logic** to handle eventual consistency in cloud APIs
-- **Environment-specific configurations** for different backend types
+- **Environment-specific configurations** for different backend types (in-cluster and in-cloud)
 
 ## Resource Reference
 
