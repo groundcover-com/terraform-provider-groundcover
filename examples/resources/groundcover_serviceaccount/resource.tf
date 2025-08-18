@@ -13,7 +13,7 @@ provider "groundcover" {
   # Configure API key and Org Name via environment variables
   # export TF_VAR_groundcover_api_key="YOUR_API_KEY"
   # export TF_VAR_groundcover_backend_id="YOUR_BACKEND_ID"
-  api_key  = var.groundcover_api_key
+  api_key    = var.groundcover_api_key
   backend_id = var.groundcover_backend_id
   # api_url = "..." # Optional: Override default API URL
 }

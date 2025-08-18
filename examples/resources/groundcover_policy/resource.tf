@@ -22,13 +22,13 @@ provider "groundcover" {
 resource "groundcover_policy" "my_policy" {
   name        = "Example Policy (Terraform)"
   description = "This policy is managed by Terraform."
-  
+
   # Optional: Specify SSO claim role for mapping
-  claim_role  = "sso-admin-role"
+  claim_role = "sso-admin-role"
 
   # Define policy roles (adjust keys/values as needed for your groundcover setup)
   role = {
-    admin  = "admin" # key is "read"/"write"/"admin" - value is ignored
+    admin = "admin" # key is "read"/"write"/"admin" - value is ignored
   }
 
   # Optional: Define data scope restrictions

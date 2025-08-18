@@ -1,4 +1,3 @@
-// Copyright (c) HashiCorp, Inc.
 // SPDX-License-Identifier: MPL-2.0
 
 package provider
@@ -40,23 +39,23 @@ func (p *GroundcoverProvider) Metadata(ctx context.Context, req provider.Metadat
 
 func (p *GroundcoverProvider) Schema(ctx context.Context, req provider.SchemaRequest, resp *provider.SchemaResponse) {
 	resp.Schema = schema.Schema{
-		MarkdownDescription: "Terraform provider for managing Groundcover resources.",
+		MarkdownDescription: "Terraform provider for managing groundcover resources.",
 		Attributes: map[string]schema.Attribute{
 			"api_key": schema.StringAttribute{
-				MarkdownDescription: "Groundcover API Key. Can also be set via the GROUNDCOVER_API_KEY environment variable.",
+				MarkdownDescription: "groundcover API Key. Can also be set via the GROUNDCOVER_API_KEY environment variable.",
 				Optional:            true,
 				Sensitive:           true,
 			},
 			"org_name": schema.StringAttribute{
-				MarkdownDescription: "Groundcover Organization Name. Can also be set via the GROUNDCOVER_ORG_NAME environment variable. Deprecated: Use backend_id instead.",
+				MarkdownDescription: "groundcover Organization Name. Can also be set via the GROUNDCOVER_ORG_NAME environment variable. Deprecated: Use backend_id instead.",
 				Optional:            true,
 			},
 			"backend_id": schema.StringAttribute{
-				MarkdownDescription: "Groundcover Backend ID. Can also be set via the GROUNDCOVER_BACKEND_ID environment variable.",
+				MarkdownDescription: "groundcover Backend ID. Can also be set via the GROUNDCOVER_BACKEND_ID environment variable.",
 				Optional:            true,
 			},
 			"api_url": schema.StringAttribute{
-				MarkdownDescription: "Groundcover API URL. Defaults to the Groundcover production URL. Can also be set via the GROUNDCOVER_API_URL environment variable.",
+				MarkdownDescription: "groundcover API URL. Defaults to the groundcover production URL. Can also be set via the GROUNDCOVER_API_URL environment variable.",
 				Optional:            true,
 			},
 		},
