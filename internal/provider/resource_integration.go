@@ -32,10 +32,11 @@ type integrationResource struct {
 type integrationResourceModel struct {
 	// The resource key is type+id. Logically, type is the primary key, but for terraform to work, the IDs are unique across
 	// all types.
-	Type      types.String `tfsdk:"type"`
-	ID        types.String `tfsdk:"id"`
-	Value     types.String `tfsdk:"value"`
+	Type types.String `tfsdk:"type"`
+	ID   types.String `tfsdk:"id"`
+
 	CreatedAt types.String `tfsdk:"created_at"`
+	Value     types.String `tfsdk:"value"`
 }
 
 func (r *integrationResource) Metadata(_ context.Context, req resource.MetadataRequest, resp *resource.MetadataResponse) {
