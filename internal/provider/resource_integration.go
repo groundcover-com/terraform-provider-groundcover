@@ -30,8 +30,10 @@ type integrationResource struct {
 }
 
 type integrationResourceModel struct {
-	ID        types.String `tfsdk:"id"`
+	// The resource key is type+id. Logically, type is the primary key, but for terraform to work, the IDs are unique across
+	// all types.
 	Type      types.String `tfsdk:"type"`
+	ID        types.String `tfsdk:"id"`
 	Value     types.String `tfsdk:"value"`
 	CreatedAt types.String `tfsdk:"created_at"`
 }
