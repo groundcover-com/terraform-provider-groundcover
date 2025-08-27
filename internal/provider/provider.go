@@ -149,6 +149,7 @@ func (p *GroundcoverProvider) Resources(ctx context.Context) []func() resource.R
 		NewApiKeyResource,
 		NewLogsPipelineResource,
 		NewIngestionKeyResource,
+		NewIntegrationResource,
 	}
 }
 
