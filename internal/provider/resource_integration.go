@@ -145,7 +145,7 @@ func (r *integrationResource) Read(ctx context.Context, req resource.ReadRequest
 	tflog.Debug(ctx, "Reading Integration resource", map[string]any{"id": state.ID.ValueString(), "type": state.Type.ValueString()})
 
 	// Call API client to get the integration
-	configEntry, err := r.client.GetIntegration(ctx, state.ID.ValueString(), state.Type.ValueString())
+	configEntry, err := r.client.GetIntegration(ctx, state.Type.ValueString(), state.ID.ValueString())
 	if err != nil {
 		if err == ErrNotFound {
 			tflog.Warn(ctx, "Integration not found, removing from state")
@@ -233,7 +233,7 @@ func (r *integrationResource) Delete(ctx context.Context, req resource.DeleteReq
 	tflog.Debug(ctx, "Deleting Integration resource", map[string]any{"id": state.ID.ValueString(), "type": state.Type.ValueString()})
 
 	// Call API client to delete the integration
-	err := r.client.DeleteIntegration(ctx, state.ID.ValueString(), state.Type.ValueString())
+	err := r.client.DeleteIntegration(ctx, state.Type.ValueString(), state.ID.ValueString())
 	if err != nil {
 		resp.Diagnostics.AddError(
 			"Error Deleting Integration",
