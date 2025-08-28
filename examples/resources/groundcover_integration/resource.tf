@@ -15,7 +15,7 @@ provider "groundcover" {
 
 # Example: CloudWatch Integration
 resource "groundcover_integration" "cloudwatch_example" {
-  type = "cloudwatch"
+  type = "Cloudwatch"
   value = <<EOF
 stsRegion: us-east-1
 regions:
