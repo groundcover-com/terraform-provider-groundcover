@@ -95,11 +95,11 @@ type ApiClient interface {
 	ListIngestionKeys(ctx context.Context, req *models.ListIngestionKeysRequest) ([]*models.IngestionKeyResult, error)
 	DeleteIngestionKey(ctx context.Context, req *models.DeleteIngestionKeyRequest) error
 
-	// Integrations
-	CreateIntegration(ctx context.Context, req *models.CreateIntegrationConfigRequest) (*models.IntegrationConfig, error)
-	GetIntegration(ctx context.Context, integrationType string, id string) (*models.IntegrationConfig, error)
-	UpdateIntegration(ctx context.Context, req *models.UpdateIntegrationConfigRequest) (*models.IntegrationConfig, error)
-	DeleteIntegration(ctx context.Context, integrationType string, id string) error
+	// DataIntegrations
+	CreateDataIntegration(ctx context.Context, integrationType string, req *models.CreateDataIntegrationConfigRequest) (*models.DataIntegrationConfig, error)
+	GetDataIntegration(ctx context.Context, integrationType string, id string) (*models.DataIntegrationConfig, error)
+	UpdateDataIntegration(ctx context.Context, integrationType string, id string, req *models.UpdateDataIntegrationConfigRequest) (*models.DataIntegrationConfig, error)
+	DeleteDataIntegration(ctx context.Context, integrationType string, id string) error
 }
 
 // SdkClientWrapper implements ApiClient using the Groundcover Go SDK.
