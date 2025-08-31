@@ -42,32 +42,8 @@ EOF
   is_paused = false
 }
 
-# Example: DataDog DataIntegration (paused)
-resource "groundcover_dataintegration" "datadog_example" {
-  type = "datadog"
-  config = <<EOF
-api_key: your-datadog-api-key
-app_key: your-datadog-app-key
-site: datadoghq.com
-tags:
-  - "env:production"
-  - "team:platform"
-EOF
-  is_paused = true
-}
-
 # Output the data integration IDs for reference
 output "cloudwatch_dataintegration_id" {
   description = "The ID of the CloudWatch data integration"
   value       = groundcover_dataintegration.cloudwatch_example.id
-}
-
-output "datadog_dataintegration_id" {
-  description = "The ID of the DataDog data integration"
-  value       = groundcover_dataintegration.datadog_example.id
-}
-
-output "cloudwatch_dataintegration_created_by" {
-  description = "Who created the CloudWatch data integration"
-  value       = groundcover_dataintegration.cloudwatch_example.created_by
 }
