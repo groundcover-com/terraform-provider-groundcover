@@ -67,14 +67,23 @@ func (r *dataIntegrationResource) Schema(_ context.Context, _ resource.SchemaReq
 			"env": schema.StringAttribute{
 				Description: "The environment where the data integration runs.",
 				Optional:    true,
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.RequiresReplace(),
+				},
 			},
 			"cluster": schema.StringAttribute{
 				Description: "The cluster where the data integration runs.",
 				Optional:    true,
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.RequiresReplace(),
+				},
 			},
 			"instance": schema.StringAttribute{
 				Description: "The instance where the data integration runs.",
 				Optional:    true,
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.RequiresReplace(),
+				},
 			},
 			"config": schema.StringAttribute{
 				Description: "The YAML configuration for the data integration.",
