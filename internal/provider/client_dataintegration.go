@@ -64,21 +64,30 @@ func (c *SdkClientWrapper) UpdateDataIntegration(ctx context.Context, integratio
 }
 
 // DeleteDataIntegration deletes a data integration configuration by type and ID
-func (c *SdkClientWrapper) DeleteDataIntegration(ctx context.Context, integrationType string, id string, env string, cluster string, instance string) error {
-	logFields := map[string]any{"req": "delete_data_integration", "id": id, "type": integrationType, "env": env, "cluster": cluster, "instance": instance}
+func (c *SdkClientWrapper) DeleteDataIntegration(ctx context.Context, integrationType string, id string, env *string, cluster *string, instance *string) error {
+	logFields := map[string]any{"req": "delete_data_integration", "id": id, "type": integrationType}
+	if env != nil {
+		logFields["env"] = *env
+	}
+	if cluster != nil {
+		logFields["cluster"] = *cluster
+	}
+	if instance != nil {
+		logFields["instance"] = *instance
+	}
 	tflog.Debug(ctx, "Executing SDK Call: Delete DataIntegration", logFields)
 
 	deleteParams := integrations.NewDeleteDataIntegrationConfigParamsWithContext(ctx).WithType(integrationType).WithID(id)
 
-	// Add optional parameters if they are provided
-	if env != "" {
-		deleteParams = deleteParams.WithEnv(&env)
+	// Add optional query parameters if provided
+	if env != nil {
+		deleteParams = deleteParams.WithEnv(env)
 	}
-	if cluster != "" {
-		deleteParams = deleteParams.WithCluster(&cluster)
+	if cluster != nil {
+		deleteParams = deleteParams.WithCluster(cluster)
 	}
-	if instance != "" {
-		deleteParams = deleteParams.WithInstance(&instance)
+	if instance != nil {
+		deleteParams = deleteParams.WithInstance(instance)
 	}
 
 	_, err := c.sdkClient.Integrations.DeleteDataIntegrationConfig(deleteParams, nil)

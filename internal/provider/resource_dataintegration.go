@@ -66,15 +66,15 @@ func (r *dataIntegrationResource) Schema(_ context.Context, _ resource.SchemaReq
 			},
 			"env": schema.StringAttribute{
 				Description: "The environment where the data integration runs.",
-				Required:    true,
+				Optional:    true,
 			},
 			"cluster": schema.StringAttribute{
 				Description: "The cluster where the data integration runs.",
-				Required:    true,
+				Optional:    true,
 			},
 			"instance": schema.StringAttribute{
 				Description: "The instance where the data integration runs.",
-				Required:    true,
+				Optional:    true,
 			},
 			"config": schema.StringAttribute{
 				Description: "The YAML configuration for the data integration.",
@@ -130,10 +130,21 @@ func (r *dataIntegrationResource) Create(ctx context.Context, req resource.Creat
 	// Create request model
 	createReq := &models.CreateDataIntegrationConfigRequest{
 		Config:   plan.Config.ValueString(),
-		Env:      plan.Env.ValueString(),
-		Cluster:  plan.Cluster.ValueString(),
-		Instance: plan.Instance.ValueString(),
 		IsPaused: plan.IsPaused.ValueBool(),
+	}
+
+	// Set pointer fields only if they are not null
+	if !plan.Env.IsNull() {
+		env := plan.Env.ValueString()
+		createReq.Env = &env
+	}
+	if !plan.Cluster.IsNull() {
+		cluster := plan.Cluster.ValueString()
+		createReq.Cluster = &cluster
+	}
+	if !plan.Instance.IsNull() {
+		instance := plan.Instance.ValueString()
+		createReq.Instance = &instance
 	}
 
 	// Call API client to create the data integration
@@ -148,9 +159,6 @@ func (r *dataIntegrationResource) Create(ctx context.Context, req resource.Creat
 
 	// Map response back to plan
 	plan.ID = types.StringValue(createdConfig.ID)
-	plan.Env = types.StringValue(createdConfig.Env)
-	plan.Cluster = types.StringValue(createdConfig.Cluster)
-	plan.Instance = types.StringValue(createdConfig.Instance)
 	plan.Config = types.StringValue(createdConfig.Config)
 	plan.CreatedAt = types.StringValue(createdConfig.CreatedTimestamp.String())
 	plan.CreatedBy = types.StringValue(createdConfig.CreatedBy)
@@ -235,10 +243,21 @@ func (r *dataIntegrationResource) Update(ctx context.Context, req resource.Updat
 	// Create update request model
 	updateReq := &models.CreateDataIntegrationConfigRequest{
 		Config:   plan.Config.ValueString(),
-		Env:      plan.Env.ValueString(),
-		Cluster:  plan.Cluster.ValueString(),
-		Instance: plan.Instance.ValueString(),
 		IsPaused: plan.IsPaused.ValueBool(),
+	}
+
+	// Set pointer fields only if they are not null
+	if !plan.Env.IsNull() {
+		env := plan.Env.ValueString()
+		updateReq.Env = &env
+	}
+	if !plan.Cluster.IsNull() {
+		cluster := plan.Cluster.ValueString()
+		updateReq.Cluster = &cluster
+	}
+	if !plan.Instance.IsNull() {
+		instance := plan.Instance.ValueString()
+		updateReq.Instance = &instance
 	}
 
 	// Call API client to update the data integration
@@ -282,7 +301,21 @@ func (r *dataIntegrationResource) Delete(ctx context.Context, req resource.Delet
 	tflog.Debug(ctx, "Deleting DataIntegration resource", map[string]any{"id": state.ID.ValueString(), "type": state.Type.ValueString()})
 
 	// Call API client to delete the data integration
-	err := r.client.DeleteDataIntegration(ctx, state.Type.ValueString(), state.ID.ValueString(), state.Env.ValueString(), state.Cluster.ValueString(), state.Instance.ValueString())
+	var env, cluster, instance *string
+	if !state.Env.IsNull() {
+		envVal := state.Env.ValueString()
+		env = &envVal
+	}
+	if !state.Cluster.IsNull() {
+		clusterVal := state.Cluster.ValueString()
+		cluster = &clusterVal
+	}
+	if !state.Instance.IsNull() {
+		instanceVal := state.Instance.ValueString()
+		instance = &instanceVal
+	}
+
+	err := r.client.DeleteDataIntegration(ctx, state.Type.ValueString(), state.ID.ValueString(), env, cluster, instance)
 	if err != nil {
 		resp.Diagnostics.AddError(
 			"Error Deleting DataIntegration",
