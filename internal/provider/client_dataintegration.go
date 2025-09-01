@@ -49,7 +49,7 @@ func (c *SdkClientWrapper) GetDataIntegration(ctx context.Context, integrationTy
 }
 
 // UpdateDataIntegration updates an existing data integration configuration
-func (c *SdkClientWrapper) UpdateDataIntegration(ctx context.Context, integrationType string, id string, req *models.UpdateDataIntegrationConfigRequest) (*models.DataIntegrationConfig, error) {
+func (c *SdkClientWrapper) UpdateDataIntegration(ctx context.Context, integrationType string, id string, req *models.CreateDataIntegrationConfigRequest) (*models.DataIntegrationConfig, error) {
 	logFields := map[string]any{"req": "update_data_integration", "id": id, "type": integrationType}
 	tflog.Debug(ctx, "Executing SDK Call: Update DataIntegration", logFields)
 
@@ -64,11 +64,23 @@ func (c *SdkClientWrapper) UpdateDataIntegration(ctx context.Context, integratio
 }
 
 // DeleteDataIntegration deletes a data integration configuration by type and ID
-func (c *SdkClientWrapper) DeleteDataIntegration(ctx context.Context, integrationType string, id string) error {
-	logFields := map[string]any{"req": "delete_data_integration", "id": id, "type": integrationType}
+func (c *SdkClientWrapper) DeleteDataIntegration(ctx context.Context, integrationType string, id string, env string, cluster string, instance string) error {
+	logFields := map[string]any{"req": "delete_data_integration", "id": id, "type": integrationType, "env": env, "cluster": cluster, "instance": instance}
 	tflog.Debug(ctx, "Executing SDK Call: Delete DataIntegration", logFields)
 
 	deleteParams := integrations.NewDeleteDataIntegrationConfigParamsWithContext(ctx).WithType(integrationType).WithID(id)
+
+	// Add optional parameters if they are provided
+	if env != "" {
+		deleteParams = deleteParams.WithEnv(&env)
+	}
+	if cluster != "" {
+		deleteParams = deleteParams.WithCluster(&cluster)
+	}
+	if instance != "" {
+		deleteParams = deleteParams.WithInstance(&instance)
+	}
+
 	_, err := c.sdkClient.Integrations.DeleteDataIntegrationConfig(deleteParams, nil)
 	if err != nil {
 		return handleApiError(ctx, err, "DeleteDataIntegration", dataIntegrationResourceId)

@@ -33,6 +33,9 @@ type dataIntegrationResource struct {
 type dataIntegrationResourceModel struct {
 	ID        types.String `tfsdk:"id"`
 	Type      types.String `tfsdk:"type"`
+	Env       types.String `tfsdk:"env"`
+	Cluster   types.String `tfsdk:"cluster"`
+	Instance  types.String `tfsdk:"instance"`
 	Config    types.String `tfsdk:"config"`
 	IsPaused  types.Bool   `tfsdk:"is_paused"`
 	CreatedAt types.String `tfsdk:"created_at"`
@@ -60,6 +63,18 @@ func (r *dataIntegrationResource) Schema(_ context.Context, _ resource.SchemaReq
 				PlanModifiers: []planmodifier.String{
 					stringplanmodifier.RequiresReplace(),
 				},
+			},
+			"env": schema.StringAttribute{
+				Description: "The environment where the data integration runs.",
+				Required:    true,
+			},
+			"cluster": schema.StringAttribute{
+				Description: "The cluster where the data integration runs.",
+				Required:    true,
+			},
+			"instance": schema.StringAttribute{
+				Description: "The instance where the data integration runs.",
+				Required:    true,
 			},
 			"config": schema.StringAttribute{
 				Description: "The YAML configuration for the data integration.",
@@ -115,6 +130,9 @@ func (r *dataIntegrationResource) Create(ctx context.Context, req resource.Creat
 	// Create request model
 	createReq := &models.CreateDataIntegrationConfigRequest{
 		Config:   plan.Config.ValueString(),
+		Env:      plan.Env.ValueString(),
+		Cluster:  plan.Cluster.ValueString(),
+		Instance: plan.Instance.ValueString(),
 		IsPaused: plan.IsPaused.ValueBool(),
 	}
 
@@ -130,6 +148,10 @@ func (r *dataIntegrationResource) Create(ctx context.Context, req resource.Creat
 
 	// Map response back to plan
 	plan.ID = types.StringValue(createdConfig.ID)
+	plan.Env = types.StringValue(createdConfig.Env)
+	plan.Cluster = types.StringValue(createdConfig.Cluster)
+	plan.Instance = types.StringValue(createdConfig.Instance)
+	plan.Config = types.StringValue(createdConfig.Config)
 	plan.CreatedAt = types.StringValue(createdConfig.CreatedTimestamp.String())
 	plan.CreatedBy = types.StringValue(createdConfig.CreatedBy)
 	plan.IsPaused = types.BoolValue(createdConfig.IsPaused)
@@ -181,6 +203,9 @@ func (r *dataIntegrationResource) Read(ctx context.Context, req resource.ReadReq
 	// Update state
 	state.ID = types.StringValue(configEntry.ID)
 	state.Type = types.StringValue(configEntry.Type)
+	state.Env = types.StringValue(configEntry.Env)
+	state.Cluster = types.StringValue(configEntry.Cluster)
+	state.Instance = types.StringValue(configEntry.Instance)
 	state.Config = types.StringValue(configEntry.Config)
 	state.IsPaused = types.BoolValue(configEntry.IsPaused)
 	state.CreatedAt = types.StringValue(configEntry.CreatedTimestamp.String())
@@ -208,8 +233,11 @@ func (r *dataIntegrationResource) Update(ctx context.Context, req resource.Updat
 	tflog.Debug(ctx, "Updating DataIntegration", map[string]any{"id": plan.ID.ValueString(), "type": plan.Type.ValueString()})
 
 	// Create update request model
-	updateReq := &models.UpdateDataIntegrationConfigRequest{
+	updateReq := &models.CreateDataIntegrationConfigRequest{
 		Config:   plan.Config.ValueString(),
+		Env:      plan.Env.ValueString(),
+		Cluster:  plan.Cluster.ValueString(),
+		Instance: plan.Instance.ValueString(),
 		IsPaused: plan.IsPaused.ValueBool(),
 	}
 
@@ -224,6 +252,9 @@ func (r *dataIntegrationResource) Update(ctx context.Context, req resource.Updat
 	}
 
 	// Update state
+	plan.Env = types.StringValue(updatedConfig.Env)
+	plan.Cluster = types.StringValue(updatedConfig.Cluster)
+	plan.Instance = types.StringValue(updatedConfig.Instance)
 	plan.Config = types.StringValue(updatedConfig.Config)
 	plan.IsPaused = types.BoolValue(updatedConfig.IsPaused)
 	plan.CreatedAt = types.StringValue(updatedConfig.CreatedTimestamp.String())
@@ -251,7 +282,7 @@ func (r *dataIntegrationResource) Delete(ctx context.Context, req resource.Delet
 	tflog.Debug(ctx, "Deleting DataIntegration resource", map[string]any{"id": state.ID.ValueString(), "type": state.Type.ValueString()})
 
 	// Call API client to delete the data integration
-	err := r.client.DeleteDataIntegration(ctx, state.Type.ValueString(), state.ID.ValueString())
+	err := r.client.DeleteDataIntegration(ctx, state.Type.ValueString(), state.ID.ValueString(), state.Env.ValueString(), state.Cluster.ValueString(), state.Instance.ValueString())
 	if err != nil {
 		resp.Diagnostics.AddError(
 			"Error Deleting DataIntegration",
