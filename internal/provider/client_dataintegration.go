@@ -9,7 +9,6 @@ import (
 )
 
 const (
-	dataIntegrationEndpoint   = "/api/integrations/data/config"
 	dataIntegrationResourceId = "dataintegration"
 )
 
