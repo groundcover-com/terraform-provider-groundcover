@@ -35,7 +35,6 @@ type ingestionKeyResourceModel struct {
 	ID           types.String `tfsdk:"id"`
 	Name         types.String `tfsdk:"name"`
 	CreatedBy    types.String `tfsdk:"created_by"`
-	CreationDate types.String `tfsdk:"creation_date"`
 	Key          types.String `tfsdk:"key"`
 	Type         types.String `tfsdk:"type"`
 	RemoteConfig types.Bool   `tfsdk:"remote_config"`
@@ -66,10 +65,6 @@ func (r *ingestionKeyResource) Schema(_ context.Context, _ resource.SchemaReques
 			},
 			"created_by": schema.StringAttribute{
 				Description: "The user who created the ingestion key.",
-				Computed:    true,
-			},
-			"creation_date": schema.StringAttribute{
-				Description: "The creation date of the ingestion key.",
 				Computed:    true,
 			},
 			"key": schema.StringAttribute{
@@ -161,7 +156,6 @@ func (r *ingestionKeyResource) Create(ctx context.Context, req resource.CreateRe
 		ID:           types.StringValue(result.Name), // Use name as ID for ingestion keys
 		Name:         types.StringValue(result.Name),
 		CreatedBy:    types.StringValue(result.CreatedBy),
-		CreationDate: types.StringValue(result.CreationDate.String()),
 		Key:          types.StringValue(result.Key),
 		Type:         types.StringValue(result.Type),
 		RemoteConfig: types.BoolValue(result.RemoteConfig), // API always returns a bool
@@ -230,7 +224,6 @@ func (r *ingestionKeyResource) Read(ctx context.Context, req resource.ReadReques
 	ingestionKey := response[0]
 	state.ID = types.StringValue(ingestionKey.Name) // Ensure ID is set
 	state.CreatedBy = types.StringValue(ingestionKey.CreatedBy)
-	state.CreationDate = types.StringValue(ingestionKey.CreationDate.String())
 	state.Key = types.StringValue(ingestionKey.Key)
 	state.Type = types.StringValue(ingestionKey.Type)
 	state.RemoteConfig = types.BoolValue(ingestionKey.RemoteConfig)
