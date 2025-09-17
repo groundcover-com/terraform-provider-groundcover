@@ -135,7 +135,12 @@ func (r *dashboardResource) Create(ctx context.Context, req resource.CreateReque
 		return
 	}
 
+	// Map all fields from the API response to capture any normalization
 	plan.UUID = types.StringValue(dashboard.UUID)
+	plan.Name = types.StringValue(dashboard.Name)
+	plan.Description = types.StringValue(dashboard.Description)
+	plan.Team = types.StringValue(dashboard.Team)
+	// Don't overwrite preset to avoid JSON formatting diffs - keep the original from plan
 	plan.Owner = types.StringValue(dashboard.Owner)
 	plan.Status = types.StringValue(dashboard.Status)
 	plan.RevisionNumber = types.Int32Value(dashboard.RevisionNumber)
@@ -255,7 +260,12 @@ func (r *dashboardResource) Update(ctx context.Context, req resource.UpdateReque
 		return
 	}
 
+	// Map all fields from the API response to capture any normalization
 	plan.UUID = types.StringValue(dashboard.UUID)
+	plan.Name = types.StringValue(dashboard.Name)
+	plan.Description = types.StringValue(dashboard.Description)
+	plan.Team = types.StringValue(dashboard.Team)
+	// Don't overwrite preset to avoid JSON formatting diffs - keep the original from plan
 	plan.Owner = types.StringValue(dashboard.Owner)
 	plan.Status = types.StringValue(dashboard.Status)
 	plan.RevisionNumber = types.Int32Value(dashboard.RevisionNumber)
