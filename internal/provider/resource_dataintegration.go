@@ -38,8 +38,8 @@ type dataIntegrationResourceModel struct {
 	Instance  types.String `tfsdk:"instance"`
 	Config    types.String `tfsdk:"config"`
 	IsPaused  types.Bool   `tfsdk:"is_paused"`
-	CreatedAt types.String `tfsdk:"created_at"`
-	CreatedBy types.String `tfsdk:"created_by"`
+	UpdatedAt types.String `tfsdk:"updated_at"`
+	UpdatedBy types.String `tfsdk:"updated_by"`
 }
 
 func (r *dataIntegrationResource) Metadata(_ context.Context, req resource.MetadataRequest, resp *resource.MetadataResponse) {
@@ -95,12 +95,12 @@ func (r *dataIntegrationResource) Schema(_ context.Context, _ resource.SchemaReq
 				Computed:    true,
 				Default:     booldefault.StaticBool(false),
 			},
-			"created_at": schema.StringAttribute{
-				Description: "The creation timestamp of the data integration configuration.",
+			"updated_at": schema.StringAttribute{
+				Description: "The last update timestamp of the data integration configuration.",
 				Computed:    true,
 			},
-			"created_by": schema.StringAttribute{
-				Description: "The user who created the data integration configuration.",
+			"updated_by": schema.StringAttribute{
+				Description: "The user who last updated the data integration configuration.",
 				Computed:    true,
 			},
 		},
@@ -169,8 +169,8 @@ func (r *dataIntegrationResource) Create(ctx context.Context, req resource.Creat
 	// Map response back to plan
 	plan.ID = types.StringValue(createdConfig.ID)
 	plan.Config = types.StringValue(createdConfig.Config)
-	plan.CreatedAt = types.StringValue(createdConfig.CreatedTimestamp.String())
-	plan.CreatedBy = types.StringValue(createdConfig.CreatedBy)
+	plan.UpdatedAt = types.StringValue(createdConfig.UpdateTimestamp.String())
+	plan.UpdatedBy = types.StringValue(createdConfig.UpdatedBy)
 	plan.IsPaused = types.BoolValue(createdConfig.IsPaused)
 
 	tflog.Debug(ctx, fmt.Sprintf("DataIntegration created with ID: %s", createdConfig.ID))
@@ -225,8 +225,8 @@ func (r *dataIntegrationResource) Read(ctx context.Context, req resource.ReadReq
 	state.Instance = types.StringValue(configEntry.Instance)
 	state.Config = types.StringValue(configEntry.Config)
 	state.IsPaused = types.BoolValue(configEntry.IsPaused)
-	state.CreatedAt = types.StringValue(configEntry.CreatedTimestamp.String())
-	state.CreatedBy = types.StringValue(configEntry.CreatedBy)
+	state.UpdatedAt = types.StringValue(configEntry.UpdateTimestamp.String())
+	state.UpdatedBy = types.StringValue(configEntry.UpdatedBy)
 
 	// Set refreshed state
 	diags = resp.State.Set(ctx, &state)
@@ -285,8 +285,8 @@ func (r *dataIntegrationResource) Update(ctx context.Context, req resource.Updat
 	plan.Instance = types.StringValue(updatedConfig.Instance)
 	plan.Config = types.StringValue(updatedConfig.Config)
 	plan.IsPaused = types.BoolValue(updatedConfig.IsPaused)
-	plan.CreatedAt = types.StringValue(updatedConfig.CreatedTimestamp.String())
-	plan.CreatedBy = types.StringValue(updatedConfig.CreatedBy)
+	plan.UpdatedAt = types.StringValue(updatedConfig.UpdateTimestamp.String())
+	plan.UpdatedBy = types.StringValue(updatedConfig.UpdatedBy)
 
 	// Set refreshed state
 	diags = resp.State.Set(ctx, &plan)
