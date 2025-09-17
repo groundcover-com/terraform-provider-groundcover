@@ -166,4 +166,3 @@ resource "groundcover_dashboard" "test" {
 }
 `, name, preset)
 }
-

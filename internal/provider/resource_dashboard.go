@@ -30,16 +30,16 @@ type dashboardResource struct {
 }
 
 type dashboardResourceModel struct {
-	UUID            types.String `tfsdk:"id"`
-	Name            types.String `tfsdk:"name"`
-	Description     types.String `tfsdk:"description"`
-	Team            types.String `tfsdk:"team"`
-	Preset          types.String `tfsdk:"preset"`
-	IsProvisioned   types.Bool   `tfsdk:"is_provisioned"`
-	RevisionNumber  types.Int32  `tfsdk:"revision_number"`
-	Override        types.Bool   `tfsdk:"override"`
-	Owner           types.String `tfsdk:"owner"`
-	Status          types.String `tfsdk:"status"`
+	UUID           types.String `tfsdk:"id"`
+	Name           types.String `tfsdk:"name"`
+	Description    types.String `tfsdk:"description"`
+	Team           types.String `tfsdk:"team"`
+	Preset         types.String `tfsdk:"preset"`
+	IsProvisioned  types.Bool   `tfsdk:"is_provisioned"`
+	RevisionNumber types.Int32  `tfsdk:"revision_number"`
+	Override       types.Bool   `tfsdk:"override"`
+	Owner          types.String `tfsdk:"owner"`
+	Status         types.String `tfsdk:"status"`
 }
 
 func (r *dashboardResource) Metadata(_ context.Context, req resource.MetadataRequest, resp *resource.MetadataResponse) {

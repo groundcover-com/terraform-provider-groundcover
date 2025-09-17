@@ -9,7 +9,6 @@ import (
 	"github.com/hashicorp/terraform-plugin-log/tflog"
 )
 
-
 func (c *SdkClientWrapper) CreateDashboard(ctx context.Context, dashboard *models.CreateDashboardRequest) (*models.View, error) {
 	var name string
 	if dashboard != nil {
