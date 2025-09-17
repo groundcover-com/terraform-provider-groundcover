@@ -34,7 +34,8 @@ func TestAccIngestionKeyResource(t *testing.T) {
 					resource.TestCheckResourceAttr("groundcover_ingestionkey.test", "name", name),
 					resource.TestCheckResourceAttr("groundcover_ingestionkey.test", "type", "sensor"),
 					resource.TestCheckResourceAttrSet("groundcover_ingestionkey.test", "key"),
-					resource.TestCheckResourceAttrSet("groundcover_ingestionkey.test", "creation_date"),
+					// creation_date is deprecated and no longer provided by API v1.84.0+
+					// The field exists in schema but is always null/empty
 					resource.TestCheckResourceAttrSet("groundcover_ingestionkey.test", "created_by"),
 				),
 			},
