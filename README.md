@@ -18,6 +18,8 @@ Basic usage examples can be found in the `examples/` directory:
     *   Demonstrates how to create and manage ingestion keys for data ingestion.
 *   **Logs Pipeline Resource:** [`examples/resources/groundcover_logspipeline/resource.tf`](./examples/resources/groundcover_logspipeline/resource.tf)
     *   Shows how to configure logs processing pipelines.
+*   **Dashboard Resource:** [`examples/resources/groundcover_dashboard/resource.tf`](./examples/resources/groundcover_dashboard/resource.tf)
+    *   Demonstrates how to create and manage dashboards with customizable widgets and layouts.
 
 ## Local Development and Testing
 

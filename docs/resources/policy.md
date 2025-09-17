@@ -13,8 +13,6 @@ Manages a groundcover RBAC policy.
 ## Example Usage
 
 ```terraform
-# Copyright (c) HashiCorp, Inc.
-
 # Configure the groundcover Provider
 provider "groundcover" {
   # Configure API key using environment variable TF_VAR_groundcover_api_key is recommended

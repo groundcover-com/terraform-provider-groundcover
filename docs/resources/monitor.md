@@ -13,8 +13,6 @@ Groundcover Monitor resource managed via raw YAML.
 ## Example Usage
 
 ```terraform
-# Copyright (c) HashiCorp, Inc.
-
 # examples/resources/groundcover_monitor/resource.tf
 
 terraform {
