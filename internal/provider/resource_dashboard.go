@@ -180,6 +180,8 @@ func (r *dashboardResource) Read(ctx context.Context, req resource.ReadRequest, 
 	state.Name = types.StringValue(dashboard.Name)
 	state.Description = types.StringValue(dashboard.Description)
 	state.Team = types.StringValue(dashboard.Team)
+	// Only update preset if it's not already set to avoid JSON formatting diffs
+	// The API may return JSON with different field ordering than what was sent
 	if state.Preset.IsNull() || state.Preset.IsUnknown() {
 		state.Preset = types.StringValue(dashboard.Preset)
 	}
@@ -207,14 +209,41 @@ func (r *dashboardResource) Update(ctx context.Context, req resource.UpdateReque
 		"uuid": state.UUID.ValueString(),
 	})
 
+	// Build update request, using plan values when known, otherwise keep state values
+	name := plan.Name.ValueString()
+	if plan.Name.IsNull() || plan.Name.IsUnknown() {
+		name = state.Name.ValueString()
+	}
+
+	description := plan.Description.ValueString()
+	if plan.Description.IsNull() || plan.Description.IsUnknown() {
+		description = state.Description.ValueString()
+	}
+
+	team := plan.Team.ValueString()
+	if plan.Team.IsNull() || plan.Team.IsUnknown() {
+		team = state.Team.ValueString()
+	}
+
+	preset := plan.Preset.ValueString()
+	if plan.Preset.IsNull() || plan.Preset.IsUnknown() {
+		preset = state.Preset.ValueString()
+	}
+
+	// Default to true if override is not set, to avoid revision conflicts
+	override := true
+	if !plan.Override.IsNull() && !plan.Override.IsUnknown() {
+		override = plan.Override.ValueBool()
+	}
+
 	updateReq := &models.UpdateDashboardRequest{
-		Name:            plan.Name.ValueString(),
-		Description:     plan.Description.ValueString(),
-		Team:            plan.Team.ValueString(),
-		Preset:          plan.Preset.ValueString(),
+		Name:            name,
+		Description:     description,
+		Team:            team,
+		Preset:          preset,
 		IsProvisioned:   true, // Always set to true
 		CurrentRevision: state.RevisionNumber.ValueInt32(),
-		Override:        true,
+		Override:        override,
 	}
 
 	dashboard, err := r.client.UpdateDashboard(ctx, state.UUID.ValueString(), updateReq)

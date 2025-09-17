@@ -2,7 +2,6 @@ package provider
 
 import (
 	"context"
-	"fmt"
 
 	"github.com/groundcover-com/groundcover-sdk-go/pkg/client/dashboards"
 	"github.com/groundcover-com/groundcover-sdk-go/pkg/models"
@@ -20,7 +19,12 @@ func (c *SdkClientWrapper) CreateDashboard(ctx context.Context, dashboard *model
 	logFields := map[string]any{"name": name}
 	tflog.Debug(ctx, "Executing SDK Call: Create Dashboard", logFields)
 
-	tflog.Debug(ctx, fmt.Sprintf("Sending CreateDashboardRequest to SDK: %+v", dashboard), logFields)
+	tflog.Debug(ctx, "Sending CreateDashboardRequest to SDK", map[string]any{
+		"name":           dashboard.Name,
+		"team":           dashboard.Team,
+		"is_provisioned": dashboard.IsProvisioned,
+		"has_preset":     dashboard.Preset != "",
+	})
 
 	params := dashboards.NewCreateDashboardParams().
 		WithContext(ctx).
@@ -56,7 +60,14 @@ func (c *SdkClientWrapper) GetDashboard(ctx context.Context, uuid string) (*mode
 func (c *SdkClientWrapper) UpdateDashboard(ctx context.Context, uuid string, dashboard *models.UpdateDashboardRequest) (*models.View, error) {
 	tflog.Debug(ctx, "Executing SDK Call: Update Dashboard", map[string]any{"uuid": uuid})
 
-	tflog.Debug(ctx, fmt.Sprintf("Sending UpdateDashboardRequest to SDK: %+v", dashboard), map[string]any{"uuid": uuid})
+	tflog.Debug(ctx, "Sending UpdateDashboardRequest to SDK", map[string]any{
+		"uuid":           uuid,
+		"name":           dashboard.Name,
+		"team":           dashboard.Team,
+		"is_provisioned": dashboard.IsProvisioned,
+		"has_preset":     dashboard.Preset != "",
+		"override":       dashboard.Override,
+	})
 
 	params := dashboards.NewUpdateDashboardParams().
 		WithContext(ctx).

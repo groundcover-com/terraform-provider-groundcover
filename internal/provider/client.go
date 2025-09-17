@@ -148,7 +148,7 @@ func NewSdkClientWrapper(ctx context.Context, baseURLStr, apiKey, backendID stri
 
 	userEnabledDebug := os.Getenv("TF_LOG") == "debug"
 
-	tflog.Info(ctx, "Initializing Groundcover SDK v1.41.0 client", map[string]any{"baseURL": baseURLStr, "backendID": backendID})
+	tflog.Info(ctx, "Initializing Groundcover SDK client", map[string]any{"baseURL": baseURLStr, "backendID": backendID})
 
 	parsedURL, err := url.Parse(baseURLStr)
 	if err != nil {
