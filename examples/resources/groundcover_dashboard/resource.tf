@@ -109,7 +109,6 @@ resource "groundcover_dashboard" "metrics_dashboard" {
     schemaVersion = 3
   })
 
-  is_provisioned = false
 }
 
 # Example Dashboard: Simple monitoring dashboard

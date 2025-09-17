@@ -124,7 +124,6 @@ resource "groundcover_dashboard" "metrics_dashboard" {
     schemaVersion = 3
   })
 
-  is_provisioned = false
 }
 
 # Example Dashboard: Simple monitoring dashboard
@@ -198,7 +197,6 @@ output "simple_dashboard_owner" {
 ### Optional
 
 - `description` (String) The description of the dashboard.
-- `is_provisioned` (Boolean) Whether the dashboard is provisioned.
 - `override` (Boolean) Whether to override the dashboard on update.
 - `team` (String) The team that owns the dashboard.
 

@@ -27,7 +27,6 @@ func TestAccDashboardResource(t *testing.T) {
 					resource.TestCheckResourceAttr("groundcover_dashboard.test", "description", "Test dashboard description"),
 					resource.TestCheckResourceAttr("groundcover_dashboard.test", "team", "engineering"),
 					resource.TestCheckResourceAttrSet("groundcover_dashboard.test", "preset"), // JSON string, just check it's set
-					resource.TestCheckResourceAttr("groundcover_dashboard.test", "is_provisioned", "false"),
 					resource.TestCheckResourceAttrSet("groundcover_dashboard.test", "id"),
 					resource.TestCheckResourceAttrSet("groundcover_dashboard.test", "owner"),
 					resource.TestCheckResourceAttrSet("groundcover_dashboard.test", "status"),
@@ -158,11 +157,10 @@ func testAccDashboardResourceConfig(name string) string {
 }`
 	return fmt.Sprintf(`
 resource "groundcover_dashboard" "test" {
-  name           = "%s"
-  description    = "Test dashboard description"
-  team           = "engineering"
-  preset         = jsonencode(%s)
-  is_provisioned = false
+  name        = "%s"
+  description = "Test dashboard description"
+  team        = "engineering"
+  preset      = jsonencode(%s)
 }
 `, name, preset)
 }

@@ -213,6 +213,7 @@ TF_ACC=1 go test ./internal/provider -v -run TestAccMonitorResource
 TF_ACC=1 go test ./internal/provider -v -run TestAccApiKeyResource
 TF_ACC=1 go test ./internal/provider -v -run TestAccLogsPipelineResource
 TF_ACC=1 go test ./internal/provider -v -run TestAccIngestionKeyResource
+TF_ACC=1 go test ./internal/provider -v -run TestAccDashboardResource
 
 # Run unit tests only (no API calls required)
 go test ./internal/provider -v
@@ -230,8 +231,9 @@ The provider includes comprehensive acceptance tests for all resources:
 | Monitor | ✅ | ✅ | ✅ | ✅ |
 | Logs Pipeline | ✅ | ✅ | - | ✅ |
 | Ingestion Key | ✅ | ✅ | ✅ | - |
+| Dashboard | ✅ | ✅ | ✅ | - |
 
-**Total: 16 acceptance tests** covering:
+**Total: 18 acceptance tests** covering:
 - **Create, Read, Update, Delete (CRUD)** operations for all resources
 - **Import functionality** to ensure resources can be imported into Terraform state
 - **Disappears testing** to verify proper handling when resources are deleted outside Terraform

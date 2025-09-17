@@ -35,7 +35,6 @@ type dashboardResourceModel struct {
 	Description    types.String `tfsdk:"description"`
 	Team           types.String `tfsdk:"team"`
 	Preset         types.String `tfsdk:"preset"`
-	IsProvisioned  types.Bool   `tfsdk:"is_provisioned"`
 	RevisionNumber types.Int32  `tfsdk:"revision_number"`
 	Override       types.Bool   `tfsdk:"override"`
 	Owner          types.String `tfsdk:"owner"`
@@ -72,10 +71,6 @@ func (r *dashboardResource) Schema(_ context.Context, _ resource.SchemaRequest, 
 			"preset": schema.StringAttribute{
 				Description: "The preset configuration for the dashboard.",
 				Required:    true,
-			},
-			"is_provisioned": schema.BoolAttribute{
-				Description: "Whether the dashboard is provisioned.",
-				Optional:    true,
 			},
 			"revision_number": schema.Int32Attribute{
 				Description: "The revision number of the dashboard.",
@@ -128,7 +123,7 @@ func (r *dashboardResource) Create(ctx context.Context, req resource.CreateReque
 		Description:   plan.Description.ValueString(),
 		Team:          plan.Team.ValueString(),
 		Preset:        plan.Preset.ValueString(),
-		IsProvisioned: plan.IsProvisioned.ValueBool(),
+		IsProvisioned: true, // Always set to true
 	}
 
 	dashboard, err := r.client.CreateDashboard(ctx, createReq)
@@ -188,7 +183,7 @@ func (r *dashboardResource) Read(ctx context.Context, req resource.ReadRequest, 
 	if state.Preset.IsNull() || state.Preset.IsUnknown() {
 		state.Preset = types.StringValue(dashboard.Preset)
 	}
-	state.IsProvisioned = types.BoolValue(dashboard.IsProvisioned)
+	// IsProvisioned is always true and not exposed to users
 	state.RevisionNumber = types.Int32Value(dashboard.RevisionNumber)
 	state.Owner = types.StringValue(dashboard.Owner)
 	state.Status = types.StringValue(dashboard.Status)
@@ -217,7 +212,7 @@ func (r *dashboardResource) Update(ctx context.Context, req resource.UpdateReque
 		Description:     plan.Description.ValueString(),
 		Team:            plan.Team.ValueString(),
 		Preset:          plan.Preset.ValueString(),
-		IsProvisioned:   plan.IsProvisioned.ValueBool(),
+		IsProvisioned:   true, // Always set to true
 		CurrentRevision: state.RevisionNumber.ValueInt32(),
 		Override:        true,
 	}
