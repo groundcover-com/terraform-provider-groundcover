@@ -86,7 +86,7 @@ func (r *dataIntegrationResource) Schema(_ context.Context, _ resource.SchemaReq
 				},
 			},
 			"config": schema.StringAttribute{
-				Description: "The YAML configuration for the data integration.",
+				Description: "The JSON configuration for the data integration.",
 				Required:    true,
 			},
 			"is_paused": schema.BoolAttribute{
@@ -168,6 +168,10 @@ func (r *dataIntegrationResource) Create(ctx context.Context, req resource.Creat
 
 	// Map response back to plan
 	plan.ID = types.StringValue(createdConfig.ID)
+	// Handle nullable fields using StringPointerValue
+	plan.Env = types.StringPointerValue(createdConfig.Env)
+	plan.Cluster = types.StringPointerValue(createdConfig.Cluster)
+	plan.Instance = types.StringPointerValue(createdConfig.Instance)
 	plan.Config = types.StringValue(createdConfig.Config)
 	plan.UpdatedAt = types.StringValue(createdConfig.UpdateTimestamp.String())
 	plan.UpdatedBy = types.StringValue(createdConfig.UpdatedBy)
@@ -220,9 +224,10 @@ func (r *dataIntegrationResource) Read(ctx context.Context, req resource.ReadReq
 	// Update state
 	state.ID = types.StringValue(configEntry.ID)
 	state.Type = types.StringValue(configEntry.Type)
-	state.Env = types.StringValue(configEntry.Env)
-	state.Cluster = types.StringValue(configEntry.Cluster)
-	state.Instance = types.StringValue(configEntry.Instance)
+	// Handle nullable fields using StringPointerValue
+	state.Env = types.StringPointerValue(configEntry.Env)
+	state.Cluster = types.StringPointerValue(configEntry.Cluster)
+	state.Instance = types.StringPointerValue(configEntry.Instance)
 	state.Config = types.StringValue(configEntry.Config)
 	state.IsPaused = types.BoolValue(configEntry.IsPaused)
 	state.UpdatedAt = types.StringValue(configEntry.UpdateTimestamp.String())
@@ -280,9 +285,10 @@ func (r *dataIntegrationResource) Update(ctx context.Context, req resource.Updat
 	}
 
 	// Update state
-	plan.Env = types.StringValue(updatedConfig.Env)
-	plan.Cluster = types.StringValue(updatedConfig.Cluster)
-	plan.Instance = types.StringValue(updatedConfig.Instance)
+	// Handle nullable fields using StringPointerValue
+	plan.Env = types.StringPointerValue(updatedConfig.Env)
+	plan.Cluster = types.StringPointerValue(updatedConfig.Cluster)
+	plan.Instance = types.StringPointerValue(updatedConfig.Instance)
 	plan.Config = types.StringValue(updatedConfig.Config)
 	plan.IsPaused = types.BoolValue(updatedConfig.IsPaused)
 	plan.UpdatedAt = types.StringValue(updatedConfig.UpdateTimestamp.String())
