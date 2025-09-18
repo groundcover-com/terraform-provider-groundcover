@@ -18,6 +18,8 @@ Basic usage examples can be found in the `examples/` directory:
     *   Demonstrates how to create and manage ingestion keys for data ingestion.
 *   **Logs Pipeline Resource:** [`examples/resources/groundcover_logspipeline/resource.tf`](./examples/resources/groundcover_logspipeline/resource.tf)
     *   Shows how to configure logs processing pipelines.
+*   **Dashboard Resource:** [`examples/resources/groundcover_dashboard/resource.tf`](./examples/resources/groundcover_dashboard/resource.tf)
+    *   Demonstrates how to create and manage dashboards with customizable widgets and layouts.
 
 ## Local Development and Testing
 
@@ -211,6 +213,7 @@ TF_ACC=1 go test ./internal/provider -v -run TestAccMonitorResource
 TF_ACC=1 go test ./internal/provider -v -run TestAccApiKeyResource
 TF_ACC=1 go test ./internal/provider -v -run TestAccLogsPipelineResource
 TF_ACC=1 go test ./internal/provider -v -run TestAccIngestionKeyResource
+TF_ACC=1 go test ./internal/provider -v -run TestAccDashboardResource
 
 # Run unit tests only (no API calls required)
 go test ./internal/provider -v
@@ -218,18 +221,7 @@ go test ./internal/provider -v
 
 ### Test Coverage
 
-The provider includes comprehensive acceptance tests for all resources:
-
-| Resource | Basic CRUD | Import | Disappears | Complex Configs |
-|----------|------------|--------|------------|-----------------|
-| Policy | ✅ | ✅ | ✅ | ✅ |
-| Service Account | ✅ | ✅ | ✅ | ✅ |
-| API Key | ✅ | ✅ | ✅ | - |
-| Monitor | ✅ | ✅ | ✅ | ✅ |
-| Logs Pipeline | ✅ | ✅ | - | ✅ |
-| Ingestion Key | ✅ | ✅ | ✅ | - |
-
-**Total: 16 acceptance tests** covering:
+The provider includes comprehensive acceptance tests covering:
 - **Create, Read, Update, Delete (CRUD)** operations for all resources
 - **Import functionality** to ensure resources can be imported into Terraform state
 - **Disappears testing** to verify proper handling when resources are deleted outside Terraform

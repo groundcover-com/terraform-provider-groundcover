@@ -1,0 +1,96 @@
+package provider
+
+import (
+	"context"
+
+	"github.com/groundcover-com/groundcover-sdk-go/pkg/client/dashboards"
+	"github.com/groundcover-com/groundcover-sdk-go/pkg/models"
+	"github.com/hashicorp/terraform-plugin-log/tflog"
+)
+
+func (c *SdkClientWrapper) CreateDashboard(ctx context.Context, dashboard *models.CreateDashboardRequest) (*models.View, error) {
+	tflog.Debug(ctx, "Executing SDK Call: Create Dashboard", map[string]any{"name": dashboard.Name})
+
+	tflog.Debug(ctx, "Sending CreateDashboardRequest to SDK", map[string]any{
+		"name":           dashboard.Name,
+		"team":           dashboard.Team,
+		"is_provisioned": dashboard.IsProvisioned,
+		"has_preset":     dashboard.Preset != "",
+	})
+
+	params := dashboards.NewCreateDashboardParams().
+		WithContext(ctx).
+		WithTimeout(defaultTimeout).
+		WithBody(dashboard)
+
+	resp, err := c.sdkClient.Dashboards.CreateDashboard(params, nil)
+	if err != nil {
+		return nil, handleApiError(ctx, err, "CreateDashboard", dashboard.Name)
+	}
+
+	tflog.Debug(ctx, "SDK Call Successful: Create Dashboard", map[string]any{"uuid": resp.Payload.UUID})
+	return resp.Payload, nil
+}
+
+func (c *SdkClientWrapper) GetDashboard(ctx context.Context, uuid string) (*models.View, error) {
+	tflog.Debug(ctx, "Executing SDK Call: Get Dashboard", map[string]any{"uuid": uuid})
+
+	params := dashboards.NewGetDashboardParams().
+		WithContext(ctx).
+		WithTimeout(defaultTimeout).
+		WithID(uuid)
+
+	resp, err := c.sdkClient.Dashboards.GetDashboard(params, nil)
+	if err != nil {
+		return nil, handleApiError(ctx, err, "GetDashboard", uuid)
+	}
+
+	tflog.Debug(ctx, "SDK Call Successful: Get Dashboard", map[string]any{"uuid": uuid})
+	return resp.Payload, nil
+}
+
+func (c *SdkClientWrapper) UpdateDashboard(ctx context.Context, uuid string, dashboard *models.UpdateDashboardRequest) (*models.View, error) {
+	tflog.Debug(ctx, "Executing SDK Call: Update Dashboard", map[string]any{"uuid": uuid})
+
+	tflog.Debug(ctx, "Sending UpdateDashboardRequest to SDK", map[string]any{
+		"uuid":             uuid,
+		"name":             dashboard.Name,
+		"description":      dashboard.Description,
+		"team":             dashboard.Team,
+		"is_provisioned":   dashboard.IsProvisioned,
+		"has_preset":       dashboard.Preset != "",
+		"override":         dashboard.Override,
+		"current_revision": dashboard.CurrentRevision,
+	})
+
+	params := dashboards.NewUpdateDashboardParams().
+		WithContext(ctx).
+		WithTimeout(defaultTimeout).
+		WithID(uuid).
+		WithBody(dashboard)
+
+	resp, err := c.sdkClient.Dashboards.UpdateDashboard(params, nil)
+	if err != nil {
+		return nil, handleApiError(ctx, err, "UpdateDashboard", uuid)
+	}
+
+	tflog.Debug(ctx, "SDK Call Successful: Update Dashboard", map[string]any{"uuid": uuid})
+	return resp.Payload, nil
+}
+
+func (c *SdkClientWrapper) DeleteDashboard(ctx context.Context, uuid string) error {
+	tflog.Debug(ctx, "Executing SDK Call: Delete Dashboard", map[string]any{"uuid": uuid})
+
+	params := dashboards.NewDeleteDashboardParams().
+		WithContext(ctx).
+		WithTimeout(defaultTimeout).
+		WithID(uuid)
+
+	_, err := c.sdkClient.Dashboards.DeleteDashboard(params, nil)
+	if err != nil {
+		return handleApiError(ctx, err, "DeleteDashboard", uuid)
+	}
+
+	tflog.Debug(ctx, "SDK Call Successful: Delete Dashboard", map[string]any{"uuid": uuid})
+	return nil
+}
