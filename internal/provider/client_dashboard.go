@@ -25,7 +25,7 @@ func (c *SdkClientWrapper) CreateDashboard(ctx context.Context, dashboard *model
 
 	resp, err := c.sdkClient.Dashboards.CreateDashboard(params, nil)
 	if err != nil {
-		return nil, handleApiError(ctx, err, "CreateDashboard", name)
+		return nil, handleApiError(ctx, err, "CreateDashboard", dashboard.Name)
 	}
 
 	tflog.Debug(ctx, "SDK Call Successful: Create Dashboard", map[string]any{"uuid": resp.Payload.UUID})

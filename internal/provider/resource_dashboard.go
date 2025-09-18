@@ -206,8 +206,8 @@ func (r *dashboardResource) Update(ctx context.Context, req resource.UpdateReque
 	}
 
 	tflog.Debug(ctx, "Updating Dashboard", map[string]interface{}{
-		"uuid": state.UUID.ValueString(),
-		"plan_description": plan.Description.ValueString(),
+		"uuid":              state.UUID.ValueString(),
+		"plan_description":  plan.Description.ValueString(),
 		"state_description": state.Description.ValueString(),
 	})
 
