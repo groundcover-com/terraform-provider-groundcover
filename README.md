@@ -215,8 +215,8 @@ TF_ACC=1 go test ./internal/provider -v -run TestAccMonitorResource
 TF_ACC=1 go test ./internal/provider -v -run TestAccApiKeyResource
 TF_ACC=1 go test ./internal/provider -v -run TestAccLogsPipelineResource
 TF_ACC=1 go test ./internal/provider -v -run TestAccIngestionKeyResource
-TF_ACC=1 go test ./internal/provider -v -run TestAccDataIntegrationResource
 TF_ACC=1 go test ./internal/provider -v -run TestAccDashboardResource
+TF_ACC=1 go test ./internal/provider -v -run TestAccDataIntegrationResource
 
 # Run unit tests only (no API calls required)
 go test ./internal/provider -v
