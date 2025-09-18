@@ -18,6 +18,8 @@ Basic usage examples can be found in the `examples/` directory:
     *   Demonstrates how to create and manage ingestion keys for data ingestion.
 *   **Logs Pipeline Resource:** [`examples/resources/groundcover_logspipeline/resource.tf`](./examples/resources/groundcover_logspipeline/resource.tf)
     *   Shows how to configure logs processing pipelines.
+*   **Data Integration Resource:** [`examples/resources/groundcover_dataintegration/resource.tf`](./examples/resources/groundcover_dataintegration/resource.tf)
+    *   Demonstrates how to create and manage data integrations.
 
 ## Local Development and Testing
 
@@ -211,6 +213,7 @@ TF_ACC=1 go test ./internal/provider -v -run TestAccMonitorResource
 TF_ACC=1 go test ./internal/provider -v -run TestAccApiKeyResource
 TF_ACC=1 go test ./internal/provider -v -run TestAccLogsPipelineResource
 TF_ACC=1 go test ./internal/provider -v -run TestAccIngestionKeyResource
+TF_ACC=1 go test ./internal/provider -v -run TestAccDataIntegrationResource
 
 # Run unit tests only (no API calls required)
 go test ./internal/provider -v
@@ -228,8 +231,9 @@ The provider includes comprehensive acceptance tests for all resources:
 | Monitor | ✅ | ✅ | ✅ | ✅ |
 | Logs Pipeline | ✅ | ✅ | - | ✅ |
 | Ingestion Key | ✅ | ✅ | ✅ | - |
+| Data Integration | ✅ | ✅ | ✅ | - |
 
-**Total: 16 acceptance tests** covering:
+**Total: 19 acceptance tests** covering:
 - **Create, Read, Update, Delete (CRUD)** operations for all resources
 - **Import functionality** to ensure resources can be imported into Terraform state
 - **Disappears testing** to verify proper handling when resources are deleted outside Terraform
