@@ -100,7 +100,6 @@ type ApiClient interface {
 	GetDashboard(ctx context.Context, uuid string) (*models.View, error)
 	UpdateDashboard(ctx context.Context, uuid string, dashboard *models.UpdateDashboardRequest) (*models.View, error)
 	DeleteDashboard(ctx context.Context, uuid string) error
-	ListDashboards(ctx context.Context) ([]*models.View, error)
 }
 
 // SdkClientWrapper implements ApiClient using the Groundcover Go SDK.

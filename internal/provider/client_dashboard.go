@@ -100,19 +100,3 @@ func (c *SdkClientWrapper) DeleteDashboard(ctx context.Context, uuid string) err
 	tflog.Debug(ctx, "SDK Call Successful: Delete Dashboard", map[string]any{"uuid": uuid})
 	return nil
 }
-
-func (c *SdkClientWrapper) ListDashboards(ctx context.Context) ([]*models.View, error) {
-	tflog.Debug(ctx, "Executing SDK Call: List Dashboards")
-
-	params := dashboards.NewGetDashboardsParams().
-		WithContext(ctx).
-		WithTimeout(defaultTimeout)
-
-	resp, err := c.sdkClient.Dashboards.GetDashboards(params, nil)
-	if err != nil {
-		return nil, handleApiError(ctx, err, "ListDashboards", "")
-	}
-
-	tflog.Debug(ctx, "SDK Call Successful: List Dashboards", map[string]any{"count": len(resp.Payload)})
-	return resp.Payload, nil
-}
