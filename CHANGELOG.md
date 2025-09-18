@@ -1,3 +1,9 @@
+## 1.1.0
+
+* Added dashboard resource for managing Groundcover dashboards
+* Fixed ingestion key resource compatibility with SDK v1.84.0 (deprecated creation_date field)
+* Updated Groundcover SDK from v1.41.0 to v1.84.0
+
 ## 1.0.0
 
 * Aligned and improved documentation for the first stable release milestone
