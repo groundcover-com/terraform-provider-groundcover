@@ -95,6 +95,12 @@ type ApiClient interface {
 	ListIngestionKeys(ctx context.Context, req *models.ListIngestionKeysRequest) ([]*models.IngestionKeyResult, error)
 	DeleteIngestionKey(ctx context.Context, req *models.DeleteIngestionKeyRequest) error
 
+	// Dashboards
+	CreateDashboard(ctx context.Context, dashboard *models.CreateDashboardRequest) (*models.View, error)
+	GetDashboard(ctx context.Context, uuid string) (*models.View, error)
+	UpdateDashboard(ctx context.Context, uuid string, dashboard *models.UpdateDashboardRequest) (*models.View, error)
+	DeleteDashboard(ctx context.Context, uuid string) error
+
 	// DataIntegrations
 	CreateDataIntegration(ctx context.Context, integrationType string, req *models.CreateDataIntegrationConfigRequest) (*models.DataIntegrationConfig, error)
 	GetDataIntegration(ctx context.Context, integrationType string, id string) (*models.DataIntegrationConfig, error)
@@ -147,7 +153,7 @@ func NewSdkClientWrapper(ctx context.Context, baseURLStr, apiKey, backendID stri
 
 	userEnabledDebug := os.Getenv("TF_LOG") == "debug"
 
-	tflog.Info(ctx, "Initializing Groundcover SDK v1.41.0 client", map[string]any{"baseURL": baseURLStr, "backendID": backendID})
+	tflog.Info(ctx, "Initializing Groundcover SDK client", map[string]any{"baseURL": baseURLStr, "backendID": backendID})
 
 	parsedURL, err := url.Parse(baseURLStr)
 	if err != nil {

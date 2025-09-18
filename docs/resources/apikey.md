@@ -13,8 +13,6 @@ API Key resource.
 ## Example Usage
 
 ```terraform
-# Copyright (c) HashiCorp, Inc.
-
 # examples/resources/groundcover_apikey/resource.tf
 
 terraform {

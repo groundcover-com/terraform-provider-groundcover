@@ -13,8 +13,6 @@ Ingestion Key resource.
 ## Example Usage
 
 ```terraform
-# Copyright (c) HashiCorp, Inc.
-
 # examples/resources/groundcover_ingestionkey/resource.tf
 
 terraform {
@@ -103,6 +101,6 @@ output "ingestionkey_minimal_key" {
 ### Read-Only
 
 - `created_by` (String) The user who created the ingestion key.
-- `creation_date` (String) The creation date of the ingestion key.
+- `creation_date` (String, Deprecated) The creation date of the ingestion key. Deprecated: No longer provided by API v1.84.0+
 - `id` (String) The unique identifier of the ingestion key.
 - `key` (String) The actual key value for ingestion.

@@ -13,8 +13,6 @@ Manages a Groundcover Service Account.
 ## Example Usage
 
 ```terraform
-# Copyright (c) HashiCorp, Inc.
-
 # examples/resources/groundcover_serviceaccount/resource.tf
 
 terraform {

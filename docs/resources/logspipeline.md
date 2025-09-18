@@ -13,8 +13,6 @@ Logs Pipeline resource. This is a singleton resource.
 ## Example Usage
 
 ```terraform
-# Copyright (c) HashiCorp, Inc.
-
 # examples/resources/groundcover_logspipeline/resource.tf
 
 terraform {

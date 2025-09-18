@@ -18,8 +18,13 @@ Basic usage examples can be found in the `examples/` directory:
     *   Demonstrates how to create and manage ingestion keys for data ingestion.
 *   **Logs Pipeline Resource:** [`examples/resources/groundcover_logspipeline/resource.tf`](./examples/resources/groundcover_logspipeline/resource.tf)
     *   Shows how to configure logs processing pipelines.
+<<<<<<< HEAD
 *   **Data Integration Resource:** [`examples/resources/groundcover_dataintegration/resource.tf`](./examples/resources/groundcover_dataintegration/resource.tf)
     *   Demonstrates how to create and manage data integrations.
+=======
+*   **Dashboard Resource:** [`examples/resources/groundcover_dashboard/resource.tf`](./examples/resources/groundcover_dashboard/resource.tf)
+    *   Demonstrates how to create and manage dashboards with customizable widgets and layouts.
+>>>>>>> main
 
 ## Local Development and Testing
 
@@ -214,6 +219,7 @@ TF_ACC=1 go test ./internal/provider -v -run TestAccApiKeyResource
 TF_ACC=1 go test ./internal/provider -v -run TestAccLogsPipelineResource
 TF_ACC=1 go test ./internal/provider -v -run TestAccIngestionKeyResource
 TF_ACC=1 go test ./internal/provider -v -run TestAccDataIntegrationResource
+TF_ACC=1 go test ./internal/provider -v -run TestAccDashboardResource
 
 # Run unit tests only (no API calls required)
 go test ./internal/provider -v
