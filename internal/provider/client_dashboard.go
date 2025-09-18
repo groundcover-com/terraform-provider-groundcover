@@ -9,15 +9,7 @@ import (
 )
 
 func (c *SdkClientWrapper) CreateDashboard(ctx context.Context, dashboard *models.CreateDashboardRequest) (*models.View, error) {
-	var name string
-	if dashboard != nil {
-		name = dashboard.Name
-	} else {
-		name = "<unknown_dashboard_name>"
-		tflog.Warn(ctx, "CreateDashboard called with nil dashboard")
-	}
-	logFields := map[string]any{"name": name}
-	tflog.Debug(ctx, "Executing SDK Call: Create Dashboard", logFields)
+	tflog.Debug(ctx, "Executing SDK Call: Create Dashboard", map[string]any{"name": dashboard.Name})
 
 	tflog.Debug(ctx, "Sending CreateDashboardRequest to SDK", map[string]any{
 		"name":           dashboard.Name,
