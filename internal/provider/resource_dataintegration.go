@@ -2,6 +2,7 @@ package provider
 
 import (
 	"context"
+	"errors"
 	"fmt"
 
 	"github.com/groundcover-com/groundcover-sdk-go/pkg/models"
@@ -202,7 +203,7 @@ func (r *dataIntegrationResource) Read(ctx context.Context, req resource.ReadReq
 	// Call API client to get the data integration
 	configEntry, err := r.client.GetDataIntegration(ctx, state.Type.ValueString(), state.ID.ValueString())
 	if err != nil {
-		if err == ErrNotFound {
+		if errors.Is(err, ErrNotFound) {
 			tflog.Warn(ctx, "DataIntegration not found, removing from state")
 			resp.State.RemoveResource(ctx)
 			return
@@ -332,11 +333,15 @@ func (r *dataIntegrationResource) Delete(ctx context.Context, req resource.Delet
 
 	err := r.client.DeleteDataIntegration(ctx, state.Type.ValueString(), state.ID.ValueString(), env, cluster, instance)
 	if err != nil {
-		resp.Diagnostics.AddError(
-			"Error Deleting DataIntegration",
-			fmt.Sprintf("Could not delete DataIntegration: %s", err.Error()),
-		)
-		return
+		if errors.Is(err, ErrNotFound) {
+			tflog.Warn(ctx, "DataIntegration not found during delete, treating as successful (idempotent delete)")
+		} else {
+			resp.Diagnostics.AddError(
+				"Error Deleting DataIntegration",
+				fmt.Sprintf("Could not delete DataIntegration: %s", err.Error()),
+			)
+			return
+		}
 	}
 
 	tflog.Debug(ctx, fmt.Sprintf("Successfully deleted DataIntegration resource with ID %s", state.ID.ValueString()))
