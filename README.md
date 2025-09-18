@@ -221,19 +221,7 @@ go test ./internal/provider -v
 
 ### Test Coverage
 
-The provider includes comprehensive acceptance tests for all resources:
-
-| Resource | Basic CRUD | Import | Disappears | Complex Configs |
-|----------|------------|--------|------------|-----------------|
-| Policy | ✅ | ✅ | ✅ | ✅ |
-| Service Account | ✅ | ✅ | ✅ | ✅ |
-| API Key | ✅ | ✅ | ✅ | - |
-| Monitor | ✅ | ✅ | ✅ | ✅ |
-| Logs Pipeline | ✅ | ✅ | - | ✅ |
-| Ingestion Key | ✅ | ✅ | ✅ | - |
-| Dashboard | ✅ | ✅ | ✅ | - |
-
-**Total: 18 acceptance tests** covering:
+The provider includes comprehensive acceptance tests covering:
 - **Create, Read, Update, Delete (CRUD)** operations for all resources
 - **Import functionality** to ensure resources can be imported into Terraform state
 - **Disappears testing** to verify proper handling when resources are deleted outside Terraform
