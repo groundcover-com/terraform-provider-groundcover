@@ -18,6 +18,7 @@ resource "groundcover_dataintegration" "cloudwatch_example" {
   type = "cloudwatch"
   config = jsonencode({
     name = "test-cloudwatch"
+    version = 1
     stsRegion = "us-east-1"
     regions = ["us-east-1"]
     roleArn = "arn:aws:iam::123456789012:role/test-role"
