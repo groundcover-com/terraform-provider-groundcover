@@ -26,7 +26,7 @@ func TestAccDashboardResource(t *testing.T) {
 					resource.TestCheckResourceAttr("groundcover_dashboard.test", "name", dashboardName),
 					resource.TestCheckResourceAttr("groundcover_dashboard.test", "description", "Test dashboard description"),
 					resource.TestCheckResourceAttr("groundcover_dashboard.test", "team", "engineering"),
-					resource.TestCheckResourceAttrSet("groundcover_dashboard.test", "preset"), // JSON string, just check it's set
+					resource.TestCheckResourceAttrSet("groundcover_dashboard.test", "preset"),
 					resource.TestCheckResourceAttrSet("groundcover_dashboard.test", "id"),
 					resource.TestCheckResourceAttrSet("groundcover_dashboard.test", "owner"),
 					resource.TestCheckResourceAttrSet("groundcover_dashboard.test", "status"),
@@ -39,23 +39,19 @@ func TestAccDashboardResource(t *testing.T) {
 				ImportState:       true,
 				ImportStateVerify: true,
 				ImportStateVerifyIgnore: []string{
-					"override", // This field is only used for updates
-					"preset",   // The API returns JSON with different formatting
+					"override",
+					"preset",
 				},
 			},
-			// TODO: Debug update issue - currently returns 400 error
-			// // Update and Read testing
-			// {
-			// 	Config: testAccDashboardResourceConfigUpdated(updatedDashboardName),
-			// 	Check: resource.ComposeTestCheckFunc(
-			// 		resource.TestCheckResourceAttr("groundcover_dashboard.test", "name", updatedDashboardName),
-			// 		resource.TestCheckResourceAttr("groundcover_dashboard.test", "description", "Updated dashboard description"),
-			// 		resource.TestCheckResourceAttr("groundcover_dashboard.test", "team", "platform"),
-			// 		resource.TestCheckResourceAttrSet("groundcover_dashboard.test", "preset"), // JSON string, just check it's set
-			// 		resource.TestCheckResourceAttr("groundcover_dashboard.test", "is_provisioned", "true"),
-			// 	),
-			// },
-			// Delete testing automatically occurs
+			{
+				Config: testAccDashboardResourceConfigUpdatedDescription(dashboardName),
+				Check: resource.ComposeTestCheckFunc(
+					resource.TestCheckResourceAttr("groundcover_dashboard.test", "name", dashboardName),
+					resource.TestCheckResourceAttr("groundcover_dashboard.test", "description", "Updated dashboard description"),
+					resource.TestCheckResourceAttr("groundcover_dashboard.test", "team", "engineering"),
+					resource.TestCheckResourceAttrSet("groundcover_dashboard.test", "preset"),
+				),
+			},
 		},
 	})
 }
@@ -159,6 +155,51 @@ func testAccDashboardResourceConfig(name string) string {
 resource "groundcover_dashboard" "test" {
   name        = "%s"
   description = "Test dashboard description"
+  team        = "engineering"
+  preset      = jsonencode(%s)
+}
+`, name, preset)
+}
+
+func testAccDashboardResourceConfigUpdatedDescription(name string) string {
+	preset := `{
+  "duration": "Last 1 hour",
+  "layout": [
+    {
+      "id": "A",
+      "x": 0,
+      "y": 0,
+      "w": 6,
+      "h": 4,
+      "minH": 2
+    }
+  ],
+  "widgets": [
+    {
+      "id": "A",
+      "type": "widget",
+      "name": "Test Widget",
+      "queries": [
+        {
+          "id": "A",
+          "expr": "avg(groundcover_node_rt_disk_space_used_percent{})",
+          "dataType": "metrics",
+          "step": null,
+          "editorMode": "builder"
+        }
+      ],
+      "visualizationConfig": {
+        "type": "time-series"
+      }
+    }
+  ],
+  "variables": {},
+  "schemaVersion": 3
+}`
+	return fmt.Sprintf(`
+resource "groundcover_dashboard" "test" {
+  name        = "%s"
+  description = "Updated dashboard description"
   team        = "engineering"
   preset      = jsonencode(%s)
 }

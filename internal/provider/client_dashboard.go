@@ -61,12 +61,14 @@ func (c *SdkClientWrapper) UpdateDashboard(ctx context.Context, uuid string, das
 	tflog.Debug(ctx, "Executing SDK Call: Update Dashboard", map[string]any{"uuid": uuid})
 
 	tflog.Debug(ctx, "Sending UpdateDashboardRequest to SDK", map[string]any{
-		"uuid":           uuid,
-		"name":           dashboard.Name,
-		"team":           dashboard.Team,
-		"is_provisioned": dashboard.IsProvisioned,
-		"has_preset":     dashboard.Preset != "",
-		"override":       dashboard.Override,
+		"uuid":             uuid,
+		"name":             dashboard.Name,
+		"description":      dashboard.Description,
+		"team":             dashboard.Team,
+		"is_provisioned":   dashboard.IsProvisioned,
+		"has_preset":       dashboard.Preset != "",
+		"override":         dashboard.Override,
+		"current_revision": dashboard.CurrentRevision,
 	})
 
 	params := dashboards.NewUpdateDashboardParams().

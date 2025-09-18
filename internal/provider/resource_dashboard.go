@@ -123,7 +123,7 @@ func (r *dashboardResource) Create(ctx context.Context, req resource.CreateReque
 		Description:   plan.Description.ValueString(),
 		Team:          plan.Team.ValueString(),
 		Preset:        plan.Preset.ValueString(),
-		IsProvisioned: true, // Always set to true
+		IsProvisioned: true,
 	}
 
 	dashboard, err := r.client.CreateDashboard(ctx, createReq)
@@ -135,12 +135,10 @@ func (r *dashboardResource) Create(ctx context.Context, req resource.CreateReque
 		return
 	}
 
-	// Map all fields from the API response to capture any normalization
 	plan.UUID = types.StringValue(dashboard.UUID)
 	plan.Name = types.StringValue(dashboard.Name)
 	plan.Description = types.StringValue(dashboard.Description)
 	plan.Team = types.StringValue(dashboard.Team)
-	// Don't overwrite preset to avoid JSON formatting diffs - keep the original from plan
 	plan.Owner = types.StringValue(dashboard.Owner)
 	plan.Status = types.StringValue(dashboard.Status)
 	plan.RevisionNumber = types.Int32Value(dashboard.RevisionNumber)
@@ -185,12 +183,9 @@ func (r *dashboardResource) Read(ctx context.Context, req resource.ReadRequest, 
 	state.Name = types.StringValue(dashboard.Name)
 	state.Description = types.StringValue(dashboard.Description)
 	state.Team = types.StringValue(dashboard.Team)
-	// Only update preset if it's not already set to avoid JSON formatting diffs
-	// The API may return JSON with different field ordering than what was sent
 	if state.Preset.IsNull() || state.Preset.IsUnknown() {
 		state.Preset = types.StringValue(dashboard.Preset)
 	}
-	// IsProvisioned is always true and not exposed to users
 	state.RevisionNumber = types.Int32Value(dashboard.RevisionNumber)
 	state.Owner = types.StringValue(dashboard.Owner)
 	state.Status = types.StringValue(dashboard.Status)
@@ -212,43 +207,25 @@ func (r *dashboardResource) Update(ctx context.Context, req resource.UpdateReque
 
 	tflog.Debug(ctx, "Updating Dashboard", map[string]interface{}{
 		"uuid": state.UUID.ValueString(),
+		"plan_description": plan.Description.ValueString(),
+		"state_description": state.Description.ValueString(),
 	})
 
-	// Build update request, using plan values when known, otherwise keep state values
-	name := plan.Name.ValueString()
-	if plan.Name.IsNull() || plan.Name.IsUnknown() {
-		name = state.Name.ValueString()
-	}
-
-	description := plan.Description.ValueString()
-	if plan.Description.IsNull() || plan.Description.IsUnknown() {
-		description = state.Description.ValueString()
-	}
-
-	team := plan.Team.ValueString()
-	if plan.Team.IsNull() || plan.Team.IsUnknown() {
-		team = state.Team.ValueString()
-	}
-
-	preset := plan.Preset.ValueString()
-	if plan.Preset.IsNull() || plan.Preset.IsUnknown() {
-		preset = state.Preset.ValueString()
-	}
-
-	// Default to true if override is not set, to avoid revision conflicts
-	override := true
-	if !plan.Override.IsNull() && !plan.Override.IsUnknown() {
-		override = plan.Override.ValueBool()
-	}
-
+	// Build update request - always use plan values for all fields
+	// The API requires all fields to be present in the update request
 	updateReq := &models.UpdateDashboardRequest{
-		Name:            name,
-		Description:     description,
-		Team:            team,
-		Preset:          preset,
-		IsProvisioned:   true, // Always set to true
+		Name:            plan.Name.ValueString(),
+		Description:     plan.Description.ValueString(),
+		Team:            plan.Team.ValueString(),
+		Preset:          plan.Preset.ValueString(),
+		IsProvisioned:   true, // Always set to true as requested
 		CurrentRevision: state.RevisionNumber.ValueInt32(),
-		Override:        override,
+		Override:        false, // Use false by default to avoid conflicts
+	}
+
+	// Only set override to true if explicitly set in the plan
+	if !plan.Override.IsNull() && !plan.Override.IsUnknown() && plan.Override.ValueBool() {
+		updateReq.Override = true
 	}
 
 	dashboard, err := r.client.UpdateDashboard(ctx, state.UUID.ValueString(), updateReq)
@@ -260,12 +237,10 @@ func (r *dashboardResource) Update(ctx context.Context, req resource.UpdateReque
 		return
 	}
 
-	// Map all fields from the API response to capture any normalization
 	plan.UUID = types.StringValue(dashboard.UUID)
 	plan.Name = types.StringValue(dashboard.Name)
 	plan.Description = types.StringValue(dashboard.Description)
 	plan.Team = types.StringValue(dashboard.Team)
-	// Don't overwrite preset to avoid JSON formatting diffs - keep the original from plan
 	plan.Owner = types.StringValue(dashboard.Owner)
 	plan.Status = types.StringValue(dashboard.Status)
 	plan.RevisionNumber = types.Int32Value(dashboard.RevisionNumber)
