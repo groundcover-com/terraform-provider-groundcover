@@ -84,9 +84,7 @@ output "cloudwatch_dataintegration_id" {
 
 ### Optional
 
-- `cluster` (String) The cluster where the data integration runs.
-- `env` (String) The environment where the data integration runs.
-- `instance` (String) The instance where the data integration runs.
+- `cluster` (String) The cluster where the data integration runs. If unspecified, it will run in the backend.
 - `is_paused` (Boolean) Whether the data integration is paused. Default: `false`.
 
 ### Read-Only

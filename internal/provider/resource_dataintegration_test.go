@@ -59,23 +59,19 @@ func TestAccDataIntegrationResource(t *testing.T) {
 	})
 }
 
-func TestAccDataIntegrationResource_withEnvironment(t *testing.T) {
-	env := acctest.RandomWithPrefix("test-env")
+func TestAccDataIntegrationResource_withCluster(t *testing.T) {
 	cluster := acctest.RandomWithPrefix("test-cluster")
-	instance := acctest.RandomWithPrefix("test-instance")
 
 	resource.Test(t, resource.TestCase{
 		PreCheck:                 func() { testAccPreCheck(t) },
 		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
 		Steps: []resource.TestStep{
-			// Create and Read testing with env, cluster, instance
+			// Create and Read testing with cluster
 			{
-				Config: testAccDataIntegrationResourceConfigWithEnvironment(env, cluster, instance),
+				Config: testAccDataIntegrationResourceConfigWithCluster(cluster),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttr("groundcover_dataintegration.test", "type", "cloudwatch"),
-					resource.TestCheckResourceAttr("groundcover_dataintegration.test", "env", env),
 					resource.TestCheckResourceAttr("groundcover_dataintegration.test", "cluster", cluster),
-					resource.TestCheckResourceAttr("groundcover_dataintegration.test", "instance", instance),
 					resource.TestCheckResourceAttrSet("groundcover_dataintegration.test", "id"),
 					resource.TestCheckResourceAttrSet("groundcover_dataintegration.test", "updated_at"),
 					resource.TestCheckResourceAttrSet("groundcover_dataintegration.test", "updated_by"),
@@ -178,16 +174,14 @@ resource "groundcover_dataintegration" "test" {
 `
 }
 
-func testAccDataIntegrationResourceConfigWithEnvironment(env, cluster, instance string) string {
+func testAccDataIntegrationResourceConfigWithCluster(cluster string) string {
 	return fmt.Sprintf(`
 resource "groundcover_dataintegration" "test" {
   type     = "cloudwatch"
-  env      = %[1]q
-  cluster  = %[2]q
-  instance = %[3]q
+  cluster  = %[1]q
   config = jsonencode({
 	version = 1
-	name = "test-cloudwatch-with-env"
+	name = "test-cloudwatch-with-cluster"
     stsRegion = "us-east-1"
     regions = ["us-east-1"]
     roleArn = "arn:aws:iam::123456789012:role/test-role"
@@ -216,7 +210,7 @@ resource "groundcover_dataintegration" "test" {
   })
   is_paused = false
 }
-`, env, cluster, instance)
+`, cluster)
 }
 
 func testAccCheckDataIntegrationResourceExists(n string) resource.TestCheckFunc {
@@ -271,19 +265,13 @@ func testAccCheckDataIntegrationResourceDisappears(n string) resource.TestCheckF
 		integrationID := rs.Primary.ID
 
 		// Get optional parameters from state
-		var env, cluster, instance *string
-		if envVal := rs.Primary.Attributes["env"]; envVal != "" {
-			env = &envVal
-		}
+		var cluster *string
 		if clusterVal := rs.Primary.Attributes["cluster"]; clusterVal != "" {
 			cluster = &clusterVal
 		}
-		if instanceVal := rs.Primary.Attributes["instance"]; instanceVal != "" {
-			instance = &instanceVal
-		}
 
 		// Delete the resource using the client
-		if err := client.DeleteDataIntegration(ctx, integrationType, integrationID, env, cluster, instance); err != nil {
+		if err := client.DeleteDataIntegration(ctx, integrationType, integrationID, cluster); err != nil {
 			return fmt.Errorf("Failed to delete DataIntegration: %v", err)
 		}
 

@@ -34,9 +34,7 @@ type dataIntegrationResource struct {
 type dataIntegrationResourceModel struct {
 	ID        types.String `tfsdk:"id"`
 	Type      types.String `tfsdk:"type"`
-	Env       types.String `tfsdk:"env"`
 	Cluster   types.String `tfsdk:"cluster"`
-	Instance  types.String `tfsdk:"instance"`
 	Config    types.String `tfsdk:"config"`
 	IsPaused  types.Bool   `tfsdk:"is_paused"`
 	UpdatedAt types.String `tfsdk:"updated_at"`
@@ -65,22 +63,8 @@ func (r *dataIntegrationResource) Schema(_ context.Context, _ resource.SchemaReq
 					stringplanmodifier.RequiresReplace(),
 				},
 			},
-			"env": schema.StringAttribute{
-				Description: "The environment where the data integration runs.",
-				Optional:    true,
-				PlanModifiers: []planmodifier.String{
-					stringplanmodifier.RequiresReplace(),
-				},
-			},
 			"cluster": schema.StringAttribute{
-				Description: "The cluster where the data integration runs.",
-				Optional:    true,
-				PlanModifiers: []planmodifier.String{
-					stringplanmodifier.RequiresReplace(),
-				},
-			},
-			"instance": schema.StringAttribute{
-				Description: "The instance where the data integration runs.",
+				Description: "The cluster where the data integration runs. If unspecified, it will run in the backend.",
 				Optional:    true,
 				PlanModifiers: []planmodifier.String{
 					stringplanmodifier.RequiresReplace(),
@@ -144,17 +128,9 @@ func (r *dataIntegrationResource) Create(ctx context.Context, req resource.Creat
 	}
 
 	// Set pointer fields only if they are not null
-	if !plan.Env.IsNull() {
-		env := plan.Env.ValueString()
-		createReq.Env = &env
-	}
 	if !plan.Cluster.IsNull() {
 		cluster := plan.Cluster.ValueString()
 		createReq.Cluster = &cluster
-	}
-	if !plan.Instance.IsNull() {
-		instance := plan.Instance.ValueString()
-		createReq.Instance = &instance
 	}
 
 	// Call API client to create the data integration
@@ -170,9 +146,7 @@ func (r *dataIntegrationResource) Create(ctx context.Context, req resource.Creat
 	// Map response back to plan
 	plan.ID = types.StringValue(createdConfig.ID)
 	// Handle nullable fields using StringPointerValue
-	plan.Env = types.StringPointerValue(createdConfig.Env)
 	plan.Cluster = types.StringPointerValue(createdConfig.Cluster)
-	plan.Instance = types.StringPointerValue(createdConfig.Instance)
 	plan.Config = types.StringValue(createdConfig.Config)
 	plan.UpdatedAt = types.StringValue(createdConfig.UpdateTimestamp.String())
 	plan.UpdatedBy = types.StringValue(createdConfig.UpdatedBy)
@@ -226,9 +200,7 @@ func (r *dataIntegrationResource) Read(ctx context.Context, req resource.ReadReq
 	state.ID = types.StringValue(configEntry.ID)
 	state.Type = types.StringValue(configEntry.Type)
 	// Handle nullable fields using StringPointerValue
-	state.Env = types.StringPointerValue(configEntry.Env)
 	state.Cluster = types.StringPointerValue(configEntry.Cluster)
-	state.Instance = types.StringPointerValue(configEntry.Instance)
 	state.Config = types.StringValue(configEntry.Config)
 	state.IsPaused = types.BoolValue(configEntry.IsPaused)
 	state.UpdatedAt = types.StringValue(configEntry.UpdateTimestamp.String())
@@ -262,17 +234,9 @@ func (r *dataIntegrationResource) Update(ctx context.Context, req resource.Updat
 	}
 
 	// Set pointer fields only if they are not null
-	if !plan.Env.IsNull() {
-		env := plan.Env.ValueString()
-		updateReq.Env = &env
-	}
 	if !plan.Cluster.IsNull() {
 		cluster := plan.Cluster.ValueString()
 		updateReq.Cluster = &cluster
-	}
-	if !plan.Instance.IsNull() {
-		instance := plan.Instance.ValueString()
-		updateReq.Instance = &instance
 	}
 
 	// Call API client to update the data integration
@@ -287,9 +251,7 @@ func (r *dataIntegrationResource) Update(ctx context.Context, req resource.Updat
 
 	// Update state
 	// Handle nullable fields using StringPointerValue
-	plan.Env = types.StringPointerValue(updatedConfig.Env)
 	plan.Cluster = types.StringPointerValue(updatedConfig.Cluster)
-	plan.Instance = types.StringPointerValue(updatedConfig.Instance)
 	plan.Config = types.StringValue(updatedConfig.Config)
 	plan.IsPaused = types.BoolValue(updatedConfig.IsPaused)
 	plan.UpdatedAt = types.StringValue(updatedConfig.UpdateTimestamp.String())
@@ -317,21 +279,13 @@ func (r *dataIntegrationResource) Delete(ctx context.Context, req resource.Delet
 	tflog.Debug(ctx, "Deleting DataIntegration resource", map[string]any{"id": state.ID.ValueString(), "type": state.Type.ValueString()})
 
 	// Call API client to delete the data integration
-	var env, cluster, instance *string
-	if !state.Env.IsNull() {
-		envVal := state.Env.ValueString()
-		env = &envVal
-	}
+	var cluster *string
 	if !state.Cluster.IsNull() {
 		clusterVal := state.Cluster.ValueString()
 		cluster = &clusterVal
 	}
-	if !state.Instance.IsNull() {
-		instanceVal := state.Instance.ValueString()
-		instance = &instanceVal
-	}
 
-	err := r.client.DeleteDataIntegration(ctx, state.Type.ValueString(), state.ID.ValueString(), env, cluster, instance)
+	err := r.client.DeleteDataIntegration(ctx, state.Type.ValueString(), state.ID.ValueString(), cluster)
 	if err != nil {
 		if errors.Is(err, ErrNotFound) {
 			tflog.Warn(ctx, "DataIntegration not found during delete, treating as successful (idempotent delete)")

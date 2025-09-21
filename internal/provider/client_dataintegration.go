@@ -33,18 +33,13 @@ func (c *SdkClientWrapper) GetDataIntegration(ctx context.Context, integrationTy
 	tflog.Debug(ctx, "Executing SDK Call: Get DataIntegration", logFields)
 
 	getParams := integrations.NewGetDataIntegrationConfigParamsWithContext(ctx).WithType(integrationType).WithID(id)
-	getResp, emptyGetResp, err := c.sdkClient.Integrations.GetDataIntegrationConfig(getParams, nil)
+	getResp, err := c.sdkClient.Integrations.GetDataIntegrationConfig(getParams, nil)
 	if err != nil {
 		return nil, handleApiError(ctx, err, "GetDataIntegration", dataIntegrationResourceId)
 	}
 
-	var response *models.DataIntegrationConfig
-	if emptyGetResp == nil {
-		response = getResp.Payload
-	}
-
 	tflog.Debug(ctx, "SDK Call Successful: Get DataIntegration", logFields)
-	return response, nil
+	return getResp.Payload, nil
 }
 
 // UpdateDataIntegration updates an existing data integration configuration
@@ -63,30 +58,18 @@ func (c *SdkClientWrapper) UpdateDataIntegration(ctx context.Context, integratio
 }
 
 // DeleteDataIntegration deletes a data integration configuration by type and ID
-func (c *SdkClientWrapper) DeleteDataIntegration(ctx context.Context, integrationType string, id string, env *string, cluster *string, instance *string) error {
+func (c *SdkClientWrapper) DeleteDataIntegration(ctx context.Context, integrationType string, id string, cluster *string) error {
 	logFields := map[string]any{"req": "delete_data_integration", "id": id, "type": integrationType}
-	if env != nil {
-		logFields["env"] = *env
-	}
 	if cluster != nil {
 		logFields["cluster"] = *cluster
-	}
-	if instance != nil {
-		logFields["instance"] = *instance
 	}
 	tflog.Debug(ctx, "Executing SDK Call: Delete DataIntegration", logFields)
 
 	deleteParams := integrations.NewDeleteDataIntegrationConfigParamsWithContext(ctx).WithType(integrationType).WithID(id)
 
 	// Add optional query parameters if provided
-	if env != nil {
-		deleteParams = deleteParams.WithEnv(env)
-	}
 	if cluster != nil {
 		deleteParams = deleteParams.WithCluster(cluster)
-	}
-	if instance != nil {
-		deleteParams = deleteParams.WithInstance(instance)
 	}
 
 	_, err := c.sdkClient.Integrations.DeleteDataIntegrationConfig(deleteParams, nil)
