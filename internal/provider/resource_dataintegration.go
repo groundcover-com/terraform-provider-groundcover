@@ -57,7 +57,7 @@ func (r *dataIntegrationResource) Schema(_ context.Context, _ resource.SchemaReq
 				},
 			},
 			"type": schema.StringAttribute{
-				Description: "The type of data integration (e.g., 'cloudwatch', 'datadog', etc.).",
+				Description: "The type of data integration (e.g., 'cloudwatch', etc.).",
 				Required:    true,
 				PlanModifiers: []planmodifier.String{
 					stringplanmodifier.RequiresReplace(),
@@ -75,7 +75,7 @@ func (r *dataIntegrationResource) Schema(_ context.Context, _ resource.SchemaReq
 				Required:    true,
 			},
 			"is_paused": schema.BoolAttribute{
-				Description: "Whether the data integration is paused.",
+				Description: "Whether the data integration is paused. Default: `false`.",
 				Optional:    true,
 				Computed:    true,
 				Default:     booldefault.StaticBool(false),
