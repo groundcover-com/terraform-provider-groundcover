@@ -244,12 +244,6 @@ func (r *dashboardResource) Read(ctx context.Context, req resource.ReadRequest, 
 	state.Owner = types.StringValue(dashboard.Owner)
 	state.Status = types.StringValue(dashboard.Status)
 
-	tflog.Debug(ctx, "Dashboard read - setting state", map[string]interface{}{
-		"uuid":                  dashboard.UUID,
-		"api_revision_number":   dashboard.RevisionNumber,
-		"state_revision_before": state.RevisionNumber.ValueInt32(),
-	})
-
 	diags = resp.State.Set(ctx, &state)
 	resp.Diagnostics.Append(diags...)
 }

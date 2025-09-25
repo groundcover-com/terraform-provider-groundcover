@@ -7,8 +7,6 @@ import (
 	"fmt"
 	"reflect"
 	"sort"
-
-	"github.com/hashicorp/terraform-plugin-log/tflog"
 )
 
 // NormalizeJSON normalizes a JSON string by parsing and re-marshaling it with sorted keys
@@ -19,10 +17,6 @@ func NormalizeJSON(ctx context.Context, jsonString string) (string, error) {
 
 	var data interface{}
 	if err := json.Unmarshal([]byte(jsonString), &data); err != nil {
-		tflog.Error(ctx, "Failed to parse JSON in NormalizeJSON", map[string]interface{}{
-			"error":       err.Error(),
-			"json_length": len(jsonString),
-		})
 		return "", fmt.Errorf("failed to parse JSON: %w", err)
 	}
 
@@ -103,17 +97,9 @@ func FilterJSONKeysBasedOnTemplate(ctx context.Context, sourceJSON, templateJSON
 
 	var sourceData, templateData interface{}
 	if err := json.Unmarshal([]byte(sourceJSON), &sourceData); err != nil {
-		tflog.Error(ctx, "Failed to parse source JSON in FilterJSONKeysBasedOnTemplate", map[string]interface{}{
-			"error": err.Error(),
-			"json":  sourceJSON,
-		})
 		return "", fmt.Errorf("failed to parse source JSON: %w", err)
 	}
 	if err := json.Unmarshal([]byte(templateJSON), &templateData); err != nil {
-		tflog.Error(ctx, "Failed to parse template JSON in FilterJSONKeysBasedOnTemplate", map[string]interface{}{
-			"error": err.Error(),
-			"json":  templateJSON,
-		})
 		return "", fmt.Errorf("failed to parse template JSON: %w", err)
 	}
 
