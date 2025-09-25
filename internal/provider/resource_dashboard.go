@@ -19,6 +19,7 @@ var (
 	_ resource.Resource                = &dashboardResource{}
 	_ resource.ResourceWithConfigure   = &dashboardResource{}
 	_ resource.ResourceWithImportState = &dashboardResource{}
+	_ resource.ResourceWithModifyPlan  = &dashboardResource{}
 )
 
 func NewDashboardResource() resource.Resource {
@@ -83,10 +84,16 @@ func (r *dashboardResource) Schema(_ context.Context, _ resource.SchemaRequest, 
 			"owner": schema.StringAttribute{
 				Description: "The owner of the dashboard.",
 				Computed:    true,
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.UseStateForUnknown(),
+				},
 			},
 			"status": schema.StringAttribute{
 				Description: "The status of the dashboard.",
 				Computed:    true,
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.UseStateForUnknown(),
+				},
 			},
 		},
 	}
@@ -138,10 +145,36 @@ func (r *dashboardResource) Create(ctx context.Context, req resource.CreateReque
 	plan.UUID = types.StringValue(dashboard.UUID)
 	plan.Name = types.StringValue(dashboard.Name)
 	plan.Description = types.StringValue(dashboard.Description)
-	plan.Team = types.StringValue(dashboard.Team)
+	if plan.Team.IsNull() && dashboard.Team == "" {
+		plan.Team = types.StringNull()
+	} else {
+		plan.Team = types.StringValue(dashboard.Team)
+	}
+	// Keep the user's original preset format if semantically the same
+	areSemanticallySame, err := CompareJSONSemantically(plan.Preset.ValueString(), dashboard.Preset)
+	if err != nil {
+		resp.Diagnostics.AddError(
+			"Invalid Dashboard Preset",
+			fmt.Sprintf("Failed to parse dashboard preset JSON: %s", err.Error()),
+		)
+		return
+	}
+	if !areSemanticallySame {
+		tflog.Debug(ctx, "Preset JSON is semantically different, using API response")
+		plan.Preset = types.StringValue(dashboard.Preset)
+	} else {
+		tflog.Debug(ctx, "Preset JSON is semantically same, keeping plan format")
+	}
 	plan.Owner = types.StringValue(dashboard.Owner)
 	plan.Status = types.StringValue(dashboard.Status)
 	plan.RevisionNumber = types.Int32Value(dashboard.RevisionNumber)
+
+	tflog.Debug(ctx, "Dashboard created - setting state", map[string]interface{}{
+		"uuid":            dashboard.UUID,
+		"revision_number": dashboard.RevisionNumber,
+		"preset_len":      len(dashboard.Preset),
+		"plan_preset_len": len(plan.Preset.ValueString()),
+	})
 
 	diags = resp.State.Set(ctx, &plan)
 	resp.Diagnostics.Append(diags...)
@@ -150,7 +183,8 @@ func (r *dashboardResource) Create(ctx context.Context, req resource.CreateReque
 	}
 
 	tflog.Trace(ctx, "Dashboard created successfully", map[string]interface{}{
-		"uuid": dashboard.UUID,
+		"uuid":            dashboard.UUID,
+		"revision_number": dashboard.RevisionNumber,
 	})
 }
 
@@ -163,7 +197,8 @@ func (r *dashboardResource) Read(ctx context.Context, req resource.ReadRequest, 
 	}
 
 	tflog.Debug(ctx, "Reading Dashboard", map[string]interface{}{
-		"uuid": state.UUID.ValueString(),
+		"uuid":                  state.UUID.ValueString(),
+		"state_revision_number": state.RevisionNumber.ValueInt32(),
 	})
 
 	dashboard, err := r.client.GetDashboard(ctx, state.UUID.ValueString())
@@ -179,13 +214,36 @@ func (r *dashboardResource) Read(ctx context.Context, req resource.ReadRequest, 
 		return
 	}
 
+	// Store the original state preset for comparison
+	originalStatePreset := state.Preset.ValueString()
+
 	state.UUID = types.StringValue(dashboard.UUID)
 	state.Name = types.StringValue(dashboard.Name)
 	state.Description = types.StringValue(dashboard.Description)
-	state.Team = types.StringValue(dashboard.Team)
-	if state.Preset.IsNull() || state.Preset.IsUnknown() {
-		state.Preset = types.StringValue(dashboard.Preset)
+	if state.Team.IsNull() && dashboard.Team == "" {
+		state.Team = types.StringNull()
+	} else {
+		state.Team = types.StringValue(dashboard.Team)
 	}
+
+	// Keep the user's original preset format if semantically the same
+	areSemanticallySame, err := CompareJSONSemantically(originalStatePreset, dashboard.Preset)
+	if err != nil {
+		// If we can't parse the JSON, use the API response
+		// This can happen if the state has invalid JSON from an older version
+		tflog.Warn(ctx, "Failed to compare preset JSON semantically during Read, using API response", map[string]interface{}{
+			"error": err.Error(),
+		})
+		state.Preset = types.StringValue(dashboard.Preset)
+	} else if !areSemanticallySame {
+		tflog.Debug(ctx, "Read: Preset JSON is semantically different, using API response")
+		state.Preset = types.StringValue(dashboard.Preset)
+	} else {
+		tflog.Debug(ctx, "Read: Preset JSON is semantically same, keeping state format")
+		// Keep the existing state preset format
+		// state.Preset stays as is
+	}
+
 	state.RevisionNumber = types.Int32Value(dashboard.RevisionNumber)
 	state.Owner = types.StringValue(dashboard.Owner)
 	state.Status = types.StringValue(dashboard.Status)
@@ -240,7 +298,26 @@ func (r *dashboardResource) Update(ctx context.Context, req resource.UpdateReque
 	plan.UUID = types.StringValue(dashboard.UUID)
 	plan.Name = types.StringValue(dashboard.Name)
 	plan.Description = types.StringValue(dashboard.Description)
-	plan.Team = types.StringValue(dashboard.Team)
+	if plan.Team.IsNull() && dashboard.Team == "" {
+		plan.Team = types.StringNull()
+	} else {
+		plan.Team = types.StringValue(dashboard.Team)
+	}
+	// Keep the user's original preset format if semantically the same
+	areSemanticallySame, err := CompareJSONSemantically(plan.Preset.ValueString(), dashboard.Preset)
+	if err != nil {
+		resp.Diagnostics.AddError(
+			"Invalid Dashboard Preset",
+			fmt.Sprintf("Failed to parse dashboard preset JSON: %s", err.Error()),
+		)
+		return
+	}
+	if !areSemanticallySame {
+		tflog.Debug(ctx, "Preset JSON is semantically different, using API response")
+		plan.Preset = types.StringValue(dashboard.Preset)
+	} else {
+		tflog.Debug(ctx, "Preset JSON is semantically same, keeping plan format")
+	}
 	plan.Owner = types.StringValue(dashboard.Owner)
 	plan.Status = types.StringValue(dashboard.Status)
 	plan.RevisionNumber = types.Int32Value(dashboard.RevisionNumber)
@@ -290,4 +367,80 @@ func (r *dashboardResource) Delete(ctx context.Context, req resource.DeleteReque
 
 func (r *dashboardResource) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {
 	resource.ImportStatePassthroughID(ctx, path.Root("id"), req, resp)
+}
+
+func (r *dashboardResource) ModifyPlan(ctx context.Context, req resource.ModifyPlanRequest, resp *resource.ModifyPlanResponse) {
+	tflog.Info(ctx, "ModifyPlan called for dashboard resource")
+	if req.State.Raw.IsNull() || req.Plan.Raw.IsNull() {
+		tflog.Debug(ctx, "ModifyPlan: Skipping for new or destroyed dashboard resource")
+		return
+	}
+
+	var plan dashboardResourceModel
+	var state dashboardResourceModel
+
+	resp.Diagnostics.Append(req.Plan.Get(ctx, &plan)...)
+	resp.Diagnostics.Append(req.State.Get(ctx, &state)...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+
+	tflog.Debug(ctx, "ModifyPlan: Checking for changes", map[string]interface{}{
+		"plan_preset_len":  len(plan.Preset.ValueString()),
+		"state_preset_len": len(state.Preset.ValueString()),
+		"presets_equal":    plan.Preset.Equal(state.Preset),
+	})
+
+	// Skip if any preset values are null or unknown
+	if plan.Preset.IsNull() || plan.Preset.IsUnknown() || state.Preset.IsNull() || state.Preset.IsUnknown() {
+		return
+	}
+
+	plannedPreset := plan.Preset.ValueString()
+	statePreset := state.Preset.ValueString()
+
+	// Skip if presets are already identical
+	if plannedPreset == statePreset {
+		return
+	}
+
+	// Try to normalize and compare the presets
+	normalizedPlanned, err := NormalizeJSON(ctx, plannedPreset)
+	if err != nil {
+		// If we can't normalize the planned preset, it's likely invalid JSON
+		// Allow Terraform to proceed with the update so the user can fix it
+		tflog.Warn(ctx, "Failed to normalize planned preset JSON", map[string]interface{}{
+			"error": err.Error(),
+		})
+		return
+	}
+
+	normalizedState, err := NormalizeJSON(ctx, statePreset)
+	if err != nil {
+		// If we can't normalize the state preset, allow the update to proceed
+		// This could happen if the state has corrupted data from a previous version
+		tflog.Warn(ctx, "Failed to normalize state preset JSON, allowing update", map[string]interface{}{
+			"error": err.Error(),
+		})
+		return
+	}
+
+	areSemanticallySame, err := CompareJSONSemantically(normalizedPlanned, normalizedState)
+	if err != nil {
+		// If we can't compare after successful normalization, something is wrong
+		// Allow the update to proceed rather than blocking it
+		tflog.Warn(ctx, "Failed to perform semantic JSON comparison, allowing update", map[string]interface{}{
+			"error": err.Error(),
+		})
+		return
+	}
+
+	if areSemanticallySame {
+		tflog.Info(ctx, "ModifyPlan: Preset JSONs are semantically identical. Suppressing diff.")
+		plan.Preset = state.Preset
+	} else {
+		tflog.Info(ctx, "ModifyPlan: Preset JSONs have semantic differences.")
+	}
+
+	resp.Diagnostics.Append(resp.Plan.Set(ctx, &plan)...)
 }

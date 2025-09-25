@@ -1,3 +1,9 @@
+## 1.1.1
+
+* Fixed dashboard resource team field to properly handle null/empty values without causing drift
+* Fixed dashboard updates to work in-place instead of requiring destroy/recreate operations
+* Fixed API URL normalization to properly handle malformed URLs and missing https:// prefix
+
 ## 1.1.0
 
 * Added dashboard resource for managing Groundcover dashboards

@@ -11,6 +11,27 @@ import (
 	"github.com/hashicorp/terraform-plugin-testing/terraform"
 )
 
+func TestAccDashboardResource_Simple(t *testing.T) {
+	timestamp := time.Now().Unix()
+	dashboardName := fmt.Sprintf("simple_dashboard_%d", timestamp)
+
+	resource.Test(t, resource.TestCase{
+		PreCheck:                 func() { testAccPreCheck(t) },
+		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
+		Steps: []resource.TestStep{
+			// Create and Read testing
+			{
+				Config: testAccDashboardResourceConfigSimple(dashboardName),
+				Check: resource.ComposeTestCheckFunc(
+					resource.TestCheckResourceAttr("groundcover_dashboard.test", "name", dashboardName),
+					resource.TestCheckResourceAttrSet("groundcover_dashboard.test", "id"),
+					resource.TestCheckResourceAttrSet("groundcover_dashboard.test", "revision_number"),
+				),
+			},
+		},
+	})
+}
+
 func TestAccDashboardResource(t *testing.T) {
 	timestamp := time.Now().Unix()
 	dashboardName := fmt.Sprintf("test_dashboard_%d", timestamp)
@@ -50,6 +71,36 @@ func TestAccDashboardResource(t *testing.T) {
 					resource.TestCheckResourceAttr("groundcover_dashboard.test", "description", "Updated dashboard description"),
 					resource.TestCheckResourceAttr("groundcover_dashboard.test", "team", "engineering"),
 					resource.TestCheckResourceAttrSet("groundcover_dashboard.test", "preset"),
+				),
+			},
+		},
+	})
+}
+
+func TestAccDashboardResource_EmptyTeam(t *testing.T) {
+	timestamp := time.Now().Unix()
+	dashboardName := fmt.Sprintf("empty_team_dashboard_%d", timestamp)
+
+	resource.Test(t, resource.TestCase{
+		PreCheck:                 func() { testAccPreCheck(t) },
+		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
+		Steps: []resource.TestStep{
+			// Create without team field
+			{
+				Config: testAccDashboardResourceConfigNoTeam(dashboardName),
+				Check: resource.ComposeTestCheckFunc(
+					resource.TestCheckResourceAttr("groundcover_dashboard.test", "name", dashboardName),
+					resource.TestCheckNoResourceAttr("groundcover_dashboard.test", "team"),
+					resource.TestCheckResourceAttrSet("groundcover_dashboard.test", "id"),
+				),
+			},
+			// Update description, team should remain empty
+			{
+				Config: testAccDashboardResourceConfigNoTeamUpdated(dashboardName),
+				Check: resource.ComposeTestCheckFunc(
+					resource.TestCheckResourceAttr("groundcover_dashboard.test", "name", dashboardName),
+					resource.TestCheckResourceAttr("groundcover_dashboard.test", "description", "Updated empty team dashboard"),
+					resource.TestCheckNoResourceAttr("groundcover_dashboard.test", "team"),
 				),
 			},
 		},
@@ -117,91 +168,137 @@ func testAccCheckDashboardResourceDisappears(n string) resource.TestCheckFunc {
 }
 
 func testAccDashboardResourceConfig(name string) string {
-	preset := `{
-  "duration": "Last 1 hour",
-  "layout": [
-    {
-      "id": "A",
-      "x": 0,
-      "y": 0,
-      "w": 6,
-      "h": 4,
-      "minH": 2
-    }
-  ],
-  "widgets": [
-    {
-      "id": "A",
-      "type": "widget",
-      "name": "Test Widget",
-      "queries": [
-        {
-          "id": "A",
-          "expr": "avg(groundcover_node_rt_disk_space_used_percent{})",
-          "dataType": "metrics",
-          "step": null,
-          "editorMode": "builder"
-        }
-      ],
-      "visualizationConfig": {
-        "type": "time-series"
-      }
-    }
-  ],
-  "variables": {},
-  "schemaVersion": 3
-}`
 	return fmt.Sprintf(`
 resource "groundcover_dashboard" "test" {
   name        = "%s"
   description = "Test dashboard description"
   team        = "engineering"
-  preset      = jsonencode(%s)
+  preset      = jsonencode({
+    duration = "Last 1 hour"
+    layout = [
+      {
+        id   = "A"
+        x    = 0
+        y    = 0
+        w    = 6
+        h    = 4
+        minH = 2
+      }
+    ]
+    widgets = [
+      {
+        id   = "A"
+        type = "widget"
+        name = "Test Widget"
+        queries = [
+          {
+            id         = "A"
+            expr       = "avg(groundcover_node_rt_disk_space_used_percent{})"
+            dataType   = "metrics"
+            step       = null
+            editorMode = "builder"
+          }
+        ]
+        visualizationConfig = {
+          type = "time-series"
+        }
+      }
+    ]
+    variables     = {}
+    schemaVersion = 3
+  })
 }
-`, name, preset)
+`, name)
 }
 
 func testAccDashboardResourceConfigUpdatedDescription(name string) string {
-	preset := `{
-  "duration": "Last 1 hour",
-  "layout": [
-    {
-      "id": "A",
-      "x": 0,
-      "y": 0,
-      "w": 6,
-      "h": 4,
-      "minH": 2
-    }
-  ],
-  "widgets": [
-    {
-      "id": "A",
-      "type": "widget",
-      "name": "Test Widget",
-      "queries": [
-        {
-          "id": "A",
-          "expr": "avg(groundcover_node_rt_disk_space_used_percent{})",
-          "dataType": "metrics",
-          "step": null,
-          "editorMode": "builder"
-        }
-      ],
-      "visualizationConfig": {
-        "type": "time-series"
-      }
-    }
-  ],
-  "variables": {},
-  "schemaVersion": 3
-}`
 	return fmt.Sprintf(`
 resource "groundcover_dashboard" "test" {
   name        = "%s"
   description = "Updated dashboard description"
   team        = "engineering"
-  preset      = jsonencode(%s)
+  preset      = jsonencode({
+    duration = "Last 1 hour"
+    layout = [
+      {
+        id   = "A"
+        x    = 0
+        y    = 0
+        w    = 6
+        h    = 4
+        minH = 2
+      }
+    ]
+    widgets = [
+      {
+        id   = "A"
+        type = "widget"
+        name = "Test Widget"
+        queries = [
+          {
+            id         = "A"
+            expr       = "avg(groundcover_node_rt_disk_space_used_percent{})"
+            dataType   = "metrics"
+            step       = null
+            editorMode = "builder"
+          }
+        ]
+        visualizationConfig = {
+          type = "time-series"
+        }
+      }
+    ]
+    variables     = {}
+    schemaVersion = 3
+  })
 }
-`, name, preset)
+`, name)
+}
+
+func testAccDashboardResourceConfigSimple(name string) string {
+	return fmt.Sprintf(`
+resource "groundcover_dashboard" "test" {
+  name        = "%s"
+  description = "Simple test dashboard"
+  preset      = jsonencode({
+    duration      = "Last 1 hour"
+    widgets       = []
+    layout        = []
+    variables     = {}
+    schemaVersion = 3
+  })
+}
+`, name)
+}
+
+func testAccDashboardResourceConfigNoTeam(name string) string {
+	return fmt.Sprintf(`
+resource "groundcover_dashboard" "test" {
+  name        = "%s"
+  description = "Dashboard without team field"
+  preset      = jsonencode({
+    duration      = "Last 1 hour"
+    widgets       = []
+    layout        = []
+    variables     = {}
+    schemaVersion = 3
+  })
+}
+`, name)
+}
+
+func testAccDashboardResourceConfigNoTeamUpdated(name string) string {
+	return fmt.Sprintf(`
+resource "groundcover_dashboard" "test" {
+  name        = "%s"
+  description = "Updated empty team dashboard"
+  preset      = jsonencode({
+    duration      = "Last 1 hour"
+    widgets       = []
+    layout        = []
+    variables     = {}
+    schemaVersion = 3
+  })
+}
+`, name)
 }
