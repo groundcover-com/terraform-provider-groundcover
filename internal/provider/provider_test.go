@@ -61,21 +61,6 @@ func TestNormalizeAPIURL(t *testing.T) {
 			expected: "https://api.groundcover.com/v1/api",
 		},
 		{
-			name:     "malformed https with triple slash",
-			input:    "https:///api.groundcover.com",
-			expected: "https://api.groundcover.com",
-		},
-		{
-			name:     "malformed http with triple slash",
-			input:    "http:///api.groundcover.com",
-			expected: "http://api.groundcover.com",
-		},
-		{
-			name:     "malformed https with single slash",
-			input:    "https:/api.groundcover.com",
-			expected: "https://api.groundcover.com",
-		},
-		{
 			name:     "URL with spaces",
 			input:    "  https://api.groundcover.com  ",
 			expected: "https://api.groundcover.com",
@@ -94,11 +79,6 @@ func TestNormalizeAPIURL(t *testing.T) {
 			name:     "IP address without scheme",
 			input:    "192.168.1.1:8080",
 			expected: "https://192.168.1.1:8080",
-		},
-		{
-			name:     "complex malformed URL",
-			input:    "https:///api.groundcover.com/v1/api",
-			expected: "https://api.groundcover.com/v1/api",
 		},
 		{
 			name:     "URL with query params without scheme",

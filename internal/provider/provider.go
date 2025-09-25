@@ -183,18 +183,7 @@ func normalizeAPIURL(apiUrl string) string {
 		return ""
 	}
 
-	// Handle malformed schemes like "https:/" or "https:///"
-	if strings.HasPrefix(apiUrl, "https:///") {
-		apiUrl = "https://" + strings.TrimPrefix(apiUrl, "https:///")
-	} else if strings.HasPrefix(apiUrl, "http:///") {
-		apiUrl = "http://" + strings.TrimPrefix(apiUrl, "http:///")
-	} else if strings.HasPrefix(apiUrl, "https:/") && !strings.HasPrefix(apiUrl, "https://") {
-		apiUrl = "https://" + strings.TrimPrefix(apiUrl, "https:/")
-	} else if strings.HasPrefix(apiUrl, "http:/") && !strings.HasPrefix(apiUrl, "http://") {
-		apiUrl = "http://" + strings.TrimPrefix(apiUrl, "http:/")
-	}
-
-	// Check if it's now a valid URL with proper scheme
+	// Check if it has a valid URL scheme
 	if strings.HasPrefix(apiUrl, "http://") || strings.HasPrefix(apiUrl, "https://") {
 		u, err := url.Parse(apiUrl)
 		if err == nil && u != nil && u.Host != "" {
