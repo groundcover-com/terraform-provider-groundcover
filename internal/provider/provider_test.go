@@ -28,3 +28,71 @@ func testAccPreCheck(t *testing.T) {
 		t.Fatal("GROUNDCOVER_BACKEND_ID must be set for acceptance tests")
 	}
 }
+
+func TestNormalizeAPIURL(t *testing.T) {
+	tests := []struct {
+		name     string
+		input    string
+		expected string
+	}{
+		{
+			name:     "valid https URL",
+			input:    "https://api.groundcover.com",
+			expected: "https://api.groundcover.com",
+		},
+		{
+			name:     "valid http URL",
+			input:    "http://api.groundcover.com",
+			expected: "http://api.groundcover.com",
+		},
+		{
+			name:     "domain without scheme",
+			input:    "api.groundcover.com",
+			expected: "https://api.groundcover.com",
+		},
+		{
+			name:     "domain with port without scheme",
+			input:    "api.groundcover.com:8080",
+			expected: "https://api.groundcover.com:8080",
+		},
+		{
+			name:     "domain with path without scheme",
+			input:    "api.groundcover.com/v1/api",
+			expected: "https://api.groundcover.com/v1/api",
+		},
+		{
+			name:     "URL with spaces",
+			input:    "  https://api.groundcover.com  ",
+			expected: "https://api.groundcover.com",
+		},
+		{
+			name:     "empty string",
+			input:    "",
+			expected: "",
+		},
+		{
+			name:     "localhost without scheme",
+			input:    "localhost:8080",
+			expected: "https://localhost:8080",
+		},
+		{
+			name:     "IP address without scheme",
+			input:    "192.168.1.1:8080",
+			expected: "https://192.168.1.1:8080",
+		},
+		{
+			name:     "URL with query params without scheme",
+			input:    "api.groundcover.com?foo=bar",
+			expected: "https://api.groundcover.com?foo=bar",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := normalizeAPIURL(tt.input)
+			if result != tt.expected {
+				t.Errorf("normalizeAPIURL(%q) = %q, want %q", tt.input, result, tt.expected)
+			}
+		})
+	}
+}
