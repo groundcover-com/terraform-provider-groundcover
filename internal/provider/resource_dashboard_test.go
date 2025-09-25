@@ -117,91 +117,89 @@ func testAccCheckDashboardResourceDisappears(n string) resource.TestCheckFunc {
 }
 
 func testAccDashboardResourceConfig(name string) string {
-	preset := `{
-  "duration": "Last 1 hour",
-  "layout": [
-    {
-      "id": "A",
-      "x": 0,
-      "y": 0,
-      "w": 6,
-      "h": 4,
-      "minH": 2
-    }
-  ],
-  "widgets": [
-    {
-      "id": "A",
-      "type": "widget",
-      "name": "Test Widget",
-      "queries": [
-        {
-          "id": "A",
-          "expr": "avg(groundcover_node_rt_disk_space_used_percent{})",
-          "dataType": "metrics",
-          "step": null,
-          "editorMode": "builder"
-        }
-      ],
-      "visualizationConfig": {
-        "type": "time-series"
-      }
-    }
-  ],
-  "variables": {},
-  "schemaVersion": 3
-}`
 	return fmt.Sprintf(`
 resource "groundcover_dashboard" "test" {
   name        = "%s"
   description = "Test dashboard description"
   team        = "engineering"
-  preset      = jsonencode(%s)
+  preset      = jsonencode({
+    duration = "Last 1 hour"
+    layout = [
+      {
+        id   = "A"
+        x    = 0
+        y    = 0
+        w    = 6
+        h    = 4
+        minH = 2
+      }
+    ]
+    widgets = [
+      {
+        id   = "A"
+        type = "widget"
+        name = "Test Widget"
+        queries = [
+          {
+            id         = "A"
+            expr       = "avg(groundcover_node_rt_disk_space_used_percent{})"
+            dataType   = "metrics"
+            step       = null
+            editorMode = "builder"
+          }
+        ]
+        visualizationConfig = {
+          type = "time-series"
+        }
+      }
+    ]
+    variables     = {}
+    schemaVersion = 3
+  })
 }
-`, name, preset)
+`, name)
 }
 
 func testAccDashboardResourceConfigUpdatedDescription(name string) string {
-	preset := `{
-  "duration": "Last 1 hour",
-  "layout": [
-    {
-      "id": "A",
-      "x": 0,
-      "y": 0,
-      "w": 6,
-      "h": 4,
-      "minH": 2
-    }
-  ],
-  "widgets": [
-    {
-      "id": "A",
-      "type": "widget",
-      "name": "Test Widget",
-      "queries": [
-        {
-          "id": "A",
-          "expr": "avg(groundcover_node_rt_disk_space_used_percent{})",
-          "dataType": "metrics",
-          "step": null,
-          "editorMode": "builder"
-        }
-      ],
-      "visualizationConfig": {
-        "type": "time-series"
-      }
-    }
-  ],
-  "variables": {},
-  "schemaVersion": 3
-}`
 	return fmt.Sprintf(`
 resource "groundcover_dashboard" "test" {
   name        = "%s"
   description = "Updated dashboard description"
   team        = "engineering"
-  preset      = jsonencode(%s)
+  preset      = jsonencode({
+    duration = "Last 1 hour"
+    layout = [
+      {
+        id   = "A"
+        x    = 0
+        y    = 0
+        w    = 6
+        h    = 4
+        minH = 2
+      }
+    ]
+    widgets = [
+      {
+        id   = "A"
+        type = "widget"
+        name = "Test Widget"
+        queries = [
+          {
+            id         = "A"
+            expr       = "avg(groundcover_node_rt_disk_space_used_percent{})"
+            dataType   = "metrics"
+            step       = null
+            editorMode = "builder"
+          }
+        ]
+        visualizationConfig = {
+          type = "time-series"
+        }
+      }
+    ]
+    variables     = {}
+    schemaVersion = 3
+  })
 }
-`, name, preset)
+`, name)
 }

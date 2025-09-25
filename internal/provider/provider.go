@@ -4,7 +4,9 @@ package provider
 
 import (
 	"context"
+	"net/url"
 	"os"
+	"strings"
 
 	"github.com/hashicorp/terraform-plugin-framework/datasource"
 	"github.com/hashicorp/terraform-plugin-framework/path"
@@ -100,6 +102,9 @@ func (p *GroundcoverProvider) Configure(ctx context.Context, req provider.Config
 	// Set default API URL if not provided
 	if apiUrl == "" {
 		apiUrl = "https://api.groundcover.com"
+	} else {
+		// Normalize the URL to ensure proper format
+		apiUrl = normalizeAPIURL(apiUrl)
 	}
 
 	if apiKey == "" {
@@ -169,4 +174,43 @@ func New(version string) func() provider.Provider {
 			version: version,
 		}
 	}
+}
+
+// normalizeAPIURL ensures the API URL has a proper scheme and format
+func normalizeAPIURL(apiUrl string) string {
+	apiUrl = strings.TrimSpace(apiUrl)
+	if apiUrl == "" {
+		return ""
+	}
+
+	// Handle malformed schemes like "https:/" or "https:///"
+	if strings.HasPrefix(apiUrl, "https:///") {
+		apiUrl = "https://" + strings.TrimPrefix(apiUrl, "https:///")
+	} else if strings.HasPrefix(apiUrl, "http:///") {
+		apiUrl = "http://" + strings.TrimPrefix(apiUrl, "http:///")
+	} else if strings.HasPrefix(apiUrl, "https:/") && !strings.HasPrefix(apiUrl, "https://") {
+		apiUrl = "https://" + strings.TrimPrefix(apiUrl, "https:/")
+	} else if strings.HasPrefix(apiUrl, "http:/") && !strings.HasPrefix(apiUrl, "http://") {
+		apiUrl = "http://" + strings.TrimPrefix(apiUrl, "http:/")
+	}
+
+	// Check if it's now a valid URL with proper scheme
+	if strings.HasPrefix(apiUrl, "http://") || strings.HasPrefix(apiUrl, "https://") {
+		u, err := url.Parse(apiUrl)
+		if err == nil && u != nil && u.Host != "" {
+			// It's valid, return as-is
+			return apiUrl
+		}
+	}
+
+	// No valid scheme, try adding https://
+	if !strings.HasPrefix(apiUrl, "http://") && !strings.HasPrefix(apiUrl, "https://") {
+		testURL := "https://" + apiUrl
+		if u, err := url.Parse(testURL); err == nil && u != nil && u.Host != "" {
+			return testURL
+		}
+	}
+
+	// If still not valid, return the original and let the client handle the error
+	return apiUrl
 }
