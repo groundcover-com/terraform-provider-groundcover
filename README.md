@@ -20,6 +20,8 @@ Basic usage examples can be found in the `examples/` directory:
     *   Shows how to configure logs processing pipelines.
 *   **Dashboard Resource:** [`examples/resources/groundcover_dashboard/resource.tf`](./examples/resources/groundcover_dashboard/resource.tf)
     *   Demonstrates how to create and manage dashboards with customizable widgets and layouts.
+*   **Data Integration Resource:** [`examples/resources/groundcover_dataintegration/resource.tf`](./examples/resources/groundcover_dataintegration/resource.tf)
+    *   Demonstrates how to create and manage data integrations.
 
 ## Local Development and Testing
 
@@ -214,6 +216,7 @@ TF_ACC=1 go test ./internal/provider -v -run TestAccApiKeyResource
 TF_ACC=1 go test ./internal/provider -v -run TestAccLogsPipelineResource
 TF_ACC=1 go test ./internal/provider -v -run TestAccIngestionKeyResource
 TF_ACC=1 go test ./internal/provider -v -run TestAccDashboardResource
+TF_ACC=1 go test ./internal/provider -v -run TestAccDataIntegrationResource
 
 # Run unit tests only (no API calls required)
 go test ./internal/provider -v

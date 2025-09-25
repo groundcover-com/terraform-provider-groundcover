@@ -1,3 +1,7 @@
+## 1.2.0
+
+* Added data integration resource for managing data integrations in Groundcover
+
 ## 1.1.1
 
 * Fixed dashboard resource team field to properly handle null/empty values without causing drift
