@@ -195,8 +195,8 @@ func (r *dashboardResource) Read(ctx context.Context, req resource.ReadRequest, 
 	}
 
 	tflog.Debug(ctx, "Reading Dashboard", map[string]interface{}{
-		"uuid":                    state.UUID.ValueString(),
-		"state_revision_number":   state.RevisionNumber.ValueInt32(),
+		"uuid":                  state.UUID.ValueString(),
+		"state_revision_number": state.RevisionNumber.ValueInt32(),
 	})
 
 	dashboard, err := r.client.GetDashboard(ctx, state.UUID.ValueString())
