@@ -102,7 +102,7 @@ output "policy_revision_number" {
 ### Optional
 
 - `claim_role` (String) SSO Role claim name used for mapping.
-- `data_scope` (Attributes) Defines the data scope restrictions for the policy. (see [below for nested schema](#nestedatt--data_scope))
+- `data_scope` (Attributes) Defines the data scope restrictions for the policy. Either 'simple' or 'advanced' must be specified, but not both. (see [below for nested schema](#nestedatt--data_scope))
 - `description` (String) A description for the policy.
 
 ### Read-Only
@@ -117,9 +117,167 @@ output "policy_revision_number" {
 <a id="nestedatt--data_scope"></a>
 ### Nested Schema for `data_scope`
 
+Optional:
+
+- `advanced` (Attributes) Advanced data scope configuration. Allows per-data-type filtering rules for fine-grained access control. (see [below for nested schema](#nestedatt--data_scope--advanced))
+- `simple` (Attributes) Simple data scope configuration. Applies a single set of filtering rules to all data types. (see [below for nested schema](#nestedatt--data_scope--simple))
+
+<a id="nestedatt--data_scope--advanced"></a>
+### Nested Schema for `data_scope.advanced`
+
+Optional:
+
+- `events` (Attributes) Data scope rules for events. (see [below for nested schema](#nestedatt--data_scope--advanced--events))
+- `logs` (Attributes) Data scope rules for logs. (see [below for nested schema](#nestedatt--data_scope--advanced--logs))
+- `metrics` (Attributes) Data scope rules for metrics. (see [below for nested schema](#nestedatt--data_scope--advanced--metrics))
+- `traces` (Attributes) Data scope rules for traces. (see [below for nested schema](#nestedatt--data_scope--advanced--traces))
+- `workloads` (Attributes) Data scope rules for workloads. (see [below for nested schema](#nestedatt--data_scope--advanced--workloads))
+
+<a id="nestedatt--data_scope--advanced--events"></a>
+### Nested Schema for `data_scope.advanced.events`
+
 Required:
 
-- `simple` (Attributes) Simple data scope configuration. (see [below for nested schema](#nestedatt--data_scope--simple))
+- `conditions` (Attributes List) List of conditions for the data scope. (see [below for nested schema](#nestedatt--data_scope--advanced--events--conditions))
+- `operator` (String) Logical operator (e.g., 'and', 'or').
+
+<a id="nestedatt--data_scope--advanced--events--conditions"></a>
+### Nested Schema for `data_scope.advanced.events.conditions`
+
+Required:
+
+- `filters` (Attributes List) List of filter criteria for the condition. (see [below for nested schema](#nestedatt--data_scope--advanced--events--conditions--filters))
+- `key` (String) The key for the condition (e.g., 'environment').
+- `origin` (String) The origin of the key.
+- `type` (String) The type of the key.
+
+<a id="nestedatt--data_scope--advanced--events--conditions--filters"></a>
+### Nested Schema for `data_scope.advanced.events.conditions.filters`
+
+Required:
+
+- `op` (String) The filter operation (e.g., 'match').
+- `value` (String) The value to filter on.
+
+
+
+
+<a id="nestedatt--data_scope--advanced--logs"></a>
+### Nested Schema for `data_scope.advanced.logs`
+
+Required:
+
+- `conditions` (Attributes List) List of conditions for the data scope. (see [below for nested schema](#nestedatt--data_scope--advanced--logs--conditions))
+- `operator` (String) Logical operator (e.g., 'and', 'or').
+
+<a id="nestedatt--data_scope--advanced--logs--conditions"></a>
+### Nested Schema for `data_scope.advanced.logs.conditions`
+
+Required:
+
+- `filters` (Attributes List) List of filter criteria for the condition. (see [below for nested schema](#nestedatt--data_scope--advanced--logs--conditions--filters))
+- `key` (String) The key for the condition (e.g., 'environment').
+- `origin` (String) The origin of the key.
+- `type` (String) The type of the key.
+
+<a id="nestedatt--data_scope--advanced--logs--conditions--filters"></a>
+### Nested Schema for `data_scope.advanced.logs.conditions.filters`
+
+Required:
+
+- `op` (String) The filter operation (e.g., 'match').
+- `value` (String) The value to filter on.
+
+
+
+
+<a id="nestedatt--data_scope--advanced--metrics"></a>
+### Nested Schema for `data_scope.advanced.metrics`
+
+Required:
+
+- `conditions` (Attributes List) List of conditions for the data scope. (see [below for nested schema](#nestedatt--data_scope--advanced--metrics--conditions))
+- `operator` (String) Logical operator (e.g., 'and', 'or').
+
+<a id="nestedatt--data_scope--advanced--metrics--conditions"></a>
+### Nested Schema for `data_scope.advanced.metrics.conditions`
+
+Required:
+
+- `filters` (Attributes List) List of filter criteria for the condition. (see [below for nested schema](#nestedatt--data_scope--advanced--metrics--conditions--filters))
+- `key` (String) The key for the condition (e.g., 'environment').
+- `origin` (String) The origin of the key.
+- `type` (String) The type of the key.
+
+<a id="nestedatt--data_scope--advanced--metrics--conditions--filters"></a>
+### Nested Schema for `data_scope.advanced.metrics.conditions.filters`
+
+Required:
+
+- `op` (String) The filter operation (e.g., 'match').
+- `value` (String) The value to filter on.
+
+
+
+
+<a id="nestedatt--data_scope--advanced--traces"></a>
+### Nested Schema for `data_scope.advanced.traces`
+
+Required:
+
+- `conditions` (Attributes List) List of conditions for the data scope. (see [below for nested schema](#nestedatt--data_scope--advanced--traces--conditions))
+- `operator` (String) Logical operator (e.g., 'and', 'or').
+
+<a id="nestedatt--data_scope--advanced--traces--conditions"></a>
+### Nested Schema for `data_scope.advanced.traces.conditions`
+
+Required:
+
+- `filters` (Attributes List) List of filter criteria for the condition. (see [below for nested schema](#nestedatt--data_scope--advanced--traces--conditions--filters))
+- `key` (String) The key for the condition (e.g., 'environment').
+- `origin` (String) The origin of the key.
+- `type` (String) The type of the key.
+
+<a id="nestedatt--data_scope--advanced--traces--conditions--filters"></a>
+### Nested Schema for `data_scope.advanced.traces.conditions.filters`
+
+Required:
+
+- `op` (String) The filter operation (e.g., 'match').
+- `value` (String) The value to filter on.
+
+
+
+
+<a id="nestedatt--data_scope--advanced--workloads"></a>
+### Nested Schema for `data_scope.advanced.workloads`
+
+Required:
+
+- `conditions` (Attributes List) List of conditions for the data scope. (see [below for nested schema](#nestedatt--data_scope--advanced--workloads--conditions))
+- `operator` (String) Logical operator (e.g., 'and', 'or').
+
+<a id="nestedatt--data_scope--advanced--workloads--conditions"></a>
+### Nested Schema for `data_scope.advanced.workloads.conditions`
+
+Required:
+
+- `filters` (Attributes List) List of filter criteria for the condition. (see [below for nested schema](#nestedatt--data_scope--advanced--workloads--conditions--filters))
+- `key` (String) The key for the condition (e.g., 'environment').
+- `origin` (String) The origin of the key.
+- `type` (String) The type of the key.
+
+<a id="nestedatt--data_scope--advanced--workloads--conditions--filters"></a>
+### Nested Schema for `data_scope.advanced.workloads.conditions.filters`
+
+Required:
+
+- `op` (String) The filter operation (e.g., 'match').
+- `value` (String) The value to filter on.
+
+
+
+
 
 <a id="nestedatt--data_scope--simple"></a>
 ### Nested Schema for `data_scope.simple`

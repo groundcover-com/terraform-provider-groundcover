@@ -51,15 +51,32 @@ type policyResourceModel struct {
 }
 
 // dataScopeModel maps the data_scope block schema.
-// Matches sdkpolicies.DataScope
+// Matches models.DataScope
 type dataScopeModel struct {
-	Simple types.Object `tfsdk:"simple"`
-	// Advanced types.Object `tfsdk:"advanced"` // Assuming SDK might add advanced later
+	Simple   types.Object `tfsdk:"simple"`
+	Advanced types.Object `tfsdk:"advanced"`
 }
 
 // simpleDataScopeModel maps the simple block schema within data_scope.
-// Matches sdkpolicies.SimpleDataScope
+// Matches models.Group (used for Simple scope)
 type simpleDataScopeModel struct {
+	Operator   types.String `tfsdk:"operator"`
+	Conditions types.List   `tfsdk:"conditions"`
+}
+
+// advancedDataScopeModel maps the advanced block schema within data_scope.
+// Matches models.AdvancedDataScope
+type advancedDataScopeModel struct {
+	Events    types.Object `tfsdk:"events"`
+	Logs      types.Object `tfsdk:"logs"`
+	Metrics   types.Object `tfsdk:"metrics"`
+	Traces    types.Object `tfsdk:"traces"`
+	Workloads types.Object `tfsdk:"workloads"`
+}
+
+// groupModel maps the group schema used in advanced data scope.
+// Matches models.Group
+type groupModel struct {
 	Operator   types.String `tfsdk:"operator"`
 	Conditions types.List   `tfsdk:"conditions"`
 }
@@ -117,6 +134,21 @@ var conditionNestedSchema = schema.NestedAttributeObject{
 	},
 }
 
+// Define the group schema used for advanced data scope data types
+func groupSchemaAttributes() map[string]schema.Attribute {
+	return map[string]schema.Attribute{
+		"operator": schema.StringAttribute{
+			MarkdownDescription: "Logical operator (e.g., 'and', 'or').",
+			Required:            true,
+		},
+		"conditions": schema.ListNestedAttribute{
+			MarkdownDescription: "List of conditions for the data scope.",
+			Required:            true,
+			NestedObject:        conditionNestedSchema,
+		},
+	}
+}
+
 func NewPolicyResource() resource.Resource {
 	return &policyResource{}
 }
@@ -162,21 +194,42 @@ func (r *policyResource) Schema(ctx context.Context, req resource.SchemaRequest,
 				Optional:            true,
 			},
 			"data_scope": schema.SingleNestedAttribute{
-				MarkdownDescription: "Defines the data scope restrictions for the policy.",
+				MarkdownDescription: "Defines the data scope restrictions for the policy. Either 'simple' or 'advanced' must be specified, but not both.",
 				Optional:            true,
 				Attributes: map[string]schema.Attribute{
 					"simple": schema.SingleNestedAttribute{
-						MarkdownDescription: "Simple data scope configuration.",
-						Required:            true,
+						MarkdownDescription: "Simple data scope configuration. Applies a single set of filtering rules to all data types.",
+						Optional:            true,
+						Attributes:          groupSchemaAttributes(),
+					},
+					"advanced": schema.SingleNestedAttribute{
+						MarkdownDescription: "Advanced data scope configuration. Allows per-data-type filtering rules for fine-grained access control.",
+						Optional:            true,
 						Attributes: map[string]schema.Attribute{
-							"operator": schema.StringAttribute{
-								MarkdownDescription: "Logical operator (e.g., 'and', 'or').",
-								Required:            true,
+							"events": schema.SingleNestedAttribute{
+								MarkdownDescription: "Data scope rules for events.",
+								Optional:            true,
+								Attributes:          groupSchemaAttributes(),
 							},
-							"conditions": schema.ListNestedAttribute{
-								MarkdownDescription: "List of conditions for the data scope.",
-								Required:            true,
-								NestedObject:        conditionNestedSchema,
+							"logs": schema.SingleNestedAttribute{
+								MarkdownDescription: "Data scope rules for logs.",
+								Optional:            true,
+								Attributes:          groupSchemaAttributes(),
+							},
+							"metrics": schema.SingleNestedAttribute{
+								MarkdownDescription: "Data scope rules for metrics.",
+								Optional:            true,
+								Attributes:          groupSchemaAttributes(),
+							},
+							"traces": schema.SingleNestedAttribute{
+								MarkdownDescription: "Data scope rules for traces.",
+								Optional:            true,
+								Attributes:          groupSchemaAttributes(),
+							},
+							"workloads": schema.SingleNestedAttribute{
+								MarkdownDescription: "Data scope rules for workloads.",
+								Optional:            true,
+								Attributes:          groupSchemaAttributes(),
 							},
 						},
 					},
@@ -644,14 +697,110 @@ func mapModelDataScopeToApiDataScope(ctx context.Context, modelDataScope types.O
 		}
 		apiDataScope.Simple = apiSimpleScope // Assign pointer
 	}
-	// TODO: Add mapping for Advanced scope if/when SDK supports it
 
-	// If no scopes were actually mapped (e.g., simple was null), return nil
-	if apiDataScope.Simple == nil /* && apiDataScope.Advanced == nil */ {
+	// Map 'advanced' scope
+	if !dataScopePlan.Advanced.IsNull() && !dataScopePlan.Advanced.IsUnknown() {
+		var advancedPlan advancedDataScopeModel
+		conversionDiags = dataScopePlan.Advanced.As(ctx, &advancedPlan, basetypes.ObjectAsOptions{})
+		diags.Append(conversionDiags...)
+		if diags.HasError() {
+			return nil, diags
+		}
+
+		apiAdvancedScope := &models.AdvancedDataScope{}
+
+		// Map each data type group (events, logs, metrics, traces, workloads)
+		if !advancedPlan.Events.IsNull() && !advancedPlan.Events.IsUnknown() {
+			apiAdvancedScope.Events = mapGroupModelToApiGroup(ctx, advancedPlan.Events, &diags)
+		}
+		if !advancedPlan.Logs.IsNull() && !advancedPlan.Logs.IsUnknown() {
+			apiAdvancedScope.Logs = mapGroupModelToApiGroup(ctx, advancedPlan.Logs, &diags)
+		}
+		if !advancedPlan.Metrics.IsNull() && !advancedPlan.Metrics.IsUnknown() {
+			apiAdvancedScope.Metrics = mapGroupModelToApiGroup(ctx, advancedPlan.Metrics, &diags)
+		}
+		if !advancedPlan.Traces.IsNull() && !advancedPlan.Traces.IsUnknown() {
+			apiAdvancedScope.Traces = mapGroupModelToApiGroup(ctx, advancedPlan.Traces, &diags)
+		}
+		if !advancedPlan.Workloads.IsNull() && !advancedPlan.Workloads.IsUnknown() {
+			apiAdvancedScope.Workloads = mapGroupModelToApiGroup(ctx, advancedPlan.Workloads, &diags)
+		}
+
+		if diags.HasError() {
+			return nil, diags
+		}
+
+		apiDataScope.Advanced = apiAdvancedScope // Assign pointer
+	}
+
+	// If no scopes were actually mapped (e.g., both simple and advanced are null), return nil
+	if apiDataScope.Simple == nil && apiDataScope.Advanced == nil {
 		return nil, diags
 	}
 
 	return apiDataScope, diags
+}
+
+// mapGroupModelToApiGroup converts a Terraform group object to SDK Group struct.
+// This is used for both simple scope and advanced scope data type groups.
+func mapGroupModelToApiGroup(ctx context.Context, groupObj types.Object, diags *diag.Diagnostics) *models.Group {
+	if groupObj.IsNull() || groupObj.IsUnknown() {
+		return nil
+	}
+
+	var groupPlan groupModel
+	conversionDiags := groupObj.As(ctx, &groupPlan, basetypes.ObjectAsOptions{})
+	diags.Append(conversionDiags...)
+	if diags.HasError() {
+		return nil
+	}
+
+	apiGroup := &models.Group{
+		Operator: models.GroupOp(groupPlan.Operator.ValueString()),
+	}
+
+	// Map conditions
+	if !groupPlan.Conditions.IsNull() && !groupPlan.Conditions.IsUnknown() {
+		conditionsPlan := make([]conditionModel, 0, len(groupPlan.Conditions.Elements()))
+		diags.Append(groupPlan.Conditions.ElementsAs(ctx, &conditionsPlan, false)...)
+		if diags.HasError() {
+			return nil
+		}
+
+		apiGroup.Conditions = make([]*models.Condition, len(conditionsPlan))
+		for i, condPlan := range conditionsPlan {
+			apiCondition := &models.Condition{
+				Key:    condPlan.Key.ValueString(),
+				Origin: condPlan.Origin.ValueString(),
+				Type:   condPlan.Type.ValueString(),
+			}
+
+			// Map filters
+			if !condPlan.Filters.IsNull() && !condPlan.Filters.IsUnknown() && len(condPlan.Filters.Elements()) > 0 {
+				filtersPlan := make([]filtersModel, 0, len(condPlan.Filters.Elements()))
+				conversionDiags := condPlan.Filters.ElementsAs(ctx, &filtersPlan, false)
+				diags.Append(conversionDiags...)
+				if diags.HasError() {
+					return nil
+				}
+
+				apiCondition.Filters = make([]*models.Filter, len(filtersPlan))
+				for j, filterPlan := range filtersPlan {
+					apiCondition.Filters[j] = &models.Filter{
+						Op:    models.Op(filterPlan.Op.ValueString()),
+						Value: filterPlan.Value.ValueString(),
+					}
+				}
+			} else {
+				apiCondition.Filters = make([]*models.Filter, 0)
+			}
+			apiGroup.Conditions[i] = apiCondition
+		}
+	} else {
+		apiGroup.Conditions = make([]*models.Condition, 0)
+	}
+
+	return apiGroup
 }
 
 // mapPolicyApiResponseToModel maps the *sdkmodels.Policy from an API response

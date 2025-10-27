@@ -93,6 +93,57 @@ func TestAccPolicyResource_disappears(t *testing.T) {
 	})
 }
 
+func TestAccPolicyResource_advanced(t *testing.T) {
+	name := acctest.RandomWithPrefix("test-policy-advanced")
+
+	resource.Test(t, resource.TestCase{
+		PreCheck:                 func() { testAccPreCheck(t) },
+		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
+		Steps: []resource.TestStep{
+			// Create with advanced data scope
+			{
+				Config: testAccPolicyResourceConfigAdvanced(name),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					resource.TestCheckResourceAttr("groundcover_policy.test", "name", name),
+					resource.TestCheckResourceAttr("groundcover_policy.test", "role.read", "read"),
+					resource.TestCheckResourceAttr("groundcover_policy.test", "claim_role", "sso-advanced-role"),
+					resource.TestCheckResourceAttrSet("groundcover_policy.test", "data_scope.advanced.logs.operator"),
+					resource.TestCheckResourceAttrSet("groundcover_policy.test", "data_scope.advanced.traces.operator"),
+				),
+			},
+		},
+	})
+}
+
+func TestAccPolicyResource_advancedUpdate(t *testing.T) {
+	name := acctest.RandomWithPrefix("test-policy-advanced-update")
+	updatedName := acctest.RandomWithPrefix("test-policy-advanced-updated")
+
+	resource.Test(t, resource.TestCase{
+		PreCheck:                 func() { testAccPreCheck(t) },
+		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
+		Steps: []resource.TestStep{
+			// Create with simple data scope
+			{
+				Config: testAccPolicyResourceConfigComplex(name),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					resource.TestCheckResourceAttr("groundcover_policy.test", "name", name),
+					resource.TestCheckResourceAttrSet("groundcover_policy.test", "data_scope.simple.operator"),
+				),
+			},
+			// Update to advanced data scope
+			{
+				Config: testAccPolicyResourceConfigAdvanced(updatedName),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					resource.TestCheckResourceAttr("groundcover_policy.test", "name", updatedName),
+					resource.TestCheckResourceAttrSet("groundcover_policy.test", "data_scope.advanced.logs.operator"),
+					resource.TestCheckResourceAttrSet("groundcover_policy.test", "data_scope.advanced.traces.operator"),
+				),
+			},
+		},
+	})
+}
+
 func testAccPolicyResourceConfig(name string) string {
 	return fmt.Sprintf(`
 resource "groundcover_policy" "test" {
@@ -142,6 +193,55 @@ resource "groundcover_policy" "test" {
           ]
         }
       ]
+    }
+  }
+}
+`, name)
+}
+
+func testAccPolicyResourceConfigAdvanced(name string) string {
+	return fmt.Sprintf(`
+resource "groundcover_policy" "test" {
+  name        = %[1]q
+  description = "Advanced test policy with per-data-type scoping"
+  claim_role  = "sso-advanced-role"
+  role = {
+    read = "read"
+  }
+  data_scope = {
+    advanced = {
+      logs = {
+        operator = "and"
+        conditions = [
+          {
+            key    = "namespace"
+            origin = "root"
+            type   = "string"
+            filters = [
+              {
+                op    = "match"
+                value = "actions-runner-system"
+              }
+            ]
+          }
+        ]
+      }
+      traces = {
+        operator = "and"
+        conditions = [
+          {
+            key    = "environment"
+            origin = "root"
+            type   = "string"
+            filters = [
+              {
+                op    = "match"
+                value = "none"
+              }
+            ]
+          }
+        ]
+      }
     }
   }
 }
