@@ -248,6 +248,45 @@ resource "groundcover_policy" "test" {
 `, name)
 }
 
+func TestAccPolicyResource_noData(t *testing.T) {
+	name := acctest.RandomWithPrefix("test-policy-no-data")
+
+	resource.Test(t, resource.TestCase{
+		PreCheck:                 func() { testAccPreCheck(t) },
+		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
+		Steps: []resource.TestStep{
+			// Create with disabled data scope (no data access)
+			{
+				Config: testAccPolicyResourceConfigNoData(name),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					resource.TestCheckResourceAttr("groundcover_policy.test", "name", name),
+					resource.TestCheckResourceAttr("groundcover_policy.test", "role.read", "read"),
+					resource.TestCheckResourceAttr("groundcover_policy.test", "data_scope.simple.disabled", "true"),
+				),
+			},
+		},
+	})
+}
+
+func testAccPolicyResourceConfigNoData(name string) string {
+	return fmt.Sprintf(`
+resource "groundcover_policy" "test" {
+  name        = %[1]q
+  description = "No data access test policy"
+  role = {
+    read = "read"
+  }
+  data_scope = {
+    simple = {
+      operator   = "and"
+      disabled   = true
+      conditions = []
+    }
+  }
+}
+`, name)
+}
+
 func testAccCheckPolicyResourceExists(n string) resource.TestCheckFunc {
 	return func(s *terraform.State) error {
 		rs, ok := s.RootModule().Resources[n]

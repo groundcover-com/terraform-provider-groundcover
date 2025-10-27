@@ -141,6 +141,10 @@ Required:
 - `conditions` (Attributes List) List of conditions for the data scope. (see [below for nested schema](#nestedatt--data_scope--advanced--events--conditions))
 - `operator` (String) Logical operator (e.g., 'and', 'or').
 
+Optional:
+
+- `disabled` (Boolean) Whether this data type is disabled (no data access). When true, users have no access to this data type.
+
 <a id="nestedatt--data_scope--advanced--events--conditions"></a>
 ### Nested Schema for `data_scope.advanced.events.conditions`
 
@@ -169,6 +173,10 @@ Required:
 
 - `conditions` (Attributes List) List of conditions for the data scope. (see [below for nested schema](#nestedatt--data_scope--advanced--logs--conditions))
 - `operator` (String) Logical operator (e.g., 'and', 'or').
+
+Optional:
+
+- `disabled` (Boolean) Whether this data type is disabled (no data access). When true, users have no access to this data type.
 
 <a id="nestedatt--data_scope--advanced--logs--conditions"></a>
 ### Nested Schema for `data_scope.advanced.logs.conditions`
@@ -199,6 +207,10 @@ Required:
 - `conditions` (Attributes List) List of conditions for the data scope. (see [below for nested schema](#nestedatt--data_scope--advanced--metrics--conditions))
 - `operator` (String) Logical operator (e.g., 'and', 'or').
 
+Optional:
+
+- `disabled` (Boolean) Whether this data type is disabled (no data access). When true, users have no access to this data type.
+
 <a id="nestedatt--data_scope--advanced--metrics--conditions"></a>
 ### Nested Schema for `data_scope.advanced.metrics.conditions`
 
@@ -227,6 +239,10 @@ Required:
 
 - `conditions` (Attributes List) List of conditions for the data scope. (see [below for nested schema](#nestedatt--data_scope--advanced--traces--conditions))
 - `operator` (String) Logical operator (e.g., 'and', 'or').
+
+Optional:
+
+- `disabled` (Boolean) Whether this data type is disabled (no data access). When true, users have no access to this data type.
 
 <a id="nestedatt--data_scope--advanced--traces--conditions"></a>
 ### Nested Schema for `data_scope.advanced.traces.conditions`
@@ -257,6 +273,10 @@ Required:
 - `conditions` (Attributes List) List of conditions for the data scope. (see [below for nested schema](#nestedatt--data_scope--advanced--workloads--conditions))
 - `operator` (String) Logical operator (e.g., 'and', 'or').
 
+Optional:
+
+- `disabled` (Boolean) Whether this data type is disabled (no data access). When true, users have no access to this data type.
+
 <a id="nestedatt--data_scope--advanced--workloads--conditions"></a>
 ### Nested Schema for `data_scope.advanced.workloads.conditions`
 
@@ -286,6 +306,10 @@ Required:
 
 - `conditions` (Attributes List) List of conditions for the data scope. (see [below for nested schema](#nestedatt--data_scope--simple--conditions))
 - `operator` (String) Logical operator (e.g., 'and', 'or').
+
+Optional:
+
+- `disabled` (Boolean) Whether this data type is disabled (no data access). When true, users have no access to this data type.
 
 <a id="nestedatt--data_scope--simple--conditions"></a>
 ### Nested Schema for `data_scope.simple.conditions`

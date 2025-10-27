@@ -62,6 +62,7 @@ type dataScopeModel struct {
 type simpleDataScopeModel struct {
 	Operator   types.String `tfsdk:"operator"`
 	Conditions types.List   `tfsdk:"conditions"`
+	Disabled   types.Bool   `tfsdk:"disabled"`
 }
 
 // advancedDataScopeModel maps the advanced block schema within data_scope.
@@ -79,6 +80,7 @@ type advancedDataScopeModel struct {
 type groupModel struct {
 	Operator   types.String `tfsdk:"operator"`
 	Conditions types.List   `tfsdk:"conditions"`
+	Disabled   types.Bool   `tfsdk:"disabled"`
 }
 
 // conditionModel maps the conditions block schema.
@@ -145,6 +147,10 @@ func groupSchemaAttributes() map[string]schema.Attribute {
 			MarkdownDescription: "List of conditions for the data scope.",
 			Required:            true,
 			NestedObject:        conditionNestedSchema,
+		},
+		"disabled": schema.BoolAttribute{
+			MarkdownDescription: "Whether this data type is disabled (no data access). When true, users have no access to this data type.",
+			Optional:            true,
 		},
 	}
 }
@@ -653,6 +659,7 @@ func mapModelDataScopeToApiDataScope(ctx context.Context, modelDataScope types.O
 
 		apiSimpleScope := &models.Group{ // Use SDK type
 			Operator: models.GroupOp(simplePlan.Operator.ValueString()), // Cast to models.GroupOp
+			Disabled: simplePlan.Disabled.ValueBool(),
 		}
 
 		// Map 'conditions'
@@ -757,6 +764,7 @@ func mapGroupModelToApiGroup(ctx context.Context, groupObj types.Object, diags *
 
 	apiGroup := &models.Group{
 		Operator: models.GroupOp(groupPlan.Operator.ValueString()),
+		Disabled: groupPlan.Disabled.ValueBool(),
 	}
 
 	// Map conditions
