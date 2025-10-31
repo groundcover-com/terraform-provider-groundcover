@@ -6,6 +6,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"regexp"
 	"testing"
 
 	"github.com/hashicorp/terraform-plugin-framework/attr"
@@ -282,6 +283,74 @@ resource "groundcover_policy" "test" {
       disabled   = true
       conditions = []
     }
+  }
+}
+`, name)
+}
+
+func TestAccPolicyResource_invalidBothScopes(t *testing.T) {
+	name := acctest.RandomWithPrefix("test-policy-invalid")
+
+	resource.Test(t, resource.TestCase{
+		PreCheck:                 func() { testAccPreCheck(t) },
+		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
+		Steps: []resource.TestStep{
+			{
+				Config:      testAccPolicyResourceConfigBothScopes(name),
+				ExpectError: regexp.MustCompile("data_scope cannot have both 'simple' and 'advanced' specified"),
+			},
+		},
+	})
+}
+
+func TestAccPolicyResource_invalidNeitherScope(t *testing.T) {
+	name := acctest.RandomWithPrefix("test-policy-invalid-neither")
+
+	resource.Test(t, resource.TestCase{
+		PreCheck:                 func() { testAccPreCheck(t) },
+		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
+		Steps: []resource.TestStep{
+			{
+				Config:      testAccPolicyResourceConfigNeitherScope(name),
+				ExpectError: regexp.MustCompile("data_scope must have either 'simple' or 'advanced' specified"),
+			},
+		},
+	})
+}
+
+func testAccPolicyResourceConfigBothScopes(name string) string {
+	return fmt.Sprintf(`
+resource "groundcover_policy" "test" {
+  name        = %[1]q
+  description = "Invalid policy with both scopes"
+  role = {
+    read = "read"
+  }
+  data_scope = {
+    simple = {
+      operator   = "and"
+      conditions = []
+    }
+    advanced = {
+      logs = {
+        operator   = "and"
+        conditions = []
+      }
+    }
+  }
+}
+`, name)
+}
+
+func testAccPolicyResourceConfigNeitherScope(name string) string {
+	return fmt.Sprintf(`
+resource "groundcover_policy" "test" {
+  name        = %[1]q
+  description = "Invalid policy with neither scope"
+  role = {
+    read = "read"
+  }
+  data_scope = {
   }
 }
 `, name)

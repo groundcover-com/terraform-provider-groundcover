@@ -57,9 +57,9 @@ type dataScopeModel struct {
 	Advanced types.Object `tfsdk:"advanced"`
 }
 
-// simpleDataScopeModel maps the simple block schema within data_scope.
-// Matches models.Group (used for Simple scope)
-type simpleDataScopeModel struct {
+// groupModel maps the group schema used for both simple and advanced data scopes.
+// Matches models.Group
+type groupModel struct {
 	Operator   types.String `tfsdk:"operator"`
 	Conditions types.List   `tfsdk:"conditions"`
 	Disabled   types.Bool   `tfsdk:"disabled"`
@@ -73,14 +73,6 @@ type advancedDataScopeModel struct {
 	Metrics   types.Object `tfsdk:"metrics"`
 	Traces    types.Object `tfsdk:"traces"`
 	Workloads types.Object `tfsdk:"workloads"`
-}
-
-// groupModel maps the group schema used in advanced data scope.
-// Matches models.Group
-type groupModel struct {
-	Operator   types.String `tfsdk:"operator"`
-	Conditions types.List   `tfsdk:"conditions"`
-	Disabled   types.Bool   `tfsdk:"disabled"`
 }
 
 // conditionModel maps the conditions block schema.
@@ -293,6 +285,34 @@ func (r *policyResource) Create(ctx context.Context, req resource.CreateRequest,
 		return
 	}
 
+	// Validate that data_scope doesn't have both simple and advanced specified
+	if !plan.DataScope.IsNull() && !plan.DataScope.IsUnknown() {
+		var dataScopePlan dataScopeModel
+		resp.Diagnostics.Append(plan.DataScope.As(ctx, &dataScopePlan, basetypes.ObjectAsOptions{})...)
+		if resp.Diagnostics.HasError() {
+			return
+		}
+
+		simpleSpecified := !dataScopePlan.Simple.IsNull() && !dataScopePlan.Simple.IsUnknown()
+		advancedSpecified := !dataScopePlan.Advanced.IsNull() && !dataScopePlan.Advanced.IsUnknown()
+
+		if simpleSpecified && advancedSpecified {
+			resp.Diagnostics.AddError(
+				"Invalid Data Scope Configuration",
+				"data_scope cannot have both 'simple' and 'advanced' specified. Please specify only one.",
+			)
+			return
+		}
+
+		if !simpleSpecified && !advancedSpecified {
+			resp.Diagnostics.AddError(
+				"Invalid Data Scope Configuration",
+				"data_scope must have either 'simple' or 'advanced' specified when data_scope is provided.",
+			)
+			return
+		}
+	}
+
 	apiRequest, diags := mapPolicyModelToApiCreateRequest(ctx, plan)
 	resp.Diagnostics.Append(diags...)
 	if resp.Diagnostics.HasError() {
@@ -406,6 +426,34 @@ func (r *policyResource) Update(ctx context.Context, req resource.UpdateRequest,
 	resp.Diagnostics.Append(req.State.Get(ctx, &state)...)
 	if resp.Diagnostics.HasError() {
 		return
+	}
+
+	// Validate that data_scope doesn't have both simple and advanced specified
+	if !plan.DataScope.IsNull() && !plan.DataScope.IsUnknown() {
+		var dataScopePlan dataScopeModel
+		resp.Diagnostics.Append(plan.DataScope.As(ctx, &dataScopePlan, basetypes.ObjectAsOptions{})...)
+		if resp.Diagnostics.HasError() {
+			return
+		}
+
+		simpleSpecified := !dataScopePlan.Simple.IsNull() && !dataScopePlan.Simple.IsUnknown()
+		advancedSpecified := !dataScopePlan.Advanced.IsNull() && !dataScopePlan.Advanced.IsUnknown()
+
+		if simpleSpecified && advancedSpecified {
+			resp.Diagnostics.AddError(
+				"Invalid Data Scope Configuration",
+				"data_scope cannot have both 'simple' and 'advanced' specified. Please specify only one.",
+			)
+			return
+		}
+
+		if !simpleSpecified && !advancedSpecified {
+			resp.Diagnostics.AddError(
+				"Invalid Data Scope Configuration",
+				"data_scope must have either 'simple' or 'advanced' specified when data_scope is provided.",
+			)
+			return
+		}
 	}
 
 	policyUUID := state.ID.ValueString()
@@ -650,59 +698,10 @@ func mapModelDataScopeToApiDataScope(ctx context.Context, modelDataScope types.O
 
 	// Map 'simple' scope
 	if !dataScopePlan.Simple.IsNull() && !dataScopePlan.Simple.IsUnknown() {
-		var simplePlan simpleDataScopeModel
-		conversionDiags = dataScopePlan.Simple.As(ctx, &simplePlan, basetypes.ObjectAsOptions{})
-		diags.Append(conversionDiags...)
+		apiDataScope.Simple = mapGroupModelToApiGroup(ctx, dataScopePlan.Simple, &diags)
 		if diags.HasError() {
 			return nil, diags
 		}
-
-		apiSimpleScope := &models.Group{ // Use SDK type
-			Operator: models.GroupOp(simplePlan.Operator.ValueString()), // Cast to models.GroupOp
-			Disabled: simplePlan.Disabled.ValueBool(),
-		}
-
-		// Map 'conditions'
-		if !simplePlan.Conditions.IsNull() && !simplePlan.Conditions.IsUnknown() {
-			conditionsPlan := make([]conditionModel, 0, len(simplePlan.Conditions.Elements()))
-			diags.Append(simplePlan.Conditions.ElementsAs(ctx, &conditionsPlan, false)...)
-			if diags.HasError() {
-				return nil, diags
-			}
-
-			apiSimpleScope.Conditions = make([]*models.Condition, len(conditionsPlan)) // Slice of pointers
-			for i, condPlan := range conditionsPlan {
-				apiCondition := &models.Condition{ // Correctly assign Key, Origin, Type directly
-					Key:    condPlan.Key.ValueString(),
-					Origin: condPlan.Origin.ValueString(),
-					Type:   condPlan.Type.ValueString(),
-				}
-
-				// Map 'filters'
-				if !condPlan.Filters.IsNull() && !condPlan.Filters.IsUnknown() && len(condPlan.Filters.Elements()) > 0 {
-					filtersPlan := make([]filtersModel, 0, len(condPlan.Filters.Elements()))
-					conversionDiags = condPlan.Filters.ElementsAs(ctx, &filtersPlan, false)
-					diags.Append(conversionDiags...)
-					if diags.HasError() {
-						return nil, diags
-					}
-
-					apiCondition.Filters = make([]*models.Filter, len(filtersPlan)) // Slice of pointers
-					for j, filterPlan := range filtersPlan {
-						apiCondition.Filters[j] = &models.Filter{ // Assign pointer to Filter struct
-							Op:    models.Op(filterPlan.Op.ValueString()), // Cast to models.Op
-							Value: filterPlan.Value.ValueString(),         // Assuming Value in SDK Filter is string or interface{}
-						}
-					}
-				} else {
-					apiCondition.Filters = make([]*models.Filter, 0) // Slice of pointers
-				}
-				apiSimpleScope.Conditions[i] = apiCondition // apiCondition is already a pointer
-			}
-		} else {
-			apiSimpleScope.Conditions = make([]*models.Condition, 0) // Slice of pointers
-		}
-		apiDataScope.Simple = apiSimpleScope // Assign pointer
 	}
 
 	// Map 'advanced' scope
@@ -767,45 +766,48 @@ func mapGroupModelToApiGroup(ctx context.Context, groupObj types.Object, diags *
 		Disabled: groupPlan.Disabled.ValueBool(),
 	}
 
-	// Map conditions
-	if !groupPlan.Conditions.IsNull() && !groupPlan.Conditions.IsUnknown() {
-		conditionsPlan := make([]conditionModel, 0, len(groupPlan.Conditions.Elements()))
-		diags.Append(groupPlan.Conditions.ElementsAs(ctx, &conditionsPlan, false)...)
+	// Map conditions - early exit if null/unknown
+	if groupPlan.Conditions.IsNull() || groupPlan.Conditions.IsUnknown() {
+		apiGroup.Conditions = make([]*models.Condition, 0)
+		return apiGroup
+	}
+
+	conditionsPlan := make([]conditionModel, 0, len(groupPlan.Conditions.Elements()))
+	diags.Append(groupPlan.Conditions.ElementsAs(ctx, &conditionsPlan, false)...)
+	if diags.HasError() {
+		return nil
+	}
+
+	apiGroup.Conditions = make([]*models.Condition, len(conditionsPlan))
+	for i, condPlan := range conditionsPlan {
+		apiCondition := &models.Condition{
+			Key:    condPlan.Key.ValueString(),
+			Origin: condPlan.Origin.ValueString(),
+			Type:   condPlan.Type.ValueString(),
+		}
+
+		// Map filters - early continue if null/unknown/empty
+		if condPlan.Filters.IsNull() || condPlan.Filters.IsUnknown() || len(condPlan.Filters.Elements()) == 0 {
+			apiCondition.Filters = make([]*models.Filter, 0)
+			apiGroup.Conditions[i] = apiCondition
+			continue
+		}
+
+		filtersPlan := make([]filtersModel, 0, len(condPlan.Filters.Elements()))
+		conversionDiags := condPlan.Filters.ElementsAs(ctx, &filtersPlan, false)
+		diags.Append(conversionDiags...)
 		if diags.HasError() {
 			return nil
 		}
 
-		apiGroup.Conditions = make([]*models.Condition, len(conditionsPlan))
-		for i, condPlan := range conditionsPlan {
-			apiCondition := &models.Condition{
-				Key:    condPlan.Key.ValueString(),
-				Origin: condPlan.Origin.ValueString(),
-				Type:   condPlan.Type.ValueString(),
+		apiCondition.Filters = make([]*models.Filter, len(filtersPlan))
+		for j, filterPlan := range filtersPlan {
+			apiCondition.Filters[j] = &models.Filter{
+				Op:    models.Op(filterPlan.Op.ValueString()),
+				Value: filterPlan.Value.ValueString(),
 			}
-
-			// Map filters
-			if !condPlan.Filters.IsNull() && !condPlan.Filters.IsUnknown() && len(condPlan.Filters.Elements()) > 0 {
-				filtersPlan := make([]filtersModel, 0, len(condPlan.Filters.Elements()))
-				conversionDiags := condPlan.Filters.ElementsAs(ctx, &filtersPlan, false)
-				diags.Append(conversionDiags...)
-				if diags.HasError() {
-					return nil
-				}
-
-				apiCondition.Filters = make([]*models.Filter, len(filtersPlan))
-				for j, filterPlan := range filtersPlan {
-					apiCondition.Filters[j] = &models.Filter{
-						Op:    models.Op(filterPlan.Op.ValueString()),
-						Value: filterPlan.Value.ValueString(),
-					}
-				}
-			} else {
-				apiCondition.Filters = make([]*models.Filter, 0)
-			}
-			apiGroup.Conditions[i] = apiCondition
 		}
-	} else {
-		apiGroup.Conditions = make([]*models.Condition, 0)
+		apiGroup.Conditions[i] = apiCondition
 	}
 
 	return apiGroup
