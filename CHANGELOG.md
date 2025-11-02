@@ -1,7 +1,7 @@
 ## 1.3.0
 
 * Added advanced data scope support for policy resource, enabling per-data-type filtering rules (logs, metrics, traces, events, workloads)
-* Improved docs and examples for monitors, dashbaords and data integrations
+* Improved docs and examples for monitors, dashboards and data integrations
 
 ## 1.2.0
 
