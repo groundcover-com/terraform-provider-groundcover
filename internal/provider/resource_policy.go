@@ -285,32 +285,9 @@ func (r *policyResource) Create(ctx context.Context, req resource.CreateRequest,
 		return
 	}
 
-	// Validate that data_scope doesn't have both simple and advanced specified
-	if !plan.DataScope.IsNull() && !plan.DataScope.IsUnknown() {
-		var dataScopePlan dataScopeModel
-		resp.Diagnostics.Append(plan.DataScope.As(ctx, &dataScopePlan, basetypes.ObjectAsOptions{})...)
-		if resp.Diagnostics.HasError() {
-			return
-		}
-
-		simpleSpecified := !dataScopePlan.Simple.IsNull() && !dataScopePlan.Simple.IsUnknown()
-		advancedSpecified := !dataScopePlan.Advanced.IsNull() && !dataScopePlan.Advanced.IsUnknown()
-
-		if simpleSpecified && advancedSpecified {
-			resp.Diagnostics.AddError(
-				"Invalid Data Scope Configuration",
-				"data_scope cannot have both 'simple' and 'advanced' specified. Please specify only one.",
-			)
-			return
-		}
-
-		if !simpleSpecified && !advancedSpecified {
-			resp.Diagnostics.AddError(
-				"Invalid Data Scope Configuration",
-				"data_scope must have either 'simple' or 'advanced' specified when data_scope is provided.",
-			)
-			return
-		}
+	// Validate data_scope configuration
+	if !validateDataScopeConfiguration(ctx, plan.DataScope, &resp.Diagnostics) {
+		return
 	}
 
 	apiRequest, diags := mapPolicyModelToApiCreateRequest(ctx, plan)
@@ -428,32 +405,9 @@ func (r *policyResource) Update(ctx context.Context, req resource.UpdateRequest,
 		return
 	}
 
-	// Validate that data_scope doesn't have both simple and advanced specified
-	if !plan.DataScope.IsNull() && !plan.DataScope.IsUnknown() {
-		var dataScopePlan dataScopeModel
-		resp.Diagnostics.Append(plan.DataScope.As(ctx, &dataScopePlan, basetypes.ObjectAsOptions{})...)
-		if resp.Diagnostics.HasError() {
-			return
-		}
-
-		simpleSpecified := !dataScopePlan.Simple.IsNull() && !dataScopePlan.Simple.IsUnknown()
-		advancedSpecified := !dataScopePlan.Advanced.IsNull() && !dataScopePlan.Advanced.IsUnknown()
-
-		if simpleSpecified && advancedSpecified {
-			resp.Diagnostics.AddError(
-				"Invalid Data Scope Configuration",
-				"data_scope cannot have both 'simple' and 'advanced' specified. Please specify only one.",
-			)
-			return
-		}
-
-		if !simpleSpecified && !advancedSpecified {
-			resp.Diagnostics.AddError(
-				"Invalid Data Scope Configuration",
-				"data_scope must have either 'simple' or 'advanced' specified when data_scope is provided.",
-			)
-			return
-		}
+	// Validate data_scope configuration
+	if !validateDataScopeConfiguration(ctx, plan.DataScope, &resp.Diagnostics) {
+		return
 	}
 
 	policyUUID := state.ID.ValueString()
@@ -598,6 +552,42 @@ func (r *policyResource) Delete(ctx context.Context, req resource.DeleteRequest,
 
 	tflog.Info(ctx, "Policy deleted successfully via SDK (or was already gone)", map[string]any{"uuid": policyUUID})
 	// Terraform automatically removes the resource from state when Delete returns no error.
+}
+
+// --- Helper Functions for Validation ---
+
+// validateDataScopeConfiguration validates that data_scope has exactly one of simple or advanced specified.
+func validateDataScopeConfiguration(ctx context.Context, dataScope types.Object, diags *diag.Diagnostics) bool {
+	if dataScope.IsNull() || dataScope.IsUnknown() {
+		return true // No validation needed if data_scope is not specified
+	}
+
+	var dataScopePlan dataScopeModel
+	diags.Append(dataScope.As(ctx, &dataScopePlan, basetypes.ObjectAsOptions{})...)
+	if diags.HasError() {
+		return false
+	}
+
+	simpleSpecified := !dataScopePlan.Simple.IsNull() && !dataScopePlan.Simple.IsUnknown()
+	advancedSpecified := !dataScopePlan.Advanced.IsNull() && !dataScopePlan.Advanced.IsUnknown()
+
+	if simpleSpecified && advancedSpecified {
+		diags.AddError(
+			"Invalid Data Scope Configuration",
+			"data_scope cannot have both 'simple' and 'advanced' specified. Please specify only one.",
+		)
+		return false
+	}
+
+	if !simpleSpecified && !advancedSpecified {
+		diags.AddError(
+			"Invalid Data Scope Configuration",
+			"data_scope must have either 'simple' or 'advanced' specified when data_scope is provided.",
+		)
+		return false
+	}
+
+	return true
 }
 
 // --- Helper Functions for Mapping ---
