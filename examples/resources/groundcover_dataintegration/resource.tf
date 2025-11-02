@@ -14,13 +14,15 @@ provider "groundcover" {
 }
 
 # Example: CloudWatch DataIntegration
+# For a full list of supported AWS metrics and statistics, visit the official CloudWatch documentation:
+# https://docs.aws.amazon.com/AmazonCloudWatch/latest/monitoring/aws-services-cloudwatch-metrics.html
 resource "groundcover_dataintegration" "cloudwatch_example" {
   type = "cloudwatch"
   config = jsonencode({
     name      = "test-cloudwatch"
     version   = 1
     stsRegion = "us-east-1"
-    regions   = ["us-east-1"]
+    regions   = ["us-east-1", "us-east-2"]
     roleArn   = "arn:aws:iam::123456789012:role/test-role"
     awsMetrics = [
       {
@@ -29,21 +31,13 @@ resource "groundcover_dataintegration" "cloudwatch_example" {
           {
             name       = "CPUUtilization"
             statistics = ["Average"]
-            period     = 300
-            length     = 300
-            nullAsZero = false
           }
         ]
       }
     ]
-    apiConcurrencyLimits = {
-      listMetrics         = 3
-      getMetricData       = 5
-      getMetricStatistics = 5
-      listInventory       = 10
+    labelSettings = {
+      extraLabels = ["env", "prod"]
     }
-    withContextTagsOnInfoMetrics = false
-    withInventoryDiscovery       = false
   })
   is_paused = false
 }

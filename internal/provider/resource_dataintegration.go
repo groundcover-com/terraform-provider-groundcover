@@ -47,7 +47,7 @@ func (r *dataIntegrationResource) Metadata(_ context.Context, req resource.Metad
 
 func (r *dataIntegrationResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *resource.SchemaResponse) {
 	resp.Schema = schema.Schema{
-		Description: "DataIntegration resource for managing data integrations with external services.",
+		Description: "DataIntegration resource for managing groundcover's integrations with external services such as cloud providers, databases and more. This resource is composed of general metadata on the integration and a specific configuration per data source. Navigate to the relevant nested schema according to your specific needs.",
 		Attributes: map[string]schema.Attribute{
 			"id": schema.StringAttribute{
 				Description: "The unique identifier of the data integration configuration.",

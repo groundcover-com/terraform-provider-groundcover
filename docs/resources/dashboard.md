@@ -175,9 +175,14 @@ output "metrics_dashboard_id" {
   value       = groundcover_dashboard.metrics_dashboard.id
 }
 
-output "metrics_dashboard_status" {
-  description = "The status of the metrics dashboard"
-  value       = groundcover_dashboard.metrics_dashboard.status
+output "metrics_dashboard_owner" {
+  description = "The owner of the metrics dashboard"
+  value       = groundcover_dashboard.metrics_dashboard.owner
+}
+
+output "simple_dashboard_id" {
+  description = "The UUID of the simple dashboard"
+  value       = groundcover_dashboard.simple_dashboard.id
 }
 
 output "simple_dashboard_owner" {

@@ -44,61 +44,62 @@ variable "groundcover_backend_id" {
   description = "Groundcover Backend ID"
 }
 
-# Example Monitor: K8s Pod Not Healthy using monitor_yaml
-resource "groundcover_monitor" "k8s_pod_not_healthy_example" {
+# Example Monitor: K8s Pod Crash Looping using monitor_yaml
+resource "groundcover_monitor" "k8s_pod_crash_looping" {
   monitor_yaml = <<-YAML
-title: "Terraform Example - K8s Pod Not Healthy (YAML)"
+title: K8s Pod Crash Looping
 display:
-  header: "K8s Pod Not Healthy Example (YAML)"
-  resource_header_labels:
-    - namespace
-    - workload
-  context_header_labels:
-    - cluster
-  description: "Pod has been in a non-running state for longer than 15 minutes (Example)"
-severity: "S2" # Example severity
-measurement_type: state
+  header: K8s Pod Crash Looping
+  resourceHeaderLabels:
+  - workload
+  contextHeaderLabels:
+  - cluster
+  - namespace
+  - workload
+  description: Kubernetes pod is on a CrashLoopBackOff for more than 5 minutes
+severity: S2
+measurementType: event
 model:
   queries:
-    - data_type: metrics
-      name: threshold_input_query
-      pipeline:
-        function:
-          name: avg_over_time
-          pipelines:
-            - function:
-                name: max_by
-                pipelines:
-                  - metric: groundcover_kube_pod_status_phase
-                args:
-                  - namespace
-                  - workload
-                  - cluster
-          args:
-            - 5m
+  - dataType: metrics
+    name: threshold_input_query
+    pipeline:
+      function:
+        name: avg_over_time
+        pipelines:
+        - function:
+            name: avg_by
+            pipelines:
+            - metric: groundcover_kube_pod_container_status_waiting_reason
+            args:
+            - cluster
+            - namespace
+            - workload
+        args:
+        - 5m
+    conditions:
+    - key: reason
+      origin: root
+      type: string
+      filters:
+      - op: match
+        value: CrashLoopBackOff
   thresholds:
-    - name: threshold_1
-      input_name: threshold_input_query
-      operator: gt # Example: Trigger if max phase > 0
-      values:
-        - 0.0
-labels:
-  source: terraform-example
-  severity: warning
-annotations:
-  description: "Pod {{ .Labels.namespace }}/{{ .Labels.pod }} has been in a non-running state for longer than 15 minutes (Example)"
-  summary: "Kubernetes Pod not healthy (Example)"
-execution_error_state: OK
-no_data_state: OK
-evaluation_interval:
-  interval: 5m
-  pending_for: 15m
-YAML
+  - name: threshold_1
+    inputName: threshold_input_query
+    operator: gt
+    values:
+    - 0
+executionErrorState: OK
+evaluationInterval:
+  interval: 1m0s
+  pendingFor: 5m0s
+  YAML
 }
 
 output "monitor_example_id" {
   description = "The ID of the example Monitor created via YAML."
-  value       = groundcover_monitor.k8s_pod_not_healthy_example.id
+  value       = groundcover_monitor.k8s_pod_crash_looping.id
 }
 
 # Note: Accessing specific fields like 'title' directly is not possible
@@ -106,7 +107,7 @@ output "monitor_example_id" {
 # You would need to parse the YAML output if required.
 output "monitor_example_yaml_output" {
   description = "The YAML definition applied to the monitor."
-  value       = groundcover_monitor.k8s_pod_not_healthy_example.monitor_yaml
+  value       = groundcover_monitor.k8s_pod_crash_looping.monitor_yaml
 }
 ```
 
