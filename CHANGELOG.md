@@ -1,3 +1,7 @@
+## 1.3.0
+
+* Added advanced data scope support for policy resource, enabling per-data-type filtering rules (logs, metrics, traces, events, workloads)
+
 ## 1.2.0
 
 * Added data integration resource for managing data integrations in Groundcover

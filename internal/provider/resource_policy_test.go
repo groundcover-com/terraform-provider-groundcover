@@ -6,6 +6,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"regexp"
 	"testing"
 
 	"github.com/hashicorp/terraform-plugin-framework/attr"
@@ -93,6 +94,57 @@ func TestAccPolicyResource_disappears(t *testing.T) {
 	})
 }
 
+func TestAccPolicyResource_advanced(t *testing.T) {
+	name := acctest.RandomWithPrefix("test-policy-advanced")
+
+	resource.Test(t, resource.TestCase{
+		PreCheck:                 func() { testAccPreCheck(t) },
+		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
+		Steps: []resource.TestStep{
+			// Create with advanced data scope
+			{
+				Config: testAccPolicyResourceConfigAdvanced(name),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					resource.TestCheckResourceAttr("groundcover_policy.test", "name", name),
+					resource.TestCheckResourceAttr("groundcover_policy.test", "role.read", "read"),
+					resource.TestCheckResourceAttr("groundcover_policy.test", "claim_role", "sso-advanced-role"),
+					resource.TestCheckResourceAttrSet("groundcover_policy.test", "data_scope.advanced.logs.operator"),
+					resource.TestCheckResourceAttrSet("groundcover_policy.test", "data_scope.advanced.traces.operator"),
+				),
+			},
+		},
+	})
+}
+
+func TestAccPolicyResource_advancedUpdate(t *testing.T) {
+	name := acctest.RandomWithPrefix("test-policy-advanced-update")
+	updatedName := acctest.RandomWithPrefix("test-policy-advanced-updated")
+
+	resource.Test(t, resource.TestCase{
+		PreCheck:                 func() { testAccPreCheck(t) },
+		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
+		Steps: []resource.TestStep{
+			// Create with simple data scope
+			{
+				Config: testAccPolicyResourceConfigComplex(name),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					resource.TestCheckResourceAttr("groundcover_policy.test", "name", name),
+					resource.TestCheckResourceAttrSet("groundcover_policy.test", "data_scope.simple.operator"),
+				),
+			},
+			// Update to advanced data scope
+			{
+				Config: testAccPolicyResourceConfigAdvanced(updatedName),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					resource.TestCheckResourceAttr("groundcover_policy.test", "name", updatedName),
+					resource.TestCheckResourceAttrSet("groundcover_policy.test", "data_scope.advanced.logs.operator"),
+					resource.TestCheckResourceAttrSet("groundcover_policy.test", "data_scope.advanced.traces.operator"),
+				),
+			},
+		},
+	})
+}
+
 func testAccPolicyResourceConfig(name string) string {
 	return fmt.Sprintf(`
 resource "groundcover_policy" "test" {
@@ -143,6 +195,162 @@ resource "groundcover_policy" "test" {
         }
       ]
     }
+  }
+}
+`, name)
+}
+
+func testAccPolicyResourceConfigAdvanced(name string) string {
+	return fmt.Sprintf(`
+resource "groundcover_policy" "test" {
+  name        = %[1]q
+  description = "Advanced test policy with per-data-type scoping"
+  claim_role  = "sso-advanced-role"
+  role = {
+    read = "read"
+  }
+  data_scope = {
+    advanced = {
+      logs = {
+        operator = "and"
+        conditions = [
+          {
+            key    = "namespace"
+            origin = "root"
+            type   = "string"
+            filters = [
+              {
+                op    = "match"
+                value = "actions-runner-system"
+              }
+            ]
+          }
+        ]
+      }
+      traces = {
+        operator = "and"
+        conditions = [
+          {
+            key    = "environment"
+            origin = "root"
+            type   = "string"
+            filters = [
+              {
+                op    = "match"
+                value = "none"
+              }
+            ]
+          }
+        ]
+      }
+    }
+  }
+}
+`, name)
+}
+
+func TestAccPolicyResource_noData(t *testing.T) {
+	name := acctest.RandomWithPrefix("test-policy-no-data")
+
+	resource.Test(t, resource.TestCase{
+		PreCheck:                 func() { testAccPreCheck(t) },
+		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
+		Steps: []resource.TestStep{
+			// Create with disabled data scope (no data access)
+			{
+				Config: testAccPolicyResourceConfigNoData(name),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					resource.TestCheckResourceAttr("groundcover_policy.test", "name", name),
+					resource.TestCheckResourceAttr("groundcover_policy.test", "role.read", "read"),
+					resource.TestCheckResourceAttr("groundcover_policy.test", "data_scope.simple.disabled", "true"),
+				),
+			},
+		},
+	})
+}
+
+func testAccPolicyResourceConfigNoData(name string) string {
+	return fmt.Sprintf(`
+resource "groundcover_policy" "test" {
+  name        = %[1]q
+  description = "No data access test policy"
+  role = {
+    read = "read"
+  }
+  data_scope = {
+    simple = {
+      operator   = "and"
+      disabled   = true
+      conditions = []
+    }
+  }
+}
+`, name)
+}
+
+func TestAccPolicyResource_invalidBothScopes(t *testing.T) {
+	name := acctest.RandomWithPrefix("test-policy-invalid")
+
+	resource.Test(t, resource.TestCase{
+		PreCheck:                 func() { testAccPreCheck(t) },
+		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
+		Steps: []resource.TestStep{
+			{
+				Config:      testAccPolicyResourceConfigBothScopes(name),
+				ExpectError: regexp.MustCompile("data_scope cannot have both 'simple' and 'advanced' specified"),
+			},
+		},
+	})
+}
+
+func TestAccPolicyResource_invalidNeitherScope(t *testing.T) {
+	name := acctest.RandomWithPrefix("test-policy-invalid-neither")
+
+	resource.Test(t, resource.TestCase{
+		PreCheck:                 func() { testAccPreCheck(t) },
+		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
+		Steps: []resource.TestStep{
+			{
+				Config:      testAccPolicyResourceConfigNeitherScope(name),
+				ExpectError: regexp.MustCompile("data_scope must have either 'simple' or 'advanced' specified"),
+			},
+		},
+	})
+}
+
+func testAccPolicyResourceConfigBothScopes(name string) string {
+	return fmt.Sprintf(`
+resource "groundcover_policy" "test" {
+  name        = %[1]q
+  description = "Invalid policy with both scopes"
+  role = {
+    read = "read"
+  }
+  data_scope = {
+    simple = {
+      operator   = "and"
+      conditions = []
+    }
+    advanced = {
+      logs = {
+        operator   = "and"
+        conditions = []
+      }
+    }
+  }
+}
+`, name)
+}
+
+func testAccPolicyResourceConfigNeitherScope(name string) string {
+	return fmt.Sprintf(`
+resource "groundcover_policy" "test" {
+  name        = %[1]q
+  description = "Invalid policy with neither scope"
+  role = {
+    read = "read"
+  }
+  data_scope = {
   }
 }
 `, name)
