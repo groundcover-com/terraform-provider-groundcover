@@ -673,3 +673,200 @@ stringKey: "hello"`
 		}
 	})
 }
+
+// TestRemoveExtraNewlines tests the removeExtraNewlines function
+func TestRemoveExtraNewlines(t *testing.T) {
+	tests := []struct {
+		name     string
+		input    string
+		expected string
+	}{
+		{
+			name: "remove blank lines between fields",
+			input: `title: K8s Pod Crash Looping
+
+display:
+  header: K8s Pod Crash Looping
+
+  resourceHeaderLabels:
+  - workload
+
+  contextHeaderLabels:
+  - cluster
+  - namespace
+
+severity: S2`,
+			expected: `title: K8s Pod Crash Looping
+display:
+  header: K8s Pod Crash Looping
+  resourceHeaderLabels:
+  - workload
+  contextHeaderLabels:
+  - cluster
+  - namespace
+severity: S2
+`,
+		},
+		{
+			name: "remove trailing newlines",
+			input: `title: Test Monitor
+severity: S1
+
+
+`,
+			expected: `title: Test Monitor
+severity: S1
+`,
+		},
+		{
+			name: "preserve single newline at end",
+			input: `title: Test Monitor
+severity: S1
+`,
+			expected: `title: Test Monitor
+severity: S1
+`,
+		},
+		{
+			name:     "handle empty string",
+			input:    "",
+			expected: "",
+		},
+		{
+			name: "single field",
+			input: `title: Test Monitor
+`,
+			expected: `title: Test Monitor
+`,
+		},
+		{
+			name: "multiple blank lines at start and end",
+			input: `
+
+title: Test Monitor
+severity: S1
+
+
+`,
+			expected: `title: Test Monitor
+severity: S1
+`,
+		},
+		{
+			name: "blank lines with only spaces",
+			input: "title: Test Monitor\n   \nseverity: S1\n  \n",
+			expected: `title: Test Monitor
+severity: S1
+`,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := removeExtraNewlines(tt.input)
+			if result != tt.expected {
+				t.Errorf("removeExtraNewlines() mismatch.\nExpected:\n%q\n\nGot:\n%q", tt.expected, result)
+			}
+		})
+	}
+}
+
+// TestNormalizeMonitorYaml_RemovesExtraNewlines tests that NormalizeMonitorYaml removes extra newlines
+func TestNormalizeMonitorYaml_RemovesExtraNewlines(t *testing.T) {
+	ctx := context.Background()
+
+	tests := []struct {
+		name          string
+		input         string
+		expectedLines []string // We'll check that these lines exist in order without blank lines between them
+	}{
+		{
+			name: "remove blank lines between top-level fields",
+			input: `title: K8s Pod Crash Looping
+
+display:
+  header: K8s Pod Crash Looping
+
+  resourceHeaderLabels:
+  - workload
+
+  contextHeaderLabels:
+  - cluster
+  - namespace
+
+severity: S2
+
+measurementType: event`,
+			expectedLines: []string{
+				"display:",
+				"  contextHeaderLabels:",
+				"  - cluster",
+				"  - namespace",
+				"  header: K8s Pod Crash Looping",
+				"  resourceHeaderLabels:",
+				"  - workload",
+				"measurementType: event",
+				"severity: S2",
+				"title: K8s Pod Crash Looping",
+			},
+		},
+		{
+			name: "complex yaml with multiple blank lines",
+			input: `title: Test Monitor
+
+
+display:
+  header: Test
+
+
+  description: Test description
+
+severity: S1
+
+
+model:
+  queries:
+  - name: test_query
+
+
+    dataType: metrics`,
+			expectedLines: []string{
+				"title: Test Monitor",
+				"display:",
+				"severity: S1",
+				"model:",
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result, err := NormalizeMonitorYaml(ctx, tt.input)
+			if err != nil {
+				t.Errorf("NormalizeMonitorYaml() error = %v", err)
+				return
+			}
+
+			// Check that result doesn't contain any blank lines (except the trailing one)
+			lines := strings.Split(strings.TrimRight(result, "\n"), "\n")
+			for _, line := range lines {
+				if strings.TrimSpace(line) == "" {
+					t.Errorf("NormalizeMonitorYaml() result contains blank line:\n%q", result)
+					break
+				}
+			}
+
+			// Check that expected lines exist in the output
+			for _, expectedLine := range tt.expectedLines {
+				if !strings.Contains(result, expectedLine) {
+					t.Errorf("NormalizeMonitorYaml() result missing expected line: %q\nGot:\n%s", expectedLine, result)
+				}
+			}
+
+			// Check that result ends with exactly one newline
+			if !strings.HasSuffix(result, "\n") || strings.HasSuffix(result, "\n\n") {
+				t.Errorf("NormalizeMonitorYaml() result should end with exactly one newline, got:\n%q", result)
+			}
+		})
+	}
+}
