@@ -34,16 +34,17 @@ variable "groundcover_backend_id" {
 # and improving query performance.
 resource "groundcover_metricsaggregator" "metricsaggregator" {
   value = <<-EOT
-- ignore_old_samples: true
-  match: '{__name__=~"http_requests_total"}'
-  without: [instance, pod]
-  interval: 60s
-  outputs: [total_prometheus]
-- ignore_old_samples: true
-  match: '{__name__=~"process_cpu_seconds_total"}'
-  without: [instance]
-  interval: 30s
-  outputs: [total_prometheus]
+content: |
+  - ignore_old_samples: true
+    match: '{__name__=~"http_requests_total"}'
+    without: [instance, pod]
+    interval: 60s
+    outputs: [total_prometheus]
+  - ignore_old_samples: true
+    match: '{__name__=~"process_cpu_seconds_total"}'
+    without: [instance]
+    interval: 30s
+    outputs: [total_prometheus]
 EOT
 }
 

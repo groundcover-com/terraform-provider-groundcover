@@ -80,11 +80,12 @@ func testAccMetricsAggregatorResourceConfig() string {
 	return `
 resource "groundcover_metricsaggregator" "test" {
   value = <<-YAML
-- ignore_old_samples: true
-  match: '{__name__=~"test_metric_counter"}'
-  without: [instance]
-  interval: 30s
-  outputs: [total_prometheus]
+content: |
+  - ignore_old_samples: true
+    match: '{__name__=~"test_metric_counter"}'
+    without: [instance]
+    interval: 30s
+    outputs: [total_prometheus]
 YAML
 }
 `
@@ -94,11 +95,12 @@ func testAccMetricsAggregatorResourceConfigUpdated() string {
 	return `
 resource "groundcover_metricsaggregator" "test" {
   value = <<-YAML
-- ignore_old_samples: true
-  match: '{__name__=~"test_metric_counter_updated"}'
-  without: [instance, pod]
-  interval: 60s
-  outputs: [total_prometheus]
+content: |
+  - ignore_old_samples: true
+    match: '{__name__=~"test_metric_counter_updated"}'
+    without: [instance, pod]
+    interval: 60s
+    outputs: [total_prometheus]
 YAML
 }
 `
@@ -108,16 +110,17 @@ func testAccMetricsAggregatorResourceConfigComplex() string {
 	return `
 resource "groundcover_metricsaggregator" "test" {
   value = <<-YAML
-- ignore_old_samples: true
-  match: '{__name__=~"test_metric_counter"}'
-  without: [instance]
-  interval: 30s
-  outputs: [total_prometheus]
-- ignore_old_samples: false
-  match: '{__name__=~"http_requests_total"}'
-  without: [pod, instance]
-  interval: 60s
-  outputs: [total_prometheus]
+content: |
+  - ignore_old_samples: true
+    match: '{__name__=~"test_metric_counter"}'
+    without: [instance]
+    interval: 30s
+    outputs: [total_prometheus]
+  - ignore_old_samples: false
+    match: '{__name__=~"http_requests_total"}'
+    without: [pod, instance]
+    interval: 60s
+    outputs: [total_prometheus]
 YAML
 }
 `
