@@ -46,7 +46,7 @@ func (r *serviceAccountResource) Metadata(ctx context.Context, req resource.Meta
 
 func (r *serviceAccountResource) Schema(ctx context.Context, req resource.SchemaRequest, resp *resource.SchemaResponse) {
 	resp.Schema = schema.Schema{
-		MarkdownDescription: "Manages a Groundcover Service Account.",
+		MarkdownDescription: "Manages a groundcover Service Account.",
 
 		Attributes: map[string]schema.Attribute{
 			"id": schema.StringAttribute{

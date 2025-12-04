@@ -1,7 +1,7 @@
 ## 1.4.0
 
-* Added metrics aggregator resource for configuring metrics aggregation rules (singleton resource)
-* Updated Groundcover SDK from v1.89.0 to v1.126.0
+* Added metrics aggregation resource for configuring metrics aggregation rules (singleton resource)
+* Updated groundcover SDK from v1.89.0 to v1.126.0
 
 ## 1.3.0
 

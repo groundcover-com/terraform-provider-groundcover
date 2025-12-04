@@ -3,12 +3,12 @@
 page_title: "groundcover_serviceaccount Resource - groundcover"
 subcategory: ""
 description: |-
-  Manages a Groundcover Service Account.
+  Manages a groundcover Service Account.
 ---
 
 # groundcover_serviceaccount (Resource)
 
-Manages a Groundcover Service Account.
+Manages a groundcover Service Account.
 
 ## Example Usage
 
@@ -35,13 +35,13 @@ provider "groundcover" {
 
 variable "groundcover_api_key" {
   type        = string
-  description = "Groundcover API Key"
+  description = "groundcover API Key"
   sensitive   = true
 }
 
 variable "groundcover_backend_id" {
   type        = string
-  description = "Groundcover Backend ID"
+  description = "groundcover Backend ID"
 }
 
 # Example Policy (required for Service Account)

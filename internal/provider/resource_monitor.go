@@ -41,7 +41,7 @@ func (r *monitorResource) Metadata(ctx context.Context, req resource.MetadataReq
 
 func (r *monitorResource) Schema(ctx context.Context, req resource.SchemaRequest, resp *resource.SchemaResponse) {
 	resp.Schema = schema.Schema{
-		MarkdownDescription: "Groundcover Monitor resource managed via raw YAML.",
+		MarkdownDescription: "groundcover Monitor resource managed via raw YAML.",
 
 		Attributes: map[string]schema.Attribute{
 			"id": schema.StringAttribute{

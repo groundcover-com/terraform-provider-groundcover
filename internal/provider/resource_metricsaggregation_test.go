@@ -13,25 +13,25 @@ import (
 	"github.com/hashicorp/terraform-plugin-testing/terraform"
 )
 
-func TestAccMetricsAggregatorResource(t *testing.T) {
+func TestAccMetricsAggregationResource(t *testing.T) {
 	resource.Test(t, resource.TestCase{
 		PreCheck:                 func() { testAccPreCheck(t) },
 		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
 		Steps: []resource.TestStep{
 			// Create and Read testing
 			{
-				Config: testAccMetricsAggregatorResourceConfig(),
+				Config: testAccMetricsAggregationResourceConfig(),
 				Check: resource.ComposeAggregateTestCheckFunc(
-					resource.TestCheckResourceAttrSet("groundcover_metricsaggregator.test", "value"),
-					resource.TestCheckResourceAttrSet("groundcover_metricsaggregator.test", "updated_at"),
+					resource.TestCheckResourceAttrSet("groundcover_metricsaggregation.test", "value"),
+					resource.TestCheckResourceAttrSet("groundcover_metricsaggregation.test", "updated_at"),
 				),
 			},
 			// Update and Read testing
 			{
-				Config: testAccMetricsAggregatorResourceConfigUpdated(),
+				Config: testAccMetricsAggregationResourceConfigUpdated(),
 				Check: resource.ComposeAggregateTestCheckFunc(
-					resource.TestCheckResourceAttrSet("groundcover_metricsaggregator.test", "value"),
-					resource.TestCheckResourceAttrSet("groundcover_metricsaggregator.test", "updated_at"),
+					resource.TestCheckResourceAttrSet("groundcover_metricsaggregation.test", "value"),
+					resource.TestCheckResourceAttrSet("groundcover_metricsaggregation.test", "updated_at"),
 				),
 			},
 			// Delete testing automatically occurs in TestCase
@@ -39,36 +39,36 @@ func TestAccMetricsAggregatorResource(t *testing.T) {
 	})
 }
 
-func TestAccMetricsAggregatorResource_complex(t *testing.T) {
+func TestAccMetricsAggregationResource_complex(t *testing.T) {
 	resource.Test(t, resource.TestCase{
 		PreCheck:                 func() { testAccPreCheck(t) },
 		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
 		Steps: []resource.TestStep{
 			// Create with complex aggregation configuration
 			{
-				Config: testAccMetricsAggregatorResourceConfigComplex(),
+				Config: testAccMetricsAggregationResourceConfigComplex(),
 				Check: resource.ComposeAggregateTestCheckFunc(
-					resource.TestCheckResourceAttrSet("groundcover_metricsaggregator.test", "value"),
-					resource.TestCheckResourceAttrSet("groundcover_metricsaggregator.test", "updated_at"),
+					resource.TestCheckResourceAttrSet("groundcover_metricsaggregation.test", "value"),
+					resource.TestCheckResourceAttrSet("groundcover_metricsaggregation.test", "updated_at"),
 					// Check that YAML contains expected elements
-					resource.TestMatchResourceAttr("groundcover_metricsaggregator.test", "value", regexp.MustCompile("ignore_old_samples")),
-					resource.TestMatchResourceAttr("groundcover_metricsaggregator.test", "value", regexp.MustCompile("total_prometheus")),
+					resource.TestMatchResourceAttr("groundcover_metricsaggregation.test", "value", regexp.MustCompile("ignore_old_samples")),
+					resource.TestMatchResourceAttr("groundcover_metricsaggregation.test", "value", regexp.MustCompile("total_prometheus")),
 				),
 			},
 		},
 	})
 }
 
-func TestAccMetricsAggregatorResource_disappears(t *testing.T) {
+func TestAccMetricsAggregationResource_disappears(t *testing.T) {
 	resource.Test(t, resource.TestCase{
 		PreCheck:                 func() { testAccPreCheck(t) },
 		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
 		Steps: []resource.TestStep{
 			{
-				Config: testAccMetricsAggregatorResourceConfig(),
+				Config: testAccMetricsAggregationResourceConfig(),
 				Check: resource.ComposeAggregateTestCheckFunc(
-					testAccCheckMetricsAggregatorResourceExists("groundcover_metricsaggregator.test"),
-					testAccCheckMetricsAggregatorResourceDisappears(),
+					testAccCheckMetricsAggregationResourceExists("groundcover_metricsaggregation.test"),
+					testAccCheckMetricsAggregationResourceDisappears(),
 				),
 				ExpectNonEmptyPlan: true,
 			},
@@ -76,9 +76,9 @@ func TestAccMetricsAggregatorResource_disappears(t *testing.T) {
 	})
 }
 
-func testAccMetricsAggregatorResourceConfig() string {
+func testAccMetricsAggregationResourceConfig() string {
 	return `
-resource "groundcover_metricsaggregator" "test" {
+resource "groundcover_metricsaggregation" "test" {
   value = <<-YAML
 content: |
   - ignore_old_samples: true
@@ -91,9 +91,9 @@ YAML
 `
 }
 
-func testAccMetricsAggregatorResourceConfigUpdated() string {
+func testAccMetricsAggregationResourceConfigUpdated() string {
 	return `
-resource "groundcover_metricsaggregator" "test" {
+resource "groundcover_metricsaggregation" "test" {
   value = <<-YAML
 content: |
   - ignore_old_samples: true
@@ -106,9 +106,9 @@ YAML
 `
 }
 
-func testAccMetricsAggregatorResourceConfigComplex() string {
+func testAccMetricsAggregationResourceConfigComplex() string {
 	return `
-resource "groundcover_metricsaggregator" "test" {
+resource "groundcover_metricsaggregation" "test" {
   value = <<-YAML
 content: |
   - ignore_old_samples: true
@@ -126,7 +126,7 @@ YAML
 `
 }
 
-func testAccCheckMetricsAggregatorResourceExists(n string) resource.TestCheckFunc {
+func testAccCheckMetricsAggregationResourceExists(n string) resource.TestCheckFunc {
 	return func(s *terraform.State) error {
 		_, ok := s.RootModule().Resources[n]
 		if !ok {
@@ -136,7 +136,7 @@ func testAccCheckMetricsAggregatorResourceExists(n string) resource.TestCheckFun
 	}
 }
 
-func testAccCheckMetricsAggregatorResourceDisappears() resource.TestCheckFunc {
+func testAccCheckMetricsAggregationResourceDisappears() resource.TestCheckFunc {
 	return func(s *terraform.State) error {
 		// Create a provider client to delete the resource
 		ctx := context.Background()
@@ -156,8 +156,8 @@ func testAccCheckMetricsAggregatorResourceDisappears() resource.TestCheckFunc {
 		}
 
 		// For singleton resources, no ID is needed - just delete directly
-		if err := client.DeleteMetricsAggregator(ctx); err != nil {
-			return fmt.Errorf("Failed to delete metrics aggregator: %v", err)
+		if err := client.DeleteMetricsAggregation(ctx); err != nil {
+			return fmt.Errorf("Failed to delete metrics aggregation: %v", err)
 		}
 
 		return nil

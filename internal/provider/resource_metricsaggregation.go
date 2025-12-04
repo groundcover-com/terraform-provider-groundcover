@@ -16,39 +16,39 @@ import (
 
 // Ensure resource implements required interfaces
 var (
-	_ resource.Resource                = &metricsAggregatorResource{}
-	_ resource.ResourceWithConfigure   = &metricsAggregatorResource{}
-	_ resource.ResourceWithImportState = &metricsAggregatorResource{}
-	_ resource.ResourceWithModifyPlan  = &metricsAggregatorResource{}
+	_ resource.Resource                = &metricsAggregationResource{}
+	_ resource.ResourceWithConfigure   = &metricsAggregationResource{}
+	_ resource.ResourceWithImportState = &metricsAggregationResource{}
+	_ resource.ResourceWithModifyPlan  = &metricsAggregationResource{}
 )
 
-func NewMetricsAggregatorResource() resource.Resource {
-	return &metricsAggregatorResource{}
+func NewMetricsAggregationResource() resource.Resource {
+	return &metricsAggregationResource{}
 }
 
-type metricsAggregatorResource struct {
+type metricsAggregationResource struct {
 	client ApiClient
 }
 
-type metricsAggregatorResourceModel struct {
+type metricsAggregationResourceModel struct {
 	Value     types.String `tfsdk:"value"`
 	UpdatedAt types.String `tfsdk:"updated_at"`
 }
 
-func (r *metricsAggregatorResource) Metadata(_ context.Context, req resource.MetadataRequest, resp *resource.MetadataResponse) {
-	resp.TypeName = req.ProviderTypeName + "_metricsaggregator"
+func (r *metricsAggregationResource) Metadata(_ context.Context, req resource.MetadataRequest, resp *resource.MetadataResponse) {
+	resp.TypeName = req.ProviderTypeName + "_metricsaggregation"
 }
 
-func (r *metricsAggregatorResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *resource.SchemaResponse) {
+func (r *metricsAggregationResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *resource.SchemaResponse) {
 	resp.Schema = schema.Schema{
-		Description: "Metrics Aggregator resource. This is a singleton resource that configures metrics aggregation rules.",
+		Description: "Metrics Aggregation resource. This is a singleton resource that configures metrics aggregation rules.",
 		Attributes: map[string]schema.Attribute{
 			"value": schema.StringAttribute{
-				Description: "The YAML representation of the metrics aggregator configuration.",
+				Description: "The YAML representation of the metrics aggregation configuration.",
 				Required:    true,
 			},
 			"updated_at": schema.StringAttribute{
-				Description: "The last update timestamp of the metrics aggregator configuration.",
+				Description: "The last update timestamp of the metrics aggregation configuration.",
 				Computed:    true,
 			},
 		},
@@ -56,7 +56,7 @@ func (r *metricsAggregatorResource) Schema(_ context.Context, _ resource.SchemaR
 }
 
 // Configure adds the provider configured client to the resource.
-func (r *metricsAggregatorResource) Configure(_ context.Context, req resource.ConfigureRequest, resp *resource.ConfigureResponse) {
+func (r *metricsAggregationResource) Configure(_ context.Context, req resource.ConfigureRequest, resp *resource.ConfigureResponse) {
 	if req.ProviderData == nil {
 		return
 	}
@@ -73,35 +73,35 @@ func (r *metricsAggregatorResource) Configure(_ context.Context, req resource.Co
 }
 
 // Create creates the resource and sets the initial Terraform state.
-func (r *metricsAggregatorResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
+func (r *metricsAggregationResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
 	// Read Terraform plan data into the model
-	var plan metricsAggregatorResourceModel
+	var plan metricsAggregationResourceModel
 	diags := req.Plan.Get(ctx, &plan)
 	resp.Diagnostics.Append(diags...)
 	if resp.Diagnostics.HasError() {
 		return
 	}
 
-	tflog.Debug(ctx, "Creating MetricsAggregator")
+	tflog.Debug(ctx, "Creating MetricsAggregation")
 
 	// Unmarshal to SDK type
 	createReq := &models.CreateOrUpdateMetricsAggregatorConfigRequest{
 		Value: plan.Value.ValueString(),
 	}
 
-	// Call API client to create the metrics aggregator
-	createdConfig, err := r.client.CreateMetricsAggregator(ctx, createReq)
+	// Call API client to create the metrics aggregation
+	createdConfig, err := r.client.CreateMetricsAggregation(ctx, createReq)
 	if err != nil {
 		resp.Diagnostics.AddError(
-			"Error Creating MetricsAggregator",
-			fmt.Sprintf("Could not create MetricsAggregator: %s", err.Error()),
+			"Error Creating MetricsAggregation",
+			fmt.Sprintf("Could not create MetricsAggregation: %s", err.Error()),
 		)
 		return
 	}
 
 	plan.UpdatedAt = types.StringValue(createdConfig.CreatedTimestamp.String())
 
-	tflog.Debug(ctx, fmt.Sprintf("MetricsAggregator created with UUID: %s", createdConfig.UUID))
+	tflog.Debug(ctx, fmt.Sprintf("MetricsAggregation created with UUID: %s", createdConfig.UUID))
 
 	// Set state to fully populated model
 	diags = resp.State.Set(ctx, plan)
@@ -109,31 +109,31 @@ func (r *metricsAggregatorResource) Create(ctx context.Context, req resource.Cre
 	if resp.Diagnostics.HasError() {
 		return
 	}
-	tflog.Debug(ctx, fmt.Sprintf("Successfully created and populated MetricsAggregator resource with uuid %s", createdConfig.UUID))
+	tflog.Debug(ctx, fmt.Sprintf("Successfully created and populated MetricsAggregation resource with uuid %s", createdConfig.UUID))
 }
 
 // Read refreshes the Terraform state with the latest data.
-func (r *metricsAggregatorResource) Read(ctx context.Context, req resource.ReadRequest, resp *resource.ReadResponse) {
-	var state metricsAggregatorResourceModel
+func (r *metricsAggregationResource) Read(ctx context.Context, req resource.ReadRequest, resp *resource.ReadResponse) {
+	var state metricsAggregationResourceModel
 	diags := req.State.Get(ctx, &state)
 	resp.Diagnostics.Append(diags...)
 	if resp.Diagnostics.HasError() {
 		return
 	}
 
-	tflog.Debug(ctx, "Reading MetricsAggregator resource")
+	tflog.Debug(ctx, "Reading MetricsAggregation resource")
 
-	// Call API client to get the metrics aggregator
-	configEntry, err := r.client.GetMetricsAggregator(ctx)
+	// Call API client to get the metrics aggregation
+	configEntry, err := r.client.GetMetricsAggregation(ctx)
 	if err != nil {
 		if err == ErrNotFound {
-			tflog.Warn(ctx, "MetricsAggregator not found, removing from state")
+			tflog.Warn(ctx, "MetricsAggregation not found, removing from state")
 			resp.State.RemoveResource(ctx)
 			return
 		}
 		resp.Diagnostics.AddError(
-			"Error Reading MetricsAggregator",
-			fmt.Sprintf("Could not read MetricsAggregator: %s", err.Error()),
+			"Error Reading MetricsAggregation",
+			fmt.Sprintf("Could not read MetricsAggregation: %s", err.Error()),
 		)
 		return
 	}
@@ -158,35 +158,35 @@ func (r *metricsAggregatorResource) Read(ctx context.Context, req resource.ReadR
 		return
 	}
 	if uuid != "" {
-		tflog.Debug(ctx, fmt.Sprintf("Successfully read MetricsAggregator resource with UUID %s", uuid))
+		tflog.Debug(ctx, fmt.Sprintf("Successfully read MetricsAggregation resource with UUID %s", uuid))
 	} else {
-		tflog.Debug(ctx, "Successfully read MetricsAggregator resource (no config found)")
+		tflog.Debug(ctx, "Successfully read MetricsAggregation resource (no config found)")
 	}
 }
 
 // Update updates the resource and sets the updated Terraform state.
-func (r *metricsAggregatorResource) Update(ctx context.Context, req resource.UpdateRequest, resp *resource.UpdateResponse) {
+func (r *metricsAggregationResource) Update(ctx context.Context, req resource.UpdateRequest, resp *resource.UpdateResponse) {
 	// Read Terraform plan data into the model
-	var plan metricsAggregatorResourceModel
+	var plan metricsAggregationResourceModel
 	diags := req.Plan.Get(ctx, &plan)
 	resp.Diagnostics.Append(diags...)
 	if resp.Diagnostics.HasError() {
 		return
 	}
 
-	tflog.Debug(ctx, "Updating MetricsAggregator")
+	tflog.Debug(ctx, "Updating MetricsAggregation")
 
 	// Unmarshal to SDK type
 	updateReq := &models.CreateOrUpdateMetricsAggregatorConfigRequest{
 		Value: plan.Value.ValueString(),
 	}
 
-	// Call API client to update the metrics aggregator
-	updatedConfig, err := r.client.UpdateMetricsAggregator(ctx, updateReq)
+	// Call API client to update the metrics aggregation
+	updatedConfig, err := r.client.UpdateMetricsAggregation(ctx, updateReq)
 	if err != nil {
 		resp.Diagnostics.AddError(
-			"Error Updating MetricsAggregator",
-			fmt.Sprintf("Could not update MetricsAggregator: %s", err.Error()),
+			"Error Updating MetricsAggregation",
+			fmt.Sprintf("Could not update MetricsAggregation: %s", err.Error()),
 		)
 		return
 	}
@@ -200,69 +200,69 @@ func (r *metricsAggregatorResource) Update(ctx context.Context, req resource.Upd
 	if resp.Diagnostics.HasError() {
 		return
 	}
-	tflog.Debug(ctx, fmt.Sprintf("Successfully updated MetricsAggregator resource with UUID %s", updatedConfig.UUID))
+	tflog.Debug(ctx, fmt.Sprintf("Successfully updated MetricsAggregation resource with UUID %s", updatedConfig.UUID))
 }
 
 // Delete deletes the resource from Terraform state.
-func (r *metricsAggregatorResource) Delete(ctx context.Context, req resource.DeleteRequest, resp *resource.DeleteResponse) {
+func (r *metricsAggregationResource) Delete(ctx context.Context, req resource.DeleteRequest, resp *resource.DeleteResponse) {
 	// Read Terraform prior state data into the model
-	var state metricsAggregatorResourceModel
+	var state metricsAggregationResourceModel
 	diags := req.State.Get(ctx, &state)
 	resp.Diagnostics.Append(diags...)
 	if resp.Diagnostics.HasError() {
 		return
 	}
 
-	tflog.Debug(ctx, "Deleting MetricsAggregator resource")
+	tflog.Debug(ctx, "Deleting MetricsAggregation resource")
 
-	// Call API client to delete the metrics aggregator
-	err := r.client.DeleteMetricsAggregator(ctx)
+	// Call API client to delete the metrics aggregation
+	err := r.client.DeleteMetricsAggregation(ctx)
 	if err != nil {
 		resp.Diagnostics.AddError(
-			"Error Deleting MetricsAggregator",
-			fmt.Sprintf("Could not delete MetricsAggregator: %s", err.Error()),
+			"Error Deleting MetricsAggregation",
+			fmt.Sprintf("Could not delete MetricsAggregation: %s", err.Error()),
 		)
 		return
 	}
 
-	tflog.Debug(ctx, "Successfully deleted MetricsAggregator resource")
+	tflog.Debug(ctx, "Successfully deleted MetricsAggregation resource")
 }
 
 // For singleton resources, we don't need the ID for lookups
 // But we need to implement a custom import rather than using ImportStatePassthroughID
-func (r *metricsAggregatorResource) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {
+func (r *metricsAggregationResource) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {
 	_, err := r.checkAndImportExisting(ctx, &resp.State, &resp.Diagnostics)
 	if err != nil {
 		resp.Diagnostics.AddError(
-			"Error Importing MetricsAggregator",
-			fmt.Sprintf("Could not import MetricsAggregator: %s", err.Error()),
+			"Error Importing MetricsAggregation",
+			fmt.Sprintf("Could not import MetricsAggregation: %s", err.Error()),
 		)
 	}
 }
 
-func (r *metricsAggregatorResource) ModifyPlan(ctx context.Context, req resource.ModifyPlanRequest, resp *resource.ModifyPlanResponse) {
-	tflog.Debug(ctx, "Modifying MetricsAggregator plan")
+func (r *metricsAggregationResource) ModifyPlan(ctx context.Context, req resource.ModifyPlanRequest, resp *resource.ModifyPlanResponse) {
+	tflog.Debug(ctx, "Modifying MetricsAggregation plan")
 
 	_, err := r.checkAndImportExisting(ctx, &req.State, &resp.Diagnostics)
 	if err != nil {
 		resp.Diagnostics.AddError(
-			"Error Importing MetricsAggregator",
-			fmt.Sprintf("Could not import MetricsAggregator: %s", err.Error()),
+			"Error Importing MetricsAggregation",
+			fmt.Sprintf("Could not import MetricsAggregation: %s", err.Error()),
 		)
 		return
 	}
 
 	resp.Diagnostics.AddWarning(
-		"MetricsAggregator is a Singleton",
+		"MetricsAggregation is a Singleton",
 		fmt.Sprintf(
-			"Your plan should never include more than one metrics aggregator resource. If it does, only the latest will take place.\n"+
+			"Your plan should never include more than one metrics aggregation resource. If it does, only the latest will take place.\n"+
 				"Renaming the resource will show an incorrect plan.",
 		),
 	)
 }
 
-func (r *metricsAggregatorResource) checkAndImportExisting(ctx context.Context, state *tfsdk.State, diags *diag.Diagnostics) (*models.MetricsAggregatorConfig, error) {
-	existingConfig, err := r.client.GetMetricsAggregator(ctx)
+func (r *metricsAggregationResource) checkAndImportExisting(ctx context.Context, state *tfsdk.State, diags *diag.Diagnostics) (*models.MetricsAggregatorConfig, error) {
+	existingConfig, err := r.client.GetMetricsAggregation(ctx)
 	if err != nil && err != ErrNotFound {
 		return nil, err
 	}

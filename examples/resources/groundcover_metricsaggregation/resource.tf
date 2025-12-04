@@ -1,4 +1,4 @@
-# examples/resources/groundcover_metricsaggregator/resource.tf
+# examples/resources/groundcover_metricsaggregation/resource.tf
 
 terraform {
   required_providers {
@@ -20,19 +20,19 @@ provider "groundcover" {
 
 variable "groundcover_api_key" {
   type        = string
-  description = "Groundcover API Key"
+  description = "groundcover API Key"
   sensitive   = true
 }
 
 variable "groundcover_backend_id" {
   type        = string
-  description = "Groundcover Backend ID"
+  description = "groundcover Backend ID"
 }
 
-# Example Metrics Aggregator
+# Example Metrics Aggregation
 # This resource configures metrics aggregation rules for reducing cardinality
 # and improving query performance.
-resource "groundcover_metricsaggregator" "metricsaggregator" {
+resource "groundcover_metricsaggregation" "metricsaggregation" {
   value = <<-EOT
 content: |
   - ignore_old_samples: true
@@ -48,7 +48,7 @@ content: |
 EOT
 }
 
-output "metrics_aggregator_updated_at" {
-  description = "The timestamp when the metrics aggregator was last updated."
-  value       = groundcover_metricsaggregator.metricsaggregator.updated_at
+output "metrics_aggregation_updated_at" {
+  description = "The timestamp when the metrics aggregation was last updated."
+  value       = groundcover_metricsaggregation.metricsaggregation.updated_at
 }
