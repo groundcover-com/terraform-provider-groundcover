@@ -140,9 +140,11 @@ func (r *metricsAggregatorResource) Read(ctx context.Context, req resource.ReadR
 
 	value := ""
 	createdAt := ""
+	uuid := ""
 	if configEntry != nil {
 		value = configEntry.Value
 		createdAt = configEntry.CreatedTimestamp.String()
+		uuid = configEntry.UUID
 	}
 
 	// Update state
@@ -155,7 +157,11 @@ func (r *metricsAggregatorResource) Read(ctx context.Context, req resource.ReadR
 	if resp.Diagnostics.HasError() {
 		return
 	}
-	tflog.Debug(ctx, fmt.Sprintf("Successfully read MetricsAggregator resource with UUID %s", configEntry.UUID))
+	if uuid != "" {
+		tflog.Debug(ctx, fmt.Sprintf("Successfully read MetricsAggregator resource with UUID %s", uuid))
+	} else {
+		tflog.Debug(ctx, "Successfully read MetricsAggregator resource (no config found)")
+	}
 }
 
 // Update updates the resource and sets the updated Terraform state.
