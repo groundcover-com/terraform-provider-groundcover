@@ -907,16 +907,6 @@ func (r *policyResource) UpgradeState(ctx context.Context) map[int64]resource.St
 			},
 			StateUpgrader: func(ctx context.Context, req resource.UpgradeStateRequest, resp *resource.UpgradeStateResponse) {
 				// Define types for v0 schema data_scope structure
-				type v0FiltersModel struct {
-					Op    types.String `tfsdk:"op"`
-					Value types.String `tfsdk:"value"`
-				}
-				type v0ConditionModel struct {
-					Key     types.String `tfsdk:"key"`
-					Origin  types.String `tfsdk:"origin"`
-					Type    types.String `tfsdk:"type"`
-					Filters types.List   `tfsdk:"filters"`
-				}
 				type v0SimpleModel struct {
 					Operator   types.String `tfsdk:"operator"`
 					Disabled   types.Bool   `tfsdk:"disabled"`
