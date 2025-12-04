@@ -90,6 +90,12 @@ type ApiClient interface {
 	UpdateLogsPipeline(ctx context.Context, req *models.CreateOrUpdateLogsPipelineConfigRequest) (*models.LogsPipelineConfig, error)
 	DeleteLogsPipeline(ctx context.Context) error
 
+	// Metrics Aggregation
+	CreateMetricsAggregation(ctx context.Context, req *models.CreateOrUpdateMetricsAggregatorConfigRequest) (*models.MetricsAggregatorConfig, error)
+	GetMetricsAggregation(ctx context.Context) (*models.MetricsAggregatorConfig, error)
+	UpdateMetricsAggregation(ctx context.Context, req *models.CreateOrUpdateMetricsAggregatorConfigRequest) (*models.MetricsAggregatorConfig, error)
+	DeleteMetricsAggregation(ctx context.Context) error
+
 	// Ingestion Keys
 	CreateIngestionKey(ctx context.Context, req *models.CreateIngestionKeyRequest) (*models.IngestionKeyResult, error)
 	ListIngestionKeys(ctx context.Context, req *models.ListIngestionKeysRequest) ([]*models.IngestionKeyResult, error)

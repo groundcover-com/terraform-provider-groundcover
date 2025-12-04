@@ -18,6 +18,8 @@ Basic usage examples can be found in the `examples/` directory:
     *   Demonstrates how to create and manage ingestion keys for data ingestion.
 *   **Logs Pipeline Resource:** [`examples/resources/groundcover_logspipeline/resource.tf`](./examples/resources/groundcover_logspipeline/resource.tf)
     *   Shows how to configure logs processing pipelines.
+*   **Metrics Aggregation Resource:** [`examples/resources/groundcover_metricsaggregation/resource.tf`](./examples/resources/groundcover_metricsaggregation/resource.tf)
+    *   Demonstrates how to configure metrics aggregation rules for reducing cardinality.
 *   **Dashboard Resource:** [`examples/resources/groundcover_dashboard/resource.tf`](./examples/resources/groundcover_dashboard/resource.tf)
     *   Demonstrates how to create and manage dashboards with customizable widgets and layouts.
 *   **Data Integration Resource:** [`examples/resources/groundcover_dataintegration/resource.tf`](./examples/resources/groundcover_dataintegration/resource.tf)
@@ -214,6 +216,7 @@ TF_ACC=1 go test ./internal/provider -v -run TestAccServiceAccountResource
 TF_ACC=1 go test ./internal/provider -v -run TestAccMonitorResource
 TF_ACC=1 go test ./internal/provider -v -run TestAccApiKeyResource
 TF_ACC=1 go test ./internal/provider -v -run TestAccLogsPipelineResource
+TF_ACC=1 go test ./internal/provider -v -run TestAccMetricsAggregationResource
 TF_ACC=1 go test ./internal/provider -v -run TestAccIngestionKeyResource
 TF_ACC=1 go test ./internal/provider -v -run TestAccDashboardResource
 TF_ACC=1 go test ./internal/provider -v -run TestAccDataIntegrationResource
