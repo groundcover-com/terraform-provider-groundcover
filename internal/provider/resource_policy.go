@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/hashicorp/terraform-plugin-framework/attr"
 	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
@@ -849,10 +850,13 @@ func (r *policyResource) UpgradeState(ctx context.Context) map[int64]resource.St
 						Optional: true,
 						Attributes: map[string]schema.Attribute{
 							"simple": schema.SingleNestedAttribute{
-								Required: true,
+								Optional: true,
 								Attributes: map[string]schema.Attribute{
 									"operator": schema.StringAttribute{
 										Required: true,
+									},
+									"disabled": schema.BoolAttribute{
+										Optional: true,
 									},
 									"conditions": schema.ListNestedAttribute{
 										Required: true,
@@ -902,9 +906,28 @@ func (r *policyResource) UpgradeState(ctx context.Context) map[int64]resource.St
 				},
 			},
 			StateUpgrader: func(ctx context.Context, req resource.UpgradeStateRequest, resp *resource.UpgradeStateResponse) {
+				// Define types for v0 schema data_scope structure
+				type v0FiltersModel struct {
+					Op    types.String `tfsdk:"op"`
+					Value types.String `tfsdk:"value"`
+				}
+				type v0ConditionModel struct {
+					Key     types.String `tfsdk:"key"`
+					Origin  types.String `tfsdk:"origin"`
+					Type    types.String `tfsdk:"type"`
+					Filters types.List   `tfsdk:"filters"`
+				}
+				type v0SimpleModel struct {
+					Operator   types.String `tfsdk:"operator"`
+					Disabled   types.Bool   `tfsdk:"disabled"`
+					Conditions types.List   `tfsdk:"conditions"`
+				}
+				type v0DataScopeModel struct {
+					Simple types.Object `tfsdk:"simple"`
+				}
+
 				// Define a struct for v0 schema (without ID field)
 				var priorStateData struct {
-					// Note: No ID field in v0
 					UUID            types.String `tfsdk:"uuid"`
 					Name            types.String `tfsdk:"name"`
 					Role            types.Map    `tfsdk:"role"`
@@ -922,8 +945,61 @@ func (r *policyResource) UpgradeState(ctx context.Context) map[int64]resource.St
 					return
 				}
 
+				// Transform the DataScope from v0 structure to v1 structure
+				var upgradedDataScope types.Object
+				if priorStateData.DataScope.IsNull() || priorStateData.DataScope.IsUnknown() {
+					upgradedDataScope = types.ObjectNull(dataScopeAttrTypes())
+				} else {
+					// Parse the v0 data_scope
+					var v0DataScope v0DataScopeModel
+					resp.Diagnostics.Append(priorStateData.DataScope.As(ctx, &v0DataScope, basetypes.ObjectAsOptions{})...)
+					if resp.Diagnostics.HasError() {
+						return
+					}
+
+					// Build the new data_scope with proper types
+					var simpleObj types.Object
+					if v0DataScope.Simple.IsNull() || v0DataScope.Simple.IsUnknown() {
+						simpleObj = types.ObjectNull(groupAttrTypes())
+					} else {
+						// Parse v0 simple
+						var v0Simple v0SimpleModel
+						resp.Diagnostics.Append(v0DataScope.Simple.As(ctx, &v0Simple, basetypes.ObjectAsOptions{})...)
+						if resp.Diagnostics.HasError() {
+							return
+						}
+
+						// Create the new simple object with disabled field (default to false if not set)
+						disabled := v0Simple.Disabled
+						if disabled.IsNull() || disabled.IsUnknown() {
+							disabled = types.BoolValue(false)
+						}
+
+						simpleObjValue, diags := types.ObjectValue(groupAttrTypes(), map[string]attr.Value{
+							"operator":   v0Simple.Operator,
+							"disabled":   disabled,
+							"conditions": v0Simple.Conditions,
+						})
+						resp.Diagnostics.Append(diags...)
+						if resp.Diagnostics.HasError() {
+							return
+						}
+						simpleObj = simpleObjValue
+					}
+
+					// Create the new data_scope with both simple and advanced (advanced is null for v0 upgrades)
+					dataScopeObjValue, diags := types.ObjectValue(dataScopeAttrTypes(), map[string]attr.Value{
+						"simple":   simpleObj,
+						"advanced": types.ObjectNull(advancedDataScopeAttrTypes()),
+					})
+					resp.Diagnostics.Append(diags...)
+					if resp.Diagnostics.HasError() {
+						return
+					}
+					upgradedDataScope = dataScopeObjValue
+				}
+
 				// Initialize the upgraded state data
-				// The key change: copy UUID to ID field
 				upgradedStateData := policyResourceModel{
 					ID:              priorStateData.UUID, // Set ID from UUID - this is the key migration
 					UUID:            priorStateData.UUID,
@@ -931,7 +1007,7 @@ func (r *policyResource) UpgradeState(ctx context.Context) map[int64]resource.St
 					Role:            priorStateData.Role,
 					Description:     priorStateData.Description,
 					ClaimRole:       priorStateData.ClaimRole,
-					DataScope:       priorStateData.DataScope,
+					DataScope:       upgradedDataScope,
 					RevisionNumber:  priorStateData.RevisionNumber,
 					ReadOnly:        priorStateData.ReadOnly,
 					Deprecated:      priorStateData.Deprecated,
@@ -941,6 +1017,53 @@ func (r *policyResource) UpgradeState(ctx context.Context) map[int64]resource.St
 				resp.Diagnostics.Append(resp.State.Set(ctx, upgradedStateData)...)
 			},
 		},
+	}
+}
+
+// Helper functions to define attribute types for state upgrade
+func filtersAttrTypes() map[string]attr.Type {
+	return map[string]attr.Type{
+		"op":    types.StringType,
+		"value": types.StringType,
+	}
+}
+
+func conditionAttrTypes() map[string]attr.Type {
+	return map[string]attr.Type{
+		"key":    types.StringType,
+		"origin": types.StringType,
+		"type":   types.StringType,
+		"filters": types.ListType{
+			ElemType: types.ObjectType{AttrTypes: filtersAttrTypes()},
+		},
+	}
+}
+
+func groupAttrTypes() map[string]attr.Type {
+	return map[string]attr.Type{
+		"operator": types.StringType,
+		"disabled": types.BoolType,
+		"conditions": types.ListType{
+			ElemType: types.ObjectType{AttrTypes: conditionAttrTypes()},
+		},
+	}
+}
+
+func advancedDataScopeAttrTypes() map[string]attr.Type {
+	groupType := types.ObjectType{AttrTypes: groupAttrTypes()}
+	return map[string]attr.Type{
+		"events":    groupType,
+		"logs":      groupType,
+		"metrics":   groupType,
+		"traces":    groupType,
+		"workloads": groupType,
+	}
+}
+
+func dataScopeAttrTypes() map[string]attr.Type {
+	return map[string]attr.Type{
+		"simple":   types.ObjectType{AttrTypes: groupAttrTypes()},
+		"advanced": types.ObjectType{AttrTypes: advancedDataScopeAttrTypes()},
 	}
 }
 
