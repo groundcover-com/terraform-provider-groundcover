@@ -1,3 +1,8 @@
+## 1.4.0
+
+* Added metrics aggregator resource for configuring metrics aggregation rules (singleton resource)
+* Updated Groundcover SDK from v1.89.0 to v1.126.0
+
 ## 1.3.0
 
 * Added advanced data scope support for policy resource, enabling per-data-type filtering rules (logs, metrics, traces, events, workloads)

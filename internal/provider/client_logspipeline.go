@@ -18,8 +18,8 @@ func (c *SdkClientWrapper) CreateLogsPipeline(ctx context.Context, req *models.C
 	logFields := map[string]any{"req": "create_logs_pipeline"}
 	tflog.Debug(ctx, "Executing SDK Call: Create Logs Pipeline", logFields)
 
-	createParams := logsPipelineClient.NewCreateConfigParamsWithContext(ctx).WithBody(req)
-	createResp, err := c.sdkClient.LogsPipeline.CreateConfig(createParams, nil)
+	createParams := logsPipelineClient.NewCreateLogsPipelineConfigParamsWithContext(ctx).WithBody(req)
+	createResp, err := c.sdkClient.LogsPipeline.CreateLogsPipelineConfig(createParams, nil)
 	if err != nil {
 		return nil, handleApiError(ctx, err, "CreateLogsPipeline", resourceId)
 	}
@@ -33,8 +33,8 @@ func (c *SdkClientWrapper) GetLogsPipeline(ctx context.Context) (*models.LogsPip
 	logFields := map[string]any{"req": "get_logs_pipeline"}
 	tflog.Debug(ctx, "Executing SDK Call: Get Logs Pipeline", logFields)
 
-	getParams := logsPipelineClient.NewGetConfigParamsWithContext(ctx)
-	getResp, emptyGetResp, err := c.sdkClient.LogsPipeline.GetConfig(getParams, nil)
+	getParams := logsPipelineClient.NewGetLogsPipelineConfigParamsWithContext(ctx)
+	getResp, emptyGetResp, err := c.sdkClient.LogsPipeline.GetLogsPipelineConfig(getParams, nil)
 	if err != nil {
 		return nil, handleApiError(ctx, err, "GetLogsPipeline", resourceId)
 	}
@@ -53,14 +53,14 @@ func (c *SdkClientWrapper) UpdateLogsPipeline(ctx context.Context, req *models.C
 	logFields := map[string]any{"req": "update_logs_pipeline"}
 	tflog.Debug(ctx, "Executing SDK Call: Update Logs Pipeline", logFields)
 
-	createParams := logsPipelineClient.NewCreateConfigParamsWithContext(ctx).WithBody(req)
-	createResp, err := c.sdkClient.LogsPipeline.CreateConfig(createParams, nil)
+	updateParams := logsPipelineClient.NewUpdateLogsPipelineConfigParamsWithContext(ctx).WithBody(req)
+	updateResp, err := c.sdkClient.LogsPipeline.UpdateLogsPipelineConfig(updateParams, nil)
 	if err != nil {
 		return nil, handleApiError(ctx, err, "UpdateLogsPipeline", resourceId)
 	}
 
 	tflog.Debug(ctx, "SDK Call Successful: Update Logs Pipeline", logFields)
-	return createResp.Payload, nil
+	return updateResp.Payload, nil
 }
 
 // DeleteLogsPipeline deletes a logs pipeline configuration by key
@@ -68,8 +68,8 @@ func (c *SdkClientWrapper) DeleteLogsPipeline(ctx context.Context) error {
 	logFields := map[string]any{"req": "delete_logs_pipeline"}
 	tflog.Debug(ctx, "Executing SDK Call: Delete Logs Pipeline", logFields)
 
-	deleteParams := logsPipelineClient.NewDeleteConfigParamsWithContext(ctx)
-	_, err := c.sdkClient.LogsPipeline.DeleteConfig(deleteParams, nil)
+	deleteParams := logsPipelineClient.NewDeleteLogsPipelineConfigParamsWithContext(ctx)
+	_, err := c.sdkClient.LogsPipeline.DeleteLogsPipelineConfig(deleteParams, nil)
 	if err != nil {
 		return handleApiError(ctx, err, "DeleteLogsPipeline", resourceId)
 	}
