@@ -1,3 +1,7 @@
+## 1.4.1
+
+* Fixed policy resource state upgrade from v0.1.x to properly transform data_scope schema (added disabled field and advanced block support)
+
 ## 1.4.0
 
 * Added metrics aggregation resource for configuring metrics aggregation rules (singleton resource)
