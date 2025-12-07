@@ -80,10 +80,12 @@ func (t *rateLimitRetryTransport) RoundTrip(req *http.Request) (*http.Response, 
 	if req.Body != nil {
 		var err error
 		bodyBytes, err = io.ReadAll(req.Body)
-		req.Body.Close()
+		_ = req.Body.Close() // Best-effort close; body already read
 		if err != nil {
 			return nil, fmt.Errorf("failed to read request body for retry: %w", err)
 		}
+		// Reassign req.Body so the request remains usable
+		req.Body = io.NopCloser(bytes.NewReader(bodyBytes))
 	}
 
 	var resp *http.Response
@@ -105,8 +107,8 @@ func (t *rateLimitRetryTransport) RoundTrip(req *http.Request) (*http.Response, 
 			return resp, nil
 		}
 
-		// Close the response body before retry
-		resp.Body.Close()
+		// Close the response body before retry (best-effort; we're discarding this response)
+		_ = resp.Body.Close()
 
 		// Don't retry after the last attempt
 		if attempt == t.maxRetries {
