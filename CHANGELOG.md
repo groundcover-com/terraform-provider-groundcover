@@ -1,3 +1,7 @@
+## 1.4.2
+
+* Added automatic retry with exponential backoff for 429 rate limit errors at the HTTP transport level, improving reliability for users provisioning larger scale infrastructure
+
 ## 1.4.1
 
 * Fixed policy resource state upgrade from v0.1.x to properly transform data_scope schema (added disabled field and advanced block support)
