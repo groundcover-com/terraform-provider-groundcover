@@ -157,6 +157,7 @@ func (p *GroundcoverProvider) Resources(ctx context.Context) []func() resource.R
 		NewIngestionKeyResource,
 		NewDashboardResource,
 		NewDataIntegrationResource,
+		NewSecretResource,
 	}
 }
 
