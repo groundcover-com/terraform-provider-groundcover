@@ -82,4 +82,3 @@ func (c *SdkClientWrapper) DeleteSecret(ctx context.Context, id string) error {
 	tflog.Debug(ctx, "SDK Call Successful: Delete Secret", logFields)
 	return nil
 }
-
