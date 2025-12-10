@@ -58,6 +58,9 @@ func NormalizeMonitorYaml(ctx context.Context, yamlString string) (string, error
 		return "", nil
 	}
 
+	// Remove extra blank lines between fields and trailing newlines
+	outputString = removeExtraNewlines(outputString)
+
 	return outputString, nil
 }
 
@@ -568,6 +571,35 @@ func normalizeTimeString(s string) string {
 		// If parsing fails, return original
 		return match
 	})
+}
+
+// removeExtraNewlines removes trailing newlines and reduces multiple consecutive blank lines to zero
+// This ensures consistent YAML formatting without extra spacing between fields
+func removeExtraNewlines(s string) string {
+	// Split into lines
+	lines := strings.Split(s, "\n")
+	
+	// Remove trailing empty lines
+	for len(lines) > 0 && strings.TrimSpace(lines[len(lines)-1]) == "" {
+		lines = lines[:len(lines)-1]
+	}
+	
+	// Filter out blank lines between fields (but preserve indented content)
+	filteredLines := make([]string, 0, len(lines))
+	for _, line := range lines {
+		// Skip completely blank lines (lines with only whitespace)
+		if strings.TrimSpace(line) == "" {
+			continue
+		}
+		filteredLines = append(filteredLines, line)
+	}
+	
+	// Join back with newlines and add a single trailing newline
+	if len(filteredLines) == 0 {
+		return ""
+	}
+	
+	return strings.Join(filteredLines, "\n") + "\n"
 }
 
 // deepEqual performs deep comparison of data structures
