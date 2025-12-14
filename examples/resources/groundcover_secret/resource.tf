@@ -4,7 +4,7 @@ terraform {
   required_providers {
     groundcover = {
       source  = "registry.terraform.io/groundcover-com/groundcover"
-      version = ">= 0.0.0" # Replace with actual version constraint
+      version = ">= 1.5.0"
     }
   }
 }

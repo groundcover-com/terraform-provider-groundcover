@@ -74,6 +74,7 @@ Secrets allow you to securely store sensitive values (like API keys, passwords, 
 				MarkdownDescription: "The secret content/value. This is write-only and will not be returned by the API.",
 				Required:            true,
 				Sensitive:           true,
+				WriteOnly:           true,
 			},
 		},
 	}
