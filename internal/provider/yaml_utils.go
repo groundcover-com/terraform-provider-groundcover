@@ -321,6 +321,17 @@ type DefaultValueRule struct {
 	DefaultValue interface{}
 }
 
+// Fields that the server doesn't persist/return and should be ignored during comparison
+var ignoredFields = map[string]bool{
+	"link": true, // Server doesn't return the link field
+}
+
+// Fields that should be ignored if they are empty (nil, empty string, empty map, empty slice)
+var ignoreIfEmptyFields = map[string]bool{
+	"description": true,
+	"annotations": true,
+}
+
 // CompareYamlSemantically compares two YAML strings semantically, ignoring formatting differences
 func CompareYamlSemantically(yaml1, yaml2 string) (bool, error) {
 	if yaml1 == yaml2 {
@@ -346,6 +357,10 @@ func CompareYamlSemantically(yaml1, yaml2 string) (bool, error) {
 	normalizedData1 = removeEmptyFields(normalizedData1)
 	normalizedData2 = removeEmptyFields(normalizedData2)
 
+	// Remove fields that the server doesn't return
+	normalizedData1 = removeIgnoredFields(normalizedData1)
+	normalizedData2 = removeIgnoredFields(normalizedData2)
+
 	// Apply monitor-specific default values normalization
 	// This handles cases where the server omits default values (like isPaused: false)
 	monitorDefaultRules := []DefaultValueRule{
@@ -363,6 +378,51 @@ func CompareYamlSemantically(yaml1, yaml2 string) (bool, error) {
 	result := deepEqual(normalizedData1, normalizedData2)
 
 	return result, nil
+}
+
+// removeIgnoredFields recursively removes fields that should be ignored during comparison
+func removeIgnoredFields(data interface{}) interface{} {
+	switch v := data.(type) {
+	case map[string]interface{}:
+		result := make(map[string]interface{})
+		for key, value := range v {
+			// Skip fields that are always ignored
+			if ignoredFields[key] {
+				continue
+			}
+			// Skip fields that are ignored when empty
+			if ignoreIfEmptyFields[key] && isEmpty(value) {
+				continue
+			}
+			result[key] = removeIgnoredFields(value)
+		}
+		return result
+	case map[interface{}]interface{}:
+		result := make(map[interface{}]interface{})
+		for key, value := range v {
+			keyStr, isString := key.(string)
+			if isString {
+				// Skip fields that are always ignored
+				if ignoredFields[keyStr] {
+					continue
+				}
+				// Skip fields that are ignored when empty
+				if ignoreIfEmptyFields[keyStr] && isEmpty(value) {
+					continue
+				}
+			}
+			result[key] = removeIgnoredFields(value)
+		}
+		return result
+	case []interface{}:
+		result := make([]interface{}, len(v))
+		for i, item := range v {
+			result[i] = removeIgnoredFields(item)
+		}
+		return result
+	default:
+		return v
+	}
 }
 
 // applyDefaultValuesWithRules adds default values based on configurable rules
@@ -570,7 +630,52 @@ func normalizeTimeString(s string) string {
 	})
 }
 
+// isNumeric checks if a value is a numeric type
+func isNumeric(v interface{}) bool {
+	switch v.(type) {
+	case int, int8, int16, int32, int64,
+		uint, uint8, uint16, uint32, uint64,
+		float32, float64:
+		return true
+	default:
+		return false
+	}
+}
+
+// toFloat64 converts a numeric value to float64 for comparison
+func toFloat64(v interface{}) (float64, bool) {
+	switch n := v.(type) {
+	case int:
+		return float64(n), true
+	case int8:
+		return float64(n), true
+	case int16:
+		return float64(n), true
+	case int32:
+		return float64(n), true
+	case int64:
+		return float64(n), true
+	case uint:
+		return float64(n), true
+	case uint8:
+		return float64(n), true
+	case uint16:
+		return float64(n), true
+	case uint32:
+		return float64(n), true
+	case uint64:
+		return float64(n), true
+	case float32:
+		return float64(n), true
+	case float64:
+		return n, true
+	default:
+		return 0, false
+	}
+}
+
 // deepEqual performs deep comparison of data structures
+// It handles numeric type differences (int vs float64) by comparing values as float64
 func deepEqual(a, b interface{}) bool {
 	if a == nil && b == nil {
 		return true
@@ -625,6 +730,16 @@ func deepEqual(a, b interface{}) bool {
 		}
 		return true
 	default:
+		// Handle numeric type comparison (int vs float64)
+		// YAML parsers may return int for "0" but float64 for "0.0" or scientific notation
+		// These should be considered equal if they represent the same value
+		if isNumeric(a) && isNumeric(b) {
+			aFloat, aOk := toFloat64(a)
+			bFloat, bOk := toFloat64(b)
+			if aOk && bOk {
+				return aFloat == bFloat
+			}
+		}
 		return av == b
 	}
 }
