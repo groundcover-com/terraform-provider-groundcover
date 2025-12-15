@@ -600,15 +600,15 @@ func TestCompareYamlSemantically_NumericTypes(t *testing.T) {
 			expect: true,
 		},
 		{
-			name: "zero as int vs float64 should be equal",
-			yaml1: `threshold: 0`,
-			yaml2: `threshold: 0.0`,
+			name:   "zero as int vs float64 should be equal",
+			yaml1:  `threshold: 0`,
+			yaml2:  `threshold: 0.0`,
 			expect: true,
 		},
 		{
-			name: "large numbers in scientific notation vs integer",
-			yaml1: `memory_limit: 1610612736`,
-			yaml2: `memory_limit: 1.610612736e+09`,
+			name:   "large numbers in scientific notation vs integer",
+			yaml1:  `memory_limit: 1610612736`,
+			yaml2:  `memory_limit: 1.610612736e+09`,
 			expect: true,
 		},
 		{
@@ -718,7 +718,7 @@ display:
 			name: "empty annotations should be ignored",
 			yaml1: `title: Test Monitor
 annotations: {}`,
-			yaml2: `title: Test Monitor`,
+			yaml2:  `title: Test Monitor`,
 			expect: true,
 		},
 		{
@@ -726,7 +726,7 @@ annotations: {}`,
 			yaml1: `title: Test Monitor
 annotations:
   key: value`,
-			yaml2: `title: Test Monitor`,
+			yaml2:  `title: Test Monitor`,
 			expect: false,
 		},
 		{
