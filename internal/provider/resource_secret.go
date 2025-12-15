@@ -49,7 +49,7 @@ func (r *secretResource) Schema(ctx context.Context, req resource.SchemaRequest,
 
 Secrets allow you to securely store sensitive values (like API keys, passwords, or credentials) and receive a reference ID that can be used in other resources (such as data integrations) as a placeholder instead of the actual secret value.
 
-**Note:** The secret content is write-only and will not be returned by the API after creation. The content is stored in the Terraform state (encrypted if using a remote backend with encryption).`,
+**Note:** The secret content is write-only and is NOT persisted in Terraform state. It is only sent to the API during create and update operations and cannot be retrieved afterward.`,
 
 		Attributes: map[string]schema.Attribute{
 			"id": schema.StringAttribute{
@@ -140,7 +140,7 @@ func (r *secretResource) Create(ctx context.Context, req resource.CreateRequest,
 
 	// Map response back to state
 	plan.ID = types.StringValue(apiResponse.ID)
-	// Name, Type, Content are preserved from the plan
+	// Name and Type are preserved from the plan; Content is write-only and not saved to state
 
 	tflog.Info(ctx, "Saving new secret to state", map[string]any{"id": plan.ID.ValueString()})
 	resp.Diagnostics.Append(resp.State.Set(ctx, &plan)...)
