@@ -192,6 +192,11 @@ type ApiClient interface {
 	GetDataIntegration(ctx context.Context, integrationType string, id string) (*models.DataIntegrationConfig, error)
 	UpdateDataIntegration(ctx context.Context, integrationType string, id string, req *models.CreateDataIntegrationConfigRequest) (*models.DataIntegrationConfig, error)
 	DeleteDataIntegration(ctx context.Context, integrationType string, id string, cluster *string) error
+
+	// Secrets
+	CreateSecret(ctx context.Context, req *models.CreateSecretRequest) (*models.SecretResponse, error)
+	UpdateSecret(ctx context.Context, id string, req *models.UpdateSecretRequest) (*models.SecretResponse, error)
+	DeleteSecret(ctx context.Context, id string) error
 }
 
 // SdkClientWrapper implements ApiClient using the Groundcover Go SDK.

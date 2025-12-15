@@ -1,3 +1,7 @@
+## 1.5.0
+
+* Added secret resource for securely storing sensitive values (API keys, passwords, credentials) and receiving reference IDs for use in other resources
+
 ## 1.4.2
 
 * Added automatic retry with exponential backoff for 429 rate limit errors at the HTTP transport level, improving reliability for users provisioning larger scale infrastructure
