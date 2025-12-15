@@ -4,20 +4,53 @@ page_title: "groundcover_secret Resource - groundcover"
 subcategory: ""
 description: |-
   Manages a groundcover Secret.
+  Secrets allow you to securely store sensitive values (like API keys, passwords, or credentials) and receive a reference ID that can be used in other resources (such as data integrations) as a placeholder instead of the actual secret value.
+  Note: The secret content is write-only and will not be returned by the API after creation. The content is stored in the Terraform state (encrypted if using a remote backend with encryption).
 ---
 
 # groundcover_secret (Resource)
 
 Manages a groundcover Secret.
 
-Secrets allow you to securely store sensitive values (like API keys, passwords, or credentials) and receive a reference ID that can be used in other resources (such as data integrations and synthetics) as a placeholder instead of the actual secret value.
+Secrets allow you to securely store sensitive values (like API keys, passwords, or credentials) and receive a reference ID that can be used in other resources (such as data integrations) as a placeholder instead of the actual secret value.
 
 **Note:** The secret content is write-only and will not be returned by the API after creation. The content is stored in the Terraform state (encrypted if using a remote backend with encryption).
 
 ## Example Usage
 
 ```terraform
-# Variables for secret content
+# examples/resources/groundcover_secret/resource.tf
+
+terraform {
+  required_providers {
+    groundcover = {
+      source  = "registry.terraform.io/groundcover-com/groundcover"
+      version = ">= 1.5.0"
+    }
+  }
+}
+
+provider "groundcover" {
+  # Configure API key and Backend ID via environment variables
+  # export TF_VAR_groundcover_api_key="YOUR_API_KEY"
+  # export TF_VAR_groundcover_backend_id="YOUR_BACKEND_ID"
+  api_key    = var.groundcover_api_key
+  backend_id = var.groundcover_backend_id
+  # api_url = "..." # Optional: Override default API URL
+}
+
+variable "groundcover_api_key" {
+  type        = string
+  description = "groundcover API Key"
+  sensitive   = true
+}
+
+variable "groundcover_backend_id" {
+  type        = string
+  description = "groundcover Backend ID"
+}
+
+# Variables for secret content (should be passed securely, e.g., via environment variables or CI/CD secrets)
 variable "external_api_key" {
   type        = string
   description = "External service API key"
@@ -44,10 +77,24 @@ resource "groundcover_secret" "password_example" {
   content = var.database_password
 }
 
-# The secret ID can be used in other resources like data integrations 
+# The secret ID can be used in other resources like data integrations
+# For example:
+# resource "groundcover_dataintegration" "example" {
+#   type = "prometheus"
+#   config = jsonencode({
+#     endpoint = "https://prometheus.example.com"
+#     password = groundcover_secret.password_example.id  # Use secret reference
+#   })
+# }
+
 output "api_key_secret_id" {
   description = "The reference ID for the API key secret. Use this in other resources."
   value       = groundcover_secret.api_key_example.id
+}
+
+output "password_secret_id" {
+  description = "The reference ID for the password secret."
+  value       = groundcover_secret.password_example.id
 }
 ```
 
@@ -56,21 +103,12 @@ output "api_key_secret_id" {
 
 ### Required
 
-- `content` (String, Sensitive) The secret content/value. This is write-only and will not be returned by the API.
+> **NOTE**: [Write-only arguments](https://developer.hashicorp.com/terraform/language/resources/ephemeral#write-only-arguments) are supported in Terraform 1.11 and later.
+
+- `content` (String, Sensitive, [Write-only](https://developer.hashicorp.com/terraform/language/resources/ephemeral#write-only-arguments)) The secret content/value. This is write-only and will not be returned by the API.
 - `name` (String) The name of the secret.
 - `type` (String) The type of the secret. Valid values are: `api_key`, `password`, `basic_auth`.
 
 ### Read-Only
 
-- `id` (String) The unique reference ID for the secret. Use this ID in other resources (e.g., data integrations, synthetics, etc.) as a placeholder for the secret value.
-
-## Import
-
-Secrets can be imported using their ID, but note that the `content` attribute cannot be retrieved and must be set in your configuration after import:
-
-```shell
-terraform import groundcover_secret.example secretRef::store::a1b2c3d4-e5f6-7890-abcd-ef1234567890
-```
-
-After importing, you must update your Terraform configuration to include the `content` value, as it cannot be read from the API.
-
+- `id` (String) The unique reference ID for the secret. Use this ID in other resources (e.g., data integrations) as a placeholder for the secret value.
