@@ -106,9 +106,16 @@ func (r *secretResource) Create(ctx context.Context, req resource.CreateRequest,
 		return
 	}
 
+	// Get content from config since it's a write-only attribute (not available in plan)
+	var config secretResourceModel
+	resp.Diagnostics.Append(req.Config.Get(ctx, &config)...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+
 	nameVal := plan.Name.ValueString()
 	typeVal := plan.Type.ValueString()
-	contentVal := plan.Content.ValueString()
+	contentVal := config.Content.ValueString()
 
 	apiRequest := &models.CreateSecretRequest{
 		Name:              &nameVal,
@@ -169,12 +176,19 @@ func (r *secretResource) Update(ctx context.Context, req resource.UpdateRequest,
 		return
 	}
 
+	// Get content from config since it's a write-only attribute (not available in plan)
+	var config secretResourceModel
+	resp.Diagnostics.Append(req.Config.Get(ctx, &config)...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+
 	secretID := state.ID.ValueString()
 	tflog.Debug(ctx, "Updating Secret", map[string]any{"id": secretID})
 
 	nameVal := plan.Name.ValueString()
 	typeVal := plan.Type.ValueString()
-	contentVal := plan.Content.ValueString()
+	contentVal := config.Content.ValueString()
 
 	apiRequest := &models.UpdateSecretRequest{
 		Name:              &nameVal,
