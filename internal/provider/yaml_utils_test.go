@@ -582,6 +582,234 @@ model:
 	}
 }
 
+// TestCompareYamlSemantically_NumericTypes tests that numeric type differences
+// don't cause false drift detection (regression test for int vs float64 issue)
+func TestCompareYamlSemantically_NumericTypes(t *testing.T) {
+	tests := []struct {
+		name   string
+		yaml1  string
+		yaml2  string
+		expect bool
+	}{
+		{
+			name: "int vs float64 with same value should be equal",
+			yaml1: `values:
+  - 5000000`,
+			yaml2: `values:
+  - 5e+06`,
+			expect: true,
+		},
+		{
+			name: "zero as int vs float64 should be equal",
+			yaml1: `threshold: 0`,
+			yaml2: `threshold: 0.0`,
+			expect: true,
+		},
+		{
+			name: "large numbers in scientific notation vs integer",
+			yaml1: `memory_limit: 1610612736`,
+			yaml2: `memory_limit: 1.610612736e+09`,
+			expect: true,
+		},
+		{
+			name: "different numeric values should not be equal",
+			yaml1: `values:
+  - 5000000`,
+			yaml2: `values:
+  - 6000000`,
+			expect: false,
+		},
+		{
+			name: "nested numeric comparison",
+			yaml1: `model:
+  thresholds:
+  - name: threshold_1
+    values:
+    - 5000000`,
+			yaml2: `model:
+  thresholds:
+  - name: threshold_1
+    values:
+    - 5e+06`,
+			expect: true,
+		},
+		{
+			name: "real world sast monitor scenario",
+			yaml1: `title: sast-results-writer-memory
+model:
+  queries:
+  - name: threshold_input_query
+    expression: test_query
+  thresholds:
+  - name: threshold_1
+    values:
+    - 1610612736
+    - 0`,
+			yaml2: `title: sast-results-writer-memory
+model:
+  queries:
+  - name: threshold_input_query
+    expression: test_query
+  thresholds:
+  - name: threshold_1
+    values:
+    - 1.610612736e+09
+    - 0`,
+			expect: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result, err := CompareYamlSemantically(tt.yaml1, tt.yaml2)
+			if err != nil {
+				t.Errorf("CompareYamlSemantically() error = %v", err)
+				return
+			}
+			if result != tt.expect {
+				t.Errorf("CompareYamlSemantically() = %v, want %v", result, tt.expect)
+			}
+		})
+	}
+}
+
+// TestCompareYamlSemantically_IgnoredFields tests that certain fields are ignored during comparison
+func TestCompareYamlSemantically_IgnoredFields(t *testing.T) {
+	tests := []struct {
+		name   string
+		yaml1  string
+		yaml2  string
+		expect bool
+	}{
+		{
+			name: "link field should be ignored",
+			yaml1: `title: Test Monitor
+display:
+  header: test
+  link: https://example.com/dashboard`,
+			yaml2: `title: Test Monitor
+display:
+  header: test`,
+			expect: true,
+		},
+		{
+			name: "empty description should be ignored",
+			yaml1: `title: Test Monitor
+display:
+  header: test
+  description:`,
+			yaml2: `title: Test Monitor
+display:
+  header: test`,
+			expect: true,
+		},
+		{
+			name: "non-empty description should not be ignored",
+			yaml1: `title: Test Monitor
+display:
+  header: test
+  description: Important info`,
+			yaml2: `title: Test Monitor
+display:
+  header: test`,
+			expect: false,
+		},
+		{
+			name: "empty annotations should be ignored",
+			yaml1: `title: Test Monitor
+annotations: {}`,
+			yaml2: `title: Test Monitor`,
+			expect: true,
+		},
+		{
+			name: "non-empty annotations should not be ignored",
+			yaml1: `title: Test Monitor
+annotations:
+  key: value`,
+			yaml2: `title: Test Monitor`,
+			expect: false,
+		},
+		{
+			name: "real world rabbitmq scenario with link and empty fields",
+			yaml1: `title: k8s-rabbitmq-nodes-memory
+display:
+  header: k8s-rabbitmq-nodes-memory
+  description:
+  link: https://grafana.example.com/dashboard
+severity: S2
+annotations:`,
+			yaml2: `title: k8s-rabbitmq-nodes-memory
+display:
+  header: k8s-rabbitmq-nodes-memory
+severity: S2`,
+			expect: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result, err := CompareYamlSemantically(tt.yaml1, tt.yaml2)
+			if err != nil {
+				t.Errorf("CompareYamlSemantically() error = %v", err)
+				return
+			}
+			if result != tt.expect {
+				t.Errorf("CompareYamlSemantically() = %v, want %v", result, tt.expect)
+			}
+		})
+	}
+}
+
+// TestDeepEqual_NumericTypes tests the deepEqual function with numeric type differences
+func TestDeepEqual_NumericTypes(t *testing.T) {
+	tests := []struct {
+		name   string
+		a      interface{}
+		b      interface{}
+		expect bool
+	}{
+		{
+			name:   "int vs float64 same value",
+			a:      5000000,
+			b:      float64(5000000),
+			expect: true,
+		},
+		{
+			name:   "int vs float64 zero",
+			a:      0,
+			b:      float64(0),
+			expect: true,
+		},
+		{
+			name:   "int vs float64 different values",
+			a:      5000000,
+			b:      float64(6000000),
+			expect: false,
+		},
+		{
+			name:   "int64 vs float64",
+			a:      int64(1610612736),
+			b:      float64(1610612736),
+			expect: true,
+		},
+		{
+			name:   "string vs int should not be equal",
+			a:      "5000000",
+			b:      5000000,
+			expect: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := deepEqual(tt.a, tt.b)
+			if result != tt.expect {
+				t.Errorf("deepEqual(%v, %v) = %v, want %v", tt.a, tt.b, result, tt.expect)
+			}
+		})
+	}
+}
+
 // Test for edge cases and specific functionality
 func TestFilterYamlKeysBasedOnTemplate_EdgeCases(t *testing.T) {
 	ctx := context.Background()

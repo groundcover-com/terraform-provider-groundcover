@@ -147,6 +147,15 @@ func (r *monitorResource) detectAndHandleDrift(ctx context.Context, data *monito
 
 	remoteYaml := string(remoteYamlBytes)
 
+	// Debug: Log the raw YAMLs being compared
+	tflog.Debug(ctx, "Drift detection: Raw YAML comparison", map[string]interface{}{
+		"id":               monitorId,
+		"state_yaml":       stateYaml,
+		"remote_yaml":      remoteYaml,
+		"state_yaml_len":   len(stateYaml),
+		"remote_yaml_len":  len(remoteYaml),
+	})
+
 	// Filter remote YAML to only include keys that exist in the state
 	// This prevents drift detection from triggering on server-added default fields
 	filteredRemoteYaml, err := FilterYamlKeysBasedOnTemplate(ctx, remoteYaml, stateYaml)
@@ -186,6 +195,13 @@ func (r *monitorResource) detectAndHandleDrift(ctx context.Context, data *monito
 		normalizedFilteredRemoteYaml = filteredRemoteYaml
 	}
 
+	// Debug: Log normalized YAMLs and their lengths
+	tflog.Debug(ctx, "Drift detection: After filtering and normalization", map[string]interface{}{
+		"id":                              monitorId,
+		"normalized_state_len":            len(normalizedStateYaml),
+		"normalized_filtered_remote_len":  len(normalizedFilteredRemoteYaml),
+	})
+
 	// Use semantic comparison to detect real drift vs formatting differences
 	areSemanticallySame, err := CompareYamlSemantically(normalizedStateYaml, normalizedFilteredRemoteYaml)
 	if err != nil {
@@ -195,6 +211,20 @@ func (r *monitorResource) detectAndHandleDrift(ctx context.Context, data *monito
 		})
 		// Fallback to string comparison of normalized YAMLs
 		areSemanticallySame = (normalizedStateYaml == normalizedFilteredRemoteYaml)
+	}
+
+	tflog.Debug(ctx, "Drift detection: Semantic comparison result", map[string]interface{}{
+		"id":                   monitorId,
+		"are_semantically_same": areSemanticallySame,
+	})
+
+	// Debug: Save YAMLs to temp files for comparison
+	if !areSemanticallySame {
+		tflog.Debug(ctx, "Drift detection: YAML content for debugging", map[string]interface{}{
+			"id":                           monitorId,
+			"normalized_state_yaml":        normalizedStateYaml,
+			"normalized_filtered_remote":   normalizedFilteredRemoteYaml,
+		})
 	}
 
 	if areSemanticallySame {
