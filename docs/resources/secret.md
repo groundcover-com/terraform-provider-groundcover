@@ -5,7 +5,7 @@ subcategory: ""
 description: |-
   Manages a groundcover Secret.
   Secrets allow you to securely store sensitive values (like API keys, passwords, or credentials) and receive a reference ID that can be used in other resources (such as data integrations) as a placeholder instead of the actual secret value.
-  Note: The secret content is write-only and will not be returned by the API after creation. The content is stored in the Terraform state (encrypted if using a remote backend with encryption).
+  Note: The secret content is write-only and is NOT persisted in Terraform state. It is only sent to the API during create and update operations and cannot be retrieved afterward.
 ---
 
 # groundcover_secret (Resource)
@@ -14,7 +14,7 @@ Manages a groundcover Secret.
 
 Secrets allow you to securely store sensitive values (like API keys, passwords, or credentials) and receive a reference ID that can be used in other resources (such as data integrations) as a placeholder instead of the actual secret value.
 
-**Note:** The secret content is write-only and will not be returned by the API after creation. The content is stored in the Terraform state (encrypted if using a remote backend with encryption).
+**Note:** The secret content is write-only and is NOT persisted in Terraform state. It is only sent to the API during create and update operations and cannot be retrieved afterward.
 
 ## Example Usage
 

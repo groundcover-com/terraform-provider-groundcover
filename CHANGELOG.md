@@ -1,3 +1,7 @@
+## 1.5.2
+
+* Added GCP and Azure examples to data integration resource documentation
+
 ## 1.5.1
 
 * Fixed monitor drift detection false positives causing apply-loops when server returns numeric values in scientific notation (e.g., `5e+06` vs `5000000`)
