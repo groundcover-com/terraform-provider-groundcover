@@ -21,7 +21,7 @@ terraform {
   }
 }
 
-# Configure the Groundcover Provider
+# Configure the groundcover Provider
 provider "groundcover" {
   # api_key can be set via the GROUNDCOVER_API_KEY environment variable
   # backend_id can be set via the GROUNDCOVER_BACKEND_ID environment variable
