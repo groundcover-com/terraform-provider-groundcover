@@ -399,10 +399,9 @@ func TestAccMonitorResource_multilinePipeSyntax(t *testing.T) {
 }
 
 // testAccMonitorResourceConfigWithMultilinePipe creates a monitor config using multiline pipe syntax (|)
-// for title and header fields, simulating the issue where `title: |` followed by value on next line
-// should be normalized and compared semantically with `title: value`
-// Note: In YAML, values after `|` must be indented, but we're testing the problematic format
-// that might come from templates where indentation is missing
+// for title and header fields. This tests that single-line values using multiline pipe syntax
+// (e.g., `title: |\n  value`) are normalized to simple string format (e.g., `title: value`)
+// because Grafana/monitor API doesn't accept multiline pipe syntax for single-line values.
 func testAccMonitorResourceConfigWithMultilinePipe(titleValue, headerValue string) string {
 	return fmt.Sprintf(`
 resource "groundcover_monitor" "test" {

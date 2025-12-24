@@ -94,7 +94,7 @@ func (r *monitorResource) Create(ctx context.Context, req resource.CreateRequest
 	tflog.Debug(ctx, "Monitor YAML normalization: Input YAML", map[string]interface{}{
 		"input_yaml":      userInputMonitorYaml,
 		"input_yaml_len":  len(userInputMonitorYaml),
-		"has_trailing_nl": strings.HasSuffix(userInputMonitorYaml, "\n\n") || strings.HasSuffix(userInputMonitorYaml, "\n"),
+		"has_trailing_nl": strings.HasSuffix(userInputMonitorYaml, "\n"),
 	})
 
 	normalizedApiYaml, err := NormalizeMonitorYaml(ctx, userInputMonitorYaml)
@@ -108,7 +108,7 @@ func (r *monitorResource) Create(ctx context.Context, req resource.CreateRequest
 	tflog.Debug(ctx, "Monitor YAML normalization: Normalized YAML", map[string]interface{}{
 		"normalized_yaml":       normalizedApiYaml,
 		"normalized_yaml_len":   len(normalizedApiYaml),
-		"has_trailing_nl":       strings.HasSuffix(normalizedApiYaml, "\n\n") || strings.HasSuffix(normalizedApiYaml, "\n"),
+		"has_trailing_nl":       strings.HasSuffix(normalizedApiYaml, "\n"),
 		"normalization_changed": userInputMonitorYaml != normalizedApiYaml,
 		"note":                  "Keys are sorted alphabetically - all fields are preserved",
 	})

@@ -1092,7 +1092,8 @@ model:
 			}
 
 			// Check that result ends with exactly one newline
-			if !strings.HasSuffix(result, "\n") || strings.HasSuffix(result, "\n\n") {
+			// Check for double newline first, then single newline
+			if strings.HasSuffix(result, "\n\n") || !strings.HasSuffix(result, "\n") {
 				t.Errorf("NormalizeMonitorYaml() result should end with exactly one newline, got:\n%q", result)
 			}
 		})
