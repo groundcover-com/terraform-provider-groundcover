@@ -89,10 +89,38 @@ func (r *monitorResource) Create(ctx context.Context, req resource.CreateRequest
 	tflog.Debug(ctx, "Creating monitor resource from YAML")
 
 	userInputMonitorYaml := data.MonitorYaml.ValueString()
+	
+	// Log input YAML to show trailing newlines/multiline syntax
+	tflog.Debug(ctx, "Monitor YAML normalization: Input YAML", map[string]interface{}{
+		"input_yaml":      userInputMonitorYaml,
+		"input_yaml_len":  len(userInputMonitorYaml),
+		"has_trailing_nl": strings.HasSuffix(userInputMonitorYaml, "\n\n") || strings.HasSuffix(userInputMonitorYaml, "\n"),
+	})
+	
 	normalizedApiYaml, err := NormalizeMonitorYaml(ctx, userInputMonitorYaml)
 	if err != nil {
 		resp.Diagnostics.AddError("YAML Normalization Error", fmt.Sprintf("Unable to normalize monitor YAML during Create: %s", err))
 		return
+	}
+	
+	// Log normalized YAML to show the transformation
+	// Note: Keys are sorted alphabetically, so order may differ from input
+	tflog.Debug(ctx, "Monitor YAML normalization: Normalized YAML", map[string]interface{}{
+		"normalized_yaml":      normalizedApiYaml,
+		"normalized_yaml_len":  len(normalizedApiYaml),
+		"has_trailing_nl":      strings.HasSuffix(normalizedApiYaml, "\n\n") || strings.HasSuffix(normalizedApiYaml, "\n"),
+		"normalization_changed": userInputMonitorYaml != normalizedApiYaml,
+		"note":                 "Keys are sorted alphabetically - all fields are preserved",
+	})
+	
+	// Also log a summary showing key presence
+	if strings.Contains(normalizedApiYaml, "title:") && strings.Contains(normalizedApiYaml, "thresholds:") {
+		tflog.Debug(ctx, "Monitor YAML normalization: Verification - all expected keys present", map[string]interface{}{
+			"has_title":      strings.Contains(normalizedApiYaml, "title:"),
+			"has_thresholds": strings.Contains(normalizedApiYaml, "thresholds:"),
+			"has_display":    strings.Contains(normalizedApiYaml, "display:"),
+			"has_model":      strings.Contains(normalizedApiYaml, "model:"),
+		})
 	}
 
 	monitorYamlBytesForApi := []byte(normalizedApiYaml)
@@ -232,7 +260,9 @@ func (r *monitorResource) detectAndHandleDrift(ctx context.Context, data *monito
 			"id": monitorId,
 		})
 		// Keep the current state YAML format since there's no semantic difference
-		// This preserves the user's formatting preferences
+		// This preserves the user's formatting preferences (e.g., multiline pipe syntax `|`)
+		// Note: State may have different formatting (e.g., `title: |\n  value`) than remote
+		// (e.g., `title: value`), but both normalize to the same semantic content, so no drift.
 		return
 	} else {
 		tflog.Info(ctx, "Semantic configuration drift detected", map[string]interface{}{

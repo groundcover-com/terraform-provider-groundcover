@@ -93,6 +93,52 @@ func TestAccMonitorResource_disappears(t *testing.T) {
 	})
 }
 
+// TestAccMonitorResource_trailingNewline tests that monitors with trailing newlines
+// do not cause apply loops. This simulates the issue where the server returns YAML
+// with different formatting (including trailing newlines) and verifies that the
+// normalization fixes prevent unnecessary updates.
+func TestAccMonitorResource_trailingNewline(t *testing.T) {
+	name := acctest.RandomWithPrefix("test-monitor-newline")
+
+	resource.Test(t, resource.TestCase{
+		PreCheck:                 func() { testAccPreCheck(t) },
+		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
+		Steps: []resource.TestStep{
+			// Step 1: Create monitor with trailing newlines in YAML
+			{
+				Config: testAccMonitorResourceConfigWithTrailingNewline(name),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					resource.TestCheckResourceAttrSet("groundcover_monitor.test", "id"),
+					resource.TestCheckResourceAttrSet("groundcover_monitor.test", "monitor_yaml"),
+					resource.TestMatchResourceAttr("groundcover_monitor.test", "monitor_yaml", regexp.MustCompile(name)),
+					testAccCheckMonitorResourcePrintDetails("groundcover_monitor.test"),
+				),
+			},
+			// Step 2: Apply the same config again - should not detect changes (no apply loop)
+			// This verifies that the normalization fixes prevent false drift detection
+			{
+				Config: testAccMonitorResourceConfigWithTrailingNewline(name),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					resource.TestCheckResourceAttrSet("groundcover_monitor.test", "id"),
+					resource.TestCheckResourceAttrSet("groundcover_monitor.test", "monitor_yaml"),
+					resource.TestMatchResourceAttr("groundcover_monitor.test", "monitor_yaml", regexp.MustCompile(name)),
+				),
+				// ExpectNonEmptyPlan is false by default, meaning we expect no changes
+				// If there were an apply loop, this step would fail or show changes
+			},
+			// Step 3: Apply one more time to be absolutely sure there's no apply loop
+			{
+				Config: testAccMonitorResourceConfigWithTrailingNewline(name),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					resource.TestCheckResourceAttrSet("groundcover_monitor.test", "id"),
+					resource.TestCheckResourceAttrSet("groundcover_monitor.test", "monitor_yaml"),
+				),
+			},
+			// Delete testing automatically occurs in TestCase
+		},
+	})
+}
+
 func testAccMonitorResourceConfig(name string) string {
 	return fmt.Sprintf(`
 resource "groundcover_monitor" "test" {
@@ -208,6 +254,31 @@ func testAccCheckMonitorResourceExists(n string) resource.TestCheckFunc {
 	}
 }
 
+// testAccCheckMonitorResourcePrintDetails prints the monitor ID and YAML for verification
+func testAccCheckMonitorResourcePrintDetails(n string) resource.TestCheckFunc {
+	return func(s *terraform.State) error {
+		rs, ok := s.RootModule().Resources[n]
+		if !ok {
+			return fmt.Errorf("Not found: %s", n)
+		}
+
+		monitorID := rs.Primary.ID
+		monitorYaml := rs.Primary.Attributes["monitor_yaml"]
+
+		fmt.Printf("\n✅ Monitor created successfully!\n")
+		fmt.Printf("   Monitor ID: %s\n", monitorID)
+		fmt.Printf("   Monitor YAML (first 200 chars): %s\n", func() string {
+			if len(monitorYaml) > 200 {
+				return monitorYaml[:200] + "..."
+			}
+			return monitorYaml
+		}())
+		fmt.Printf("   Full YAML length: %d characters\n\n", len(monitorYaml))
+
+		return nil
+	}
+}
+
 func testAccCheckMonitorResourceDisappears(n string) resource.TestCheckFunc {
 	return func(s *terraform.State) error {
 		rs, ok := s.RootModule().Resources[n]
@@ -243,4 +314,128 @@ func testAccCheckMonitorResourceDisappears(n string) resource.TestCheckFunc {
 
 		return nil
 	}
+}
+
+// testAccMonitorResourceConfigWithTrailingNewline creates a monitor config with trailing newlines
+// to simulate the issue where YAML formatting differences cause apply loops
+func testAccMonitorResourceConfigWithTrailingNewline(name string) string {
+	return fmt.Sprintf(`
+resource "groundcover_monitor" "test" {
+  monitor_yaml = <<-YAML
+title: %[1]s
+display:
+  header: %[1]s Test Monitor
+  description: Test monitor with trailing newlines
+severity: critical
+model:
+  queries:
+    - name: test_query
+      dataType: metrics
+      pipeline:
+        function:
+          name: sum_over_time
+          pipelines:
+            - metric: up
+          args:
+          - 5m
+  thresholds:
+    - name: threshold_1
+      inputName: test_query
+      operator: gt
+      values:
+        - 1
+evaluationInterval:
+  interval: 1m
+  pendingFor: 1m
+measurementType: state
+
+YAML
+}
+`, name)
+}
+
+// TestAccMonitorResource_multilinePipeSyntax tests that monitors with multiline pipe syntax (|)
+// for title and header fields do not cause apply loops. This simulates the issue shown in the
+// image where `title: |` followed by the value on the next line should be normalized to `title: value`.
+func TestAccMonitorResource_multilinePipeSyntax(t *testing.T) {
+	name := acctest.RandomWithPrefix("test-monitor-pipe")
+	titleValue := fmt.Sprintf("CloudSql Connection Count %s", name)
+	headerValue := fmt.Sprintf("CloudSql Connection Count %s", name)
+
+	resource.Test(t, resource.TestCase{
+		PreCheck:                 func() { testAccPreCheck(t) },
+		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
+		Steps: []resource.TestStep{
+			// Step 1: Create monitor with multiline pipe syntax (|) for title and header
+			{
+				Config: testAccMonitorResourceConfigWithMultilinePipe(titleValue, headerValue),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					resource.TestCheckResourceAttrSet("groundcover_monitor.test", "id"),
+					resource.TestCheckResourceAttrSet("groundcover_monitor.test", "monitor_yaml"),
+					resource.TestMatchResourceAttr("groundcover_monitor.test", "monitor_yaml", regexp.MustCompile(regexp.QuoteMeta(titleValue))),
+					testAccCheckMonitorResourcePrintDetails("groundcover_monitor.test"),
+				),
+			},
+			// Step 2: Apply the same config again - should not detect changes (no apply loop)
+			// This verifies that semantic comparison treats `title: |\nvalue` and `title: value` as equivalent
+			{
+				Config: testAccMonitorResourceConfigWithMultilinePipe(titleValue, headerValue),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					resource.TestCheckResourceAttrSet("groundcover_monitor.test", "id"),
+					resource.TestCheckResourceAttrSet("groundcover_monitor.test", "monitor_yaml"),
+					resource.TestMatchResourceAttr("groundcover_monitor.test", "monitor_yaml", regexp.MustCompile(regexp.QuoteMeta(titleValue))),
+				),
+			},
+			// Step 3: Apply one more time to be absolutely sure there's no apply loop
+			{
+				Config: testAccMonitorResourceConfigWithMultilinePipe(titleValue, headerValue),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					resource.TestCheckResourceAttrSet("groundcover_monitor.test", "id"),
+					resource.TestCheckResourceAttrSet("groundcover_monitor.test", "monitor_yaml"),
+				),
+			},
+		},
+	})
+}
+
+// testAccMonitorResourceConfigWithMultilinePipe creates a monitor config using multiline pipe syntax (|)
+// for title and header fields, simulating the issue where `title: |` followed by value on next line
+// should be normalized and compared semantically with `title: value`
+// Note: In YAML, values after `|` must be indented, but we're testing the problematic format
+// that might come from templates where indentation is missing
+func testAccMonitorResourceConfigWithMultilinePipe(titleValue, headerValue string) string {
+	return fmt.Sprintf(`
+resource "groundcover_monitor" "test" {
+  monitor_yaml = <<-YAML
+title: |
+  %s
+display:
+  header: |
+    %s
+  description: Test monitor with multiline pipe syntax
+severity: critical
+model:
+  queries:
+    - name: test_query
+      dataType: metrics
+      pipeline:
+        function:
+          name: sum_over_time
+          pipelines:
+            - metric: up
+          args:
+          - 5m
+  thresholds:
+    - name: threshold_1
+      inputName: test_query
+      operator: gt
+      values:
+        - 1
+evaluationInterval:
+  interval: 1m
+  pendingFor: 1m
+measurementType: state
+YAML
+}
+`, titleValue, headerValue)
 }
