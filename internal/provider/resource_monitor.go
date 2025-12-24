@@ -89,30 +89,30 @@ func (r *monitorResource) Create(ctx context.Context, req resource.CreateRequest
 	tflog.Debug(ctx, "Creating monitor resource from YAML")
 
 	userInputMonitorYaml := data.MonitorYaml.ValueString()
-	
+
 	// Log input YAML to show trailing newlines/multiline syntax
 	tflog.Debug(ctx, "Monitor YAML normalization: Input YAML", map[string]interface{}{
 		"input_yaml":      userInputMonitorYaml,
 		"input_yaml_len":  len(userInputMonitorYaml),
 		"has_trailing_nl": strings.HasSuffix(userInputMonitorYaml, "\n\n") || strings.HasSuffix(userInputMonitorYaml, "\n"),
 	})
-	
+
 	normalizedApiYaml, err := NormalizeMonitorYaml(ctx, userInputMonitorYaml)
 	if err != nil {
 		resp.Diagnostics.AddError("YAML Normalization Error", fmt.Sprintf("Unable to normalize monitor YAML during Create: %s", err))
 		return
 	}
-	
+
 	// Log normalized YAML to show the transformation
 	// Note: Keys are sorted alphabetically, so order may differ from input
 	tflog.Debug(ctx, "Monitor YAML normalization: Normalized YAML", map[string]interface{}{
-		"normalized_yaml":      normalizedApiYaml,
-		"normalized_yaml_len":  len(normalizedApiYaml),
-		"has_trailing_nl":      strings.HasSuffix(normalizedApiYaml, "\n\n") || strings.HasSuffix(normalizedApiYaml, "\n"),
+		"normalized_yaml":       normalizedApiYaml,
+		"normalized_yaml_len":   len(normalizedApiYaml),
+		"has_trailing_nl":       strings.HasSuffix(normalizedApiYaml, "\n\n") || strings.HasSuffix(normalizedApiYaml, "\n"),
 		"normalization_changed": userInputMonitorYaml != normalizedApiYaml,
-		"note":                 "Keys are sorted alphabetically - all fields are preserved",
+		"note":                  "Keys are sorted alphabetically - all fields are preserved",
 	})
-	
+
 	// Also log a summary showing key presence
 	if strings.Contains(normalizedApiYaml, "title:") && strings.Contains(normalizedApiYaml, "thresholds:") {
 		tflog.Debug(ctx, "Monitor YAML normalization: Verification - all expected keys present", map[string]interface{}{

@@ -981,7 +981,7 @@ severity: S1
 `,
 		},
 		{
-			name: "blank lines with only spaces",
+			name:  "blank lines with only spaces",
 			input: "title: Test Monitor\n   \nseverity: S1\n  \n",
 			expected: `title: Test Monitor
 severity: S1

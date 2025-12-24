@@ -644,41 +644,41 @@ func convertSingleLineMultilinePipeToSimpleString(s string) string {
 	lines := strings.Split(s, "\n")
 	result := make([]string, 0, len(lines))
 	i := 0
-	
+
 	for i < len(lines) {
 		line := lines[i]
-		
+
 		// Check if this line matches the pattern: "key: |" (with optional whitespace)
 		pipePattern := regexp.MustCompile(`^(\s*)([a-zA-Z_][a-zA-Z0-9_]*):\s*\|\s*$`)
 		if matches := pipePattern.FindStringSubmatch(line); matches != nil {
 			indent := matches[1]
 			key := matches[2]
-			
+
 			// Check if the next line exists and contains a single-line value
 			if i+1 < len(lines) {
 				nextLine := lines[i+1]
 				nextLineTrimmed := strings.TrimSpace(nextLine)
-				
+
 				// Check if the next line is indented more than the key (value line)
 				// The value should be indented at least one level more than the key
 				if nextLineTrimmed != "" {
 					// Calculate minimum indentation for the value (key indent + at least 2 spaces)
 					minValueIndent := len(indent) + 2
 					actualValueIndent := len(nextLine) - len(strings.TrimLeft(nextLine, " \t"))
-					
+
 					if actualValueIndent >= minValueIndent {
 						value := strings.TrimSpace(nextLine)
-						
+
 						// Check if the line after the value is empty, less indented (next key at same or less level), or doesn't exist
 						isSingleLine := true
 						if i+2 < len(lines) {
 							nextNextLine := lines[i+2]
 							nextNextLineTrimmed := strings.TrimSpace(nextNextLine)
-							
+
 							if nextNextLineTrimmed != "" {
 								// Calculate indentation of the next line
 								nextNextIndent := len(nextNextLine) - len(strings.TrimLeft(nextNextLine, " \t"))
-								
+
 								// If the next line is also indented at the same or deeper level as the value,
 								// it means this is actually a multiline value
 								if nextNextIndent >= actualValueIndent {
@@ -686,18 +686,18 @@ func convertSingleLineMultilinePipeToSimpleString(s string) string {
 								}
 							}
 						}
-						
+
 						if isSingleLine {
 							// Convert to simple string format
 							// Check if value needs quoting (only for special cases that would break YAML)
 							// Most values don't need quotes, but we quote if they contain special YAML characters
-							needsQuotes := strings.Contains(value, ": ") || 
+							needsQuotes := strings.Contains(value, ": ") ||
 								(strings.Contains(value, "#") && !strings.HasPrefix(value, "#")) ||
 								strings.Contains(value, "|") || strings.Contains(value, "&") ||
 								strings.Contains(value, "*") || strings.Contains(value, "!") ||
 								strings.Contains(value, "%") || strings.Contains(value, "@") ||
 								strings.HasPrefix(value, " ") || strings.HasSuffix(value, " ")
-							
+
 							if needsQuotes && !strings.HasPrefix(value, `"`) && !strings.HasPrefix(value, `'`) {
 								escapedValue := strings.ReplaceAll(value, `"`, `\"`)
 								result = append(result, fmt.Sprintf("%s%s: \"%s\"", indent, key, escapedValue))
@@ -711,12 +711,12 @@ func convertSingleLineMultilinePipeToSimpleString(s string) string {
 				}
 			}
 		}
-		
+
 		// Keep the line as-is
 		result = append(result, line)
 		i++
 	}
-	
+
 	return strings.Join(result, "\n")
 }
 
@@ -725,12 +725,12 @@ func convertSingleLineMultilinePipeToSimpleString(s string) string {
 func removeExtraNewlines(s string) string {
 	// Split into lines
 	lines := strings.Split(s, "\n")
-	
+
 	// Remove trailing empty lines
 	for len(lines) > 0 && strings.TrimSpace(lines[len(lines)-1]) == "" {
 		lines = lines[:len(lines)-1]
 	}
-	
+
 	// Filter out blank lines between fields (but preserve indented content)
 	filteredLines := make([]string, 0, len(lines))
 	for _, line := range lines {
@@ -740,12 +740,12 @@ func removeExtraNewlines(s string) string {
 		}
 		filteredLines = append(filteredLines, line)
 	}
-	
+
 	// Join back with newlines and add a single trailing newline
 	if len(filteredLines) == 0 {
 		return ""
 	}
-	
+
 	return strings.Join(filteredLines, "\n") + "\n"
 }
 
