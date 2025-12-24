@@ -1,3 +1,11 @@
+## 1.5.3
+
+* Fixed monitor resource apply loops caused by trailing newlines in YAML
+* Fixed monitor resource apply loops caused by multiline pipe syntax (`|`) for single-line values
+* Added automatic normalization of monitor YAML to convert single-line multiline pipe syntax to simple strings (required for Grafana/monitor API compatibility)
+* Improved semantic comparison to ignore formatting differences (trailing newlines, multiline syntax) while detecting actual configuration changes
+* Added acceptance tests for trailing newline and multiline pipe syntax scenarios
+
 ## 1.5.2
 
 * Added GCP and Azure examples to data integration resource documentation
