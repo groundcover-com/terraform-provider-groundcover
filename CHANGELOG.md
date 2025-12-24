@@ -1,7 +1,7 @@
 ## 1.5.3
 
-* Improved automatic normalization of monitor YAML to convert single-line multiline pipe syntax to simple strings
-* Improved semantic comparison to ignore formatting differences (trailing newlines, multiline syntax) while detecting actual configuration changes
+* Improved automatic normalization of monitor YAML to convert single-line pipe syntax to simple strings
+* Improved semantic comparison to ignore formatting differences (trailing newlines, multiline syntax)
 
 ## 1.5.2
 
