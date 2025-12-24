@@ -3,12 +3,12 @@
 page_title: "groundcover_monitor Resource - groundcover"
 subcategory: ""
 description: |-
-  Groundcover Monitor resource managed via raw YAML.
+  groundcover Monitor resource managed via raw YAML.
 ---
 
 # groundcover_monitor (Resource)
 
-Groundcover Monitor resource managed via raw YAML.
+groundcover Monitor resource managed via raw YAML.
 
 ## Example Usage
 
@@ -35,13 +35,13 @@ provider "groundcover" {
 
 variable "groundcover_api_key" {
   type        = string
-  description = "Groundcover API Key"
+  description = "groundcover API Key"
   sensitive   = true
 }
 
 variable "groundcover_backend_id" {
   type        = string
-  description = "Groundcover Backend ID"
+  description = "groundcover Backend ID"
 }
 
 # Example Monitor: K8s Pod Crash Looping using monitor_yaml

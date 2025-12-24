@@ -48,7 +48,7 @@ func (r *dashboardResource) Metadata(_ context.Context, req resource.MetadataReq
 
 func (r *dashboardResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *resource.SchemaResponse) {
 	resp.Schema = schema.Schema{
-		Description: "Dashboard resource for managing Groundcover dashboards.",
+		Description: "Dashboard resource for managing groundcover dashboards.",
 		Attributes: map[string]schema.Attribute{
 			"id": schema.StringAttribute{
 				Description: "The UUID of the dashboard.",

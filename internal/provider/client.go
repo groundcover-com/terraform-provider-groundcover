@@ -4,9 +4,11 @@
 package provider
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"fmt"
+	"io"
 	"net/http"
 	"net/url"
 	"os"
@@ -52,12 +54,90 @@ var (
 )
 
 const (
-	defaultTimeout    = 30 * time.Second
+	// defaultTimeout is set to 120s to accommodate retry logic with exponential backoff.
+	// With 5 retries and backoff delays of ~1s, ~2s, ~4s, ~10s, ~10s plus request times,
+	// we need sufficient time for all retry attempts to complete.
+	defaultTimeout    = 120 * time.Second
 	defaultRetryCount = 5
 	minRetryWait      = 1 * time.Second
-	maxRetryWait      = 5 * time.Second
+	maxRetryWait      = 10 * time.Second
 	yamlContentType   = "application/x-yaml" // Added for consistency
 )
+
+// rateLimitRetryTransport wraps an http.RoundTripper to handle 429 rate limit errors
+// with exponential backoff and retry at the HTTP transport level.
+// This ensures retries happen before go-openapi processes the response.
+type rateLimitRetryTransport struct {
+	transport  http.RoundTripper
+	maxRetries int
+	minWait    time.Duration
+	maxWait    time.Duration
+}
+
+func (t *rateLimitRetryTransport) RoundTrip(req *http.Request) (*http.Response, error) {
+	// Buffer the request body if present so we can retry
+	var bodyBytes []byte
+	if req.Body != nil {
+		var err error
+		bodyBytes, err = io.ReadAll(req.Body)
+		_ = req.Body.Close() // Best-effort close; body already read
+		if err != nil {
+			return nil, fmt.Errorf("failed to read request body for retry: %w", err)
+		}
+		// Reassign req.Body so the request remains usable
+		req.Body = io.NopCloser(bytes.NewReader(bodyBytes))
+	}
+
+	var resp *http.Response
+	var err error
+
+	for attempt := 0; attempt <= t.maxRetries; attempt++ {
+		// Restore the body for each attempt
+		if bodyBytes != nil {
+			req.Body = io.NopCloser(bytes.NewReader(bodyBytes))
+		}
+
+		resp, err = t.transport.RoundTrip(req)
+		if err != nil {
+			return nil, err
+		}
+
+		// If not a 429, return immediately
+		if resp.StatusCode != http.StatusTooManyRequests {
+			return resp, nil
+		}
+
+		// Close the response body before retry (best-effort; we're discarding this response)
+		_ = resp.Body.Close()
+
+		// Don't retry after the last attempt
+		if attempt == t.maxRetries {
+			// Re-execute to get a fresh response to return
+			if bodyBytes != nil {
+				req.Body = io.NopCloser(bytes.NewReader(bodyBytes))
+			}
+			return t.transport.RoundTrip(req)
+		}
+
+		// Calculate exponential backoff with jitter
+		backoff := t.minWait * time.Duration(1<<uint(attempt))
+		if backoff > t.maxWait {
+			backoff = t.maxWait
+		}
+		// Add jitter (0-25% of backoff)
+		jitter := time.Duration(float64(backoff) * 0.25 * (float64(time.Now().UnixNano()%100) / 100.0))
+		delay := backoff + jitter
+
+		select {
+		case <-req.Context().Done():
+			return nil, req.Context().Err()
+		case <-time.After(delay):
+			// Continue to next attempt
+		}
+	}
+
+	return resp, err
+}
 
 // ApiClient defines the interface for interacting with the Groundcover API for Terraform resources.
 type ApiClient interface {
@@ -90,6 +170,12 @@ type ApiClient interface {
 	UpdateLogsPipeline(ctx context.Context, req *models.CreateOrUpdateLogsPipelineConfigRequest) (*models.LogsPipelineConfig, error)
 	DeleteLogsPipeline(ctx context.Context) error
 
+	// Metrics Aggregation
+	CreateMetricsAggregation(ctx context.Context, req *models.CreateOrUpdateMetricsAggregatorConfigRequest) (*models.MetricsAggregatorConfig, error)
+	GetMetricsAggregation(ctx context.Context) (*models.MetricsAggregatorConfig, error)
+	UpdateMetricsAggregation(ctx context.Context, req *models.CreateOrUpdateMetricsAggregatorConfigRequest) (*models.MetricsAggregatorConfig, error)
+	DeleteMetricsAggregation(ctx context.Context) error
+
 	// Ingestion Keys
 	CreateIngestionKey(ctx context.Context, req *models.CreateIngestionKeyRequest) (*models.IngestionKeyResult, error)
 	ListIngestionKeys(ctx context.Context, req *models.ListIngestionKeysRequest) ([]*models.IngestionKeyResult, error)
@@ -106,6 +192,11 @@ type ApiClient interface {
 	GetDataIntegration(ctx context.Context, integrationType string, id string) (*models.DataIntegrationConfig, error)
 	UpdateDataIntegration(ctx context.Context, integrationType string, id string, req *models.CreateDataIntegrationConfigRequest) (*models.DataIntegrationConfig, error)
 	DeleteDataIntegration(ctx context.Context, integrationType string, id string, cluster *string) error
+
+	// Secrets
+	CreateSecret(ctx context.Context, req *models.CreateSecretRequest) (*models.SecretResponse, error)
+	UpdateSecret(ctx context.Context, id string, req *models.UpdateSecretRequest) (*models.SecretResponse, error)
+	DeleteSecret(ctx context.Context, id string) error
 }
 
 // SdkClientWrapper implements ApiClient using the Groundcover Go SDK.
@@ -194,8 +285,16 @@ func NewSdkClientWrapper(ctx context.Context, baseURLStr, apiKey, backendID stri
 		retryableStatuses,
 	)
 
+	// Wrap with rate limit retry transport (handles 429s at HTTP level before go-openapi processes them)
+	rateLimitTransport := &rateLimitRetryTransport{
+		transport:  sdkTransportWrapper,
+		maxRetries: defaultRetryCount,
+		minWait:    minRetryWait,
+		maxWait:    maxRetryWait,
+	}
+
 	monitorContentTypeFixer := &overrideYamlContextTypeTransport{
-		transport: sdkTransportWrapper,
+		transport: rateLimitTransport,
 	}
 
 	finalRuntimeTransport := openapi_client.New(host, basePath, schemes)

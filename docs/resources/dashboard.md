@@ -3,12 +3,12 @@
 page_title: "groundcover_dashboard Resource - groundcover"
 subcategory: ""
 description: |-
-  Dashboard resource for managing Groundcover dashboards.
+  Dashboard resource for managing groundcover dashboards.
 ---
 
 # groundcover_dashboard (Resource)
 
-Dashboard resource for managing Groundcover dashboards.
+Dashboard resource for managing groundcover dashboards.
 
 ## Example Usage
 
@@ -35,13 +35,13 @@ provider "groundcover" {
 
 variable "groundcover_api_key" {
   type        = string
-  description = "Groundcover API Key"
+  description = "groundcover API Key"
   sensitive   = true
 }
 
 variable "groundcover_backend_id" {
   type        = string
-  description = "Groundcover Backend ID"
+  description = "groundcover Backend ID"
 }
 
 # Example Dashboard: Basic metrics dashboard
