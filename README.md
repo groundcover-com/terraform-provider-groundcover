@@ -15,9 +15,9 @@ Basic usage examples can be found in the `examples/` directory:
 *   **Monitor Resource:** [`examples/resources/groundcover_monitor/resource.tf`](./examples/resources/groundcover_monitor/resource.tf)
     *   Provides examples of configuring monitoring rules and alerts.
     *   **Note:** The provider automatically normalizes monitor YAML to prevent apply loops. This includes:
-        *   Removing trailing newlines
-        *   Converting single-line multiline pipe syntax (`title: |\n  value`) to simple strings (`title: value`) for Grafana compatibility
-        *   Semantic comparison to detect actual configuration changes vs. formatting differences
+    *   Removing trailing newlines
+    *   Converting single-line multiline pipe syntax (`title: |\n  value`) to simple strings (`title: value`) for Grafana compatibility
+    *   Semantic comparison to detect actual configuration changes vs. formatting differences
 *   **Ingestion Key Resource:** [`examples/resources/groundcover_ingestionkey/resource.tf`](./examples/resources/groundcover_ingestionkey/resource.tf)
     *   Demonstrates how to create and manage ingestion keys for data ingestion.
 *   **Logs Pipeline Resource:** [`examples/resources/groundcover_logspipeline/resource.tf`](./examples/resources/groundcover_logspipeline/resource.tf)
