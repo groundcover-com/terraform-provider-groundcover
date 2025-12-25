@@ -1,5 +1,7 @@
 ## 1.5.3
 
+* Added tags support to data integration resource for organizing and categorizing integrations
+* Added state upgrader for data integration resource to migrate existing state to new schema version
 * Improved automatic normalization of monitor YAML to convert single-line pipe syntax to simple strings
 * Improved semantic comparison to ignore formatting differences (trailing newlines, multiline syntax)
 
