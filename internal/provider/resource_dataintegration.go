@@ -6,14 +6,17 @@ import (
 	"fmt"
 
 	"github.com/groundcover-com/groundcover-sdk-go/pkg/models"
+	"github.com/hashicorp/terraform-plugin-framework/attr"
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/booldefault"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/mapdefault"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/hashicorp/terraform-plugin-log/tflog"
+	"github.com/tidwall/gjson"
 )
 
 // Ensure resource implements required interfaces
@@ -37,6 +40,8 @@ type dataIntegrationResourceModel struct {
 	Cluster   types.String `tfsdk:"cluster"`
 	Config    types.String `tfsdk:"config"`
 	IsPaused  types.Bool   `tfsdk:"is_paused"`
+	Name      types.String `tfsdk:"name"`
+	Tags      types.Map    `tfsdk:"tags"`
 	UpdatedAt types.String `tfsdk:"updated_at"`
 	UpdatedBy types.String `tfsdk:"updated_by"`
 }
@@ -88,6 +93,17 @@ func (r *dataIntegrationResource) Schema(_ context.Context, _ resource.SchemaReq
 				Description: "The user who last updated the data integration configuration.",
 				Computed:    true,
 			},
+			"name": schema.StringAttribute{
+				Description: "The name of the data integration configuration.",
+				Computed:    true,
+			},
+			"tags": schema.MapAttribute{
+				Description: "Tags associated with the data integration. Key-value pairs for organizing and filtering integrations.",
+				ElementType: types.StringType,
+				Optional:    true,
+				Computed:    true,
+				Default:     mapdefault.StaticValue(types.MapValueMust(types.StringType, map[string]attr.Value{})),
+			},
 		},
 	}
 }
@@ -133,6 +149,17 @@ func (r *dataIntegrationResource) Create(ctx context.Context, req resource.Creat
 		createReq.Cluster = &cluster
 	}
 
+	// Set tags if provided
+	if !plan.Tags.IsNull() && !plan.Tags.IsUnknown() {
+		tags := make(map[string]any)
+		for k, v := range plan.Tags.Elements() {
+			if strVal, ok := v.(types.String); ok {
+				tags[k] = strVal.ValueString()
+			}
+		}
+		createReq.Tags = tags
+	}
+
 	// Call API client to create the data integration
 	createdConfig, err := r.client.CreateDataIntegration(ctx, plan.Type.ValueString(), createReq)
 	if err != nil {
@@ -151,6 +178,8 @@ func (r *dataIntegrationResource) Create(ctx context.Context, req resource.Creat
 	plan.UpdatedAt = types.StringValue(createdConfig.UpdateTimestamp.String())
 	plan.UpdatedBy = types.StringValue(createdConfig.UpdatedBy)
 	plan.IsPaused = types.BoolValue(createdConfig.IsPaused)
+	plan.Name = types.StringValue(getStringOrDefault(createdConfig.Name, gjson.Get(createdConfig.Config, "name").String()))
+	plan.Tags = tagsToMapValue(createdConfig.Tags)
 
 	tflog.Debug(ctx, fmt.Sprintf("DataIntegration created with ID: %s", createdConfig.ID))
 
@@ -205,6 +234,8 @@ func (r *dataIntegrationResource) Read(ctx context.Context, req resource.ReadReq
 	state.IsPaused = types.BoolValue(configEntry.IsPaused)
 	state.UpdatedAt = types.StringValue(configEntry.UpdateTimestamp.String())
 	state.UpdatedBy = types.StringValue(configEntry.UpdatedBy)
+	state.Tags = tagsToMapValue(configEntry.Tags)
+	state.Name = types.StringValue(getStringOrDefault(configEntry.Name, gjson.Get(configEntry.Config, "name").String()))
 
 	// Set refreshed state
 	diags = resp.State.Set(ctx, &state)
@@ -239,6 +270,17 @@ func (r *dataIntegrationResource) Update(ctx context.Context, req resource.Updat
 		updateReq.Cluster = &cluster
 	}
 
+	// Set tags if provided
+	if !plan.Tags.IsNull() && !plan.Tags.IsUnknown() {
+		tags := make(map[string]any)
+		for k, v := range plan.Tags.Elements() {
+			if strVal, ok := v.(types.String); ok {
+				tags[k] = strVal.ValueString()
+			}
+		}
+		updateReq.Tags = tags
+	}
+
 	// Call API client to update the data integration
 	updatedConfig, err := r.client.UpdateDataIntegration(ctx, plan.Type.ValueString(), plan.ID.ValueString(), updateReq)
 	if err != nil {
@@ -256,6 +298,8 @@ func (r *dataIntegrationResource) Update(ctx context.Context, req resource.Updat
 	plan.IsPaused = types.BoolValue(updatedConfig.IsPaused)
 	plan.UpdatedAt = types.StringValue(updatedConfig.UpdateTimestamp.String())
 	plan.UpdatedBy = types.StringValue(updatedConfig.UpdatedBy)
+	plan.Tags = tagsToMapValue(updatedConfig.Tags)
+	plan.Name = types.StringValue(getStringOrDefault(updatedConfig.Name, gjson.Get(updatedConfig.Config, "name").String()))
 
 	// Set refreshed state
 	diags = resp.State.Set(ctx, &plan)
@@ -344,4 +388,28 @@ func (r *dataIntegrationResource) ImportState(ctx context.Context, req resource.
 	// Set the type and id attributes
 	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("type"), integrationType)...)
 	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("id"), integrationID)...)
+}
+
+// tagsToMapValue converts map[string]any to types.Map
+func tagsToMapValue(tags map[string]any) types.Map {
+	if tags == nil || len(tags) == 0 {
+		return types.MapValueMust(types.StringType, map[string]attr.Value{})
+	}
+
+	elements := make(map[string]attr.Value)
+	for k, v := range tags {
+		if strVal, ok := v.(string); ok {
+			elements[k] = types.StringValue(strVal)
+		} else {
+			elements[k] = types.StringValue(fmt.Sprintf("%v", v))
+		}
+	}
+	return types.MapValueMust(types.StringType, elements)
+}
+
+func getStringOrDefault(str, defaultStr string) string {
+	if str == "" {
+		return defaultStr
+	}
+	return str
 }
