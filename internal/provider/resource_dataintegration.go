@@ -21,9 +21,10 @@ import (
 
 // Ensure resource implements required interfaces
 var (
-	_ resource.Resource                = &dataIntegrationResource{}
-	_ resource.ResourceWithConfigure   = &dataIntegrationResource{}
-	_ resource.ResourceWithImportState = &dataIntegrationResource{}
+	_ resource.Resource                 = &dataIntegrationResource{}
+	_ resource.ResourceWithConfigure    = &dataIntegrationResource{}
+	_ resource.ResourceWithImportState  = &dataIntegrationResource{}
+	_ resource.ResourceWithUpgradeState = &dataIntegrationResource{}
 )
 
 func NewDataIntegrationResource() resource.Resource {
@@ -52,6 +53,7 @@ func (r *dataIntegrationResource) Metadata(_ context.Context, req resource.Metad
 
 func (r *dataIntegrationResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *resource.SchemaResponse) {
 	resp.Schema = schema.Schema{
+		Version:     1,
 		Description: "DataIntegration resource for managing groundcover's integrations with external services such as cloud providers, databases and more. This resource is composed of general metadata on the integration and a specific configuration per data source. Navigate to the relevant nested schema according to your specific needs.",
 		Attributes: map[string]schema.Attribute{
 			"id": schema.StringAttribute{
@@ -392,7 +394,7 @@ func (r *dataIntegrationResource) ImportState(ctx context.Context, req resource.
 
 // tagsToMapValue converts map[string]any to types.Map
 func tagsToMapValue(tags map[string]any) types.Map {
-	if tags == nil || len(tags) == 0 {
+	if len(tags) == 0 {
 		return types.MapValueMust(types.StringType, map[string]attr.Value{})
 	}
 
@@ -412,4 +414,76 @@ func getStringOrDefault(str, defaultStr string) string {
 		return defaultStr
 	}
 	return str
+}
+
+// UpgradeState handles state upgrades from previous schema versions
+func (r *dataIntegrationResource) UpgradeState(ctx context.Context) map[int64]resource.StateUpgrader {
+	return map[int64]resource.StateUpgrader{
+		// Version 0 -> 1: Added tags field
+		0: {
+			PriorSchema: &schema.Schema{
+				Attributes: map[string]schema.Attribute{
+					"id": schema.StringAttribute{
+						Computed: true,
+					},
+					"type": schema.StringAttribute{
+						Required: true,
+					},
+					"cluster": schema.StringAttribute{
+						Optional: true,
+					},
+					"config": schema.StringAttribute{
+						Required: true,
+					},
+					"is_paused": schema.BoolAttribute{
+						Optional: true,
+						Computed: true,
+					},
+					"name": schema.StringAttribute{
+						Computed: true,
+					},
+					"updated_at": schema.StringAttribute{
+						Computed: true,
+					},
+					"updated_by": schema.StringAttribute{
+						Computed: true,
+					},
+				},
+			},
+			StateUpgrader: func(ctx context.Context, req resource.UpgradeStateRequest, resp *resource.UpgradeStateResponse) {
+				// Define the v0 state model (without tags)
+				var priorStateData struct {
+					ID        types.String `tfsdk:"id"`
+					Type      types.String `tfsdk:"type"`
+					Cluster   types.String `tfsdk:"cluster"`
+					Config    types.String `tfsdk:"config"`
+					IsPaused  types.Bool   `tfsdk:"is_paused"`
+					Name      types.String `tfsdk:"name"`
+					UpdatedAt types.String `tfsdk:"updated_at"`
+					UpdatedBy types.String `tfsdk:"updated_by"`
+				}
+
+				resp.Diagnostics.Append(req.State.Get(ctx, &priorStateData)...)
+				if resp.Diagnostics.HasError() {
+					return
+				}
+
+				// Create the upgraded state with empty tags
+				upgradedStateData := dataIntegrationResourceModel{
+					ID:        priorStateData.ID,
+					Type:      priorStateData.Type,
+					Cluster:   priorStateData.Cluster,
+					Config:    priorStateData.Config,
+					IsPaused:  priorStateData.IsPaused,
+					Name:      priorStateData.Name,
+					Tags:      types.MapValueMust(types.StringType, map[string]attr.Value{}),
+					UpdatedAt: priorStateData.UpdatedAt,
+					UpdatedBy: priorStateData.UpdatedBy,
+				}
+
+				resp.Diagnostics.Append(resp.State.Set(ctx, upgradedStateData)...)
+				tflog.Debug(ctx, "Successfully upgraded DataIntegration state from version 0 to 1", map[string]any{"id": priorStateData.ID.ValueString()})
+			},
+		},
+	}
 }
