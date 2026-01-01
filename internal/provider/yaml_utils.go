@@ -360,6 +360,10 @@ func CompareYamlSemantically(yaml1, yaml2 string) (bool, error) {
 	normalizedData1 := normalizeTimeInData(data1)
 	normalizedData2 := normalizeTimeInData(data2)
 
+	// Normalize string values (especially expression fields) to handle multiline formatting differences
+	normalizedData1 = normalizeStringValues(normalizedData1)
+	normalizedData2 = normalizeStringValues(normalizedData2)
+
 	// Remove empty fields that the server commonly adds
 	normalizedData1 = removeEmptyFields(normalizedData1)
 	normalizedData2 = removeEmptyFields(normalizedData2)
@@ -594,6 +598,61 @@ func normalizeTimeInData(data interface{}) interface{} {
 	case string:
 		// Normalize time strings
 		return normalizeTimeString(v)
+	default:
+		return v
+	}
+}
+
+// normalizeStringValues recursively normalizes string values in a data structure
+// This collapses whitespace in multiline strings, especially for expression fields.
+// For expression fields, it normalizes whitespace to handle cases where the API returns
+// expressions on a single line but the input has them split across lines with trailing spaces.
+func normalizeStringValues(data interface{}) interface{} {
+	switch v := data.(type) {
+	case map[string]interface{}:
+		result := make(map[string]interface{})
+		for key, value := range v {
+			// Special handling for expression fields - normalize whitespace
+			// This handles multiline expressions where trailing spaces and line breaks
+			// should be treated as equivalent to single-line expressions
+			if key == "expression" {
+				if strVal, ok := value.(string); ok {
+					// Collapse multiple whitespace characters (spaces, tabs, newlines) into single spaces
+					// This makes "value1 \n  value2" equivalent to "value1 value2"
+					normalized := strings.Join(strings.Fields(strVal), " ")
+					result[key] = normalized
+					continue
+				}
+			}
+			result[key] = normalizeStringValues(value)
+		}
+		return result
+	case map[interface{}]interface{}:
+		result := make(map[interface{}]interface{})
+		for key, value := range v {
+			keyStr, isString := key.(string)
+			// Special handling for expression fields - normalize whitespace
+			if isString && keyStr == "expression" {
+				if strVal, ok := value.(string); ok {
+					// Collapse multiple whitespace characters (spaces, tabs, newlines) into single spaces
+					normalized := strings.Join(strings.Fields(strVal), " ")
+					result[key] = normalized
+					continue
+				}
+			}
+			result[key] = normalizeStringValues(value)
+		}
+		return result
+	case []interface{}:
+		result := make([]interface{}, len(v))
+		for i, item := range v {
+			result[i] = normalizeStringValues(item)
+		}
+		return result
+	case string:
+		// Don't normalize all strings, only expression fields
+		// Other strings should preserve their formatting
+		return v
 	default:
 		return v
 	}

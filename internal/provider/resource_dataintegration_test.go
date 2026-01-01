@@ -104,7 +104,7 @@ resource "groundcover_dataintegration" "test" {
   type = "cloudwatch"
   config = jsonencode({
 	version = 1
-	name = "test-cloudwatch"
+	name = "test-cloudwatch2"
 	exporters = ["prometheus"]
 	scrapeInterval = "5m"
     stsRegion = "us-east-1"
