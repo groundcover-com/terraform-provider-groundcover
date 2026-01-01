@@ -900,6 +900,90 @@ stringKey: "hello"`
 			t.Errorf("FilterYamlKeysBasedOnTemplate() result mismatch.\nExpected:\n%s\n\nGot:\n%s", expected, result)
 		}
 	})
+
+	// TestFilterYamlKeysBasedOnTemplate_OptionalFieldsInArrays tests the critical bug fix where
+	// optional fields (like 'alias') that exist in some array items but not others must be preserved.
+	// This is the exact scenario that caused apply loops in monitor resources with groupBy arrays.
+	t.Run("optional fields in arrays - groupBy with aliases", func(t *testing.T) {
+		// Template has groupBy where first item has no alias, but later items do
+		// This simulates the exact bug scenario from monitor.yml
+		templateYaml := `model:
+  queries:
+  - name: threshold_input_query
+    sqlPipeline:
+      groupBy:
+      - key: _bucket_timestamp
+        origin: root
+        type: string
+      - key: podName
+        origin: root
+        type: string
+        alias: pod_name
+      - key: container
+        origin: root
+        type: string
+        alias: container`
+
+		// Source YAML has the same structure with values
+		sourceYaml := `model:
+  queries:
+  - name: threshold_input_query
+    sqlPipeline:
+      groupBy:
+      - key: _bucket_timestamp
+        origin: root
+        type: string
+      - key: podName
+        origin: root
+        type: string
+        alias: pod_name
+      - key: container
+        origin: root
+        type: string
+        alias: container
+      extraField: shouldBeFiltered`
+
+		result, err := FilterYamlKeysBasedOnTemplate(ctx, sourceYaml, templateYaml)
+		if err != nil {
+			t.Errorf("FilterYamlKeysBasedOnTemplate() unexpected error = %v", err)
+			return
+		}
+
+		// CRITICAL: The alias fields must be preserved in the filtered result
+		// With the buggy code, only the first item's keys (no alias) would be in the template,
+		// causing alias fields to be filtered out. With the fix, all keys from all items are merged.
+		expected := `model:
+  queries:
+  - name: threshold_input_query
+    sqlPipeline:
+      groupBy:
+      - key: _bucket_timestamp
+        origin: root
+        type: string
+      - key: podName
+        origin: root
+        type: string
+        alias: pod_name
+      - key: container
+        origin: root
+        type: string
+        alias: container`
+
+		resultNormalized := normalizeYamlForComparison(result)
+		expectedNormalized := normalizeYamlForComparison(expected)
+
+		if resultNormalized != expectedNormalized {
+			t.Errorf("FilterYamlKeysBasedOnTemplate() result mismatch.\nExpected:\n%s\n\nGot:\n%s", expected, result)
+		}
+
+		// Additional verification: explicitly check that alias fields are present
+		if !strings.Contains(result, "alias: pod_name") {
+			t.Errorf("FilterYamlKeysBasedOnTemplate() filtered out 'alias: pod_name' - this indicates the bug is present!")
+		}
+		if !strings.Contains(result, "alias: container") {
+			t.Errorf("FilterYamlKeysBasedOnTemplate() filtered out 'alias: container' - this indicates the bug is present!")
+		}
+	})
 }
 
 // TestRemoveExtraNewlines tests the removeExtraNewlines function

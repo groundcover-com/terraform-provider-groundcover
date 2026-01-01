@@ -622,3 +622,182 @@ YAML
 }
 `, name, name)
 }
+
+// TestAccMonitorResource_oomKilled tests the K8s Pod OOM Killed Monitor from monitor.yml
+// as an integration/regression test. This monitor uses sqlPipeline with complex selectors,
+// filters, groupBy, and orderBy configurations.
+//
+// NOTE: The primary test for the apply loop bug is the unit test:
+// TestFilterYamlKeysBasedOnTemplate_EdgeCases/optional_fields_in_arrays_-_groupBy_with_aliases
+// which directly tests the filtering logic and reliably catches the bug.
+//
+// This acceptance test serves as:
+// 1. An integration test to verify the fix works end-to-end with real API
+// 2. A regression test for the specific monitor.yml configuration
+// 3. Verification that the monitor can be created and managed without issues
+func TestAccMonitorResource_oomKilled(t *testing.T) {
+	title := fmt.Sprintf("K8s Pod OOM Killed Monitor %s", acctest.RandomWithPrefix("test"))
+
+	resource.Test(t, resource.TestCase{
+		PreCheck:                 func() { testAccPreCheck(t) },
+		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
+		Steps: []resource.TestStep{
+			// Step 1: Create monitor with the exact YAML from monitor.yml
+			{
+				Config: testAccMonitorResourceConfigOomKilled(title),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					resource.TestCheckResourceAttrSet("groundcover_monitor.test", "id"),
+					resource.TestCheckResourceAttrSet("groundcover_monitor.test", "monitor_yaml"),
+					resource.TestMatchResourceAttr("groundcover_monitor.test", "monitor_yaml", regexp.MustCompile(regexp.QuoteMeta(title))),
+					// Verify that groupBy entries with aliases are present
+					resource.TestMatchResourceAttr("groundcover_monitor.test", "monitor_yaml", regexp.MustCompile(`(?s)groupBy:.*alias: pod_name`)),
+				),
+			},
+			// Step 2: Apply the same config again - should not detect changes (no apply loop)
+			// This verifies idempotency after state refresh
+			{
+				Config: testAccMonitorResourceConfigOomKilled(title),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					resource.TestCheckResourceAttrSet("groundcover_monitor.test", "id"),
+					resource.TestCheckResourceAttrSet("groundcover_monitor.test", "monitor_yaml"),
+				),
+				ExpectNonEmptyPlan: false, // Should be no changes
+			},
+		},
+	})
+}
+
+// testAccMonitorResourceConfigOomKilled creates a monitor config that matches the exact
+// YAML from monitor.yml. This monitor uses sqlPipeline with complex selectors, filters,
+// groupBy, and orderBy configurations.
+func testAccMonitorResourceConfigOomKilled(title string) string {
+	// This is the exact YAML from monitor.yml with a dynamic title
+	yaml := fmt.Sprintf(`title: %s
+display:
+  header: %s
+  resourceHeaderLabels:
+  - pod_name
+  - container
+  contextHeaderLabels:
+  - env
+  - cluster
+  - namespace
+  - workload
+  description: This Monitor fires when a pod has been OOM Killed, leading to potential
+    application instability.
+severity: error
+measurementType: event
+model:
+  queries:
+  - dataType: events
+    name: threshold_input_query
+    sqlPipeline:
+      selectors:
+      - key: _time
+        origin: root
+        type: string
+        processors:
+        - op: toStartOfInterval
+          args:
+          - 5 minutes
+        alias: _bucket_timestamp
+      - key: podName
+        origin: root
+        type: string
+        alias: pod_name
+      - key: container
+        origin: root
+        type: string
+        alias: container
+      - key: cluster
+        origin: root
+        type: string
+        alias: cluster
+      - key: namespace
+        origin: root
+        type: string
+        alias: namespace
+      - key: env
+        origin: root
+        type: string
+        alias: env
+      - key: workload
+        origin: root
+        type: string
+        alias: workload
+      - key: '*'
+        origin: root
+        type: string
+        processors:
+        - op: count
+        alias: crashes_count
+      filters:
+        conditions:
+        - key: type
+          origin: root
+          type: string
+          filters:
+          - op: match
+            value: container_crash
+        - key: reason
+          origin: root
+          type: string
+          filters:
+          - op: match
+            value: OOMKilled
+        operator: and
+      groupBy:
+      - key: _bucket_timestamp
+        origin: root
+        type: string
+      - key: podName
+        origin: root
+        type: string
+        alias: pod_name
+      - key: container
+        origin: root
+        type: string
+        alias: container
+      - key: cluster
+        origin: root
+        type: string
+        alias: cluster
+      - key: namespace
+        origin: root
+        type: string
+        alias: namespace
+      - key: env
+        origin: root
+        type: string
+        alias: env
+      - key: workload
+        origin: root
+        type: string
+        alias: workload
+      orderBy:
+      - selector:
+          key: _bucket_timestamp
+          origin: root
+          type: string
+        direction: ASC
+    instantRollup: 5 minutes
+  thresholds:
+  - name: threshold_1
+    inputName: threshold_input_query
+    operator: gt
+    values:
+    - 0
+executionErrorState: OK
+noDataState: OK
+evaluationInterval:
+  interval: 1m0s
+  pendingFor: 1m0s`, title, title)
+
+	return fmt.Sprintf(`
+resource "groundcover_monitor" "test" {
+  monitor_yaml = <<-YAML
+%s
+YAML
+}
+`, yaml)
+}

@@ -1,5 +1,6 @@
 ## 1.5.3
 
+* Fixed apply loop bug in monitor resources where `FilterYamlKeysBasedOnTemplate` only looked at the first item in arrays (like `groupBy`), causing optional fields like `alias` that exist in later items to be filtered out, leading to false drift detection and apply loops. The fix merges keys from all array items to capture all possible fields.
 * Improved automatic normalization of monitor YAML to convert single-line pipe syntax to simple strings
 * Improved semantic comparison to ignore formatting differences (trailing newlines, multiline syntax)
 * Added normalization for expression fields to handle multiline formatting differences (e.g., expressions split across lines with trailing spaces vs single-line expressions returned by API)
