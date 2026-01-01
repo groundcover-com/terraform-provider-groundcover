@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"os"
 	"regexp"
-	"strings"
 	"testing"
 
 	"github.com/hashicorp/terraform-plugin-testing/helper/acctest"
@@ -440,12 +439,8 @@ YAML
 `, titleValue, headerValue)
 }
 
-// TestAccMonitorResource_applyLoopIssue tests the specific monitor configuration that was causing
-// an apply loop. This test uses the exact YAML from the user's monitor test.yml file and tests
-// that applying the same configuration multiple times does not trigger unnecessary updates.
 func TestAccMonitorResource_applyLoopIssue(t *testing.T) {
-	originalTitle := "k8s eu-povs node not ready"
-	newTitle := "k8s eu-povs node not ready"
+	title := "k8s eu-povs node not ready"
 
 	resource.Test(t, resource.TestCase{
 		PreCheck:                 func() { testAccPreCheck(t) },
@@ -453,29 +448,29 @@ func TestAccMonitorResource_applyLoopIssue(t *testing.T) {
 		Steps: []resource.TestStep{
 			// Step 1: Create monitor with the exact YAML from monitor test.yml
 			{
-				Config: testAccMonitorResourceConfigApplyLoop(originalTitle, newTitle),
+				Config: testAccMonitorResourceConfigApplyLoop(title),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttrSet("groundcover_monitor.test", "id"),
 					resource.TestCheckResourceAttrSet("groundcover_monitor.test", "monitor_yaml"),
-					resource.TestMatchResourceAttr("groundcover_monitor.test", "monitor_yaml", regexp.MustCompile(regexp.QuoteMeta(newTitle))),
+					resource.TestMatchResourceAttr("groundcover_monitor.test", "monitor_yaml", regexp.MustCompile(regexp.QuoteMeta(title))),
 					testAccCheckMonitorResourcePrintDetails("groundcover_monitor.test"),
 				),
 			},
 			// Step 2: Apply the same config again - should not detect changes (no apply loop)
 			// This is the critical test - if there's an apply loop, this step will show changes
 			{
-				Config: testAccMonitorResourceConfigApplyLoop(originalTitle, newTitle),
+				Config: testAccMonitorResourceConfigApplyLoop(title),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttrSet("groundcover_monitor.test", "id"),
 					resource.TestCheckResourceAttrSet("groundcover_monitor.test", "monitor_yaml"),
-					resource.TestMatchResourceAttr("groundcover_monitor.test", "monitor_yaml", regexp.MustCompile(regexp.QuoteMeta(newTitle))),
+					resource.TestMatchResourceAttr("groundcover_monitor.test", "monitor_yaml", regexp.MustCompile(regexp.QuoteMeta(title))),
 				),
 				// ExpectNonEmptyPlan is false by default, meaning we expect no changes
 				// If there were an apply loop, this step would fail or show changes
 			},
 			// Step 3: Apply one more time to be absolutely sure there's no apply loop
 			{
-				Config: testAccMonitorResourceConfigApplyLoop(originalTitle, newTitle),
+				Config: testAccMonitorResourceConfigApplyLoop(title),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttrSet("groundcover_monitor.test", "id"),
 					resource.TestCheckResourceAttrSet("groundcover_monitor.test", "monitor_yaml"),
@@ -486,13 +481,12 @@ func TestAccMonitorResource_applyLoopIssue(t *testing.T) {
 }
 
 // testAccMonitorResourceConfigApplyLoop creates a monitor config that matches the user's
-// monitor test.yml file. This uses string replacement to modify the title, just like
-// the user's terraform configuration does.
-func testAccMonitorResourceConfigApplyLoop(originalTitle, newTitle string) string {
+// monitor test.yml file.
+func testAccMonitorResourceConfigApplyLoop(title string) string {
 	// This is the exact YAML from monitor test.yml
-	originalYaml := `title: k8s eu-povs node not ready
+	yaml := fmt.Sprintf(`title: %s
 display:
-  header: k8s eu-povs node not ready
+  header: %s
   contextHeaderLabels:
   - cluster
   - node
@@ -526,10 +520,7 @@ noDataState: OK
 evaluationInterval:
   interval: 5m0s
   pendingFor: 5m0s
-isPaused: true`
-
-	// Simulate the string replacement that the user's terraform does
-	modifiedYaml := strings.Replace(originalYaml, fmt.Sprintf("title: %s", originalTitle), fmt.Sprintf("title: %s", newTitle), 1)
+isPaused: true`, title, title)
 
 	return fmt.Sprintf(`
 resource "groundcover_monitor" "test" {
@@ -537,7 +528,7 @@ resource "groundcover_monitor" "test" {
 %s
 YAML
 }
-`, modifiedYaml)
+`, yaml)
 }
 
 // TestAccMonitorResource_multilineExpression tests that monitors with multiline expressions
