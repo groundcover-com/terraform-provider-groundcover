@@ -526,8 +526,6 @@ noDataState: OK
 evaluationInterval:
   interval: 5m0s
   pendingFor: 5m0s
-notificationSettings:
-  renotificationInterval: 4h0m0s
 isPaused: true`
 
 	// Simulate the string replacement that the user's terraform does
