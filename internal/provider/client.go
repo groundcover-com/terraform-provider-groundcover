@@ -244,6 +244,10 @@ func NewSdkClientWrapper(ctx context.Context, baseURLStr, apiKey, backendID stri
 
 	userEnabledDebug := os.Getenv("TF_LOG") == "debug"
 
+	// Normalize the URL to ensure it has a proper scheme before parsing
+	// This is important when tests call NewSdkClientWrapper directly with URLs from env vars
+	baseURLStr = normalizeAPIURL(baseURLStr)
+
 	tflog.Info(ctx, "Initializing Groundcover SDK client", map[string]any{"baseURL": baseURLStr, "backendID": backendID})
 
 	parsedURL, err := url.Parse(baseURLStr)
