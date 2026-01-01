@@ -438,3 +438,188 @@ YAML
 }
 `, titleValue, headerValue)
 }
+
+func TestAccMonitorResource_applyLoopIssue(t *testing.T) {
+	title := acctest.RandomWithPrefix("k8s eu-povs node not ready")
+
+	resource.Test(t, resource.TestCase{
+		PreCheck:                 func() { testAccPreCheck(t) },
+		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
+		Steps: []resource.TestStep{
+			// Step 1: Create monitor with the exact YAML from monitor test.yml
+			{
+				Config: testAccMonitorResourceConfigApplyLoop(title),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					resource.TestCheckResourceAttrSet("groundcover_monitor.test", "id"),
+					resource.TestCheckResourceAttrSet("groundcover_monitor.test", "monitor_yaml"),
+					resource.TestMatchResourceAttr("groundcover_monitor.test", "monitor_yaml", regexp.MustCompile(regexp.QuoteMeta(title))),
+					testAccCheckMonitorResourcePrintDetails("groundcover_monitor.test"),
+				),
+			},
+			// Step 2: Apply the same config again - should not detect changes (no apply loop)
+			// This is the critical test - if there's an apply loop, this step will show changes
+			{
+				Config: testAccMonitorResourceConfigApplyLoop(title),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					resource.TestCheckResourceAttrSet("groundcover_monitor.test", "id"),
+					resource.TestCheckResourceAttrSet("groundcover_monitor.test", "monitor_yaml"),
+					resource.TestMatchResourceAttr("groundcover_monitor.test", "monitor_yaml", regexp.MustCompile(regexp.QuoteMeta(title))),
+				),
+				// ExpectNonEmptyPlan is false by default, meaning we expect no changes
+				// If there were an apply loop, this step would fail or show changes
+			},
+			// Step 3: Apply one more time to be absolutely sure there's no apply loop
+			{
+				Config: testAccMonitorResourceConfigApplyLoop(title),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					resource.TestCheckResourceAttrSet("groundcover_monitor.test", "id"),
+					resource.TestCheckResourceAttrSet("groundcover_monitor.test", "monitor_yaml"),
+				),
+			},
+		},
+	})
+}
+
+// testAccMonitorResourceConfigApplyLoop creates a monitor config that matches the user's
+// monitor test.yml file.
+func testAccMonitorResourceConfigApplyLoop(title string) string {
+	// This is the exact YAML from monitor test.yml
+	yaml := fmt.Sprintf(`title: %s
+display:
+  header: %s
+  contextHeaderLabels:
+  - cluster
+  - node
+  - environment
+  - cluster
+  - env
+  description: is not ready
+severity: error
+measurementType: state
+model:
+  queries:
+  - name: threshold_input_query
+    expression: sum(kube_node_status_condition{cluster="eu-povs", condition="Ready",status="true"}) 
+      by (cluster, node, environment) > 0
+    datasourceType: prometheus
+    queryType: instant
+    rollup:
+      function: last
+      time: 10m
+  thresholds:
+  - name: threshold_1
+    inputName: threshold_input_query
+    operator: gt
+    values:
+    - 0
+annotations:
+  Pagerduty_Incidents: enabled
+  Slack-Prod-Alerts: enabled
+executionErrorState: Error
+noDataState: OK
+evaluationInterval:
+  interval: 5m0s
+  pendingFor: 5m0s
+notificationSettings:
+    renotificationInterval: 2h
+isPaused: true`, title, title)
+
+	return fmt.Sprintf(`
+resource "groundcover_monitor" "test" {
+  monitor_yaml = <<-YAML
+%s
+YAML
+}
+`, yaml)
+}
+
+// TestAccMonitorResource_multilineExpression tests that monitors with multiline expressions
+// (where the expression spans multiple lines with trailing spaces) do not cause apply loops.
+// This tests the specific issue where the API returns expressions on a single line, but the
+// input has them split across lines with trailing spaces.
+func TestAccMonitorResource_multilineExpression(t *testing.T) {
+	name := acctest.RandomWithPrefix("test-monitor-multiline-expr")
+
+	resource.Test(t, resource.TestCase{
+		PreCheck:                 func() { testAccPreCheck(t) },
+		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
+		Steps: []resource.TestStep{
+			// Step 1: Create monitor with multiline expression (trailing space + continuation)
+			{
+				Config: testAccMonitorResourceConfigMultilineExpression(name),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					resource.TestCheckResourceAttrSet("groundcover_monitor.test", "id"),
+					resource.TestCheckResourceAttrSet("groundcover_monitor.test", "monitor_yaml"),
+					resource.TestMatchResourceAttr("groundcover_monitor.test", "monitor_yaml", regexp.MustCompile(regexp.QuoteMeta(name))),
+					testAccCheckMonitorResourcePrintDetails("groundcover_monitor.test"),
+				),
+			},
+			// Step 2: Plan with the same config - should show no changes (no apply loop)
+			// This explicitly verifies that multiline expressions are normalized correctly
+			// and don't cause drift. If there were an apply loop, this would show changes.
+			{
+				Config:             testAccMonitorResourceConfigMultilineExpression(name),
+				PlanOnly:           true,
+				ExpectNonEmptyPlan: false, // Explicitly expect no changes - this is the key check for apply loop
+			},
+			// Step 3: Apply the same config again - should not detect changes (no apply loop)
+			// This verifies that applying doesn't trigger updates
+			{
+				Config: testAccMonitorResourceConfigMultilineExpression(name),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					resource.TestCheckResourceAttrSet("groundcover_monitor.test", "id"),
+					resource.TestCheckResourceAttrSet("groundcover_monitor.test", "monitor_yaml"),
+					resource.TestMatchResourceAttr("groundcover_monitor.test", "monitor_yaml", regexp.MustCompile(regexp.QuoteMeta(name))),
+				),
+				ExpectNonEmptyPlan: false, // Explicitly expect no changes
+			},
+			// Step 4: Plan one more time to be absolutely sure there's no apply loop
+			{
+				Config:             testAccMonitorResourceConfigMultilineExpression(name),
+				PlanOnly:           true,
+				ExpectNonEmptyPlan: false, // Explicitly expect no changes
+			},
+		},
+	})
+}
+
+// testAccMonitorResourceConfigMultilineExpression creates a monitor config with a multiline expression
+// that has a trailing space on the first line and continuation on the next line. This simulates
+// the exact issue where the API returns the expression on a single line, but the input has it
+// split across lines with trailing spaces.
+func testAccMonitorResourceConfigMultilineExpression(name string) string {
+	return fmt.Sprintf(`
+resource "groundcover_monitor" "test" {
+  monitor_yaml = <<-YAML
+title: %s
+display:
+  header: %s
+  description: Test monitor with multiline expression
+severity: error
+measurementType: state
+model:
+  queries:
+  - name: threshold_input_query
+    expression: sum(kube_node_status_condition{cluster="test", condition="Ready",status="true"}) 
+      by (cluster, node, environment) > 0
+    datasourceType: prometheus
+    queryType: instant
+    rollup:
+      function: last
+      time: 10m
+  thresholds:
+  - name: threshold_1
+    inputName: threshold_input_query
+    operator: gt
+    values:
+    - 0
+executionErrorState: Error
+noDataState: OK
+evaluationInterval:
+  interval: 5m0s
+  pendingFor: 5m0s
+isPaused: true
+YAML
+}
+`, name, name)
+}
