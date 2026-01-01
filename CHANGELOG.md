@@ -2,6 +2,7 @@
 
 * Improved automatic normalization of monitor YAML to convert single-line pipe syntax to simple strings
 * Improved semantic comparison to ignore formatting differences (trailing newlines, multiline syntax)
+* Added normalization for expression fields to handle multiline formatting differences (e.g., expressions split across lines with trailing spaces vs single-line expressions returned by API)
 * Updated groundcover SDK from v1.28.0 to v1.136.0
 
 ## 1.5.2
