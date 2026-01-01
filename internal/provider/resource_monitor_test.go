@@ -499,6 +499,7 @@ measurementType: state
 model:
   queries:
   - name: threshold_input_query
+    # trailing space after status="true"}) tests yaml normalization
     expression: sum(kube_node_status_condition{cluster="eu-povs", condition="Ready",status="true"}) 
       by (cluster, node, environment) > 0
     datasourceType: prometheus
