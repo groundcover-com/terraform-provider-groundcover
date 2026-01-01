@@ -1,3 +1,7 @@
+## 1.5.4
+
+* Added normalization for expression fields to handle multiline formatting differences (e.g., expressions split across lines with trailing spaces vs single-line expressions returned by API)
+
 ## 1.5.3
 
 * Improved automatic normalization of monitor YAML to convert single-line pipe syntax to simple strings
