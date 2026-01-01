@@ -440,7 +440,7 @@ YAML
 }
 
 func TestAccMonitorResource_applyLoopIssue(t *testing.T) {
-	title := "k8s eu-povs node not ready"
+	title := acctest.RandomWithPrefix("k8s eu-povs node not ready")
 
 	resource.Test(t, resource.TestCase{
 		PreCheck:                 func() { testAccPreCheck(t) },
