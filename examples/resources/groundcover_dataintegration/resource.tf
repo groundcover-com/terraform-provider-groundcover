@@ -174,7 +174,7 @@ resource "groundcover_dataintegration" "prometheus_discovery_example" {
       url = "https://cloud.mongodb.com/prometheus/v1.0/groups/example"
 
       # Please refer to the groundcover_secret doc on how to create a secret
-      authentication = {
+      authentication = { # Authentication for the discovery endpoint
         basicAuth = {
           username = "prom_user_6909b9ab19480f045c1f2eca"
           password = "secretRef::store::5219731e4bc798eb"
@@ -191,7 +191,7 @@ resource "groundcover_dataintegration" "prometheus_discovery_example" {
       ]
     }
 
-    authentication = {
+    authentication = { # Authentication for scraping discovered targets
       basicAuth = {
         username = "prom_user_6909b9ab19480f045c1f2eca"
         password = "secretRef::store::15e1b4b9c0ce0a45"
@@ -248,7 +248,7 @@ resource "groundcover_dataintegration" "mongodb_atlas_example" {
       url = "https://cloud.mongodb.com/prometheus/v1.0/groups/example/discovery"
 
       # Please refer to the groundcover_secret doc on how to create a secret
-      authentication = {
+      authentication = { # Authentication for the discovery endpoint
         basicAuth = {
           username = "prom_user_6909b9ab19480f045c1f2eca"
           password = "secretRef::store::5219731e4bc798eb"
@@ -265,7 +265,7 @@ resource "groundcover_dataintegration" "mongodb_atlas_example" {
       ]
     }
 
-    authentication = {
+    authentication = { # Authentication for scraping discovered targets
       basicAuth = {
         username = "prom_user_6909b9ab19480f045c1f2eca"
         password = "secretRef::store::15e1b4b9c0ce0a45"
