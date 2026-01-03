@@ -104,8 +104,8 @@ resource "groundcover_dataintegration" "prometheus_static_example" {
     name           = "prometheus-static-config"
     scheme         = "https"
     metricsPath    = "/metrics"
-    scrapeInterval = "30s"
-    scrapeTimeout  = "10s"
+    scrapeInterval = 30000000000
+    scrapeTimeout  = 10000000000
 
     staticTargets = [
       "prometheus-target.example.com:9090"
