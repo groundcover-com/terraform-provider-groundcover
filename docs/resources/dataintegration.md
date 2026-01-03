@@ -110,6 +110,206 @@ resource "groundcover_dataintegration" "azure_example" {
   is_paused = false
 }
 
+# Example: Prometheus Static Targets
+resource "groundcover_dataintegration" "prometheus_static_example" {
+  type = "prometheusscrape"
+  config = jsonencode({
+    version        = 1
+    enabled        = true
+    name           = "prometheus-static-config"
+    scheme         = "https"
+    metricsPath    = "/metrics"
+    scrapeInterval = "30s"
+    scrapeTimeout  = "10s"
+
+    staticTargets = [
+      "prometheus-target.example.com:9090"
+    ]
+
+    exporters = [
+      "prometheus"
+    ]
+
+    metricsRelabels = {
+      # List of regex of metrics to keep. All other metrics will be dropped.
+      keepRegex = [
+        "[*]cpu[*]"
+      ]
+
+      # List of regex of metrics to drop
+      dropRegex = [
+        "DB1[*]"
+      ]
+      raw = <<-EOT
+# additional relabeling rules that can be applied such as adding a prefix
+  - action: labelmap
+    replacement: "groundcover_$1"
+EOT
+    }
+
+    labelSettings = {
+      extraLabels = {
+        env = "prod"
+      }
+    }
+
+    authentication = {
+      basicAuth = {
+        username = "prometheus-user"
+        # refer to groundcover_secret to create a secret
+        password = "secretRef::store::d1fc037f11f8ce58"
+      }
+    }
+  })
+  is_paused = false
+}
+
+# Example: Prometheus HTTPs Target Discovery
+resource "groundcover_dataintegration" "prometheus_discovery_example" {
+  type = "prometheusscrape"
+
+  config = jsonencode({
+    version = 1
+    enabled = true
+    name    = "Target discovery scraping example"
+
+    exporters = [
+      "prometheus"
+    ]
+
+    # Durations are numeric (nanoseconds), preserved as-is
+    scrapeInterval = 30000000000
+    scrapeTimeout  = 10000000000
+
+    metricsPath = "/metrics"
+    scheme      = "http"
+
+    # provide the host details for discovery
+    httpDiscovery = {
+      url = "https://cloud.mongodb.com/prometheus/v1.0/groups/example"
+
+      # Please refer to the groundcover_secret doc on how to create a secret
+      authentication = {
+        basicAuth = {
+          username = "prom_user_6909b9ab19480f045c1f2eca"
+          password = "secretRef::store::5219731e4bc798eb"
+        }
+      }
+    }
+    # Relabeling options on discovered targets. keepRegex - drop all targets which don't comply with this rule. dropRegex - drop all targets which comply with this rule.
+    targetsRelabels = {
+      keepRegex = [
+        ".*shard-00-02.*"
+      ]
+      dropRegex = [
+        ".*shard-00-01.*"
+      ]
+    }
+
+    authentication = {
+      basicAuth = {
+        username = "prom_user_6909b9ab19480f045c1f2eca"
+        password = "secretRef::store::15e1b4b9c0ce0a45"
+      }
+    }
+
+    metricsRelabels = {
+      # List of regex of metrics to keep. All other metrics will be dropped.
+      keepRegex = [
+        "[*]cpu[*]"
+      ]
+      dropRegex = [
+        "DB1[*]"
+      ]
+      raw = <<-EOT
+# additional relabeling rules that can be applied such as adding a prefix
+  - action: labelmap
+    replacement: "groundcover_$1"
+EOT
+    }
+
+    labelSettings = {
+      extraLabels = {
+        env = "prod"
+      }
+    }
+  })
+
+  is_paused = false
+}
+
+# Example: MongoDB Atlas
+resource "groundcover_dataintegration" "mongodb_atlas_example" {
+  type = "mongoatlasscrape"
+
+  config = jsonencode({
+    version = 1
+    enabled = true
+    name    = "MongoDB Atlas example"
+
+    exporters = [
+      "prometheus"
+    ]
+
+    # Durations are numeric (nanoseconds), preserved as-is
+    scrapeInterval = 30000000000
+    scrapeTimeout  = 10000000000
+
+    metricsPath = "/metrics"
+    scheme      = "http"
+
+    # provide the host details for discovery
+    httpDiscovery = {
+      url = "https://cloud.mongodb.com/prometheus/v1.0/groups/example/discovery"
+
+      # Please refer to the groundcover_secret doc on how to create a secret
+      authentication = {
+        basicAuth = {
+          username = "prom_user_6909b9ab19480f045c1f2eca"
+          password = "secretRef::store::5219731e4bc798eb"
+        }
+      }
+    }
+    # Relabeling options on discovered targets. keepRegex - drop all targets which don't comply with this rule. dropRegex - drop all targets which comply with this rule.
+    targetsRelabels = {
+      keepRegex = [
+        ".*shard-00-02.*"
+      ]
+      dropRegex = [
+        ".*shard-00-01.*"
+      ]
+    }
+
+    authentication = {
+      basicAuth = {
+        username = "prom_user_6909b9ab19480f045c1f2eca"
+        password = "secretRef::store::15e1b4b9c0ce0a45"
+      }
+    }
+
+    metricsRelabels = {
+      # List of regex of metrics to keep. All other metrics will be dropped.
+      keepRegex = []
+      dropRegex = [
+        "[*]catalogStats[*]"
+      ]
+      raw = <<-EOT
+# additional relabeling rules that can be applied such as adding a prefix
+  - action: labelmap
+    replacement: "groundcover_$1"
+EOT
+    }
+
+    labelSettings = {
+      extraLabels = {
+        env = "prod"
+      }
+    }
+  })
+
+  is_paused = false
+}
+
 # Output the data integration IDs for reference
 output "cloudwatch_dataintegration_id" {
   description = "The ID of the CloudWatch data integration"
@@ -124,6 +324,21 @@ output "gcpmetrics_dataintegration_id" {
 output "azuremetrics_dataintegration_id" {
   description = "The ID of the Azure Metrics data integration"
   value       = groundcover_dataintegration.azure_example.id
+}
+
+output "prometheus_static_dataintegration_id" {
+  description = "The ID of the Prometheus Static Targets data integration"
+  value       = groundcover_dataintegration.prometheus_static_example.id
+}
+
+output "prometheus_discovery_dataintegration_id" {
+  description = "The ID of the Prometheus Target Discovery data integration"
+  value       = groundcover_dataintegration.prometheus_discovery_example.id
+}
+
+output "mongodb_atlas_dataintegration_id" {
+  description = "The ID of the MongoDB Atlas data integration"
+  value       = groundcover_dataintegration.mongodb_atlas_example.id
 }
 ```
 
