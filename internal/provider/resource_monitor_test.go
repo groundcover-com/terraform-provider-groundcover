@@ -521,6 +521,8 @@ noDataState: OK
 evaluationInterval:
   interval: 5m0s
   pendingFor: 5m0s
+notificationSettings:
+    renotificationInterval: 2h
 isPaused: true`, title, title)
 
 	return fmt.Sprintf(`
