@@ -200,11 +200,19 @@ func extractKeysFromAstNode(ctx context.Context, node ast.Node) map[string]inter
 			}
 		}
 	case *ast.SequenceNode:
-		// For arrays, extract keys from the first item (assuming array items have similar structure)
+		// For arrays, merge keys from all items to capture optional fields that may only exist in some items
+		// This is critical for cases like groupBy where some items have 'alias' fields and others don't.
+		// Previously, only the first item's keys were used, which caused optional fields (like 'alias')
+		// that only exist in later items to be filtered out, leading to false drift detection and apply loops.
 		if len(n.Values) > 0 {
-			firstItemKeys := extractKeysFromAstNode(ctx, n.Values[0])
-			if len(firstItemKeys) > 0 {
-				return map[string]interface{}{SequenceMarker: true, ItemKeysField: firstItemKeys}
+			mergedKeys := make(map[string]interface{})
+			for _, itemNode := range n.Values {
+				itemKeys := extractKeysFromAstNode(ctx, itemNode)
+				// Merge keys from this item into the merged result
+				mergeKeysInto(mergedKeys, itemKeys)
+			}
+			if len(mergedKeys) > 0 {
+				return map[string]interface{}{SequenceMarker: true, ItemKeysField: mergedKeys}
 			}
 		}
 		return map[string]interface{}{SequenceMarker: true}
@@ -217,6 +225,33 @@ func extractKeysFromAstNode(ctx context.Context, node ast.Node) map[string]inter
 	}
 
 	return result
+}
+
+// mergeKeysInto merges keys from source into target recursively
+// This is used to combine keys from multiple array items to capture all possible fields.
+// For example, in a groupBy array where the first item has no 'alias' field but later items do,
+// this ensures the 'alias' field is included in the template so it won't be filtered out.
+func mergeKeysInto(target, source map[string]interface{}) {
+	for key, sourceValue := range source {
+		// Skip special markers
+		if key == SequenceMarker || key == ScalarMarker || key == ItemKeysField {
+			continue
+		}
+
+		if targetValue, exists := target[key]; exists {
+			// Key exists in both - need to merge recursively if both are maps
+			if targetMap, targetIsMap := targetValue.(map[string]interface{}); targetIsMap {
+				if sourceMap, sourceIsMap := sourceValue.(map[string]interface{}); sourceIsMap {
+					mergeKeysInto(targetMap, sourceMap)
+					continue
+				}
+			}
+			// If types don't match or aren't maps, keep the existing value
+		} else {
+			// Key doesn't exist in target - add it
+			target[key] = sourceValue
+		}
+	}
 }
 
 // filterAstNodeByKeys recursively filters an AST node to only include keys present in the allowedKeys structure
