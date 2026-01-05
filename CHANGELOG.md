@@ -1,6 +1,6 @@
 ## 1.5.4
 
-* Fixed dashboard resource `revision_number` attribute showing false changes on every apply by adding `UseStateForUnknown()` plan modifier. This prevents Terraform from detecting changes when the revision number hasn't actually changed remotely.
+* Fixed dashboard resource `revision_number` attribute showing false changes on every apply. The fix uses ModifyPlan to handle revision_number intelligently: when there are no actual changes, it uses the state value to prevent false positives; when there are changes, it allows the revision number to increment during updates (which is expected API behavior).
 
 ## 1.5.3
 

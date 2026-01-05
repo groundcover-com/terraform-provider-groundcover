@@ -9,7 +9,6 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
-	"github.com/hashicorp/terraform-plugin-framework/resource/schema/int32planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/types"
@@ -77,9 +76,6 @@ func (r *dashboardResource) Schema(_ context.Context, _ resource.SchemaRequest, 
 			"revision_number": schema.Int32Attribute{
 				Description: "The revision number of the dashboard.",
 				Computed:    true,
-				PlanModifiers: []planmodifier.Int32{
-					int32planmodifier.UseStateForUnknown(),
-				},
 			},
 			"override": schema.BoolAttribute{
 				Description: "Whether to override the dashboard on update.",
@@ -389,61 +385,62 @@ func (r *dashboardResource) ModifyPlan(ctx context.Context, req resource.ModifyP
 		return
 	}
 
-	tflog.Debug(ctx, "ModifyPlan: Checking for changes", map[string]interface{}{
-		"plan_preset_len":  len(plan.Preset.ValueString()),
-		"state_preset_len": len(state.Preset.ValueString()),
-		"presets_equal":    plan.Preset.Equal(state.Preset),
-	})
-
-	// Skip if any preset values are null or unknown
-	if plan.Preset.IsNull() || plan.Preset.IsUnknown() || state.Preset.IsNull() || state.Preset.IsUnknown() {
-		return
+	// Check if there are any actual changes to the dashboard
+	hasChanges := false
+	if !plan.Name.Equal(state.Name) {
+		hasChanges = true
+	}
+	if !plan.Description.Equal(state.Description) {
+		hasChanges = true
+	}
+	if !plan.Team.Equal(state.Team) {
+		hasChanges = true
 	}
 
-	plannedPreset := plan.Preset.ValueString()
-	statePreset := state.Preset.ValueString()
+	// Handle preset comparison
+	if !plan.Preset.IsNull() && !plan.Preset.IsUnknown() && !state.Preset.IsNull() && !state.Preset.IsUnknown() {
+		plannedPreset := plan.Preset.ValueString()
+		statePreset := state.Preset.ValueString()
 
-	// Skip if presets are already identical
-	if plannedPreset == statePreset {
-		return
+		if plannedPreset != statePreset {
+			// Try to normalize and compare the presets
+			normalizedPlanned, err := NormalizeJSON(ctx, plannedPreset)
+			if err != nil {
+				tflog.Warn(ctx, "Failed to normalize planned preset JSON", map[string]interface{}{
+					"error": err.Error(),
+				})
+				hasChanges = true
+			} else {
+				normalizedState, err := NormalizeJSON(ctx, statePreset)
+				if err != nil {
+					tflog.Warn(ctx, "Failed to normalize state preset JSON", map[string]interface{}{
+						"error": err.Error(),
+					})
+					hasChanges = true
+				} else {
+					areSemanticallySame, err := CompareJSONSemantically(normalizedPlanned, normalizedState)
+					if err != nil {
+						tflog.Warn(ctx, "Failed to perform semantic JSON comparison", map[string]interface{}{
+							"error": err.Error(),
+						})
+						hasChanges = true
+					} else if !areSemanticallySame {
+						hasChanges = true
+					} else {
+						// Presets are semantically the same, suppress the diff
+						tflog.Info(ctx, "ModifyPlan: Preset JSONs are semantically identical. Suppressing diff.")
+						plan.Preset = state.Preset
+					}
+				}
+			}
+		}
 	}
 
-	// Try to normalize and compare the presets
-	normalizedPlanned, err := NormalizeJSON(ctx, plannedPreset)
-	if err != nil {
-		// If we can't normalize the planned preset, it's likely invalid JSON
-		// Allow Terraform to proceed with the update so the user can fix it
-		tflog.Warn(ctx, "Failed to normalize planned preset JSON", map[string]interface{}{
-			"error": err.Error(),
-		})
-		return
-	}
-
-	normalizedState, err := NormalizeJSON(ctx, statePreset)
-	if err != nil {
-		// If we can't normalize the state preset, allow the update to proceed
-		// This could happen if the state has corrupted data from a previous version
-		tflog.Warn(ctx, "Failed to normalize state preset JSON, allowing update", map[string]interface{}{
-			"error": err.Error(),
-		})
-		return
-	}
-
-	areSemanticallySame, err := CompareJSONSemantically(normalizedPlanned, normalizedState)
-	if err != nil {
-		// If we can't compare after successful normalization, something is wrong
-		// Allow the update to proceed rather than blocking it
-		tflog.Warn(ctx, "Failed to perform semantic JSON comparison, allowing update", map[string]interface{}{
-			"error": err.Error(),
-		})
-		return
-	}
-
-	if areSemanticallySame {
-		tflog.Info(ctx, "ModifyPlan: Preset JSONs are semantically identical. Suppressing diff.")
-		plan.Preset = state.Preset
-	} else {
-		tflog.Info(ctx, "ModifyPlan: Preset JSONs have semantic differences.")
+	// Handle revision_number: if there are no changes, use state value to prevent false positives
+	// If there are changes, allow it to be unknown so it can increment during the update
+	if !hasChanges && !plan.RevisionNumber.IsUnknown() && !state.RevisionNumber.IsNull() && !state.RevisionNumber.IsUnknown() {
+		tflog.Debug(ctx, "ModifyPlan: No changes detected, using state revision_number to prevent false positive")
+		plan.RevisionNumber = state.RevisionNumber
 	}
 
 	resp.Diagnostics.Append(resp.Plan.Set(ctx, &plan)...)
