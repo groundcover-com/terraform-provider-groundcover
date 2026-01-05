@@ -431,7 +431,7 @@ func (r *dashboardResource) ModifyPlan(ctx context.Context, req resource.ModifyP
 
 	// Handle revision_number: if there are no changes, use state value to prevent false positives
 	// If there are changes, allow it to be unknown so it can increment during the update
-	if !hasChanges && !plan.RevisionNumber.IsUnknown() && !state.RevisionNumber.IsNull() && !state.RevisionNumber.IsUnknown() {
+	if !hasChanges && !state.RevisionNumber.IsNull() && !state.RevisionNumber.IsUnknown() {
 		tflog.Debug(ctx, "ModifyPlan: No changes detected, using state revision_number to prevent false positive")
 		plan.RevisionNumber = state.RevisionNumber
 	}
