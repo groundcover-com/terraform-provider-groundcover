@@ -386,16 +386,9 @@ func (r *dashboardResource) ModifyPlan(ctx context.Context, req resource.ModifyP
 	}
 
 	// Check if there are any actual changes to the dashboard
-	hasChanges := false
-	if !plan.Name.Equal(state.Name) {
-		hasChanges = true
-	}
-	if !plan.Description.Equal(state.Description) {
-		hasChanges = true
-	}
-	if !plan.Team.Equal(state.Team) {
-		hasChanges = true
-	}
+	hasChanges := !plan.Name.Equal(state.Name) ||
+		!plan.Description.Equal(state.Description) ||
+		!plan.Team.Equal(state.Team)
 
 	// Handle preset comparison
 	if !plan.Preset.IsNull() && !plan.Preset.IsUnknown() && !state.Preset.IsNull() && !state.Preset.IsUnknown() {
