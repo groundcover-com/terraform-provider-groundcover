@@ -1,3 +1,7 @@
+## 1.5.4
+
+* Fixed dashboard resource `revision_number` attribute showing false changes on every apply by adding `UseStateForUnknown()` plan modifier. This prevents Terraform from detecting changes when the revision number hasn't actually changed remotely.
+
 ## 1.5.3
 
 * Fixed apply loop bug in monitor resources where `FilterYamlKeysBasedOnTemplate` only looked at the first item in arrays (like `groupBy`), causing optional fields like `alias` that exist in later items to be filtered out, leading to false drift detection and apply loops. The fix merges keys from all array items to capture all possible fields.
