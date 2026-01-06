@@ -289,14 +289,12 @@ func (r *silenceResource) Create(ctx context.Context, req resource.CreateRequest
 	}
 
 	// Update matchers from API response
-	if len(apiResponse.Matchers) > 0 {
-		matchersList, err := r.matchersToModel(ctx, apiResponse.Matchers)
-		if err != nil {
-			resp.Diagnostics.AddError("Error processing response matchers", err.Error())
-			return
-		}
-		plan.Matchers = matchersList
+	matchersList, err := r.matchersToModel(ctx, apiResponse.Matchers)
+	if err != nil {
+		resp.Diagnostics.AddError("Error processing response matchers", err.Error())
+		return
 	}
+	plan.Matchers = matchersList
 
 	tflog.Info(ctx, "Saving new silence to state", map[string]any{"id": plan.ID.ValueString()})
 	resp.Diagnostics.Append(resp.State.Set(ctx, &plan)...)
@@ -420,14 +418,12 @@ func (r *silenceResource) Update(ctx context.Context, req resource.UpdateRequest
 		if apiResponse.Comment != "" {
 			plan.Comment = types.StringValue(apiResponse.Comment)
 		}
-		if len(apiResponse.Matchers) > 0 {
-			matchersList, err := r.matchersToModel(ctx, apiResponse.Matchers)
-			if err != nil {
-				resp.Diagnostics.AddError("Error processing response matchers", err.Error())
-				return
-			}
-			plan.Matchers = matchersList
+		matchersList, err := r.matchersToModel(ctx, apiResponse.Matchers)
+		if err != nil {
+			resp.Diagnostics.AddError("Error processing response matchers", err.Error())
+			return
 		}
+		plan.Matchers = matchersList
 	}
 
 	tflog.Info(ctx, "Saving updated silence to state", map[string]any{"id": plan.ID.ValueString()})
