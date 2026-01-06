@@ -10,7 +10,6 @@ import (
 	"time"
 
 	"github.com/go-openapi/strfmt"
-	"github.com/go-openapi/swag"
 	"github.com/groundcover-com/groundcover-sdk-go/pkg/models"
 	"github.com/hashicorp/terraform-plugin-framework/attr"
 	"github.com/hashicorp/terraform-plugin-framework/path"
@@ -268,7 +267,7 @@ func (r *silenceResource) Create(ctx context.Context, req resource.CreateRequest
 		return
 	}
 
-	if apiResponse == nil || swag.IsZero(apiResponse.UUID) {
+	if apiResponse == nil || apiResponse.UUID.String() == "" {
 		resp.Diagnostics.AddError("SDK Client Create Silence Error", "Create response missing silence ID")
 		return
 	}
@@ -279,10 +278,10 @@ func (r *silenceResource) Create(ctx context.Context, req resource.CreateRequest
 	plan.ID = types.StringValue(apiResponse.UUID.String())
 
 	// Update times from API response if available
-	if !swag.IsZero(apiResponse.StartsAt) {
+	if !time.Time(apiResponse.StartsAt).IsZero() {
 		plan.StartsAt = types.StringValue(time.Time(apiResponse.StartsAt).Format(time.RFC3339))
 	}
-	if !swag.IsZero(apiResponse.EndsAt) {
+	if !time.Time(apiResponse.EndsAt).IsZero() {
 		plan.EndsAt = types.StringValue(time.Time(apiResponse.EndsAt).Format(time.RFC3339))
 	}
 	if apiResponse.Comment != "" {
@@ -332,13 +331,13 @@ func (r *silenceResource) Read(ctx context.Context, req resource.ReadRequest, re
 	tflog.Info(ctx, "Silence read successfully via SDK", map[string]any{"id": silenceID})
 
 	// Update state from API response
-	if !swag.IsZero(apiResponse.UUID) {
+	if apiResponse.UUID.String() != "" {
 		state.ID = types.StringValue(apiResponse.UUID.String())
 	}
-	if !swag.IsZero(apiResponse.StartsAt) {
+	if !time.Time(apiResponse.StartsAt).IsZero() {
 		state.StartsAt = types.StringValue(time.Time(apiResponse.StartsAt).Format(time.RFC3339))
 	}
-	if !swag.IsZero(apiResponse.EndsAt) {
+	if !time.Time(apiResponse.EndsAt).IsZero() {
 		state.EndsAt = types.StringValue(time.Time(apiResponse.EndsAt).Format(time.RFC3339))
 	}
 	if apiResponse.Comment != "" {
@@ -412,10 +411,10 @@ func (r *silenceResource) Update(ctx context.Context, req resource.UpdateRequest
 	plan.ID = state.ID
 
 	if apiResponse != nil {
-		if !swag.IsZero(apiResponse.StartsAt) {
+		if !time.Time(apiResponse.StartsAt).IsZero() {
 			plan.StartsAt = types.StringValue(time.Time(apiResponse.StartsAt).Format(time.RFC3339))
 		}
-		if !swag.IsZero(apiResponse.EndsAt) {
+		if !time.Time(apiResponse.EndsAt).IsZero() {
 			plan.EndsAt = types.StringValue(time.Time(apiResponse.EndsAt).Format(time.RFC3339))
 		}
 		if apiResponse.Comment != "" {

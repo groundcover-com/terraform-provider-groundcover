@@ -7,7 +7,6 @@ import (
 	"context"
 	"errors"
 
-	"github.com/go-openapi/swag"
 	"github.com/groundcover-com/groundcover-sdk-go/pkg/client/monitors"
 	"github.com/groundcover-com/groundcover-sdk-go/pkg/models"
 
@@ -38,7 +37,7 @@ func (c *SdkClientWrapper) CreateSilence(ctx context.Context, req *models.Create
 	}
 
 	respId := "<empty_id>"
-	if resp.Payload != nil && !swag.IsZero(resp.Payload.UUID) {
+	if resp.Payload != nil && resp.Payload.UUID.String() != "" {
 		respId = resp.Payload.UUID.String()
 	} else if resp.Payload == nil {
 		tflog.Warn(ctx, "CreateSilence response payload was nil", logFields)
