@@ -197,6 +197,12 @@ type ApiClient interface {
 	CreateSecret(ctx context.Context, req *models.CreateSecretRequest) (*models.SecretResponse, error)
 	UpdateSecret(ctx context.Context, id string, req *models.UpdateSecretRequest) (*models.SecretResponse, error)
 	DeleteSecret(ctx context.Context, id string) error
+
+	// Silences
+	CreateSilence(ctx context.Context, req *models.CreateSilenceRequest) (*models.Silence, error)
+	GetSilence(ctx context.Context, id string) (*models.Silence, error)
+	UpdateSilence(ctx context.Context, id string, req *models.UpdateSilenceRequest) (*models.Silence, error)
+	DeleteSilence(ctx context.Context, id string) error
 }
 
 // SdkClientWrapper implements ApiClient using the Groundcover Go SDK.
