@@ -32,8 +32,8 @@ variable "groundcover_backend_id" {
 # Example 1: Simple silence for planned maintenance
 # Silences all alerts for a specific service during a maintenance window
 resource "groundcover_silence" "maintenance_window" {
-  starts_at = "2024-01-15T10:00:00Z"
-  ends_at   = "2024-01-15T14:00:00Z"
+  starts_at = "2030-01-15T10:00:00Z"
+  ends_at   = "2030-01-15T14:00:00Z"
   comment   = "Planned maintenance window for payment-service"
 
   matchers = [
@@ -49,8 +49,8 @@ resource "groundcover_silence" "maintenance_window" {
 # Example 2: Silence with multiple matchers
 # Silences alerts for a specific workload in a specific environment
 resource "groundcover_silence" "deployment_silence" {
-  starts_at = "2024-01-20T08:00:00Z"
-  ends_at   = "2024-01-20T10:00:00Z"
+  starts_at = "2030-01-20T08:00:00Z"
+  ends_at   = "2030-01-20T10:00:00Z"
   comment   = "Deploying new version of api-gateway in staging"
 
   matchers = [
@@ -72,8 +72,8 @@ resource "groundcover_silence" "deployment_silence" {
 # Example 3: Silence with regex pattern
 # Silences alerts for any service matching a pattern
 resource "groundcover_silence" "test_services_silence" {
-  starts_at = "2024-02-01T00:00:00Z"
-  ends_at   = "2024-02-01T06:00:00Z"
+  starts_at = "2030-02-01T00:00:00Z"
+  ends_at   = "2030-02-01T06:00:00Z"
   comment   = "Overnight testing - silence all test services"
 
   matchers = [
@@ -89,8 +89,8 @@ resource "groundcover_silence" "test_services_silence" {
 # Example 4: Silence with negation (is_equal = false)
 # Silences all alerts EXCEPT for production environment
 resource "groundcover_silence" "non_production_silence" {
-  starts_at = "2024-03-01T12:00:00Z"
-  ends_at   = "2024-03-01T18:00:00Z"
+  starts_at = "2030-03-01T12:00:00Z"
+  ends_at   = "2030-03-01T18:00:00Z"
   comment   = "Silence non-production alerts during load testing"
 
   matchers = [

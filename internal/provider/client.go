@@ -400,6 +400,13 @@ func handleApiError(ctx context.Context, err error, operation string, resourceId
 		return ErrNotFound
 	}
 
+	// Handle specific case for silence deletion where 500 can mean the silence doesn't exist
+	// The API returns 500 instead of 404 when trying to delete a non-existent silence
+	if operation == "DeleteSilence" && (statusCode == http.StatusInternalServerError || strings.Contains(errStr, "[500]")) {
+		tflog.Warn(ctx, "Mapping SDK error to ErrNotFound for DeleteSilence 500 error (likely already deleted).", logFields)
+		return ErrNotFound
+	}
+
 	if strings.Contains(lowerErrStr, "read-only") || strings.Contains(lowerErrStr, "read only") {
 		tflog.Warn(ctx, "Mapping SDK error to ErrReadOnly based on substring match.", logFields)
 		return ErrReadOnly

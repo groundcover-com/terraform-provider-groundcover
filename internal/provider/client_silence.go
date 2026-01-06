@@ -85,6 +85,11 @@ func (c *SdkClientWrapper) UpdateSilence(ctx context.Context, id string, req *mo
 		return nil, handleApiError(ctx, err, "UpdateSilence", id)
 	}
 
+	if resp == nil {
+		tflog.Error(ctx, "SDK UpdateSilence returned nil response and nil error, which is unexpected.", logFields)
+		return nil, errors.New("internal SDK error: UpdateSilence returned nil response without error")
+	}
+
 	tflog.Debug(ctx, "SDK Call Successful: Update Silence", logFields)
 	return resp.Payload, nil
 }
