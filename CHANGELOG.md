@@ -1,3 +1,7 @@
+## 1.5.4
+
+* Added silence resource for managing alert silences in groundcover
+
 ## 1.5.3
 
 * Fixed apply loop bug in monitor resources where `FilterYamlKeysBasedOnTemplate` only looked at the first item in arrays (like `groupBy`), causing optional fields like `alias` that exist in later items to be filtered out, leading to false drift detection and apply loops. The fix merges keys from all array items to capture all possible fields.
@@ -40,7 +44,7 @@
 
 ## 1.2.0
 
-* Added data integration resource for managing data integrations in Groundcover
+* Added data integration resource for managing data integrations in groundcover
 
 ## 1.1.1
 
@@ -50,9 +54,9 @@
 
 ## 1.1.0
 
-* Added dashboard resource for managing Groundcover dashboards
+* Added dashboard resource for managing groundcover dashboards
 * Fixed ingestion key resource compatibility with SDK v1.84.0 (deprecated creation_date field)
-* Updated Groundcover SDK from v1.41.0 to v1.84.0
+* Updated groundcover SDK from v1.41.0 to v1.84.0
 
 ## 1.0.0
 
@@ -60,7 +64,7 @@
 ## 0.8.0
 
 * Added `backend_id` as the new standard configuration option (replaces `org_name`, which remains supported for backwards compatibility)
-* Added support for in-cloud backend configuration via `GROUNDCOVER_INCLOUD_BACKEND_ID`
+* Added support for in-cloud backend configuration via `groundcover_INCLOUD_BACKEND_ID`
 * Updated Go version to 1.24
 
 ## 0.7.4
