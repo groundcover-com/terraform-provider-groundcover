@@ -84,7 +84,7 @@ func TestAccSilenceResource_multipleMatchers(t *testing.T) {
 					resource.TestCheckResourceAttr("groundcover_silence.test", "matchers.0.value", "test-service"),
 					resource.TestCheckResourceAttr("groundcover_silence.test", "matchers.0.is_equal", "true"),
 					resource.TestCheckResourceAttr("groundcover_silence.test", "matchers.0.is_contains", "false"),
-					// Second matcher - not contains regex
+					// Second matcher - not contains
 					resource.TestCheckResourceAttr("groundcover_silence.test", "matchers.1.name", "not-contains"),
 					resource.TestCheckResourceAttr("groundcover_silence.test", "matchers.1.value", "test-service"),
 					resource.TestCheckResourceAttr("groundcover_silence.test", "matchers.1.is_equal", "false"),
@@ -100,8 +100,8 @@ func TestAccSilenceResource_multipleMatchers(t *testing.T) {
 	})
 }
 
-func TestAccSilenceResource_regexMatcher(t *testing.T) {
-	comment := acctest.RandomWithPrefix("test-silence-regex")
+func TestAccSilenceResource_containsMatcher(t *testing.T) {
+	comment := acctest.RandomWithPrefix("test-silence-contains")
 
 	startsAt := time.Now().Add(1 * time.Hour).UTC().Format(time.RFC3339)
 	endsAt := time.Now().Add(2 * time.Hour).UTC().Format(time.RFC3339)
