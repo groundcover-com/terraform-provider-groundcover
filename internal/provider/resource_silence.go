@@ -71,11 +71,11 @@ A silence is defined by: a time window (starts_at, ends_at), a comment describin
 				},
 			},
 			"starts_at": schema.StringAttribute{
-				MarkdownDescription: "The start time of the silence in RFC3339 format (e.g., `2024-01-15T10:00:00Z`).",
+				MarkdownDescription: "The start time of the silence in RFC3339 format UTC 0 (e.g., `2024-01-15T10:00:00Z`).",
 				Required:            true,
 			},
 			"ends_at": schema.StringAttribute{
-				MarkdownDescription: "The end time of the silence in RFC3339 format (e.g., `2024-01-15T12:00:00Z`).",
+				MarkdownDescription: "The end time of the silence in RFC3339 format UTC 0 (e.g., `2024-01-15T12:00:00Z`).",
 				Required:            true,
 			},
 			"comment": schema.StringAttribute{
@@ -149,7 +149,7 @@ func (r *silenceResource) ValidateConfig(ctx context.Context, req resource.Valid
 		resp.Diagnostics.AddAttributeError(
 			path.Root("starts_at"),
 			"Invalid starts_at format",
-			fmt.Sprintf("starts_at must be in RFC3339 format (e.g., 2024-01-15T10:00:00Z): %s", err.Error()),
+			fmt.Sprintf("starts_at must be in RFC3339 format UTC 0 (e.g., 2024-01-15T10:00:00Z): %s", err.Error()),
 		)
 		return
 	}
@@ -159,7 +159,7 @@ func (r *silenceResource) ValidateConfig(ctx context.Context, req resource.Valid
 		resp.Diagnostics.AddAttributeError(
 			path.Root("ends_at"),
 			"Invalid ends_at format",
-			fmt.Sprintf("ends_at must be in RFC3339 format (e.g., 2024-01-15T12:00:00Z): %s", err.Error()),
+			fmt.Sprintf("ends_at must be in RFC3339 format UTC 0 (e.g., 2024-01-15T12:00:00Z): %s", err.Error()),
 		)
 		return
 	}
@@ -169,6 +169,15 @@ func (r *silenceResource) ValidateConfig(ctx context.Context, req resource.Valid
 			path.Root("ends_at"),
 			"Invalid time range",
 			fmt.Sprintf("ends_at (%s) must be after starts_at (%s)", config.EndsAt.ValueString(), config.StartsAt.ValueString()),
+		)
+	}
+
+	// Validate that comment is not an empty string
+	if !config.Comment.IsNull() && !config.Comment.IsUnknown() && config.Comment.ValueString() == "" {
+		resp.Diagnostics.AddAttributeError(
+			path.Root("comment"),
+			"Invalid comment",
+			"Comment cannot be an empty string. Either omit the comment attribute or provide a non-empty value.",
 		)
 	}
 }
@@ -384,20 +393,13 @@ func (r *silenceResource) Read(ctx context.Context, req resource.ReadRequest, re
 
 	tflog.Info(ctx, "Silence read successfully via SDK", map[string]any{"id": silenceID})
 
-	// Update state from API response
+	// Unconditionally update state from API response to ensure state reflects the API
 	if apiResponse.UUID.String() != "" {
 		state.ID = types.StringValue(apiResponse.UUID.String())
 	}
-	if !time.Time(apiResponse.StartsAt).IsZero() {
-		state.StartsAt = types.StringValue(time.Time(apiResponse.StartsAt).Format(time.RFC3339))
-	}
-	if !time.Time(apiResponse.EndsAt).IsZero() {
-		state.EndsAt = types.StringValue(time.Time(apiResponse.EndsAt).Format(time.RFC3339))
-	}
-	// Use comment from API response
-	if apiResponse.Comment != "" {
-		state.Comment = types.StringValue(apiResponse.Comment)
-	}
+	state.StartsAt = types.StringValue(time.Time(apiResponse.StartsAt).Format(time.RFC3339))
+	state.EndsAt = types.StringValue(time.Time(apiResponse.EndsAt).Format(time.RFC3339))
+	state.Comment = types.StringValue(apiResponse.Comment)
 
 	// Update matchers from API response
 	matchersList, err := r.matchersToModel(ctx, apiResponse.Matchers)
@@ -456,6 +458,7 @@ func (r *silenceResource) Update(ctx context.Context, req resource.UpdateRequest
 	}
 
 	// Use existing comment from state if not specified in plan
+	// Note: Empty string is rejected by ValidateConfig, so we only need to check for null/unknown
 	comment := state.Comment.ValueString()
 	if !plan.Comment.IsNull() && !plan.Comment.IsUnknown() {
 		comment = plan.Comment.ValueString()
@@ -481,16 +484,10 @@ func (r *silenceResource) Update(ctx context.Context, req resource.UpdateRequest
 	plan.ID = state.ID
 
 	if apiResponse != nil {
-		if !time.Time(apiResponse.StartsAt).IsZero() {
-			plan.StartsAt = types.StringValue(time.Time(apiResponse.StartsAt).Format(time.RFC3339))
-		}
-		if !time.Time(apiResponse.EndsAt).IsZero() {
-			plan.EndsAt = types.StringValue(time.Time(apiResponse.EndsAt).Format(time.RFC3339))
-		}
-		// Use comment from API response
-		if apiResponse.Comment != "" {
-			plan.Comment = types.StringValue(apiResponse.Comment)
-		}
+		// Unconditionally update from API response to ensure state reflects the API
+		plan.StartsAt = types.StringValue(time.Time(apiResponse.StartsAt).Format(time.RFC3339))
+		plan.EndsAt = types.StringValue(time.Time(apiResponse.EndsAt).Format(time.RFC3339))
+		plan.Comment = types.StringValue(apiResponse.Comment)
 		matchersList, err := r.matchersToModel(ctx, apiResponse.Matchers)
 		if err != nil {
 			resp.Diagnostics.AddError("Error processing response matchers", err.Error())
@@ -515,6 +512,10 @@ func (r *silenceResource) Delete(ctx context.Context, req resource.DeleteRequest
 
 	err := r.client.DeleteSilence(ctx, silenceID)
 	if err != nil {
+		if errors.Is(err, ErrNotFound) {
+			tflog.Warn(ctx, "Silence already deleted externally, treating as success", map[string]any{"id": silenceID})
+			return
+		}
 		resp.Diagnostics.AddError("SDK Client Delete Silence Error", fmt.Sprintf("Failed to delete silence %s: %s", silenceID, err.Error()))
 		return
 	}

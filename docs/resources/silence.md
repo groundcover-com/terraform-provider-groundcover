@@ -90,8 +90,8 @@ resource "groundcover_silence" "deployment_silence" {
   ]
 }
 
-# Example 3: Silence with regex pattern (starts_at and ends_at are UTC 0)
-# Silences alerts for any service matching a pattern
+# Example 3: Silence with contains pattern (starts_at and ends_at are UTC 0)
+# Silences alerts for any service containing the specified value
 resource "groundcover_silence" "test_services_silence" {
   starts_at = "2030-02-01T00:00:00Z"
   ends_at   = "2030-02-01T06:00:00Z"
@@ -140,9 +140,9 @@ output "deployment_silence_id" {
 
 ### Required
 
-- `ends_at` (String) The end time of the silence in RFC3339 format (e.g., `2024-01-15T12:00:00Z`).
+- `ends_at` (String) The end time of the silence in RFC3339 format UTC 0 (e.g., `2024-01-15T12:00:00Z`).
 - `matchers` (Attributes List) A list of matchers that define which alerts to silence. Each matcher specifies a label name and value to match against. (see [below for nested schema](#nestedatt--matchers))
-- `starts_at` (String) The start time of the silence in RFC3339 format (e.g., `2024-01-15T10:00:00Z`).
+- `starts_at` (String) The start time of the silence in RFC3339 format UTC 0 (e.g., `2024-01-15T10:00:00Z`).
 
 ### Optional
 
