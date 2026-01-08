@@ -94,7 +94,7 @@ A silence is defined by:
 							Required:            true,
 						},
 						"value": schema.StringAttribute{
-							MarkdownDescription: "The value to match against. Can be an exact value or a regex pattern if `is_regex` is true.",
+							MarkdownDescription: "The value to match against. Can be an exact value or a contains/ not contains pattern if `is_regex` is true.",
 							Required:            true,
 						},
 						"is_equal": schema.BoolAttribute{
@@ -104,7 +104,7 @@ A silence is defined by:
 							Default:             booldefault.StaticBool(true),
 						},
 						"is_regex": schema.BoolAttribute{
-							MarkdownDescription: "If true, the value is treated as a regular expression. Defaults to `false`.",
+							MarkdownDescription: "If true, the value is treated as a contains/ not contains pattern. Defaults to `false`.",
 							Optional:            true,
 							Computed:            true,
 							Default:             booldefault.StaticBool(false),

@@ -159,9 +159,9 @@ output "deployment_silence_id" {
 Required:
 
 - `name` (String) The name of the label to match (e.g., `service`, `environment`, `workload`).
-- `value` (String) The value to match against. Can be an exact value or a regex pattern if `is_regex` is true.
+- `value` (String) The value to match against. Can be an exact value or a contains/ not contains pattern if `is_regex` is true.
 
 Optional:
 
 - `is_equal` (Boolean) If true, the matcher will match when the label value equals the specified value. If false, it matches when the value does NOT equal. Defaults to `true`.
-- `is_regex` (Boolean) If true, the value is treated as a regular expression. Defaults to `false`.
+- `is_regex` (Boolean) If true, the value is treated as a contains/ not contains pattern. Defaults to `false`.

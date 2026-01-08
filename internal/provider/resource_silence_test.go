@@ -172,6 +172,50 @@ func TestAccSilenceResource_disappears(t *testing.T) {
 	})
 }
 
+// TestAccSilenceResource_applyLoop tests that consecutive applies do not require
+// plan changes. This verifies that there is no apply loop caused by server-side
+// normalization or formatting differences.
+func TestAccSilenceResource_applyLoop(t *testing.T) {
+	comment := acctest.RandomWithPrefix("test-silence-apply-loop")
+
+	startsAt := time.Now().Add(1 * time.Hour).UTC().Format(time.RFC3339)
+	endsAt := time.Now().Add(2 * time.Hour).UTC().Format(time.RFC3339)
+
+	resource.Test(t, resource.TestCase{
+		PreCheck:                 func() { testAccPreCheck(t) },
+		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
+		Steps: []resource.TestStep{
+			// Step 1: Create silence
+			{
+				Config: testAccSilenceResourceConfig(comment, startsAt, endsAt, "service", "test-service", true, false),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					resource.TestCheckResourceAttrSet("groundcover_silence.test", "id"),
+					resource.TestCheckResourceAttr("groundcover_silence.test", "comment", comment),
+				),
+			},
+			// Step 2: Apply the same config again - should not detect changes (no apply loop)
+			{
+				Config: testAccSilenceResourceConfig(comment, startsAt, endsAt, "service", "test-service", true, false),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					resource.TestCheckResourceAttrSet("groundcover_silence.test", "id"),
+					resource.TestCheckResourceAttr("groundcover_silence.test", "comment", comment),
+				),
+				// ExpectNonEmptyPlan is false by default, meaning we expect no changes
+				// If there were an apply loop, this step would fail or show changes
+			},
+			// Step 3: Apply one more time to be absolutely sure there's no apply loop
+			{
+				Config: testAccSilenceResourceConfig(comment, startsAt, endsAt, "service", "test-service", true, false),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					resource.TestCheckResourceAttrSet("groundcover_silence.test", "id"),
+					resource.TestCheckResourceAttr("groundcover_silence.test", "comment", comment),
+				),
+			},
+			// Delete testing automatically occurs in TestCase
+		},
+	})
+}
+
 func testAccSilenceResourceConfig(comment, startsAt, endsAt, matcherName, matcherValue string, isEqual, isRegex bool) string {
 	return fmt.Sprintf(`
 resource "groundcover_silence" "test" {
