@@ -64,7 +64,7 @@
 ## 0.8.0
 
 * Added `backend_id` as the new standard configuration option (replaces `org_name`, which remains supported for backwards compatibility)
-* Added support for in-cloud backend configuration via `groundcover_INCLOUD_BACKEND_ID`
+* Added support for in-cloud backend configuration via `GROUNDCOVER_INCLOUD_BACKEND_ID`
 * Updated Go version to 1.24
 
 ## 0.7.4
