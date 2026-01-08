@@ -59,10 +59,7 @@ func (r *silenceResource) Schema(ctx context.Context, req resource.SchemaRequest
 
 Silences allow you to suppress alerts for a specific time window based on matching criteria. This is useful for planned maintenance, deployments, or other situations where you want to temporarily mute alerts.
 
-A silence is defined by:
-- A time window (starts_at, ends_at)
-- A comment describing the reason for the silence
-- One or more matchers that define which alerts to silence`,
+A silence is defined by: a time window (starts_at, ends_at), a comment describing the reason for the silence, and one or more matchers that define which alerts to silence.`,
 
 		Attributes: map[string]schema.Attribute{
 			"id": schema.StringAttribute{
