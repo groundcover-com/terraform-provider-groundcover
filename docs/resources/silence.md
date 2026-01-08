@@ -6,7 +6,7 @@ description: |-
   Manages a groundcover Silence.
   Silences allow you to suppress alerts for a specific time window based on matching criteria. This is useful for planned maintenance, deployments, or other situations where you want to temporarily mute alerts.
   A silence is defined by:
-  A time window (starts_at, ends_at)A comment describing the reason for the silenceOne or more matchers that define which alerts to silence
+  A time window (starts_at, ends_at) A comment describing the reason for the silenceOne or more matchers that define which alerts to silence
 ---
 
 # groundcover_silence (Resource)
