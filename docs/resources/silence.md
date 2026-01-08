@@ -94,7 +94,7 @@ resource "groundcover_silence" "deployment_silence" {
   ]
 }
 
-# Example 3: Silence with regex pattern
+# Example 3: Silence with regex pattern (starts_at and ends_at are UTC 0)
 # Silences alerts for any service matching a pattern
 resource "groundcover_silence" "test_services_silence" {
   starts_at = "2030-02-01T00:00:00Z"
@@ -104,7 +104,7 @@ resource "groundcover_silence" "test_services_silence" {
   matchers = [
     {
       name     = "service"
-      value    = ".*-test$"
+      value    = "app-dev"
       is_equal = true
       is_regex = true
     }

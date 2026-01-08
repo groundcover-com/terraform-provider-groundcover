@@ -207,7 +207,7 @@ resource "groundcover_silence" "test" {
     },
     {
       name     = "not-contains"
-      value    = ".*test-service.*"
+      value    = "test-service"
       is_equal = false
       is_regex = true
     },
