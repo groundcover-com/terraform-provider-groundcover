@@ -63,10 +63,10 @@ resource "groundcover_silence" "maintenance_window" {
 
   matchers = [
     {
-      name     = "service"
-      value    = "payment-service"
-      is_equal = true
-      is_regex = false
+      name        = "service"
+      value       = "payment-service"
+      is_equal    = true
+      is_contains = false
     }
   ]
 }
@@ -80,16 +80,16 @@ resource "groundcover_silence" "deployment_silence" {
 
   matchers = [
     {
-      name     = "workload"
-      value    = "api-gateway"
-      is_equal = true
-      is_regex = false
+      name        = "workload"
+      value       = "api-gateway"
+      is_equal    = true
+      is_contains = false
     },
     {
-      name     = "environment"
-      value    = "staging"
-      is_equal = true
-      is_regex = false
+      name        = "environment"
+      value       = "staging"
+      is_equal    = true
+      is_contains = false
     }
   ]
 }
@@ -103,10 +103,10 @@ resource "groundcover_silence" "test_services_silence" {
 
   matchers = [
     {
-      name     = "service"
-      value    = "app-dev"
-      is_equal = true
-      is_regex = true
+      name        = "service"
+      value       = "app-dev"
+      is_equal    = true
+      is_contains = true
     }
   ]
 }
@@ -120,10 +120,10 @@ resource "groundcover_silence" "non_production_silence" {
 
   matchers = [
     {
-      name     = "environment"
-      value    = "production"
-      is_equal = false # Match everything EXCEPT production
-      is_regex = false
+      name        = "environment"
+      value       = "production"
+      is_equal    = false # Match everything EXCEPT production
+      is_contains = false
     }
   ]
 }
