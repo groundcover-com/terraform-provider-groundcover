@@ -25,6 +25,7 @@ import (
 var _ resource.Resource = &silenceResource{}
 var _ resource.ResourceWithConfigure = &silenceResource{}
 var _ resource.ResourceWithImportState = &silenceResource{}
+var _ resource.ResourceWithValidateConfig = &silenceResource{}
 
 func NewSilenceResource() resource.Resource {
 	return &silenceResource{}
@@ -129,6 +130,47 @@ func (r *silenceResource) Configure(ctx context.Context, req resource.ConfigureR
 	}
 	r.client = client
 	tflog.Info(ctx, "Silence resource configured successfully")
+}
+
+func (r *silenceResource) ValidateConfig(ctx context.Context, req resource.ValidateConfigRequest, resp *resource.ValidateConfigResponse) {
+	var config silenceResourceModel
+	resp.Diagnostics.Append(req.Config.Get(ctx, &config)...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+
+	// Skip validation if values are unknown (e.g., computed or from other resources)
+	if config.StartsAt.IsUnknown() || config.EndsAt.IsUnknown() {
+		return
+	}
+
+	startsAt, err := time.Parse(time.RFC3339, config.StartsAt.ValueString())
+	if err != nil {
+		resp.Diagnostics.AddAttributeError(
+			path.Root("starts_at"),
+			"Invalid starts_at format",
+			fmt.Sprintf("starts_at must be in RFC3339 format (e.g., 2024-01-15T10:00:00Z): %s", err.Error()),
+		)
+		return
+	}
+
+	endsAt, err := time.Parse(time.RFC3339, config.EndsAt.ValueString())
+	if err != nil {
+		resp.Diagnostics.AddAttributeError(
+			path.Root("ends_at"),
+			"Invalid ends_at format",
+			fmt.Sprintf("ends_at must be in RFC3339 format (e.g., 2024-01-15T12:00:00Z): %s", err.Error()),
+		)
+		return
+	}
+
+	if !endsAt.After(startsAt) {
+		resp.Diagnostics.AddAttributeError(
+			path.Root("ends_at"),
+			"Invalid time range",
+			fmt.Sprintf("ends_at (%s) must be after starts_at (%s)", config.EndsAt.ValueString(), config.StartsAt.ValueString()),
+		)
+	}
 }
 
 // --- Helper Functions ---
@@ -241,6 +283,15 @@ func (r *silenceResource) Create(ctx context.Context, req resource.CreateRequest
 	endsAt, err := parseRFC3339(plan.EndsAt.ValueString())
 	if err != nil {
 		resp.Diagnostics.AddError("Invalid ends_at", err.Error())
+		return
+	}
+
+	// Validate that ends_at is after starts_at
+	if !time.Time(endsAt).After(time.Time(startsAt)) {
+		resp.Diagnostics.AddError(
+			"Invalid time range",
+			"ends_at must be after starts_at",
+		)
 		return
 	}
 
@@ -375,15 +426,6 @@ func (r *silenceResource) Update(ctx context.Context, req resource.UpdateRequest
 	silenceID := state.ID.ValueString()
 	tflog.Debug(ctx, "Updating Silence", map[string]any{"id": silenceID})
 
-	// Validate that comment is not being set to empty
-	if !plan.Comment.IsNull() && plan.Comment.ValueString() == "" {
-		resp.Diagnostics.AddError(
-			"Invalid comment value",
-			"Comment cannot be set to an empty string. Either omit the comment attribute or provide a non-empty value.",
-		)
-		return
-	}
-
 	// Parse time values
 	startsAt, err := parseRFC3339(plan.StartsAt.ValueString())
 	if err != nil {
@@ -397,6 +439,15 @@ func (r *silenceResource) Update(ctx context.Context, req resource.UpdateRequest
 		return
 	}
 
+	// Validate that ends_at is after starts_at
+	if !time.Time(endsAt).After(time.Time(startsAt)) {
+		resp.Diagnostics.AddError(
+			"Invalid time range",
+			"ends_at must be after starts_at",
+		)
+		return
+	}
+
 	// Convert matchers
 	matchers, err := r.matchersFromModel(ctx, plan.Matchers)
 	if err != nil {
@@ -405,9 +456,9 @@ func (r *silenceResource) Update(ctx context.Context, req resource.UpdateRequest
 	}
 
 	// Use existing comment from state if not specified in plan
-	comment := plan.Comment.ValueString()
-	if plan.Comment.IsNull() {
-		comment = state.Comment.ValueString()
+	comment := state.Comment.ValueString()
+	if !plan.Comment.IsNull() && !plan.Comment.IsUnknown() {
+		comment = plan.Comment.ValueString()
 	}
 
 	apiRequest := &models.UpdateSilenceRequest{
