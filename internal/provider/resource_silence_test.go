@@ -38,7 +38,7 @@ func TestAccSilenceResource(t *testing.T) {
 					resource.TestCheckResourceAttr("groundcover_silence.test", "matchers.0.name", "service"),
 					resource.TestCheckResourceAttr("groundcover_silence.test", "matchers.0.value", "test-service"),
 					resource.TestCheckResourceAttr("groundcover_silence.test", "matchers.0.is_equal", "true"),
-					resource.TestCheckResourceAttr("groundcover_silence.test", "matchers.0.is_regex", "false"),
+					resource.TestCheckResourceAttr("groundcover_silence.test", "matchers.0.is_contains", "false"),
 				),
 			},
 			// ImportState testing
@@ -83,17 +83,17 @@ func TestAccSilenceResource_multipleMatchers(t *testing.T) {
 					resource.TestCheckResourceAttr("groundcover_silence.test", "matchers.0.name", "equal"),
 					resource.TestCheckResourceAttr("groundcover_silence.test", "matchers.0.value", "test-service"),
 					resource.TestCheckResourceAttr("groundcover_silence.test", "matchers.0.is_equal", "true"),
-					resource.TestCheckResourceAttr("groundcover_silence.test", "matchers.0.is_regex", "false"),
+					resource.TestCheckResourceAttr("groundcover_silence.test", "matchers.0.is_contains", "false"),
 					// Second matcher - not contains regex
 					resource.TestCheckResourceAttr("groundcover_silence.test", "matchers.1.name", "not-contains"),
-					resource.TestCheckResourceAttr("groundcover_silence.test", "matchers.1.value", ".*test-service.*"),
+					resource.TestCheckResourceAttr("groundcover_silence.test", "matchers.1.value", "test-service"),
 					resource.TestCheckResourceAttr("groundcover_silence.test", "matchers.1.is_equal", "false"),
-					resource.TestCheckResourceAttr("groundcover_silence.test", "matchers.1.is_regex", "true"),
+					resource.TestCheckResourceAttr("groundcover_silence.test", "matchers.1.is_contains", "true"),
 					// Third matcher - defaults
 					resource.TestCheckResourceAttr("groundcover_silence.test", "matchers.2.name", "empty-equal"),
 					resource.TestCheckResourceAttr("groundcover_silence.test", "matchers.2.value", "test-service"),
 					resource.TestCheckResourceAttr("groundcover_silence.test", "matchers.2.is_equal", "true"),
-					resource.TestCheckResourceAttr("groundcover_silence.test", "matchers.2.is_regex", "false"),
+					resource.TestCheckResourceAttr("groundcover_silence.test", "matchers.2.is_contains", "false"),
 				),
 			},
 		},
@@ -111,14 +111,14 @@ func TestAccSilenceResource_regexMatcher(t *testing.T) {
 		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
 		Steps: []resource.TestStep{
 			{
-				Config: testAccSilenceResourceConfig(comment, startsAt, endsAt, "service", ".*-test$", true, true),
+				Config: testAccSilenceResourceConfig(comment, startsAt, endsAt, "service", "*test*", true, true),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttrSet("groundcover_silence.test", "id"),
 					resource.TestCheckResourceAttr("groundcover_silence.test", "comment", comment),
 					resource.TestCheckResourceAttr("groundcover_silence.test", "matchers.0.name", "service"),
-					resource.TestCheckResourceAttr("groundcover_silence.test", "matchers.0.value", ".*-test$"),
+					resource.TestCheckResourceAttr("groundcover_silence.test", "matchers.0.value", "*test*"),
 					resource.TestCheckResourceAttr("groundcover_silence.test", "matchers.0.is_equal", "true"),
-					resource.TestCheckResourceAttr("groundcover_silence.test", "matchers.0.is_regex", "true"),
+					resource.TestCheckResourceAttr("groundcover_silence.test", "matchers.0.is_contains", "true"),
 				),
 			},
 		},
@@ -143,7 +143,7 @@ func TestAccSilenceResource_negation(t *testing.T) {
 					resource.TestCheckResourceAttr("groundcover_silence.test", "matchers.0.name", "environment"),
 					resource.TestCheckResourceAttr("groundcover_silence.test", "matchers.0.value", "production"),
 					resource.TestCheckResourceAttr("groundcover_silence.test", "matchers.0.is_equal", "false"),
-					resource.TestCheckResourceAttr("groundcover_silence.test", "matchers.0.is_regex", "false"),
+					resource.TestCheckResourceAttr("groundcover_silence.test", "matchers.0.is_contains", "false"),
 				),
 			},
 		},
@@ -216,7 +216,7 @@ func TestAccSilenceResource_applyLoop(t *testing.T) {
 	})
 }
 
-func testAccSilenceResourceConfig(comment, startsAt, endsAt, matcherName, matcherValue string, isEqual, isRegex bool) string {
+func testAccSilenceResourceConfig(comment, startsAt, endsAt, matcherName, matcherValue string, isEqual, isContains bool) string {
 	return fmt.Sprintf(`
 resource "groundcover_silence" "test" {
   starts_at = %[1]q
@@ -225,14 +225,14 @@ resource "groundcover_silence" "test" {
 
   matchers = [
     {
-      name     = %[4]q
-      value    = %[5]q
-      is_equal = %[6]t
-      is_regex = %[7]t
+      name        = %[4]q
+      value       = %[5]q
+      is_equal    = %[6]t
+      is_contains = %[7]t
     }
   ]
 }
-`, startsAt, endsAt, comment, matcherName, matcherValue, isEqual, isRegex)
+`, startsAt, endsAt, comment, matcherName, matcherValue, isEqual, isContains)
 }
 
 func testAccSilenceResourceConfigMultipleMatchers(comment, startsAt, endsAt string) string {
@@ -244,22 +244,22 @@ resource "groundcover_silence" "test" {
 
   matchers = [
     {
-      name     = "equal"
-      value    = "test-service"
-      is_equal = true
-      is_regex = false
+      name        = "equal"
+      value       = "test-service"
+      is_equal    = true
+      is_contains = false
     },
     {
-      name     = "not-contains"
-      value    = "test-service"
-      is_equal = false
-      is_regex = true
+      name        = "not-contains"
+      value       = "test-service"
+      is_equal    = false
+      is_contains = true
     },
     {
-      name     = "empty-equal"
-      value    = "test-service"
-      is_equal = true
-      is_regex = false
+      name        = "empty-equal"
+      value       = "test-service"
+      is_equal    = true
+      is_contains = false
     }
   ]
 }

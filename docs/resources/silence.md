@@ -144,10 +144,13 @@ output "deployment_silence_id" {
 
 ### Required
 
-- `comment` (String) A comment describing the reason for the silence.
 - `ends_at` (String) The end time of the silence in RFC3339 format (e.g., `2024-01-15T12:00:00Z`).
 - `matchers` (Attributes List) A list of matchers that define which alerts to silence. Each matcher specifies a label name and value to match against. (see [below for nested schema](#nestedatt--matchers))
 - `starts_at` (String) The start time of the silence in RFC3339 format (e.g., `2024-01-15T10:00:00Z`).
+
+### Optional
+
+- `comment` (String) A comment describing the reason for the silence.
 
 ### Read-Only
 
@@ -159,9 +162,9 @@ output "deployment_silence_id" {
 Required:
 
 - `name` (String) The name of the label to match (e.g., `service`, `environment`, `workload`).
-- `value` (String) The value to match against. Can be an exact value or a contains/ not contains pattern if `is_regex` is true.
+- `value` (String) The value to match against. Can be an exact value or a partial match pattern if `is_contains` is true.
 
 Optional:
 
+- `is_contains` (Boolean) If true, the value is treated as a contains pattern (partial match). If false, the value must match exactly. Defaults to `false`.
 - `is_equal` (Boolean) If true, the matcher will match when the label value equals the specified value. If false, it matches when the value does NOT equal. Defaults to `true`.
-- `is_regex` (Boolean) If true, the value is treated as a contains/ not contains pattern. Defaults to `false`.

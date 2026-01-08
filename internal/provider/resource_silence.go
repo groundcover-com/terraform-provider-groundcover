@@ -43,10 +43,10 @@ type silenceResourceModel struct {
 }
 
 type silenceMatcherModel struct {
-	Name    types.String `tfsdk:"name"`
-	Value   types.String `tfsdk:"value"`
-	IsEqual types.Bool   `tfsdk:"is_equal"`
-	IsRegex types.Bool   `tfsdk:"is_regex"`
+	Name       types.String `tfsdk:"name"`
+	Value      types.String `tfsdk:"value"`
+	IsEqual    types.Bool   `tfsdk:"is_equal"`
+	IsContains types.Bool   `tfsdk:"is_contains"`
 }
 
 func (r *silenceResource) Metadata(ctx context.Context, req resource.MetadataRequest, resp *resource.MetadataResponse) {
@@ -82,7 +82,8 @@ A silence is defined by:
 			},
 			"comment": schema.StringAttribute{
 				MarkdownDescription: "A comment describing the reason for the silence.",
-				Required:            true,
+				Optional:            true,
+				Computed:            true,
 			},
 			"matchers": schema.ListNestedAttribute{
 				MarkdownDescription: "A list of matchers that define which alerts to silence. Each matcher specifies a label name and value to match against.",
@@ -94,7 +95,7 @@ A silence is defined by:
 							Required:            true,
 						},
 						"value": schema.StringAttribute{
-							MarkdownDescription: "The value to match against. Can be an exact value or a contains/ not contains pattern if `is_regex` is true.",
+							MarkdownDescription: "The value to match against. Can be an exact value or a partial match pattern if `is_contains` is true.",
 							Required:            true,
 						},
 						"is_equal": schema.BoolAttribute{
@@ -103,8 +104,8 @@ A silence is defined by:
 							Computed:            true,
 							Default:             booldefault.StaticBool(true),
 						},
-						"is_regex": schema.BoolAttribute{
-							MarkdownDescription: "If true, the value is treated as a contains/ not contains pattern. Defaults to `false`.",
+						"is_contains": schema.BoolAttribute{
+							MarkdownDescription: "If true, the value is treated as a contains pattern (partial match). If false, the value must match exactly. Defaults to `false`.",
 							Optional:            true,
 							Computed:            true,
 							Default:             booldefault.StaticBool(false),
@@ -149,13 +150,13 @@ func (r *silenceResource) matchersFromModel(ctx context.Context, matchersList ty
 	matchers := make(models.Matchers, 0, len(matcherModels))
 	for _, m := range matcherModels {
 		isEqual := m.IsEqual.ValueBool()
-		isRegex := m.IsRegex.ValueBool()
+		isContains := m.IsContains.ValueBool()
 
 		matcher := &models.SilenceMatcher{
 			Name:    m.Name.ValueString(),
 			Value:   m.Value.ValueString(),
 			IsEqual: &isEqual,
-			IsRegex: &isRegex,
+			IsRegex: &isContains, // SDK uses IsRegex, provider exposes as is_contains
 		}
 		matchers = append(matchers, matcher)
 	}
@@ -166,10 +167,10 @@ func (r *silenceResource) matchersFromModel(ctx context.Context, matchersList ty
 func (r *silenceResource) matchersToModel(ctx context.Context, apiMatchers models.Matchers) (types.List, error) {
 	matcherAttrType := types.ObjectType{
 		AttrTypes: map[string]attr.Type{
-			"name":     types.StringType,
-			"value":    types.StringType,
-			"is_equal": types.BoolType,
-			"is_regex": types.BoolType,
+			"name":        types.StringType,
+			"value":       types.StringType,
+			"is_equal":    types.BoolType,
+			"is_contains": types.BoolType,
 		},
 	}
 
@@ -183,23 +184,23 @@ func (r *silenceResource) matchersToModel(ctx context.Context, apiMatchers model
 		if m.IsEqual != nil {
 			isEqual = *m.IsEqual
 		}
-		isRegex := false
+		isContains := false
 		if m.IsRegex != nil {
-			isRegex = *m.IsRegex
+			isContains = *m.IsRegex // SDK uses IsRegex, provider exposes as is_contains
 		}
 
 		matcherObj, diags := types.ObjectValue(
 			map[string]attr.Type{
-				"name":     types.StringType,
-				"value":    types.StringType,
-				"is_equal": types.BoolType,
-				"is_regex": types.BoolType,
+				"name":        types.StringType,
+				"value":       types.StringType,
+				"is_equal":    types.BoolType,
+				"is_contains": types.BoolType,
 			},
 			map[string]attr.Value{
-				"name":     types.StringValue(m.Name),
-				"value":    types.StringValue(m.Value),
-				"is_equal": types.BoolValue(isEqual),
-				"is_regex": types.BoolValue(isRegex),
+				"name":        types.StringValue(m.Name),
+				"value":       types.StringValue(m.Value),
+				"is_equal":    types.BoolValue(isEqual),
+				"is_contains": types.BoolValue(isContains),
 			},
 		)
 		if diags.HasError() {
@@ -253,10 +254,16 @@ func (r *silenceResource) Create(ctx context.Context, req resource.CreateRequest
 		return
 	}
 
+	// Default comment to "created YYYY-MM-DD HH:MM:SS" if empty or null
+	comment := plan.Comment.ValueString()
+	if plan.Comment.IsNull() || comment == "" {
+		comment = fmt.Sprintf("created %s", time.Now().UTC().Format("2006-01-02 15:04:05"))
+	}
+
 	apiRequest := &models.CreateSilenceRequest{
 		StartsAt: &startsAt,
 		EndsAt:   &endsAt,
-		Comment:  plan.Comment.ValueString(),
+		Comment:  comment,
 		Matchers: matchers,
 	}
 
@@ -284,6 +291,7 @@ func (r *silenceResource) Create(ctx context.Context, req resource.CreateRequest
 	if !time.Time(apiResponse.EndsAt).IsZero() {
 		plan.EndsAt = types.StringValue(time.Time(apiResponse.EndsAt).Format(time.RFC3339))
 	}
+	// Use comment from API response (will contain the default we generated if user didn't provide one)
 	if apiResponse.Comment != "" {
 		plan.Comment = types.StringValue(apiResponse.Comment)
 	}
@@ -338,6 +346,7 @@ func (r *silenceResource) Read(ctx context.Context, req resource.ReadRequest, re
 	if !time.Time(apiResponse.EndsAt).IsZero() {
 		state.EndsAt = types.StringValue(time.Time(apiResponse.EndsAt).Format(time.RFC3339))
 	}
+	// Use comment from API response
 	if apiResponse.Comment != "" {
 		state.Comment = types.StringValue(apiResponse.Comment)
 	}
@@ -369,6 +378,15 @@ func (r *silenceResource) Update(ctx context.Context, req resource.UpdateRequest
 	silenceID := state.ID.ValueString()
 	tflog.Debug(ctx, "Updating Silence", map[string]any{"id": silenceID})
 
+	// Validate that comment is not being set to empty
+	if !plan.Comment.IsNull() && plan.Comment.ValueString() == "" {
+		resp.Diagnostics.AddError(
+			"Invalid comment value",
+			"Comment cannot be set to an empty string. Either omit the comment attribute or provide a non-empty value.",
+		)
+		return
+	}
+
 	// Parse time values
 	startsAt, err := parseRFC3339(plan.StartsAt.ValueString())
 	if err != nil {
@@ -389,10 +407,16 @@ func (r *silenceResource) Update(ctx context.Context, req resource.UpdateRequest
 		return
 	}
 
+	// Use existing comment from state if not specified in plan
+	comment := plan.Comment.ValueString()
+	if plan.Comment.IsNull() {
+		comment = state.Comment.ValueString()
+	}
+
 	apiRequest := &models.UpdateSilenceRequest{
 		StartsAt: startsAt,
 		EndsAt:   endsAt,
-		Comment:  plan.Comment.ValueString(),
+		Comment:  comment,
 		Matchers: matchers,
 	}
 
@@ -415,6 +439,7 @@ func (r *silenceResource) Update(ctx context.Context, req resource.UpdateRequest
 		if !time.Time(apiResponse.EndsAt).IsZero() {
 			plan.EndsAt = types.StringValue(time.Time(apiResponse.EndsAt).Format(time.RFC3339))
 		}
+		// Use comment from API response
 		if apiResponse.Comment != "" {
 			plan.Comment = types.StringValue(apiResponse.Comment)
 		}
