@@ -1,6 +1,8 @@
 ## 1.5.4
 
-* Fixed dashboard resource `revision_number` attribute showing false changes on every apply. The fix uses ModifyPlan to handle revision_number intelligently: when there are no actual changes, it uses the state value to prevent false positives; when there are changes, it allows the revision number to increment during updates (which is expected API behavior).
+* Resolved critical bug where dashboards were being updated on every Terraform apply even when no logical changes were made, causing unnecessary revision increments and apply loops.
+* Comprehensive debug logging: Added extensive debug logging throughout the dashboard resource.
+* Enhanced logic to preserve original preset JSON format when semantically identical, preventing format drift cycles that could cause apply loops.
 
 ## 1.5.3
 
