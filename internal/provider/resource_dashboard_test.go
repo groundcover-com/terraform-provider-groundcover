@@ -107,6 +107,49 @@ func TestAccDashboardResource_EmptyTeam(t *testing.T) {
 	})
 }
 
+// TestAccDashboardResource_ApplyLoopIssue tests that applying the same configuration multiple times
+// doesn't cause an apply loop, even when using jsonencode which can produce different formatting
+func TestAccDashboardResource_ApplyLoopIssue(t *testing.T) {
+	timestamp := time.Now().Unix()
+	dashboardName := fmt.Sprintf("apply_loop_test_%d", timestamp)
+
+	resource.Test(t, resource.TestCase{
+		PreCheck:                 func() { testAccPreCheck(t) },
+		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
+		Steps: []resource.TestStep{
+			// Step 1: Create dashboard with jsonencode (simulating for_each usage)
+			{
+				Config: testAccDashboardResourceConfigWithJsonEncode(dashboardName),
+				Check: resource.ComposeTestCheckFunc(
+					resource.TestCheckResourceAttrSet("groundcover_dashboard.test", "id"),
+					resource.TestCheckResourceAttrSet("groundcover_dashboard.test", "preset"),
+					resource.TestCheckResourceAttrSet("groundcover_dashboard.test", "revision_number"),
+				),
+			},
+			// Step 2: Apply the same config again - should not detect changes (no apply loop)
+			// This is the critical test - if there's an apply loop, this step will show changes
+			{
+				Config: testAccDashboardResourceConfigWithJsonEncode(dashboardName),
+				Check: resource.ComposeTestCheckFunc(
+					resource.TestCheckResourceAttrSet("groundcover_dashboard.test", "id"),
+					resource.TestCheckResourceAttrSet("groundcover_dashboard.test", "preset"),
+					resource.TestCheckResourceAttrSet("groundcover_dashboard.test", "revision_number"),
+				),
+				// ExpectNonEmptyPlan is false by default, meaning we expect no changes
+				// If there were an apply loop, this step would fail or show changes
+			},
+			// Step 3: Apply one more time to be absolutely sure there's no apply loop
+			{
+				Config: testAccDashboardResourceConfigWithJsonEncode(dashboardName),
+				Check: resource.ComposeTestCheckFunc(
+					resource.TestCheckResourceAttrSet("groundcover_dashboard.test", "id"),
+					resource.TestCheckResourceAttrSet("groundcover_dashboard.test", "preset"),
+				),
+			},
+		},
+	})
+}
+
 func TestAccDashboardResource_disappears(t *testing.T) {
 	timestamp := time.Now().Unix()
 	dashboardName := fmt.Sprintf("disappears_dashboard_%d", timestamp)
@@ -299,6 +342,56 @@ resource "groundcover_dashboard" "test" {
     variables     = {}
     schemaVersion = 3
   })
+}
+`, name)
+}
+
+// testAccDashboardResourceConfigWithJsonEncode simulates the for_each pattern where
+// jsonencode is used, which can produce different JSON formatting on each run
+func testAccDashboardResourceConfigWithJsonEncode(name string) string {
+	return fmt.Sprintf(`
+locals {
+  preset_data = {
+    duration = "Last 1 hour"
+    layout = [
+      {
+        id   = "A"
+        x    = 0
+        y    = 0
+        w    = 6
+        h    = 4
+        minH = 2
+      }
+    ]
+    widgets = [
+      {
+        id   = "A"
+        type = "widget"
+        name = "Test Widget"
+        queries = [
+          {
+            id         = "A"
+            expr       = "avg(groundcover_node_rt_disk_space_used_percent{})"
+            dataType   = "metrics"
+            step       = null
+            editorMode = "builder"
+          }
+        ]
+        visualizationConfig = {
+          type = "time-series"
+        }
+      }
+    ]
+    variables     = {}
+    schemaVersion = 3
+  }
+}
+
+resource "groundcover_dashboard" "test" {
+  name        = "%s"
+  description = "Test dashboard for apply loop detection"
+  team        = "engineering"
+  preset      = jsonencode(local.preset_data)
 }
 `, name)
 }
