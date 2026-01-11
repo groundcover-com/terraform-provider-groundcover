@@ -123,13 +123,20 @@ func (r *dashboardResource) Create(ctx context.Context, req resource.CreateReque
 		return
 	}
 
-	tflog.Debug(ctx, "Creating Dashboard")
+	planPresetStr := plan.Preset.ValueString()
+	tflog.Debug(ctx, "Create: Creating Dashboard", map[string]interface{}{
+		"plan_name":           plan.Name.ValueString(),
+		"plan_description":    plan.Description.ValueString(),
+		"plan_team":           plan.Team.ValueString(),
+		"plan_preset_len":     len(planPresetStr),
+		"plan_preset_preview": getPreview(planPresetStr, 200),
+	})
 
 	createReq := &models.CreateDashboardRequest{
 		Name:          plan.Name.ValueString(),
 		Description:   plan.Description.ValueString(),
 		Team:          plan.Team.ValueString(),
-		Preset:        plan.Preset.ValueString(),
+		Preset:        planPresetStr,
 		IsProvisioned: true,
 	}
 
@@ -142,6 +149,16 @@ func (r *dashboardResource) Create(ctx context.Context, req resource.CreateReque
 		return
 	}
 
+	tflog.Debug(ctx, "Create: API response", map[string]interface{}{
+		"uuid":                    dashboard.UUID,
+		"response_name":           dashboard.Name,
+		"response_description":    dashboard.Description,
+		"response_team":           dashboard.Team,
+		"response_revision":       dashboard.RevisionNumber,
+		"response_preset_len":     len(dashboard.Preset),
+		"response_preset_preview": getPreview(dashboard.Preset, 200),
+	})
+
 	plan.UUID = types.StringValue(dashboard.UUID)
 	plan.Name = types.StringValue(dashboard.Name)
 	plan.Description = types.StringValue(dashboard.Description)
@@ -151,7 +168,8 @@ func (r *dashboardResource) Create(ctx context.Context, req resource.CreateReque
 		plan.Team = types.StringValue(dashboard.Team)
 	}
 	// Keep the user's original preset format if semantically the same
-	areSemanticallySame, err := CompareJSONSemantically(plan.Preset.ValueString(), dashboard.Preset)
+	apiPresetStr := dashboard.Preset
+	areSemanticallySame, err := CompareJSONSemantically(planPresetStr, apiPresetStr)
 	if err != nil {
 		resp.Diagnostics.AddError(
 			"Invalid Dashboard Preset",
@@ -159,11 +177,32 @@ func (r *dashboardResource) Create(ctx context.Context, req resource.CreateReque
 		)
 		return
 	}
+
+	// Normalize for logging
+	normalizedPlan, errPlanNorm := NormalizeJSON(ctx, planPresetStr)
+	normalizedApi, errApiNorm := NormalizeJSON(ctx, apiPresetStr)
+	if errPlanNorm == nil && errApiNorm == nil {
+		tflog.Debug(ctx, "Create: Normalized preset comparison", map[string]interface{}{
+			"uuid":                dashboard.UUID,
+			"normalized_plan_len": len(normalizedPlan),
+			"normalized_api_len":  len(normalizedApi),
+			"normalized_equal":    normalizedPlan == normalizedApi,
+		})
+	}
+
 	if !areSemanticallySame {
-		tflog.Debug(ctx, "Preset JSON is semantically different, using API response")
-		plan.Preset = types.StringValue(dashboard.Preset)
+		tflog.Info(ctx, "Create: Preset JSON is semantically different, using API response", map[string]interface{}{
+			"uuid":            dashboard.UUID,
+			"plan_preset_len": len(planPresetStr),
+			"api_preset_len":  len(apiPresetStr),
+		})
+		plan.Preset = types.StringValue(apiPresetStr)
 	} else {
-		tflog.Debug(ctx, "Preset JSON is semantically same, keeping plan format")
+		tflog.Debug(ctx, "Create: Preset JSON is semantically same, keeping plan format", map[string]interface{}{
+			"uuid":            dashboard.UUID,
+			"plan_preset_len": len(planPresetStr),
+			"api_preset_len":  len(apiPresetStr),
+		})
 	}
 	plan.Owner = types.StringValue(dashboard.Owner)
 	plan.Status = types.StringValue(dashboard.Status)
@@ -216,6 +255,17 @@ func (r *dashboardResource) Read(ctx context.Context, req resource.ReadRequest, 
 
 	// Store the original state preset for comparison
 	originalStatePreset := state.Preset.ValueString()
+	apiPreset := dashboard.Preset
+
+	// Log preset comparison details for debugging apply loop issues
+	tflog.Debug(ctx, "Read: Comparing state preset with API preset", map[string]interface{}{
+		"uuid":                 state.UUID.ValueString(),
+		"state_preset_len":     len(originalStatePreset),
+		"api_preset_len":       len(apiPreset),
+		"presets_string_equal": originalStatePreset == apiPreset,
+		"state_revision":       state.RevisionNumber.ValueInt32(),
+		"api_revision":         dashboard.RevisionNumber,
+	})
 
 	state.UUID = types.StringValue(dashboard.UUID)
 	state.Name = types.StringValue(dashboard.Name)
@@ -226,20 +276,52 @@ func (r *dashboardResource) Read(ctx context.Context, req resource.ReadRequest, 
 		state.Team = types.StringValue(dashboard.Team)
 	}
 
+	// Normalize both presets for detailed comparison logging
+	normalizedStatePreset, errStateNorm := NormalizeJSON(ctx, originalStatePreset)
+	normalizedApiPreset, errApiNorm := NormalizeJSON(ctx, apiPreset)
+
+	if errStateNorm == nil && errApiNorm == nil {
+		tflog.Debug(ctx, "Read: Normalized preset comparison", map[string]interface{}{
+			"uuid":                     state.UUID.ValueString(),
+			"normalized_state_len":     len(normalizedStatePreset),
+			"normalized_api_len":       len(normalizedApiPreset),
+			"normalized_equal":         normalizedStatePreset == normalizedApiPreset,
+			"normalized_state_preview": getPreview(normalizedStatePreset, 200),
+			"normalized_api_preview":   getPreview(normalizedApiPreset, 200),
+		})
+	} else {
+		tflog.Warn(ctx, "Read: Failed to normalize presets for comparison", map[string]interface{}{
+			"uuid":           state.UUID.ValueString(),
+			"state_norm_err": errStateNorm,
+			"api_norm_err":   errApiNorm,
+		})
+	}
+
 	// Keep the user's original preset format if semantically the same
-	areSemanticallySame, err := CompareJSONSemantically(originalStatePreset, dashboard.Preset)
+	areSemanticallySame, err := CompareJSONSemantically(originalStatePreset, apiPreset)
 	if err != nil {
 		// If we can't parse the JSON, use the API response
 		// This can happen if the state has invalid JSON from an older version
-		tflog.Warn(ctx, "Failed to compare preset JSON semantically during Read, using API response", map[string]interface{}{
+		tflog.Warn(ctx, "Read: Failed to compare preset JSON semantically, using API response", map[string]interface{}{
+			"uuid":  state.UUID.ValueString(),
 			"error": err.Error(),
 		})
-		state.Preset = types.StringValue(dashboard.Preset)
+		state.Preset = types.StringValue(apiPreset)
 	} else if !areSemanticallySame {
-		tflog.Debug(ctx, "Read: Preset JSON is semantically different, using API response")
-		state.Preset = types.StringValue(dashboard.Preset)
+		tflog.Info(ctx, "Read: Preset JSON is semantically different, using API response", map[string]interface{}{
+			"uuid":                 state.UUID.ValueString(),
+			"state_preset_len":     len(originalStatePreset),
+			"api_preset_len":       len(apiPreset),
+			"state_preset_preview": getPreview(originalStatePreset, 200),
+			"api_preset_preview":   getPreview(apiPreset, 200),
+		})
+		state.Preset = types.StringValue(apiPreset)
 	} else {
-		tflog.Debug(ctx, "Read: Preset JSON is semantically same, keeping state format")
+		tflog.Debug(ctx, "Read: Preset JSON is semantically same, keeping state format", map[string]interface{}{
+			"uuid":             state.UUID.ValueString(),
+			"state_preset_len": len(originalStatePreset),
+			"api_preset_len":   len(apiPreset),
+		})
 		// Keep the existing state preset format
 		// state.Preset stays as is
 	}
@@ -263,10 +345,62 @@ func (r *dashboardResource) Update(ctx context.Context, req resource.UpdateReque
 		return
 	}
 
-	tflog.Debug(ctx, "Updating Dashboard", map[string]interface{}{
+	// Log all field comparisons before update
+	tflog.Debug(ctx, "Update: Field comparison (plan vs state vs API)", map[string]interface{}{
 		"uuid":              state.UUID.ValueString(),
+		"plan_name":         plan.Name.ValueString(),
+		"state_name":        state.Name.ValueString(),
 		"plan_description":  plan.Description.ValueString(),
 		"state_description": state.Description.ValueString(),
+		"plan_team":         plan.Team.ValueString(),
+		"state_team":        state.Team.ValueString(),
+		"plan_revision":     plan.RevisionNumber.ValueInt32(),
+		"state_revision":    state.RevisionNumber.ValueInt32(),
+		"plan_preset_len":   len(plan.Preset.ValueString()),
+		"state_preset_len":  len(state.Preset.ValueString()),
+	})
+
+	// First, read the current state from the API to get the latest revision number
+	// This prevents concurrency conflicts when the resource was modified externally
+	// and ensures we use the most up-to-date revision number
+	tflog.Debug(ctx, "Update: Reading current dashboard state before update to get latest revision", map[string]interface{}{
+		"uuid": state.UUID.ValueString(),
+	})
+	apiCurrentState, err := r.client.GetDashboard(ctx, state.UUID.ValueString())
+	if err != nil {
+		if errors.Is(err, ErrNotFound) {
+			resp.Diagnostics.AddError(
+				"Error Reading Dashboard",
+				fmt.Sprintf("Failed to read dashboard %s before update because it was not found. It may have been deleted externally.", state.UUID.ValueString()),
+			)
+		} else {
+			resp.Diagnostics.AddError(
+				"Error Reading Dashboard",
+				fmt.Sprintf("Failed to read current dashboard state %s before update: %s", state.UUID.ValueString(), err.Error()),
+			)
+		}
+		return
+	}
+
+	// Log API current state for comparison
+	tflog.Debug(ctx, "Update: API current state before update", map[string]interface{}{
+		"uuid":            state.UUID.ValueString(),
+		"api_name":        apiCurrentState.Name,
+		"api_description": apiCurrentState.Description,
+		"api_team":        apiCurrentState.Team,
+		"api_revision":    apiCurrentState.RevisionNumber,
+		"api_preset_len":  len(apiCurrentState.Preset),
+		"api_owner":       apiCurrentState.Owner,
+		"api_status":      apiCurrentState.Status,
+	})
+
+	// Use the current revision number from the API for the update request
+	currentRevision := apiCurrentState.RevisionNumber
+	tflog.Debug(ctx, "Update: Using current revision from API for update", map[string]interface{}{
+		"uuid":             state.UUID.ValueString(),
+		"state_revision":   state.RevisionNumber.ValueInt32(),
+		"api_revision":     currentRevision,
+		"revision_changed": state.RevisionNumber.ValueInt32() != int32(currentRevision),
 	})
 
 	// Build update request - always use plan values for all fields
@@ -277,9 +411,22 @@ func (r *dashboardResource) Update(ctx context.Context, req resource.UpdateReque
 		Team:            plan.Team.ValueString(),
 		Preset:          plan.Preset.ValueString(),
 		IsProvisioned:   true, // Always set to true as requested
-		CurrentRevision: state.RevisionNumber.ValueInt32(),
+		CurrentRevision: currentRevision,
 		Override:        false, // Use false by default to avoid conflicts
 	}
+
+	// Log what we're sending in the update request
+	tflog.Debug(ctx, "Update: Sending update request", map[string]interface{}{
+		"uuid":                     state.UUID.ValueString(),
+		"request_name":             updateReq.Name,
+		"request_description":      updateReq.Description,
+		"request_team":             updateReq.Team,
+		"request_preset_len":       len(updateReq.Preset),
+		"request_is_provisioned":   updateReq.IsProvisioned,
+		"request_current_revision": updateReq.CurrentRevision,
+		"request_override":         updateReq.Override,
+		"request_preset_preview":   getPreview(updateReq.Preset, 200),
+	})
 
 	// Only set override to true if explicitly set in the plan
 	if !plan.Override.IsNull() && !plan.Override.IsUnknown() && plan.Override.ValueBool() {
@@ -295,6 +442,31 @@ func (r *dashboardResource) Update(ctx context.Context, req resource.UpdateReque
 		return
 	}
 
+	// Log API response after update
+	tflog.Debug(ctx, "Update: API response after update", map[string]interface{}{
+		"uuid":                    state.UUID.ValueString(),
+		"response_name":           dashboard.Name,
+		"response_description":    dashboard.Description,
+		"response_team":           dashboard.Team,
+		"response_revision":       dashboard.RevisionNumber,
+		"response_preset_len":     len(dashboard.Preset),
+		"response_owner":          dashboard.Owner,
+		"response_status":         dashboard.Status,
+		"response_preset_preview": getPreview(dashboard.Preset, 200),
+	})
+
+	// Log field-by-field comparison: request vs response
+	tflog.Debug(ctx, "Update: Request vs Response comparison", map[string]interface{}{
+		"uuid":                 state.UUID.ValueString(),
+		"name_match":           updateReq.Name == dashboard.Name,
+		"description_match":    updateReq.Description == dashboard.Description,
+		"team_match":           updateReq.Team == dashboard.Team,
+		"preset_string_match":  updateReq.Preset == dashboard.Preset,
+		"revision_incremented": dashboard.RevisionNumber > currentRevision,
+		"revision_before":      currentRevision,
+		"revision_after":       dashboard.RevisionNumber,
+	})
+
 	plan.UUID = types.StringValue(dashboard.UUID)
 	plan.Name = types.StringValue(dashboard.Name)
 	plan.Description = types.StringValue(dashboard.Description)
@@ -304,7 +476,54 @@ func (r *dashboardResource) Update(ctx context.Context, req resource.UpdateReque
 		plan.Team = types.StringValue(dashboard.Team)
 	}
 	// Keep the user's original preset format if semantically the same
-	areSemanticallySame, err := CompareJSONSemantically(plan.Preset.ValueString(), dashboard.Preset)
+	// This prevents format drift when the API returns semantically identical but differently formatted JSON
+	// The ModifyPlan method normalizes and compares during plan phase, so plan.Preset should already
+	// match state.Preset format if they're semantically the same. Keeping plan format here ensures
+	// consistency and prevents format drift cycles that could cause apply loops.
+	planPresetStr := plan.Preset.ValueString()
+	apiPresetStr := dashboard.Preset
+	statePresetStr := state.Preset.ValueString()
+
+	tflog.Debug(ctx, "Update: Comparing preset JSONs", map[string]interface{}{
+		"uuid":             state.UUID.ValueString(),
+		"plan_preset_len":  len(planPresetStr),
+		"state_preset_len": len(statePresetStr),
+		"api_preset_len":   len(apiPresetStr),
+		"plan_eq_state":    planPresetStr == statePresetStr,
+		"plan_eq_api":      planPresetStr == apiPresetStr,
+		"state_eq_api":     statePresetStr == apiPresetStr,
+		"revision_before":  currentRevision,
+		"revision_after":   dashboard.RevisionNumber,
+	})
+
+	// Normalize all three presets for detailed comparison
+	normalizedPlan, errPlanNorm := NormalizeJSON(ctx, planPresetStr)
+	normalizedState, errStateNorm := NormalizeJSON(ctx, statePresetStr)
+	normalizedApi, errApiNorm := NormalizeJSON(ctx, apiPresetStr)
+
+	if errPlanNorm == nil && errStateNorm == nil && errApiNorm == nil {
+		tflog.Debug(ctx, "Update: Normalized preset comparison", map[string]interface{}{
+			"uuid":                     state.UUID.ValueString(),
+			"normalized_plan_len":      len(normalizedPlan),
+			"normalized_state_len":     len(normalizedState),
+			"normalized_api_len":       len(normalizedApi),
+			"norm_plan_eq_norm_state":  normalizedPlan == normalizedState,
+			"norm_plan_eq_norm_api":    normalizedPlan == normalizedApi,
+			"norm_state_eq_norm_api":   normalizedState == normalizedApi,
+			"normalized_plan_preview":  getPreview(normalizedPlan, 200),
+			"normalized_state_preview": getPreview(normalizedState, 200),
+			"normalized_api_preview":   getPreview(normalizedApi, 200),
+		})
+	} else {
+		tflog.Warn(ctx, "Update: Failed to normalize some presets", map[string]interface{}{
+			"uuid":           state.UUID.ValueString(),
+			"plan_norm_err":  errPlanNorm,
+			"state_norm_err": errStateNorm,
+			"api_norm_err":   errApiNorm,
+		})
+	}
+
+	areSemanticallySame, err := CompareJSONSemantically(planPresetStr, apiPresetStr)
 	if err != nil {
 		resp.Diagnostics.AddError(
 			"Invalid Dashboard Preset",
@@ -313,14 +532,53 @@ func (r *dashboardResource) Update(ctx context.Context, req resource.UpdateReque
 		return
 	}
 	if !areSemanticallySame {
-		tflog.Debug(ctx, "Preset JSON is semantically different, using API response")
-		plan.Preset = types.StringValue(dashboard.Preset)
+		tflog.Info(ctx, "Update: Preset JSON is semantically different, using API response", map[string]interface{}{
+			"uuid":                state.UUID.ValueString(),
+			"plan_preset_len":     len(planPresetStr),
+			"api_preset_len":      len(apiPresetStr),
+			"plan_preset_preview": getPreview(planPresetStr, 200),
+			"api_preset_preview":  getPreview(apiPresetStr, 200),
+		})
+		plan.Preset = types.StringValue(apiPresetStr)
 	} else {
-		tflog.Debug(ctx, "Preset JSON is semantically same, keeping plan format")
+		tflog.Debug(ctx, "Update: Preset JSON is semantically same, keeping plan format to prevent format drift", map[string]interface{}{
+			"uuid":            state.UUID.ValueString(),
+			"plan_preset_len": len(planPresetStr),
+			"api_preset_len":  len(apiPresetStr),
+			"plan_eq_state":   planPresetStr == statePresetStr,
+		})
+		// Keep the plan format (which should match state format after ModifyPlan)
+		// This ensures consistency and prevents format drift cycles
 	}
 	plan.Owner = types.StringValue(dashboard.Owner)
 	plan.Status = types.StringValue(dashboard.Status)
 	plan.RevisionNumber = types.Int32Value(dashboard.RevisionNumber)
+
+	// Log final state that will be saved
+	tflog.Debug(ctx, "Update: Final state being saved", map[string]interface{}{
+		"uuid":                 state.UUID.ValueString(),
+		"final_name":           plan.Name.ValueString(),
+		"final_description":    plan.Description.ValueString(),
+		"final_team":           plan.Team.ValueString(),
+		"final_revision":       plan.RevisionNumber.ValueInt32(),
+		"final_preset_len":     len(plan.Preset.ValueString()),
+		"final_owner":          plan.Owner.ValueString(),
+		"final_status":         plan.Status.ValueString(),
+		"final_preset_preview": getPreview(plan.Preset.ValueString(), 200),
+	})
+
+	// Log summary comparison: state before vs state after
+	tflog.Info(ctx, "Update: Summary - State before vs after", map[string]interface{}{
+		"uuid":                state.UUID.ValueString(),
+		"name_changed":        state.Name.ValueString() != plan.Name.ValueString(),
+		"description_changed": state.Description.ValueString() != plan.Description.ValueString(),
+		"team_changed":        state.Team.ValueString() != plan.Team.ValueString(),
+		"preset_changed":      state.Preset.ValueString() != plan.Preset.ValueString(),
+		"preset_len_changed":  len(state.Preset.ValueString()) != len(plan.Preset.ValueString()),
+		"revision_changed":    state.RevisionNumber.ValueInt32() != plan.RevisionNumber.ValueInt32(),
+		"revision_before":     state.RevisionNumber.ValueInt32(),
+		"revision_after":      plan.RevisionNumber.ValueInt32(),
+	})
 
 	diags = resp.State.Set(ctx, &plan)
 	resp.Diagnostics.Append(diags...)
@@ -385,56 +643,143 @@ func (r *dashboardResource) ModifyPlan(ctx context.Context, req resource.ModifyP
 		return
 	}
 
-	// Check if there are any actual changes to the dashboard
+	// Check if there are any actual changes to the dashboard (excluding preset)
 	hasChanges := !plan.Name.Equal(state.Name) ||
 		!plan.Description.Equal(state.Description) ||
 		!plan.Team.Equal(state.Team)
 
+	plannedPreset := plan.Preset.ValueString()
+	statePreset := state.Preset.ValueString()
+
+	tflog.Debug(ctx, "ModifyPlan: Checking for changes", map[string]interface{}{
+		"uuid":                 plan.UUID.ValueString(),
+		"plan_preset_len":      len(plannedPreset),
+		"state_preset_len":     len(statePreset),
+		"presets_equal":        plan.Preset.Equal(state.Preset),
+		"presets_string_equal": plannedPreset == statePreset,
+		"plan_revision":        plan.RevisionNumber.ValueInt32(),
+		"state_revision":       state.RevisionNumber.ValueInt32(),
+		"has_other_changes":    hasChanges,
+	})
+
 	// Handle preset comparison
 	if !plan.Preset.IsNull() && !plan.Preset.IsUnknown() && !state.Preset.IsNull() && !state.Preset.IsUnknown() {
-		plannedPreset := plan.Preset.ValueString()
-		statePreset := state.Preset.ValueString()
+		// Skip if presets are already identical
+		if plannedPreset == statePreset {
+			tflog.Debug(ctx, "ModifyPlan: Presets are already identical, no normalization needed", map[string]interface{}{
+				"uuid":       plan.UUID.ValueString(),
+				"preset_len": len(plannedPreset),
+			})
+		} else {
+			// Log raw presets before normalization for debugging
+			tflog.Debug(ctx, "ModifyPlan: Raw preset comparison (before normalization)", map[string]interface{}{
+				"uuid":                 plan.UUID.ValueString(),
+				"plan_preset_len":      len(plannedPreset),
+				"state_preset_len":     len(statePreset),
+				"plan_preset_preview":  getPreview(plannedPreset, 300),
+				"state_preset_preview": getPreview(statePreset, 300),
+			})
 
-		if plannedPreset != statePreset {
 			// Try to normalize and compare the presets
 			normalizedPlanned, err := NormalizeJSON(ctx, plannedPreset)
 			if err != nil {
-				tflog.Warn(ctx, "Failed to normalize planned preset JSON", map[string]interface{}{
-					"error": err.Error(),
+				// If we can't normalize the planned preset, it's likely invalid JSON
+				// Allow Terraform to proceed with the update so the user can fix it
+				tflog.Warn(ctx, "ModifyPlan: Failed to normalize planned preset JSON", map[string]interface{}{
+					"uuid":                plan.UUID.ValueString(),
+					"plan_preset_len":     len(plannedPreset),
+					"plan_preset_preview": getPreview(plannedPreset, 200),
+					"error":               err.Error(),
 				})
 				hasChanges = true
 			} else {
 				normalizedState, err := NormalizeJSON(ctx, statePreset)
 				if err != nil {
-					tflog.Warn(ctx, "Failed to normalize state preset JSON", map[string]interface{}{
-						"error": err.Error(),
+					// If we can't normalize the state preset, allow the update to proceed
+					// This could happen if the state has corrupted data from a previous version
+					tflog.Warn(ctx, "ModifyPlan: Failed to normalize state preset JSON, allowing update", map[string]interface{}{
+						"uuid":                 plan.UUID.ValueString(),
+						"state_preset_len":     len(statePreset),
+						"state_preset_preview": getPreview(statePreset, 200),
+						"error":                err.Error(),
 					})
 					hasChanges = true
 				} else {
+					// Log normalized presets for detailed debugging
+					tflog.Debug(ctx, "ModifyPlan: Normalized preset comparison (after normalization)", map[string]interface{}{
+						"uuid":                     plan.UUID.ValueString(),
+						"normalized_plan_len":      len(normalizedPlanned),
+						"normalized_state_len":     len(normalizedState),
+						"normalized_equal":         normalizedPlanned == normalizedState,
+						"normalized_plan_preview":  getPreview(normalizedPlanned, 300),
+						"normalized_state_preview": getPreview(normalizedState, 300),
+					})
+
 					areSemanticallySame, err := CompareJSONSemantically(normalizedPlanned, normalizedState)
 					if err != nil {
-						tflog.Warn(ctx, "Failed to perform semantic JSON comparison", map[string]interface{}{
-							"error": err.Error(),
+						// If we can't compare after successful normalization, something is wrong
+						// Allow the update to proceed rather than blocking it
+						tflog.Warn(ctx, "ModifyPlan: Failed to perform semantic JSON comparison, allowing update", map[string]interface{}{
+							"uuid":                 plan.UUID.ValueString(),
+							"normalized_plan_len":  len(normalizedPlanned),
+							"normalized_state_len": len(normalizedState),
+							"error":                err.Error(),
 						})
 						hasChanges = true
 					} else if !areSemanticallySame {
 						hasChanges = true
+						tflog.Info(ctx, "ModifyPlan: Preset JSONs have semantic differences.", map[string]interface{}{
+							"uuid":                     plan.UUID.ValueString(),
+							"plan_preset_len":          len(plannedPreset),
+							"state_preset_len":         len(statePreset),
+							"normalized_plan_len":      len(normalizedPlanned),
+							"normalized_state_len":     len(normalizedState),
+							"normalized_plan_preview":  getPreview(normalizedPlanned, 300),
+							"normalized_state_preview": getPreview(normalizedState, 300),
+						})
 					} else {
 						// Presets are semantically the same, suppress the diff
-						tflog.Info(ctx, "ModifyPlan: Preset JSONs are semantically identical. Suppressing diff.")
+						tflog.Info(ctx, "ModifyPlan: Preset JSONs are semantically identical. Suppressing diff.", map[string]interface{}{
+							"uuid":                 plan.UUID.ValueString(),
+							"plan_preset_len":      len(plannedPreset),
+							"state_preset_len":     len(statePreset),
+							"normalized_plan_len":  len(normalizedPlanned),
+							"normalized_state_len": len(normalizedState),
+							"normalized_match":     normalizedPlanned == normalizedState,
+							"raw_match":            plannedPreset == statePreset,
+						})
 						plan.Preset = state.Preset
 					}
 				}
 			}
 		}
+	} else {
+		tflog.Debug(ctx, "ModifyPlan: Skipping preset comparison - preset is null or unknown", map[string]interface{}{
+			"uuid":             plan.UUID.ValueString(),
+			"plan_is_null":     plan.Preset.IsNull(),
+			"plan_is_unknown":  plan.Preset.IsUnknown(),
+			"state_is_null":    state.Preset.IsNull(),
+			"state_is_unknown": state.Preset.IsUnknown(),
+		})
 	}
 
 	// Handle revision_number: if there are no changes, use state value to prevent false positives
 	// If there are changes, allow it to be unknown so it can increment during the update
 	if !hasChanges && !state.RevisionNumber.IsNull() && !state.RevisionNumber.IsUnknown() {
-		tflog.Debug(ctx, "ModifyPlan: No changes detected, using state revision_number to prevent false positive")
+		tflog.Debug(ctx, "ModifyPlan: No changes detected, using state revision_number to prevent false positive", map[string]interface{}{
+			"uuid":           plan.UUID.ValueString(),
+			"state_revision": state.RevisionNumber.ValueInt32(),
+		})
 		plan.RevisionNumber = state.RevisionNumber
 	}
 
 	resp.Diagnostics.Append(resp.Plan.Set(ctx, &plan)...)
+}
+
+// getPreview returns a preview of a string, useful for logging long JSON strings
+func getPreview(s string, maxLen int) string {
+	if len(s) <= maxLen {
+		return s
+	}
+	return s[:maxLen] + "... (truncated)"
 }
