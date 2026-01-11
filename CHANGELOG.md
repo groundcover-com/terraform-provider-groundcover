@@ -1,3 +1,9 @@
+## 1.5.4
+
+* Resolved critical bug where dashboards were being updated on every Terraform apply even when no logical changes were made, causing unnecessary revision increments and apply loops.
+* Comprehensive debug logging: Added extensive debug logging throughout the dashboard resource.
+* Enhanced logic to preserve original preset JSON format when semantically identical, preventing format drift cycles that could cause apply loops.
+
 ## 1.5.3
 
 * Fixed apply loop bug in monitor resources where `FilterYamlKeysBasedOnTemplate` only looked at the first item in arrays (like `groupBy`), causing optional fields like `alias` that exist in later items to be filtered out, leading to false drift detection and apply loops. The fix merges keys from all array items to capture all possible fields.
