@@ -109,16 +109,16 @@ func TestNormalizeJSON(t *testing.T) {
 		expected string // We'll check that normalization is consistent
 	}{
 		{
-			name:     "simple object",
-			input:    `{"b":2,"a":1}`,
+			name:  "simple object",
+			input: `{"b":2,"a":1}`,
 			expected: `{
   "a": 1,
   "b": 2
 }`,
 		},
 		{
-			name:     "nested object",
-			input:    `{"outer":{"c":3,"a":1,"b":2}}`,
+			name:  "nested object",
+			input: `{"outer":{"c":3,"a":1,"b":2}}`,
 			expected: `{
   "outer": {
     "a": 1,
@@ -128,8 +128,8 @@ func TestNormalizeJSON(t *testing.T) {
 }`,
 		},
 		{
-			name:     "array with objects",
-			input:    `{"items":[{"b":2,"a":1}]}`,
+			name:  "array with objects",
+			input: `{"items":[{"b":2,"a":1}]}`,
 			expected: `{
   "items": [
     {
@@ -173,7 +173,7 @@ func TestNormalizeJSON(t *testing.T) {
 func TestCompareJSONSemantically_RealWorldDashboardPreset(t *testing.T) {
 	// Test with actual preset JSON from the trace data
 	preset1 := `{"spec":{"layoutType":"ordered"},"layout":[{"h":5,"w":24,"x":0,"y":0,"id":"A","minH":2,"children":[]}],"widgets":[{"id":"A","name":"Test","type":"section"}],"duration":"Last hour","variables":[],"schemaVersion":7}`
-	
+
 	// Same preset with different key ordering and whitespace
 	preset2 := `{
   "layout": [
@@ -242,4 +242,3 @@ func TestNormalizeJSON_ThenCompare(t *testing.T) {
 		t.Errorf("Normalized JSONs should be semantically the same")
 	}
 }
-
