@@ -144,6 +144,7 @@ func TestAccDashboardResource_ApplyLoopIssue(t *testing.T) {
 				Check: resource.ComposeTestCheckFunc(
 					resource.TestCheckResourceAttrSet("groundcover_dashboard.test", "id"),
 					resource.TestCheckResourceAttrSet("groundcover_dashboard.test", "preset"),
+					resource.TestCheckResourceAttrSet("groundcover_dashboard.test", "revision_number"),
 				),
 			},
 		},
