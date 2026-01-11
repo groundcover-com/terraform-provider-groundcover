@@ -1,6 +1,9 @@
 ## 1.5.4
 
 * Added silence resource for managing alert silences in groundcover
+* Resolved critical bug where dashboards were being updated on every Terraform apply even when no logical changes were made, causing unnecessary revision increments and apply loops.
+* Comprehensive debug logging: Added extensive debug logging throughout the dashboard resource.
+* Enhanced logic to preserve original preset JSON format when semantically identical, preventing format drift cycles that could cause apply loops.
 
 ## 1.5.3
 
