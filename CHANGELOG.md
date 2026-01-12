@@ -3,6 +3,7 @@
 * Resolved critical bug where dashboards were being updated on every Terraform apply even when no logical changes were made, causing unnecessary revision increments and apply loops.
 * Comprehensive debug logging: Added extensive debug logging throughout the dashboard resource.
 * Enhanced logic to preserve original preset JSON format when semantically identical, preventing format drift cycles that could cause apply loops.
+* Added RabbitMQ and Redis Cloud examples to data integration resource documentation
 
 ## 1.5.3
 

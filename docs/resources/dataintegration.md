@@ -310,6 +310,137 @@ EOT
   is_paused = false
 }
 
+# Example: RabbitMQ
+resource "groundcover_dataintegration" "rabbitmq_example" {
+  type = "rabbitscrape"
+
+  config = jsonencode({
+    version = 1
+    enabled = true
+    name    = "RabbitMQ example"
+
+    exporters = [
+      "prometheus"
+    ]
+
+    # Durations are numeric (nanoseconds), preserved as-is
+    scrapeInterval = 30000000000
+    scrapeTimeout  = 10000000000
+
+    metricsPath = "/metrics"
+    scheme      = "https"
+
+    # provide the list of hosts to scrape from
+    staticTargets = [
+      "myserver1:9090",
+      "myserver2:9090"
+    ]
+
+    # Relabeling options on discovered targets. keepRegex - drop all targets which don't comply with this rule. dropRegex - drop all targets which comply with this rule.
+    targetsRelabels = {
+      keepRegex = [
+        ".*shard-00-02.*"
+      ]
+      dropRegex = [
+        ".*shard-00-01.*"
+      ]
+    }
+
+    authentication = {
+      basicAuth = {
+        username = "prom_user_6909b9ab19480f045c1f2eca"
+        password = "secretRef::store::15e1b4b9c0ce0a45"
+      }
+    }
+
+    metricsRelabels = {
+      # List of regex of metrics to keep. All other metrics will be dropped.
+      keepRegex = []
+      dropRegex = [
+        "[*]catalogStats[*]"
+      ]
+      raw = <<-EOT
+# additional relabeling rules that can be applied such as adding a prefix
+  - action: labelmap
+    replacement: "groundcover_$1"
+EOT
+    }
+
+    labelSettings = {
+      extraLabels = {
+        env = "prod"
+      }
+    }
+  })
+
+  is_paused = false
+}
+
+# Example: Redis Cloud
+resource "groundcover_dataintegration" "rediscloud_example" {
+  type = "rediscloudscrape"
+
+  config = jsonencode({
+    version = 1
+    enabled = true
+    name    = "Redis Cloud example"
+
+    exporters = [
+      "prometheus"
+    ]
+
+    # Durations are numeric (nanoseconds), preserved as-is
+    scrapeInterval = 30000000000
+    scrapeTimeout  = 10000000000
+
+    metricsPath = "/metrics"
+    scheme      = "https"
+
+    # provide the host details for discovery
+    staticTargets = [
+      "https://your-redis-cloud-address:8070"
+    ]
+
+    # Relabeling options on discovered targets. keepRegex - drop all targets which don't comply with this rule. dropRegex - drop all targets which comply with this rule.
+    targetsRelabels = {
+      keepRegex = [
+        ".*shard-00-02.*"
+      ]
+      dropRegex = [
+        ".*shard-00-01.*"
+      ]
+    }
+
+    authentication = {
+      headerAuth = {
+        key   = "bearer_token"
+        value = "secretRef::store::15e1b4b9c0ce0a45"
+      }
+    }
+
+    metricsRelabels = {
+      # List of regex of metrics to keep. All other metrics will be dropped.
+      keepRegex = []
+      dropRegex = [
+        "[*]catalogStats[*]"
+      ]
+      raw = <<-EOT
+# additional relabeling rules that can be applied such as adding a prefix
+  - action: labelmap
+    replacement: "groundcover_$1"
+EOT
+    }
+
+    labelSettings = {
+      extraLabels = {
+        env = "prod"
+      }
+    }
+  })
+
+  is_paused = false
+}
+
 # Output the data integration IDs for reference
 output "cloudwatch_dataintegration_id" {
   description = "The ID of the CloudWatch data integration"
@@ -339,6 +470,16 @@ output "prometheus_discovery_dataintegration_id" {
 output "mongodb_atlas_dataintegration_id" {
   description = "The ID of the MongoDB Atlas data integration"
   value       = groundcover_dataintegration.mongodb_atlas_example.id
+}
+
+output "rabbitmq_dataintegration_id" {
+  description = "The ID of the RabbitMQ data integration"
+  value       = groundcover_dataintegration.rabbitmq_example.id
+}
+
+output "rediscloud_dataintegration_id" {
+  description = "The ID of the Redis Cloud data integration"
+  value       = groundcover_dataintegration.rediscloud_example.id
 }
 ```
 
