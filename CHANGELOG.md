@@ -1,5 +1,7 @@
 ## 1.5.4
 
+* Added silence resource for managing alert silences in groundcover
+* Updated groundcover SDK from v1.136.0 to v1.139.0
 * Resolved critical bug where dashboards were being updated on every Terraform apply even when no logical changes were made, causing unnecessary revision increments and apply loops.
 * Comprehensive debug logging: Added extensive debug logging throughout the dashboard resource.
 * Enhanced logic to preserve original preset JSON format when semantically identical, preventing format drift cycles that could cause apply loops.
@@ -46,7 +48,7 @@
 
 ## 1.2.0
 
-* Added data integration resource for managing data integrations in Groundcover
+* Added data integration resource for managing data integrations in groundcover
 
 ## 1.1.1
 
@@ -56,9 +58,9 @@
 
 ## 1.1.0
 
-* Added dashboard resource for managing Groundcover dashboards
+* Added dashboard resource for managing groundcover dashboards
 * Fixed ingestion key resource compatibility with SDK v1.84.0 (deprecated creation_date field)
-* Updated Groundcover SDK from v1.41.0 to v1.84.0
+* Updated groundcover SDK from v1.41.0 to v1.84.0
 
 ## 1.0.0
 

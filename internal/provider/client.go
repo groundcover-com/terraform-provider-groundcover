@@ -197,6 +197,12 @@ type ApiClient interface {
 	CreateSecret(ctx context.Context, req *models.CreateSecretRequest) (*models.SecretResponse, error)
 	UpdateSecret(ctx context.Context, id string, req *models.UpdateSecretRequest) (*models.SecretResponse, error)
 	DeleteSecret(ctx context.Context, id string) error
+
+	// Silences
+	CreateSilence(ctx context.Context, req *models.CreateSilenceRequest) (*models.Silence, error)
+	GetSilence(ctx context.Context, id string) (*models.Silence, error)
+	UpdateSilence(ctx context.Context, id string, req *models.UpdateSilenceRequest) (*models.Silence, error)
+	DeleteSilence(ctx context.Context, id string) error
 }
 
 // SdkClientWrapper implements ApiClient using the Groundcover Go SDK.
@@ -391,6 +397,13 @@ func handleApiError(ctx context.Context, err error, operation string, resourceId
 	// Handle specific case for ingestion key deletion where resource not found should be treated as success
 	if operation == "DeleteIngestionKey" && (statusCode == http.StatusNotFound || strings.Contains(lowerErrStr, "resource not found") || strings.Contains(lowerErrStr, "not found")) {
 		tflog.Warn(ctx, "Mapping SDK error to ErrNotFound for DeleteIngestionKey not found error (already deleted).", logFields)
+		return ErrNotFound
+	}
+
+	// Handle specific case for silence deletion where 500 can mean the silence doesn't exist
+	// The API returns 500 instead of 404 when trying to delete a non-existent silence
+	if operation == "DeleteSilence" && (statusCode == http.StatusInternalServerError || strings.Contains(errStr, "[500]")) {
+		tflog.Warn(ctx, "Mapping SDK error to ErrNotFound for DeleteSilence 500 error (likely already deleted).", logFields)
 		return ErrNotFound
 	}
 
