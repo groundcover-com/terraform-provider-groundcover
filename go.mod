@@ -11,7 +11,7 @@ require (
 
 require (
 	github.com/goccy/go-yaml v1.17.1
-	github.com/groundcover-com/groundcover-sdk-go v1.139.0
+	github.com/groundcover-com/groundcover-sdk-go v1.151.0
 	github.com/hashicorp/terraform-plugin-framework-validators v0.19.0
 	github.com/hashicorp/terraform-plugin-go v0.29.0
 	github.com/hashicorp/terraform-plugin-testing v1.13.2
@@ -94,5 +94,3 @@ require (
 	google.golang.org/grpc v1.75.1 // indirect
 	google.golang.org/protobuf v1.36.9 // indirect
 )
-
-replace github.com/groundcover-com/groundcover-sdk-go => ../groundcover-sdk-go
