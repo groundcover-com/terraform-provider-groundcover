@@ -188,7 +188,7 @@ func TestAccNotificationRoute_applyLoop(t *testing.T) {
 func testAccNotificationRouteConfig_basic(name string) string {
 	return fmt.Sprintf(`
 resource "groundcover_connected_app" "test" {
-  name = "test-slack-for-route"
+  name = "%[1]s-slack"
   type = "slack-webhook"
   data = {
     url = "https://hooks.slack.com/services/TEST/WEBHOOK/URL"
@@ -217,7 +217,7 @@ resource "groundcover_notification_route" "test" {
 func testAccNotificationRouteConfig_update_step1(name string) string {
 	return fmt.Sprintf(`
 resource "groundcover_connected_app" "test" {
-  name = "test-slack-for-route"
+  name = "%[1]s-slack"
   type = "slack-webhook"
   data = {
     url = "https://hooks.slack.com/services/TEST/WEBHOOK/URL"
@@ -246,7 +246,7 @@ resource "groundcover_notification_route" "test" {
 func testAccNotificationRouteConfig_update_step2(name string) string {
 	return fmt.Sprintf(`
 resource "groundcover_connected_app" "test" {
-  name = "test-slack-for-route"
+  name = "%[1]s-slack"
   type = "slack-webhook"
   data = {
     url = "https://hooks.slack.com/services/TEST/WEBHOOK/URL"
@@ -275,7 +275,7 @@ resource "groundcover_notification_route" "test" {
 func testAccNotificationRouteConfig_multipleRoutes(name string) string {
 	return fmt.Sprintf(`
 resource "groundcover_connected_app" "test1" {
-  name = "test-slack-1"
+  name = "%[1]s-slack-1"
   type = "slack-webhook"
   data = {
     url = "https://hooks.slack.com/services/TEST/WEBHOOK/URL1"
@@ -283,7 +283,7 @@ resource "groundcover_connected_app" "test1" {
 }
 
 resource "groundcover_connected_app" "test2" {
-  name = "test-slack-2"
+  name = "%[1]s-slack-2"
   type = "slack-webhook"
   data = {
     url = "https://hooks.slack.com/services/TEST/WEBHOOK/URL2"
@@ -321,7 +321,7 @@ resource "groundcover_notification_route" "test" {
 func testAccNotificationRouteConfig_durationNormalization(name string) string {
 	return fmt.Sprintf(`
 resource "groundcover_connected_app" "test" {
-  name = "test-slack-for-route"
+  name = "%[1]s-slack"
   type = "slack-webhook"
   data = {
     url = "https://hooks.slack.com/services/TEST/WEBHOOK/URL"

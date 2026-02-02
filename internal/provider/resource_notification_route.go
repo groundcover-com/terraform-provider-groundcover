@@ -122,9 +122,6 @@ func (r *notificationRouteResource) Schema(_ context.Context, _ resource.SchemaR
 					"renotification_interval": schema.StringAttribute{
 						Description: "Duration between renotifications (e.g., '1h', '30m'). The API may normalize this value.",
 						Optional:    true,
-						PlanModifiers: []planmodifier.String{
-							stringplanmodifier.UseStateForUnknown(),
-						},
 					},
 				},
 			},
