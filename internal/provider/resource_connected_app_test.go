@@ -123,6 +123,89 @@ func TestAccConnectedApp_pagerdutyWithSeverityMapping(t *testing.T) {
 	})
 }
 
+// TestAccConnectedApp_applyLoop tests that applying the same configuration multiple times
+// doesn't cause an apply loop due to server-side normalization or formatting differences.
+func TestAccConnectedApp_applyLoop(t *testing.T) {
+	name := acctest.RandomWithPrefix("test-slack-apply-loop")
+
+	resource.Test(t, resource.TestCase{
+		PreCheck:                 func() { testAccPreCheck(t) },
+		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
+		Steps: []resource.TestStep{
+			// Step 1: Create connected app
+			{
+				Config: testAccConnectedAppConfig_basic(name),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					resource.TestCheckResourceAttr("groundcover_connected_app.test", "name", name),
+					resource.TestCheckResourceAttrSet("groundcover_connected_app.test", "id"),
+				),
+			},
+			// Step 2: Apply the same config again - should not detect changes (no apply loop)
+			// This is the critical test - if there's an apply loop, this step will show changes
+			{
+				Config: testAccConnectedAppConfig_basic(name),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					resource.TestCheckResourceAttr("groundcover_connected_app.test", "name", name),
+					resource.TestCheckResourceAttrSet("groundcover_connected_app.test", "id"),
+				),
+				// ExpectNonEmptyPlan is false by default, meaning we expect no changes
+				// If there were an apply loop, this step would fail or show changes
+			},
+			// Step 3: Apply one more time to be absolutely sure there's no apply loop
+			{
+				Config: testAccConnectedAppConfig_basic(name),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					resource.TestCheckResourceAttr("groundcover_connected_app.test", "name", name),
+					resource.TestCheckResourceAttrSet("groundcover_connected_app.test", "id"),
+				),
+			},
+		},
+	})
+}
+
+// TestAccConnectedApp_applyLoopWithSeverityMapping tests that applying the same configuration
+// with nested severity_mapping doesn't cause an apply loop due to dynamic attribute handling.
+func TestAccConnectedApp_applyLoopWithSeverityMapping(t *testing.T) {
+	name := acctest.RandomWithPrefix("test-pagerduty-apply-loop")
+
+	resource.Test(t, resource.TestCase{
+		PreCheck:                 func() { testAccPreCheck(t) },
+		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
+		Steps: []resource.TestStep{
+			// Step 1: Create connected app with nested severity_mapping
+			{
+				Config: testAccConnectedAppConfig_pagerdutyWithSeverityMapping(name),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					resource.TestCheckResourceAttr("groundcover_connected_app.test", "name", name),
+					resource.TestCheckResourceAttr("groundcover_connected_app.test", "data.severity_mapping.critical", "critical"),
+					resource.TestCheckResourceAttrSet("groundcover_connected_app.test", "id"),
+				),
+			},
+			// Step 2: Apply the same config again - should not detect changes (no apply loop)
+			// This is the critical test - if there's an apply loop, this step will show changes
+			{
+				Config: testAccConnectedAppConfig_pagerdutyWithSeverityMapping(name),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					resource.TestCheckResourceAttr("groundcover_connected_app.test", "name", name),
+					resource.TestCheckResourceAttr("groundcover_connected_app.test", "data.severity_mapping.critical", "critical"),
+					resource.TestCheckResourceAttrSet("groundcover_connected_app.test", "id"),
+				),
+				// ExpectNonEmptyPlan is false by default, meaning we expect no changes
+				// If there were an apply loop, this step would fail or show changes
+			},
+			// Step 3: Apply one more time to be absolutely sure there's no apply loop
+			{
+				Config: testAccConnectedAppConfig_pagerdutyWithSeverityMapping(name),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					resource.TestCheckResourceAttr("groundcover_connected_app.test", "name", name),
+					resource.TestCheckResourceAttr("groundcover_connected_app.test", "data.severity_mapping.critical", "critical"),
+					resource.TestCheckResourceAttrSet("groundcover_connected_app.test", "id"),
+				),
+			},
+		},
+	})
+}
+
 func TestAccConnectedApp_disappears(t *testing.T) {
 	name := acctest.RandomWithPrefix("test-slack-app")
 
