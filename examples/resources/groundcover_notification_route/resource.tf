@@ -2,7 +2,7 @@ terraform {
   required_providers {
     groundcover = {
       source  = "registry.terraform.io/groundcover-com/groundcover"
-      version = ">= 1.5.0"
+      version = ">= 1.6.0"
     }
   }
 }
