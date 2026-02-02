@@ -72,7 +72,7 @@ resource "groundcover_notification_route" "critical_alerts" {
 
   routes = [
     {
-      status = ["open"]
+      status = ["Alerting"]
       connected_apps = [
         {
           type = "pagerduty"
@@ -85,7 +85,7 @@ resource "groundcover_notification_route" "critical_alerts" {
       ]
     },
     {
-      status = ["resolved"]
+      status = ["Resolved"]
       connected_apps = [
         {
           type = "slack-webhook"
@@ -106,7 +106,7 @@ resource "groundcover_notification_route" "all_alerts_to_slack" {
 
   routes = [
     {
-      status = ["open", "resolved"]
+      status = ["Alerting", "Resolved"]
       connected_apps = [
         {
           type = "slack-webhook"
@@ -164,7 +164,7 @@ Optional:
 Required:
 
 - `connected_apps` (Attributes List) List of connected apps to notify for this route. (see [below for nested schema](#nestedatt--routes--connected_apps))
-- `status` (List of String) List of issue statuses that trigger this route (e.g., 'open', 'resolved').
+- `status` (List of String) List of issue statuses that trigger this route (e.g., 'Alerting', 'Resolved').
 
 <a id="nestedatt--routes--connected_apps"></a>
 ### Nested Schema for `routes.connected_apps`

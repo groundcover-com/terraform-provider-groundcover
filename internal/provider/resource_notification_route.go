@@ -92,7 +92,7 @@ func (r *notificationRouteResource) Schema(_ context.Context, _ resource.SchemaR
 				NestedObject: schema.NestedAttributeObject{
 					Attributes: map[string]schema.Attribute{
 						"status": schema.ListAttribute{
-							Description: "List of issue statuses that trigger this route (e.g., 'open', 'resolved').",
+							Description: "List of issue statuses that trigger this route (e.g., 'Alerting', 'Resolved').",
 							ElementType: types.StringType,
 							Required:    true,
 						},
