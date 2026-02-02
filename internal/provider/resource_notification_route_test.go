@@ -121,13 +121,12 @@ func TestAccNotificationRoute_durationNormalization(t *testing.T) {
 		PreCheck:                 func() { testAccPreCheck(t) },
 		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
 		Steps: []resource.TestStep{
-			// Create with "60m" - API will normalize to "1h"
 			{
 				Config: testAccNotificationRouteConfig_durationNormalization(name),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttr("groundcover_notification_route.test", "name", name),
 					resource.TestCheckResourceAttr("groundcover_notification_route.test", "query", "env:test"),
-					resource.TestCheckResourceAttr("groundcover_notification_route.test", "notification_settings.renotification_interval", "1h"),
+					resource.TestCheckResourceAttr("groundcover_notification_route.test", "notification_settings.renotification_interval", "60m"),
 					resource.TestCheckResourceAttrSet("groundcover_notification_route.test", "id"),
 				),
 			},
@@ -156,15 +155,15 @@ resource "groundcover_notification_route" "test" {
   name  = %[1]q
   query = "env:test"
 
-  routes {
+  routes = [{
     status = ["Alerting"]
-    connected_apps {
+    connected_apps = [{
       type = "slack-webhook"
       id   = groundcover_connected_app.test.id
-    }
-  }
+    }]
+  }]
 
-  notification_settings {
+  notification_settings = {
     renotification_interval = "4h"
   }
 }
@@ -185,13 +184,13 @@ resource "groundcover_notification_route" "test" {
   name  = %[1]q
   query = "env:test"
 
-  routes {
+  routes = [{
     status = ["Alerting"]
-    connected_apps {
+    connected_apps = [{
       type = "slack-webhook"
       id   = groundcover_connected_app.test.id
-    }
-  }
+    }]
+  }]
 }
 `, name)
 }
@@ -210,13 +209,13 @@ resource "groundcover_notification_route" "test" {
   name  = %[1]q
   query = "env:production"
 
-  routes {
+  routes = [{
     status = ["Alerting", "Resolved"]
-    connected_apps {
+    connected_apps = [{
       type = "slack-webhook"
       id   = groundcover_connected_app.test.id
-    }
-  }
+    }]
+  }]
 }
 `, name)
 }
@@ -243,21 +242,22 @@ resource "groundcover_notification_route" "test" {
   name  = %[1]q
   query = "env:test"
 
-  routes {
-    status = ["Alerting"]
-    connected_apps {
-      type = "slack-webhook"
-      id   = groundcover_connected_app.test1.id
+  routes = [
+    {
+      status = ["Alerting"]
+      connected_apps = [{
+        type = "slack-webhook"
+        id   = groundcover_connected_app.test1.id
+      }]
+    },
+    {
+      status = ["Resolved"]
+      connected_apps = [{
+        type = "slack-webhook"
+        id   = groundcover_connected_app.test2.id
+      }]
     }
-  }
-
-  routes {
-    status = ["Resolved"]
-    connected_apps {
-      type = "slack-webhook"
-      id   = groundcover_connected_app.test2.id
-    }
-  }
+  ]
 }
 `, name)
 }
@@ -276,15 +276,15 @@ resource "groundcover_notification_route" "test" {
   name  = %[1]q
   query = "env:test"
 
-  routes {
+  routes = [{
     status = ["Alerting"]
-    connected_apps {
+    connected_apps = [{
       type = "slack-webhook"
       id   = groundcover_connected_app.test.id
-    }
-  }
+    }]
+  }]
 
-  notification_settings {
+  notification_settings = {
     renotification_interval = "60m"
   }
 }

@@ -8,6 +8,8 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/hashicorp/terraform-plugin-framework/attr"
+	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
@@ -34,14 +36,14 @@ type connectedAppResource struct {
 }
 
 type connectedAppResourceModel struct {
-	Id        types.String `tfsdk:"id"`
-	Name      types.String `tfsdk:"name"`
-	Type      types.String `tfsdk:"type"`
-	Data      types.Map    `tfsdk:"data"`
-	CreatedBy types.String `tfsdk:"created_by"`
-	CreatedAt types.String `tfsdk:"created_at"`
-	UpdatedBy types.String `tfsdk:"updated_by"`
-	UpdatedAt types.String `tfsdk:"updated_at"`
+	Id        types.String  `tfsdk:"id"`
+	Name      types.String  `tfsdk:"name"`
+	Type      types.String  `tfsdk:"type"`
+	Data      types.Dynamic `tfsdk:"data"`
+	CreatedBy types.String  `tfsdk:"created_by"`
+	CreatedAt types.String  `tfsdk:"created_at"`
+	UpdatedBy types.String  `tfsdk:"updated_by"`
+	UpdatedAt types.String  `tfsdk:"updated_at"`
 }
 
 func (r *connectedAppResource) Metadata(_ context.Context, req resource.MetadataRequest, resp *resource.MetadataResponse) {
@@ -67,9 +69,8 @@ func (r *connectedAppResource) Schema(_ context.Context, _ resource.SchemaReques
 				Description: "Type of connected app (slack-webhook or pagerduty).",
 				Required:    true,
 			},
-			"data": schema.MapAttribute{
-				Description: "Type-specific configuration. For slack-webhook: {url: string}. For pagerduty: {routing_key: string, severity_mapping?: map[string]string}.",
-				ElementType: types.StringType,
+			"data": schema.DynamicAttribute{
+				Description: "Type-specific configuration. Supports nested structures. For slack-webhook: {url = \"https://...\"}. For pagerduty: {routing_key = \"...\", severity_mapping = {critical = \"P1\", ...}}.",
 				Required:    true,
 				Sensitive:   true,
 			},
@@ -124,18 +125,10 @@ func (r *connectedAppResource) Create(ctx context.Context, req resource.CreateRe
 	nameStr := plan.Name.ValueString()
 	typeStr := plan.Type.ValueString()
 
-	dataMap := make(map[string]string)
-	if !plan.Data.IsNull() && !plan.Data.IsUnknown() {
-		diags := plan.Data.ElementsAs(ctx, &dataMap, false)
-		resp.Diagnostics.Append(diags...)
-		if resp.Diagnostics.HasError() {
-			return
-		}
-	}
-
-	dataAny := make(map[string]any)
-	for k, v := range dataMap {
-		dataAny[k] = v
+	dataAny, diags := dynamicValueToMap(ctx, plan.Data)
+	resp.Diagnostics.Append(diags...)
+	if resp.Diagnostics.HasError() {
+		return
 	}
 
 	createReq := &models.CreateConnectedAppRequest{
@@ -216,18 +209,10 @@ func (r *connectedAppResource) Update(ctx context.Context, req resource.UpdateRe
 	nameStr := plan.Name.ValueString()
 	typeStr := plan.Type.ValueString()
 
-	dataMap := make(map[string]string)
-	if !plan.Data.IsNull() && !plan.Data.IsUnknown() {
-		diags := plan.Data.ElementsAs(ctx, &dataMap, false)
-		resp.Diagnostics.Append(diags...)
-		if resp.Diagnostics.HasError() {
-			return
-		}
-	}
-
-	dataAny := make(map[string]any)
-	for k, v := range dataMap {
-		dataAny[k] = v
+	dataAny, diags := dynamicValueToMap(ctx, plan.Data)
+	resp.Diagnostics.Append(diags...)
+	if resp.Diagnostics.HasError() {
+		return
 	}
 
 	updateReq := &models.UpdateConnectedAppRequest{
@@ -294,10 +279,21 @@ func mapConnectedAppResponseToModel(ctx context.Context, app *models.ConnectedAp
 	model.Type = types.StringValue(app.Type)
 
 	if app.Data != nil {
-		dataValue, _ := types.MapValueFrom(ctx, types.StringType, app.Data)
-		model.Data = dataValue
+		dataMap, ok := app.Data.(map[string]any)
+		if !ok {
+			tflog.Warn(ctx, fmt.Sprintf("Connected app data is not a map[string]any, got %T", app.Data))
+			model.Data = types.DynamicNull()
+		} else {
+			dynamicValue, err := mapToDynamicValue(ctx, dataMap)
+			if err != nil {
+				tflog.Error(ctx, fmt.Sprintf("Error converting connected app data to dynamic: %v", err))
+				model.Data = types.DynamicNull()
+			} else {
+				model.Data = dynamicValue
+			}
+		}
 	} else {
-		model.Data = types.MapNull(types.StringType)
+		model.Data = types.DynamicNull()
 	}
 
 	model.CreatedBy = types.StringValue(app.CreatedBy)
@@ -312,5 +308,174 @@ func mapConnectedAppResponseToModel(ctx context.Context, app *models.ConnectedAp
 		model.UpdatedAt = types.StringValue(app.UpdatedAt.String())
 	} else {
 		model.UpdatedAt = types.StringNull()
+	}
+}
+
+func dynamicValueToMap(ctx context.Context, dynamic types.Dynamic) (map[string]any, diag.Diagnostics) {
+	var diags diag.Diagnostics
+
+	if dynamic.IsNull() || dynamic.IsUnknown() {
+		return make(map[string]any), diags
+	}
+
+	underlyingValue := dynamic.UnderlyingValue()
+	if underlyingValue == nil {
+		return make(map[string]any), diags
+	}
+
+	result, err := attrValueToGo(ctx, underlyingValue)
+	if err != nil {
+		diags.AddError("Error converting dynamic value", err.Error())
+		return nil, diags
+	}
+
+	resultMap, ok := result.(map[string]any)
+	if !ok {
+		diags.AddError("Invalid data type", fmt.Sprintf("Expected map, got %T", result))
+		return nil, diags
+	}
+
+	return resultMap, diags
+}
+
+func mapToDynamicValue(ctx context.Context, data map[string]any) (types.Dynamic, error) {
+	attrValue, err := goToAttrValue(ctx, data)
+	if err != nil {
+		return types.DynamicNull(), err
+	}
+
+	return types.DynamicValue(attrValue), nil
+}
+
+func attrValueToGo(ctx context.Context, value attr.Value) (any, error) {
+	if value.IsNull() || value.IsUnknown() {
+		return nil, nil
+	}
+
+	switch v := value.(type) {
+	case types.String:
+		return v.ValueString(), nil
+	case types.Bool:
+		return v.ValueBool(), nil
+	case types.Int64:
+		return v.ValueInt64(), nil
+	case types.Float64:
+		return v.ValueFloat64(), nil
+	case types.Number:
+		f, _ := v.ValueBigFloat().Float64()
+		return f, nil
+	case types.Map:
+		result := make(map[string]any)
+		for k, elem := range v.Elements() {
+			converted, err := attrValueToGo(ctx, elem)
+			if err != nil {
+				return nil, err
+			}
+			result[k] = converted
+		}
+		return result, nil
+	case types.Object:
+		result := make(map[string]any)
+		for k, elem := range v.Attributes() {
+			converted, err := attrValueToGo(ctx, elem)
+			if err != nil {
+				return nil, err
+			}
+			result[k] = converted
+		}
+		return result, nil
+	case types.List:
+		var result []any
+		for _, elem := range v.Elements() {
+			converted, err := attrValueToGo(ctx, elem)
+			if err != nil {
+				return nil, err
+			}
+			result = append(result, converted)
+		}
+		return result, nil
+	case types.Tuple:
+		var result []any
+		for _, elem := range v.Elements() {
+			converted, err := attrValueToGo(ctx, elem)
+			if err != nil {
+				return nil, err
+			}
+			result = append(result, converted)
+		}
+		return result, nil
+	case types.Set:
+		var result []any
+		for _, elem := range v.Elements() {
+			converted, err := attrValueToGo(ctx, elem)
+			if err != nil {
+				return nil, err
+			}
+			result = append(result, converted)
+		}
+		return result, nil
+	default:
+		return nil, fmt.Errorf("unsupported attr.Value type: %T", value)
+	}
+}
+
+func goToAttrValue(ctx context.Context, value any) (attr.Value, error) {
+	if value == nil {
+		return types.StringNull(), nil
+	}
+
+	switch v := value.(type) {
+	case string:
+		return types.StringValue(v), nil
+	case bool:
+		return types.BoolValue(v), nil
+	case int:
+		return types.Int64Value(int64(v)), nil
+	case int64:
+		return types.Int64Value(v), nil
+	case float64:
+		return types.Float64Value(v), nil
+	case map[string]any:
+		if len(v) == 0 {
+			return types.MapValueMust(types.StringType, map[string]attr.Value{}), nil
+		}
+		attrTypes := make(map[string]attr.Type)
+		attrValues := make(map[string]attr.Value)
+		for k, elem := range v {
+			converted, err := goToAttrValue(ctx, elem)
+			if err != nil {
+				return nil, err
+			}
+			attrTypes[k] = converted.Type(ctx)
+			attrValues[k] = converted
+		}
+		objValue, diags := types.ObjectValue(attrTypes, attrValues)
+		if diags.HasError() {
+			return nil, fmt.Errorf("error creating object value: %v", diags.Errors())
+		}
+		return objValue, nil
+	case []any:
+		if len(v) == 0 {
+			return types.ListValueMust(types.StringType, []attr.Value{}), nil
+		}
+		var attrValues []attr.Value
+		for _, elem := range v {
+			converted, err := goToAttrValue(ctx, elem)
+			if err != nil {
+				return nil, err
+			}
+			attrValues = append(attrValues, converted)
+		}
+		elemTypes := make([]attr.Type, len(attrValues))
+		for i, av := range attrValues {
+			elemTypes[i] = av.Type(ctx)
+		}
+		tupleValue, diags := types.TupleValue(elemTypes, attrValues)
+		if diags.HasError() {
+			return nil, fmt.Errorf("error creating tuple value: %v", diags.Errors())
+		}
+		return tupleValue, nil
+	default:
+		return types.StringValue(fmt.Sprintf("%v", v)), nil
 	}
 }

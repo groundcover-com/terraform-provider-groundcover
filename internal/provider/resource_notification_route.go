@@ -197,11 +197,17 @@ func (r *notificationRouteResource) Create(ctx context.Context, req resource.Cre
 		return
 	}
 
+	// Save the original plan's notification_settings for duration comparison
+	originalSettings := plan.NotificationSettings
+
 	// Populate state from GET response
 	mapNotificationRouteResponseToModel(ctx, route, &plan, &resp.Diagnostics)
 	if resp.Diagnostics.HasError() {
 		return
 	}
+
+	// Preserve plan's notification_settings.renotification_interval if semantically equivalent
+	plan.NotificationSettings = preserveEquivalentDuration(ctx, originalSettings, plan.NotificationSettings)
 
 	diags = resp.State.Set(ctx, plan)
 	resp.Diagnostics.Append(diags...)
@@ -233,10 +239,14 @@ func (r *notificationRouteResource) Read(ctx context.Context, req resource.ReadR
 		return
 	}
 
+	originalSettings := state.NotificationSettings
+
 	mapNotificationRouteResponseToModel(ctx, route, &state, &resp.Diagnostics)
 	if resp.Diagnostics.HasError() {
 		return
 	}
+
+	state.NotificationSettings = preserveEquivalentDuration(ctx, originalSettings, state.NotificationSettings)
 
 	diags = resp.State.Set(ctx, &state)
 	resp.Diagnostics.Append(diags...)
@@ -280,10 +290,14 @@ func (r *notificationRouteResource) Update(ctx context.Context, req resource.Upd
 		return
 	}
 
+	originalSettings := plan.NotificationSettings
+
 	mapNotificationRouteResponseToModel(ctx, route, &plan, &resp.Diagnostics)
 	if resp.Diagnostics.HasError() {
 		return
 	}
+
+	plan.NotificationSettings = preserveEquivalentDuration(ctx, originalSettings, plan.NotificationSettings)
 
 	diags = resp.State.Set(ctx, plan)
 	resp.Diagnostics.Append(diags...)
@@ -589,8 +603,6 @@ func mapNotificationRouteResponseToModel(ctx context.Context, route *models.Noti
 	}
 }
 
-// normalizeDuration normalizes duration strings to a canonical form
-// This prevents drift when API returns "1h" but user specified "60m"
 func normalizeDuration(d string) string {
 	if d == "" {
 		return d
@@ -598,9 +610,67 @@ func normalizeDuration(d string) string {
 
 	parsed, err := time.ParseDuration(d)
 	if err != nil {
-		return d // Return as-is if invalid
+		return d
 	}
-	return parsed.String() // Returns normalized form
+
+	hours := int(parsed.Hours())
+	minutes := int(parsed.Minutes()) % 60
+	seconds := int(parsed.Seconds()) % 60
+
+	if hours > 0 && minutes == 0 && seconds == 0 {
+		return fmt.Sprintf("%dh", hours)
+	}
+	if hours > 0 && seconds == 0 {
+		return fmt.Sprintf("%dh%dm", hours, minutes)
+	}
+	if hours == 0 && minutes > 0 && seconds == 0 {
+		return fmt.Sprintf("%dm", minutes)
+	}
+
+	return parsed.String()
+}
+
+func durationsEqual(d1, d2 string) bool {
+	if d1 == d2 {
+		return true
+	}
+	if d1 == "" || d2 == "" {
+		return false
+	}
+
+	parsed1, err1 := time.ParseDuration(d1)
+	parsed2, err2 := time.ParseDuration(d2)
+	if err1 != nil || err2 != nil {
+		return false
+	}
+
+	return parsed1 == parsed2
+}
+
+func preserveEquivalentDuration(ctx context.Context, original, updated types.Object) types.Object {
+	if original.IsNull() || original.IsUnknown() {
+		return updated
+	}
+	if updated.IsNull() {
+		return updated
+	}
+
+	var origSettings, updSettings notificationSettingsModel
+	if diags := original.As(ctx, &origSettings, basetypes.ObjectAsOptions{}); diags.HasError() {
+		return updated
+	}
+	if diags := updated.As(ctx, &updSettings, basetypes.ObjectAsOptions{}); diags.HasError() {
+		return updated
+	}
+
+	origInterval := origSettings.RenotificationInterval.ValueString()
+	updInterval := updSettings.RenotificationInterval.ValueString()
+
+	if durationsEqual(origInterval, updInterval) {
+		return original
+	}
+
+	return updated
 }
 
 // Attribute type definitions for nested structures

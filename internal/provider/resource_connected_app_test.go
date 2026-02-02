@@ -88,13 +88,37 @@ func TestAccConnectedApp_pagerduty(t *testing.T) {
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttr("groundcover_connected_app.test", "name", name),
 					resource.TestCheckResourceAttr("groundcover_connected_app.test", "type", "pagerduty"),
-					resource.TestCheckResourceAttr("groundcover_connected_app.test", "data.routing_key", "test-routing-key-12345"),
+					resource.TestCheckResourceAttr("groundcover_connected_app.test", "data.routing_key", "a1234567890123456789012345678901"),
 					resource.TestCheckResourceAttrSet("groundcover_connected_app.test", "id"),
 					resource.TestCheckResourceAttrSet("groundcover_connected_app.test", "created_by"),
 					resource.TestCheckResourceAttrSet("groundcover_connected_app.test", "created_at"),
 				),
 			},
 			// Delete testing automatically occurs in TestCase
+		},
+	})
+}
+
+func TestAccConnectedApp_pagerdutyWithSeverityMapping(t *testing.T) {
+	name := acctest.RandomWithPrefix("test-pagerduty-severity")
+
+	resource.Test(t, resource.TestCase{
+		PreCheck:                 func() { testAccPreCheck(t) },
+		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
+		Steps: []resource.TestStep{
+			{
+				Config: testAccConnectedAppConfig_pagerdutyWithSeverityMapping(name),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					resource.TestCheckResourceAttr("groundcover_connected_app.test", "name", name),
+					resource.TestCheckResourceAttr("groundcover_connected_app.test", "type", "pagerduty"),
+					resource.TestCheckResourceAttr("groundcover_connected_app.test", "data.routing_key", "a1234567890123456789012345678901"),
+					resource.TestCheckResourceAttr("groundcover_connected_app.test", "data.severity_mapping.critical", "critical"),
+					resource.TestCheckResourceAttr("groundcover_connected_app.test", "data.severity_mapping.error", "error"),
+					resource.TestCheckResourceAttr("groundcover_connected_app.test", "data.severity_mapping.warning", "warning"),
+					resource.TestCheckResourceAttr("groundcover_connected_app.test", "data.severity_mapping.info", "info"),
+					resource.TestCheckResourceAttrSet("groundcover_connected_app.test", "id"),
+				),
+			},
 		},
 	})
 }
@@ -136,7 +160,25 @@ resource "groundcover_connected_app" "test" {
   name = %[1]q
   type = "pagerduty"
   data = {
-    routing_key = "test-routing-key-12345"
+    routing_key = "a1234567890123456789012345678901"
+  }
+}
+`, name)
+}
+
+func testAccConnectedAppConfig_pagerdutyWithSeverityMapping(name string) string {
+	return fmt.Sprintf(`
+resource "groundcover_connected_app" "test" {
+  name = %[1]q
+  type = "pagerduty"
+  data = {
+    routing_key = "a1234567890123456789012345678901"
+    severity_mapping = {
+      critical = "critical"
+      error    = "error"
+      warning  = "warning"
+      info     = "info"
+    }
   }
 }
 `, name)

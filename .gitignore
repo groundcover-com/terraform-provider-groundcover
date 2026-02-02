@@ -19,6 +19,8 @@ vendor/
 .idea/
 .vscode/
 .claude/
+.opencode/
+.sisyphus/
 *.swp
 *.swo
 *~
