@@ -117,6 +117,10 @@ resource "groundcover_notification_route" "all_alerts_to_slack" {
       ]
     }
   ]
+
+  notification_settings = {
+    renotification_interval = "30m"
+  }
 }
 
 output "critical_route_id" {
@@ -137,10 +141,7 @@ output "all_alerts_route_id" {
 - `name` (String) Name of the notification route.
 - `query` (String) gcQL query to match issues. Use `*` to match all issues.
 - `routes` (List of Object) List of routing rules that define which connected apps receive notifications based on issue status.
-
-### Optional
-
-- `notification_settings` (Object) Optional notification settings for this route.
+- `notification_settings` (Object) Notification settings for this route.
   - `renotification_interval` (String) Duration between renotifications (e.g., `1h`, `30m`).
 
 ### Read-Only

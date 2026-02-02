@@ -100,6 +100,10 @@ resource "groundcover_notification_route" "all_alerts_to_slack" {
       ]
     }
   ]
+
+  notification_settings = {
+    renotification_interval = "30m"
+  }
 }
 
 output "critical_route_id" {

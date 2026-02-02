@@ -116,8 +116,8 @@ func (r *notificationRouteResource) Schema(_ context.Context, _ resource.SchemaR
 				},
 			},
 			"notification_settings": schema.SingleNestedAttribute{
-				Description: "Optional notification settings for this route.",
-				Optional:    true,
+				Description: "Notification settings for this route.",
+				Required:    true,
 				Attributes: map[string]schema.Attribute{
 					"renotification_interval": schema.StringAttribute{
 						Description: "Duration between renotifications (e.g., '1h', '30m'). The API may normalize this value.",
@@ -355,15 +355,12 @@ func planToCreateRequest(ctx context.Context, plan *notificationRouteResourceMod
 	}
 	req.Routes = routes
 
-	// Convert notification settings if present
-	if !plan.NotificationSettings.IsNull() && !plan.NotificationSettings.IsUnknown() {
-		settings, settingsDiags := notificationSettingsToSDK(ctx, plan.NotificationSettings)
-		diags.Append(settingsDiags...)
-		if diags.HasError() {
-			return nil, diags
-		}
-		req.NotificationSettings = settings
+	settings, settingsDiags := notificationSettingsToSDK(ctx, plan.NotificationSettings)
+	diags.Append(settingsDiags...)
+	if diags.HasError() {
+		return nil, diags
 	}
+	req.NotificationSettings = settings
 
 	return req, diags
 }
@@ -387,15 +384,12 @@ func planToUpdateRequest(ctx context.Context, plan *notificationRouteResourceMod
 	}
 	req.Routes = routes
 
-	// Convert notification settings if present
-	if !plan.NotificationSettings.IsNull() && !plan.NotificationSettings.IsUnknown() {
-		settings, settingsDiags := notificationSettingsToSDK(ctx, plan.NotificationSettings)
-		diags.Append(settingsDiags...)
-		if diags.HasError() {
-			return nil, diags
-		}
-		req.NotificationSettings = settings
+	settings, settingsDiags := notificationSettingsToSDK(ctx, plan.NotificationSettings)
+	diags.Append(settingsDiags...)
+	if diags.HasError() {
+		return nil, diags
 	}
+	req.NotificationSettings = settings
 
 	return req, diags
 }
@@ -456,9 +450,11 @@ func routesSDKToList(ctx context.Context, sdkRoutes []*models.RouteRuleResponse)
 	var diags diag.Diagnostics
 
 	if len(sdkRoutes) == 0 {
-		return types.ListNull(types.ObjectType{
+		emptyList, listDiags := types.ListValue(types.ObjectType{
 			AttrTypes: routeRuleAttrTypes(),
-		}), diags
+		}, []attr.Value{})
+		diags.Append(listDiags...)
+		return emptyList, diags
 	}
 
 	routeElements := make([]attr.Value, len(sdkRoutes))

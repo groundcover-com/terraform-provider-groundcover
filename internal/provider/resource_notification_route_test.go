@@ -235,6 +235,10 @@ resource "groundcover_notification_route" "test" {
       id   = groundcover_connected_app.test.id
     }]
   }]
+
+  notification_settings = {
+    renotification_interval = "1h"
+  }
 }
 `, name)
 }
@@ -260,6 +264,10 @@ resource "groundcover_notification_route" "test" {
       id   = groundcover_connected_app.test.id
     }]
   }]
+
+  notification_settings = {
+    renotification_interval = "1h"
+  }
 }
 `, name)
 }
@@ -302,6 +310,10 @@ resource "groundcover_notification_route" "test" {
       }]
     }
   ]
+
+  notification_settings = {
+    renotification_interval = "2h"
+  }
 }
 `, name)
 }
