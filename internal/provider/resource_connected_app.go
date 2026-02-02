@@ -436,9 +436,6 @@ func goToAttrValue(ctx context.Context, value any) (attr.Value, error) {
 	case float64:
 		return types.Float64Value(v), nil
 	case map[string]any:
-		if len(v) == 0 {
-			return types.MapValueMust(types.StringType, map[string]attr.Value{}), nil
-		}
 		attrTypes := make(map[string]attr.Type)
 		attrValues := make(map[string]attr.Value)
 		for k, elem := range v {
@@ -455,9 +452,6 @@ func goToAttrValue(ctx context.Context, value any) (attr.Value, error) {
 		}
 		return objValue, nil
 	case []any:
-		if len(v) == 0 {
-			return types.ListValueMust(types.StringType, []attr.Value{}), nil
-		}
 		var attrValues []attr.Value
 		for _, elem := range v {
 			converted, err := goToAttrValue(ctx, elem)
