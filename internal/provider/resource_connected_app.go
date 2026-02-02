@@ -247,7 +247,6 @@ func (r *connectedAppResource) Update(ctx context.Context, req resource.UpdateRe
 	tflog.Debug(ctx, fmt.Sprintf("Successfully updated connected app resource: %s", plan.Id.ValueString()))
 }
 
-// Delete deletes the resource from Terraform state.
 func (r *connectedAppResource) Delete(ctx context.Context, req resource.DeleteRequest, resp *resource.DeleteResponse) {
 	var state connectedAppResourceModel
 	diags := req.State.Get(ctx, &state)
@@ -261,13 +260,16 @@ func (r *connectedAppResource) Delete(ctx context.Context, req resource.DeleteRe
 
 	err := r.client.DeleteConnectedApp(ctx, connectedAppId)
 	if err != nil {
-		if !errors.Is(err, ErrNotFound) {
-			resp.Diagnostics.AddError("Error deleting connected app", err.Error())
+		if errors.Is(err, ErrNotFound) {
+			tflog.Warn(ctx, "Connected app already deleted externally, treating as success", map[string]any{"id": connectedAppId})
 			return
 		}
+		resp.Diagnostics.AddError("Error deleting connected app", err.Error())
+		return
 	}
 
 	tflog.Debug(ctx, fmt.Sprintf("Successfully deleted connected app resource: %s", connectedAppId))
+	// Terraform automatically removes the resource from state when Delete returns no error.
 }
 
 func (r *connectedAppResource) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {
@@ -316,12 +318,14 @@ func dynamicValueToMap(ctx context.Context, dynamic types.Dynamic) (map[string]a
 	var diags diag.Diagnostics
 
 	if dynamic.IsNull() || dynamic.IsUnknown() {
-		return make(map[string]any), diags
+		diags.AddError("Missing required attribute", "The 'data' attribute is required and cannot be null or unknown")
+		return nil, diags
 	}
 
 	underlyingValue := dynamic.UnderlyingValue()
 	if underlyingValue == nil {
-		return make(map[string]any), diags
+		diags.AddError("Missing required attribute", "The 'data' attribute is required and cannot be empty")
+		return nil, diags
 	}
 
 	result, err := attrValueToGo(ctx, underlyingValue)
