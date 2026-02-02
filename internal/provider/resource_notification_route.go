@@ -537,13 +537,8 @@ func notificationSettingsToSDK(ctx context.Context, settings types.Object) (*mod
 func notificationSettingsSDKToObject(ctx context.Context, sdkSettings *models.NotificationSettingsResponse) (types.Object, diag.Diagnostics) {
 	var diags diag.Diagnostics
 
-	if sdkSettings == nil {
-		return types.ObjectNull(notificationSettingsAttrTypes()), diags
-	}
-
-	// Normalize duration if present
 	renotificationInterval := types.StringNull()
-	if sdkSettings.RenotificationInterval != "" {
+	if sdkSettings != nil && sdkSettings.RenotificationInterval != "" {
 		normalized := normalizeDuration(sdkSettings.RenotificationInterval)
 		renotificationInterval = types.StringValue(normalized)
 	}
