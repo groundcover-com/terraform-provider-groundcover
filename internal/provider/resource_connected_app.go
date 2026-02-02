@@ -7,6 +7,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"time"
 
 	"github.com/hashicorp/terraform-plugin-framework/attr"
 	"github.com/hashicorp/terraform-plugin-framework/diag"
@@ -297,15 +298,15 @@ func mapConnectedAppResponseToModel(ctx context.Context, app *models.ConnectedAp
 	}
 
 	model.CreatedBy = types.StringValue(app.CreatedBy)
-	if !app.CreatedAt.IsZero() {
-		model.CreatedAt = types.StringValue(app.CreatedAt.String())
+	if !time.Time(app.CreatedAt).IsZero() {
+		model.CreatedAt = types.StringValue(time.Time(app.CreatedAt).Format(time.RFC3339))
 	} else {
 		model.CreatedAt = types.StringNull()
 	}
 
 	model.UpdatedBy = types.StringValue(app.UpdatedBy)
-	if !app.UpdatedAt.IsZero() {
-		model.UpdatedAt = types.StringValue(app.UpdatedAt.String())
+	if !time.Time(app.UpdatedAt).IsZero() {
+		model.UpdatedAt = types.StringValue(time.Time(app.UpdatedAt).Format(time.RFC3339))
 	} else {
 		model.UpdatedAt = types.StringNull()
 	}

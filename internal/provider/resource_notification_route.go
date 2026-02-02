@@ -587,17 +587,16 @@ func mapNotificationRouteResponseToModel(ctx context.Context, route *models.Noti
 	}
 	model.NotificationSettings = settingsObj
 
-	// Set computed fields (timestamps are strfmt.DateTime)
 	model.CreatedBy = types.StringValue(route.CreatedBy)
-	if !route.CreatedAt.IsZero() {
-		model.CreatedAt = types.StringValue(route.CreatedAt.String())
+	if !time.Time(route.CreatedAt).IsZero() {
+		model.CreatedAt = types.StringValue(time.Time(route.CreatedAt).Format(time.RFC3339))
 	} else {
 		model.CreatedAt = types.StringNull()
 	}
 
 	model.ModifiedBy = types.StringValue(route.ModifiedBy)
-	if !route.ModifiedAt.IsZero() {
-		model.ModifiedAt = types.StringValue(route.ModifiedAt.String())
+	if !time.Time(route.ModifiedAt).IsZero() {
+		model.ModifiedAt = types.StringValue(time.Time(route.ModifiedAt).Format(time.RFC3339))
 	} else {
 		model.ModifiedAt = types.StringNull()
 	}
