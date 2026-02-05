@@ -16,7 +16,7 @@ Notification Route resource for managing issue routing to connected apps.
 terraform {
   required_providers {
     groundcover = {
-      source  = "registry.terraform.io/groundcover-com/groundcover"
+      source = "registry.terraform.io/groundcover-com/groundcover"
     }
   }
 }

@@ -16,7 +16,7 @@ Connected App resource for managing integrations with external services.
 terraform {
   required_providers {
     groundcover = {
-      source  = "registry.terraform.io/groundcover-com/groundcover"
+      source = "registry.terraform.io/groundcover-com/groundcover"
     }
   }
 }
