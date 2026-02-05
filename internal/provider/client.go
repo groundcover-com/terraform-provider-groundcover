@@ -203,6 +203,18 @@ type ApiClient interface {
 	GetSilence(ctx context.Context, id string) (*models.Silence, error)
 	UpdateSilence(ctx context.Context, id string, req *models.UpdateSilenceRequest) (*models.Silence, error)
 	DeleteSilence(ctx context.Context, id string) error
+
+	// Connected Apps
+	CreateConnectedApp(ctx context.Context, req *models.CreateConnectedAppRequest) (*models.CreateConnectedAppResponse, error)
+	GetConnectedApp(ctx context.Context, id string) (*models.ConnectedAppResponse, error)
+	UpdateConnectedApp(ctx context.Context, id string, req *models.UpdateConnectedAppRequest) error
+	DeleteConnectedApp(ctx context.Context, id string) error
+
+	// Notification Routes
+	CreateNotificationRoute(ctx context.Context, req *models.CreateNotificationRouteRequest) (*models.CreateNotificationRouteResponse, error)
+	GetNotificationRoute(ctx context.Context, id string) (*models.NotificationRouteResponse, error)
+	UpdateNotificationRoute(ctx context.Context, id string, req *models.UpdateNotificationRouteRequest) error
+	DeleteNotificationRoute(ctx context.Context, id string) error
 }
 
 // SdkClientWrapper implements ApiClient using the Groundcover Go SDK.
@@ -378,6 +390,11 @@ func handleApiError(ctx context.Context, err error, operation string, resourceId
 	if operation == "CreatePolicy" && (statusCode == http.StatusConflict || strings.Contains(lowerErrStr, "conflict")) {
 		tflog.Warn(ctx, "Detected 409 Conflict during CreatePolicy, likely name collision.", logFields)
 		return fmt.Errorf("policy name '%s' was previously used or is currently in use. Please choose a different name", resourceId)
+	}
+
+	if operation == "DeleteConnectedApp" && (statusCode == http.StatusConflict || strings.Contains(lowerErrStr, "conflict")) {
+		tflog.Warn(ctx, "Detected 409 Conflict during DeleteConnectedApp, connected app is referenced by notification routes.", logFields)
+		return fmt.Errorf("cannot delete connected app '%s': it is referenced by one or more notification routes. Remove the references first", resourceId)
 	}
 
 	if statusCode == http.StatusNotFound {
