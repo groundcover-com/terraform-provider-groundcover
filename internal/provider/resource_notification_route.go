@@ -117,7 +117,8 @@ func (r *notificationRouteResource) Schema(_ context.Context, _ resource.SchemaR
 			},
 			"notification_settings": schema.SingleNestedAttribute{
 				Description: "Notification settings for this route.",
-				Required:    true,
+				Optional:    true,
+				Computed:    true,
 				Attributes: map[string]schema.Attribute{
 					"renotification_interval": schema.StringAttribute{
 						Description: "Duration between renotifications (e.g., '1h', '30m'). The API may normalize this value.",

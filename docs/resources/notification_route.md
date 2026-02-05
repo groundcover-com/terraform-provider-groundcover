@@ -17,7 +17,6 @@ terraform {
   required_providers {
     groundcover = {
       source  = "registry.terraform.io/groundcover-com/groundcover"
-      version = ">= 1.6.0"
     }
   }
 }
@@ -138,9 +137,12 @@ output "all_alerts_route_id" {
 ### Required
 
 - `name` (String) Name of the notification route.
-- `notification_settings` (Attributes) Notification settings for this route. (see [below for nested schema](#nestedatt--notification_settings))
 - `query` (String) gcQL query to match issues.
 - `routes` (Attributes List) List of routing rules that define which connected apps receive notifications based on issue status. (see [below for nested schema](#nestedatt--routes))
+
+### Optional
+
+- `notification_settings` (Attributes) Notification settings for this route. (see [below for nested schema](#nestedatt--notification_settings))
 
 ### Read-Only
 
@@ -149,14 +151,6 @@ output "all_alerts_route_id" {
 - `id` (String) The unique identifier for the notification route.
 - `modified_at` (String) The date the notification route was last modified (RFC3339 format).
 - `modified_by` (String) The user who last modified the notification route.
-
-<a id="nestedatt--notification_settings"></a>
-### Nested Schema for `notification_settings`
-
-Optional:
-
-- `renotification_interval` (String) Duration between renotifications (e.g., '1h', '30m'). The API may normalize this value.
-
 
 <a id="nestedatt--routes"></a>
 ### Nested Schema for `routes`
@@ -173,3 +167,12 @@ Required:
 
 - `id` (String) ID of the connected app.
 - `type` (String) Type of connected app (e.g., 'slack-webhook', 'pagerduty').
+
+
+
+<a id="nestedatt--notification_settings"></a>
+### Nested Schema for `notification_settings`
+
+Optional:
+
+- `renotification_interval` (String) Duration between renotifications (e.g., '1h', '30m'). The API may normalize this value.

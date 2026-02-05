@@ -1,4 +1,4 @@
-## 1.6.0
+## 1.5.5
 
 * Added connected_app resource for managing integrations with external services (Slack, PagerDuty)
 * Added notification_route resource for routing alerts to connected apps based on issue queries and statuses
