@@ -1,3 +1,9 @@
+## 1.6.0
+
+* Added connected_app resource for managing integrations with external services (Slack, PagerDuty)
+* Added notification_route resource for routing alerts to connected apps based on issue queries and statuses
+* Updated groundcover SDK from v1.139.0 to v1.151.0
+
 ## 1.5.5
 
 * Added connected_app resource for managing integrations with external services (Slack, PagerDuty)
