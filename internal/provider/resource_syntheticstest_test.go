@@ -285,4 +285,3 @@ func testAccCheckSyntheticTestResourceDisappears(n string) resource.TestCheckFun
 		return nil
 	}
 }
-

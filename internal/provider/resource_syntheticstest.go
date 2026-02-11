@@ -542,7 +542,7 @@ func fromSDKResponse(ctx context.Context, sdkResp *models.SyntheticTestCreateReq
 
 	cc := sdkResp.CheckConfig
 
-	// Labels - only set if present in response
+	// Labels - set from API response or clear if none returned
 	if cc.Metadata != nil && len(cc.Metadata.Labels) > 0 {
 		labels := make(map[string]string)
 		for k, v := range cc.Metadata.Labels {
@@ -552,6 +552,9 @@ func fromSDKResponse(ctx context.Context, sdkResp *models.SyntheticTestCreateReq
 		if !diags.HasError() {
 			state.Labels = labelsMap
 		}
+	} else if !state.Labels.IsNull() {
+		// API returned no labels but state had labels - clear them
+		state.Labels = types.MapNull(types.StringType)
 	}
 
 	// HTTP Check
@@ -577,10 +580,15 @@ func fromSDKResponse(ctx context.Context, sdkResp *models.SyntheticTestCreateReq
 			httpModel.Headers = types.MapNull(types.StringType)
 		}
 
-		if http.FollowRedirects {
+		// Always set bool fields to preserve explicit false (avoid null drift)
+		if state.HTTPCheck != nil && !state.HTTPCheck.FollowRedirects.IsNull() {
+			httpModel.FollowRedirects = types.BoolValue(http.FollowRedirects)
+		} else if http.FollowRedirects {
 			httpModel.FollowRedirects = types.BoolValue(true)
 		}
-		if http.AllowInsecure {
+		if state.HTTPCheck != nil && !state.HTTPCheck.AllowInsecure.IsNull() {
+			httpModel.AllowInsecure = types.BoolValue(http.AllowInsecure)
+		} else if http.AllowInsecure {
 			httpModel.AllowInsecure = types.BoolValue(true)
 		}
 

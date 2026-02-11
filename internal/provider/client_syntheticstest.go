@@ -84,4 +84,3 @@ func (c *SdkClientWrapper) DeleteSyntheticTest(ctx context.Context, id string) e
 	tflog.Debug(ctx, "SDK Call Successful: Delete Synthetic Test", logFields)
 	return nil
 }
-
