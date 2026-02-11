@@ -24,6 +24,8 @@ Basic usage examples can be found in the `examples/` directory:
     *   Demonstrates how to create and manage dashboards with customizable widgets and layouts.
 *   **Data Integration Resource:** [`examples/resources/groundcover_dataintegration/resource.tf`](./examples/resources/groundcover_dataintegration/resource.tf)
     *   Demonstrates how to create and manage data integrations.
+*   **Synthetic Test Resource:** [`examples/resources/groundcover_synthetic_test/resource.tf`](./examples/resources/groundcover_synthetic_test/resource.tf)
+    *   Demonstrates how to create and manage synthetic tests for proactive HTTP endpoint monitoring with assertions, retries, and authentication support.
 
 ## Local Development and Testing
 
@@ -220,6 +222,7 @@ TF_ACC=1 go test ./internal/provider -v -run TestAccMetricsAggregationResource
 TF_ACC=1 go test ./internal/provider -v -run TestAccIngestionKeyResource
 TF_ACC=1 go test ./internal/provider -v -run TestAccDashboardResource
 TF_ACC=1 go test ./internal/provider -v -run TestAccDataIntegrationResource
+TF_ACC=1 go test ./internal/provider -v -run TestAccSyntheticTestResource
 
 # Run unit tests only (no API calls required)
 go test ./internal/provider -v
