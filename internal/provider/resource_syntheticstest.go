@@ -11,7 +11,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/booldefault"
-	"github.com/hashicorp/terraform-plugin-framework/resource/schema/int64default"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/int64planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringdefault"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
@@ -122,10 +122,11 @@ func (r *syntheticTestResource) Schema(_ context.Context, _ resource.SchemaReque
 				},
 			},
 			"version": schema.Int64Attribute{
-				Description: "Configuration version. Default: `1`.",
-				Optional:    true,
+				Description: "Configuration schema version. Managed by the provider.",
 				Computed:    true,
-				Default:     int64default.StaticInt64(1),
+				PlanModifiers: []planmodifier.Int64{
+					int64planmodifier.UseStateForUnknown(),
+				},
 			},
 			"labels": schema.MapAttribute{
 				Description: "Extra labels to attach to the synthetic test metrics.",
@@ -295,6 +296,14 @@ func (r *syntheticTestResource) Create(ctx context.Context, req resource.CreateR
 
 	tflog.Debug(ctx, "Creating Synthetic Test", map[string]any{"name": plan.Name.ValueString()})
 
+	if plan.HTTPCheck == nil {
+		resp.Diagnostics.AddError(
+			"Missing http_check",
+			"An http_check block is required to define the synthetic test check configuration.",
+		)
+		return
+	}
+
 	sdkReq := toSDKRequest(&plan)
 
 	createdResp, err := r.client.CreateSyntheticTest(ctx, sdkReq)
@@ -307,6 +316,7 @@ func (r *syntheticTestResource) Create(ctx context.Context, req resource.CreateR
 	}
 
 	plan.ID = types.StringValue(createdResp.ID)
+	plan.Version = types.Int64Value(1)
 
 	tflog.Debug(ctx, fmt.Sprintf("Synthetic Test created with ID: %s", createdResp.ID))
 
@@ -360,6 +370,14 @@ func (r *syntheticTestResource) Update(ctx context.Context, req resource.UpdateR
 
 	tflog.Debug(ctx, "Updating Synthetic Test", map[string]any{"id": plan.ID.ValueString()})
 
+	if plan.HTTPCheck == nil {
+		resp.Diagnostics.AddError(
+			"Missing http_check",
+			"An http_check block is required to define the synthetic test check configuration.",
+		)
+		return
+	}
+
 	sdkReq := toSDKRequest(&plan)
 
 	err := r.client.UpdateSyntheticTest(ctx, plan.ID.ValueString(), sdkReq)
@@ -370,6 +388,8 @@ func (r *syntheticTestResource) Update(ctx context.Context, req resource.UpdateR
 		)
 		return
 	}
+
+	plan.Version = types.Int64Value(1)
 
 	diags = resp.State.Set(ctx, &plan)
 	resp.Diagnostics.Append(diags...)
@@ -412,7 +432,7 @@ func toSDKRequest(plan *syntheticTestResourceModel) *models.SyntheticTestCreateR
 		Name:     plan.Name.ValueString(),
 		Enabled:  plan.Enabled.ValueBool(),
 		Interval: plan.Interval.ValueString(),
-		Version:  plan.Version.ValueInt64(),
+		Version:  1, // Always use version 1
 	}
 
 	// Build CheckConfig
@@ -566,30 +586,22 @@ func fromSDKResponse(ctx context.Context, sdkResp *models.SyntheticTestCreateReq
 			Timeout: types.StringValue(http.Timeout),
 		}
 
-		// Only set headers if there are actual headers, otherwise keep null
-		// to match user's config (avoid drift when user didn't specify headers)
+		// Headers - set from API or clear to null when API returns none
 		if len(http.Headers) > 0 {
 			headersMap, diags := types.MapValueFrom(ctx, types.StringType, http.Headers)
 			if !diags.HasError() {
 				httpModel.Headers = headersMap
 			}
-		} else if state.HTTPCheck != nil && !state.HTTPCheck.Headers.IsNull() {
-			// Preserve existing state if user had specified headers
-			httpModel.Headers = state.HTTPCheck.Headers
 		} else {
 			httpModel.Headers = types.MapNull(types.StringType)
 		}
 
-		// Always set bool fields to preserve explicit false (avoid null drift)
-		if state.HTTPCheck != nil && !state.HTTPCheck.FollowRedirects.IsNull() {
+		// Set bool fields: preserve explicit user values, set from API if true or if user had set them
+		if http.FollowRedirects || (state.HTTPCheck != nil && !state.HTTPCheck.FollowRedirects.IsNull()) {
 			httpModel.FollowRedirects = types.BoolValue(http.FollowRedirects)
-		} else if http.FollowRedirects {
-			httpModel.FollowRedirects = types.BoolValue(true)
 		}
-		if state.HTTPCheck != nil && !state.HTTPCheck.AllowInsecure.IsNull() {
+		if http.AllowInsecure || (state.HTTPCheck != nil && !state.HTTPCheck.AllowInsecure.IsNull()) {
 			httpModel.AllowInsecure = types.BoolValue(http.AllowInsecure)
-		} else if http.AllowInsecure {
-			httpModel.AllowInsecure = types.BoolValue(true)
 		}
 
 		if http.Body != nil && (http.Body.Content != "" || string(http.Body.Type) != "") {

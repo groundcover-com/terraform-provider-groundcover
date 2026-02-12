@@ -168,11 +168,11 @@ output "http_post_check_id" {
 - `http_check` (Block, Optional) HTTP check configuration. (see [below for nested schema](#nestedblock--http_check))
 - `labels` (Map of String) Extra labels to attach to the synthetic test metrics.
 - `retry` (Block, Optional) Retry policy for failed checks. (see [below for nested schema](#nestedblock--retry))
-- `version` (Number) Configuration version. Default: `1`.
 
 ### Read-Only
 
 - `id` (String) The unique identifier (UUID) of the synthetic test.
+- `version` (Number) Configuration schema version. Managed by the provider.
 
 <a id="nestedblock--assertion"></a>
 ### Nested Schema for `assertion`
@@ -230,7 +230,7 @@ Optional:
 <a id="nestedblock--retry"></a>
 ### Nested Schema for `retry`
 
-Required:
+Optional:
 
 - `count` (Number) Number of retry attempts.
 - `interval` (String) Delay between retries (e.g. `1s`, `500ms`).
