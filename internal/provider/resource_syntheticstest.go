@@ -254,11 +254,11 @@ func (r *syntheticTestResource) Schema(_ context.Context, _ resource.SchemaReque
 				Attributes: map[string]schema.Attribute{
 					"count": schema.Int64Attribute{
 						Description: "Number of retry attempts.",
-						Required:    true,
+						Optional:    true,
 					},
 					"interval": schema.StringAttribute{
 						Description: "Delay between retries (e.g. `1s`, `500ms`).",
-						Required:    true,
+						Optional:    true,
 					},
 				},
 			},
@@ -642,11 +642,13 @@ func fromSDKResponse(ctx context.Context, sdkResp *models.SyntheticTestCreateReq
 		state.Assertion = nil
 	}
 
-	// Retries
+	// Retries - clear when API returns none to avoid stale state
 	if cc.ExecutionPolicy != nil && cc.ExecutionPolicy.Retries != nil && cc.ExecutionPolicy.Retries.Count > 0 {
 		state.Retry = &syntheticRetryModel{
 			Count:    types.Int64Value(cc.ExecutionPolicy.Retries.Count),
 			Interval: types.StringValue(cc.ExecutionPolicy.Retries.Interval),
 		}
+	} else {
+		state.Retry = nil
 	}
 }
