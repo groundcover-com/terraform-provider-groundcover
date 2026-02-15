@@ -24,6 +24,8 @@ Basic usage examples can be found in the `examples/` directory:
     *   Demonstrates how to create and manage dashboards with customizable widgets and layouts.
 *   **Data Integration Resource:** [`examples/resources/groundcover_dataintegration/resource.tf`](./examples/resources/groundcover_dataintegration/resource.tf)
     *   Demonstrates how to create and manage data integrations.
+*   **Synthetic Test Resource:** [`examples/resources/groundcover_synthetic_test/resource.tf`](./examples/resources/groundcover_synthetic_test/resource.tf)
+    *   Demonstrates how to create and manage synthetic tests for proactive HTTP endpoint monitoring with assertions, retries, and authentication support.
 
 ## Local Development and Testing
 
@@ -155,7 +157,7 @@ To use this provider locally before it is published to the Terraform Registry, f
 ## Requirements
 
 *   [Terraform](https://www.terraform.io/downloads.html) >= 1.0 (Check `required_version` if specified in `main.tf`)
-*   [Go](https://golang.org/doc/install) >= 1.21 (to build the provider plugin)
+*   [Go](https://golang.org/doc/install) >= 1.25.7 (to build the provider plugin)
 *   groundcover Account and API Key.
 
 ## Provider Reference
@@ -220,6 +222,7 @@ TF_ACC=1 go test ./internal/provider -v -run TestAccMetricsAggregationResource
 TF_ACC=1 go test ./internal/provider -v -run TestAccIngestionKeyResource
 TF_ACC=1 go test ./internal/provider -v -run TestAccDashboardResource
 TF_ACC=1 go test ./internal/provider -v -run TestAccDataIntegrationResource
+TF_ACC=1 go test ./internal/provider -v -run TestAccSyntheticTestResource
 
 # Run unit tests only (no API calls required)
 go test ./internal/provider -v
