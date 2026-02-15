@@ -489,9 +489,13 @@ func toSDKRequest(plan *syntheticTestResourceModel) *models.SyntheticTestCreateR
 			httpReq.Headers = headers
 		}
 
-		if plan.HTTPCheck.Body != nil && !plan.HTTPCheck.Body.Type.IsNull() {
+		if plan.HTTPCheck.Body != nil && (!plan.HTTPCheck.Body.Type.IsNull() || !plan.HTTPCheck.Body.Content.IsNull()) {
+			bodyType := plan.HTTPCheck.Body.Type.ValueString()
+			if bodyType == "" && !plan.HTTPCheck.Body.Content.IsNull() {
+				bodyType = "raw" // default to raw if content is set without type
+			}
 			httpReq.Body = &models.Body{
-				Type:    models.HTTPRequestBodyType(plan.HTTPCheck.Body.Type.ValueString()),
+				Type:    models.HTTPRequestBodyType(bodyType),
 				Content: plan.HTTPCheck.Body.Content.ValueString(),
 			}
 		}
