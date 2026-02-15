@@ -22,10 +22,9 @@ import (
 
 // Ensure resource implements required interfaces
 var (
-	_ resource.Resource                   = &syntheticTestResource{}
-	_ resource.ResourceWithConfigure      = &syntheticTestResource{}
-	_ resource.ResourceWithImportState    = &syntheticTestResource{}
-	_ resource.ResourceWithValidateConfig = &syntheticTestResource{}
+	_ resource.Resource                = &syntheticTestResource{}
+	_ resource.ResourceWithConfigure   = &syntheticTestResource{}
+	_ resource.ResourceWithImportState = &syntheticTestResource{}
 )
 
 func NewSyntheticTestResource() resource.Resource {
@@ -137,7 +136,7 @@ func (r *syntheticTestResource) Schema(_ context.Context, _ resource.SchemaReque
 		},
 		Blocks: map[string]schema.Block{
 			"http_check": schema.SingleNestedBlock{
-				Description: "HTTP check configuration. Defines the endpoint to monitor. (Required)",
+				Description: "HTTP check configuration. Defines the endpoint to monitor.",
 				Attributes: map[string]schema.Attribute{
 					"url": schema.StringAttribute{
 						Description: "The URL to check (must include http:// or https://).",
@@ -265,23 +264,6 @@ func (r *syntheticTestResource) Schema(_ context.Context, _ resource.SchemaReque
 				},
 			},
 		},
-	}
-}
-
-// ValidateConfig ensures required blocks are present at plan time.
-func (r *syntheticTestResource) ValidateConfig(ctx context.Context, req resource.ValidateConfigRequest, resp *resource.ValidateConfigResponse) {
-	var config syntheticTestResourceModel
-	resp.Diagnostics.Append(req.Config.Get(ctx, &config)...)
-	if resp.Diagnostics.HasError() {
-		return
-	}
-
-	if config.HTTPCheck == nil {
-		resp.Diagnostics.AddAttributeError(
-			path.Root("http_check"),
-			"Missing http_check block",
-			"An http_check block is required to define the synthetic test check configuration.",
-		)
 	}
 }
 
