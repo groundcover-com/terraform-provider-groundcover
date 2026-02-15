@@ -304,6 +304,14 @@ func (r *syntheticTestResource) Create(ctx context.Context, req resource.CreateR
 		return
 	}
 
+	if len(plan.Assertion) == 0 {
+		resp.Diagnostics.AddError(
+			"Missing assertion",
+			"At least one assertion block is required to define pass/fail conditions for the synthetic test.",
+		)
+		return
+	}
+
 	sdkReq := toSDKRequest(&plan)
 
 	createdResp, err := r.client.CreateSyntheticTest(ctx, sdkReq)
@@ -374,6 +382,14 @@ func (r *syntheticTestResource) Update(ctx context.Context, req resource.UpdateR
 		resp.Diagnostics.AddError(
 			"Missing http_check",
 			"An http_check block is required to define the synthetic test check configuration.",
+		)
+		return
+	}
+
+	if len(plan.Assertion) == 0 {
+		resp.Diagnostics.AddError(
+			"Missing assertion",
+			"At least one assertion block is required to define pass/fail conditions for the synthetic test.",
 		)
 		return
 	}
