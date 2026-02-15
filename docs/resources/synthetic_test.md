@@ -157,13 +157,15 @@ output "http_post_check_id" {
 ## Schema
 
 ### Required
-- `http_check` (Block, Required) HTTP check configuration. Defines the endpoint to monitor. (see [below for nested schema](#nestedblock--http_check))
+
 - `interval` (String) How often the check runs. Supported values: `15s`, `30s`, `1m`, `5m`, `10m`, `15m`, `30m`, `1h`.
 - `name` (String) The name of the synthetic test.
 
 ### Optional
-- `assertion` (Block, Optional) At least one assertion is required to define pass/fail conditions. (see [below for nested schema](#nestedblock--assertion))
+
+- `assertion` (Block List) Assertions to validate the check result. (see [below for nested schema](#nestedblock--assertion))
 - `enabled` (Boolean) Whether the synthetic test is enabled. Default: `true`.
+- `http_check` (Block, Optional) HTTP check configuration. (see [below for nested schema](#nestedblock--http_check))
 - `labels` (Map of String) Extra labels to attach to the synthetic test metrics.
 - `retry` (Block, Optional) Retry policy for failed checks. (see [below for nested schema](#nestedblock--retry))
 
@@ -184,7 +186,7 @@ Optional:
 
 - `property` (String) Property path for header or JSON body assertions (e.g. `Content-Type` or `data.id`).
 - `severity` (String) Assertion severity: `critical` (default) or `degraded`.
-- `target` (String) Expected value to compare against (as string, e.g. `"200"` for status code). Required for most operators (`eq`, `ne`, `gt`, `lt`, `contains`, etc.). Not needed for `exists` and `notExists` operators.
+- `target` (String) Expected value to compare against (as string, e.g. `"200"` for status code).
 
 
 <a id="nestedblock--http_check"></a>
