@@ -163,9 +163,9 @@ output "http_post_check_id" {
 
 ### Optional
 
-- `assertion` (Block List) Assertions to validate the check result. (see [below for nested schema](#nestedblock--assertion))
+- `assertion` (Block List) Assertions to validate the check result. At least one assertion is required. (see [below for nested schema](#nestedblock--assertion))
 - `enabled` (Boolean) Whether the synthetic test is enabled. Default: `true`.
-- `http_check` (Block, Optional) HTTP check configuration. (see [below for nested schema](#nestedblock--http_check))
+- `http_check` (Block, Optional) HTTP check configuration. Defines the endpoint to monitor. (Required) (see [below for nested schema](#nestedblock--http_check))
 - `labels` (Map of String) Extra labels to attach to the synthetic test metrics.
 - `retry` (Block, Optional) Retry policy for failed checks. (see [below for nested schema](#nestedblock--retry))
 
