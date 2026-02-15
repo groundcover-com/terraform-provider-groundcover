@@ -216,7 +216,7 @@ func (r *syntheticTestResource) Schema(_ context.Context, _ resource.SchemaReque
 				},
 			},
 			"assertion": schema.ListNestedBlock{
-				Description: "Assertions to validate the check result. At least one assertion is required.",
+				Description: "Assertions to validate the check result.",
 				NestedObject: schema.NestedBlockObject{
 					Attributes: map[string]schema.Attribute{
 						"source": schema.StringAttribute{
@@ -281,13 +281,6 @@ func (r *syntheticTestResource) ValidateConfig(ctx context.Context, req resource
 			path.Root("http_check"),
 			"Missing http_check block",
 			"An http_check block is required to define the synthetic test check configuration.",
-		)
-	}
-
-	if len(config.Assertion) == 0 {
-		resp.Diagnostics.AddError(
-			"Missing assertion block",
-			"At least one assertion block is required to define pass/fail conditions for the synthetic test.",
 		)
 	}
 }
