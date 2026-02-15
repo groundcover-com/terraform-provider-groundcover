@@ -157,7 +157,7 @@ To use this provider locally before it is published to the Terraform Registry, f
 ## Requirements
 
 *   [Terraform](https://www.terraform.io/downloads.html) >= 1.0 (Check `required_version` if specified in `main.tf`)
-*   [Go](https://golang.org/doc/install) >= 1.21 (to build the provider plugin)
+*   [Go](https://golang.org/doc/install) >= 1.25.7 (to build the provider plugin)
 *   groundcover Account and API Key.
 
 ## Provider Reference

@@ -23,7 +23,7 @@ We use GitHub to host code, to track issues and feature requests, as well as acc
 
 ### Prerequisites
 
-- [Go](https://golang.org/doc/install) >= 1.24
+- [Go](https://golang.org/doc/install) >= 1.25.7
 - [Terraform](https://www.terraform.io/downloads.html) >= 1.0
 - groundcover account with API access
 
