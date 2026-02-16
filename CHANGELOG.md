@@ -1,3 +1,8 @@
+## 1.7.0
+
+* Added synthetic_test resource for proactive HTTP endpoint monitoring with assertions, retries, and authentication (basic/bearer with secret store support)
+* Updated groundcover SDK from v1.151.0 to v1.154.0
+
 ## 1.6.0
 
 * Added connected_app resource for managing integrations with external services (Slack, PagerDuty)

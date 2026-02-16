@@ -215,6 +215,12 @@ type ApiClient interface {
 	GetNotificationRoute(ctx context.Context, id string) (*models.NotificationRouteResponse, error)
 	UpdateNotificationRoute(ctx context.Context, id string, req *models.UpdateNotificationRouteRequest) error
 	DeleteNotificationRoute(ctx context.Context, id string) error
+
+	// Synthetic Tests
+	CreateSyntheticTest(ctx context.Context, req *models.SyntheticTestCreateRequest) (*models.SyntheticTestCreateResponse, error)
+	GetSyntheticTest(ctx context.Context, id string) (*models.SyntheticTestCreateRequest, error)
+	UpdateSyntheticTest(ctx context.Context, id string, req *models.SyntheticTestCreateRequest) error
+	DeleteSyntheticTest(ctx context.Context, id string) error
 }
 
 // SdkClientWrapper implements ApiClient using the Groundcover Go SDK.
