@@ -38,8 +38,10 @@ resource "groundcover_dataintegration" "cloudwatch_example" {
     labelSettings = {
       extraLabels = { env = "prod" }
     }
-    scrapeInterval = 300000000000
-    exporters      = ["prometheus"]
+    # use this parameter to enrich with resource labels
+    withContextTagsOnInfoMetrics = true
+    scrapeInterval               = 300000000000
+    exporters                    = ["prometheus"]
   })
   is_paused = false
 }
@@ -426,6 +428,253 @@ EOT
   is_paused = false
 }
 
+# Example: Clickhouse - Query Log & Custom Metrics
+resource "groundcover_dataintegration" "clickhouse_demo" {
+  type      = "clickhousedbm"
+  is_paused = false
+
+  config = jsonencode({
+    authentication = {
+      basicAuth = {
+        username = "default"
+
+        # use the groundcover_secret resource to create a secret
+        password = "secretRef::k8s::groundcover-incloud::groundcover-incloud-clickhouse::admin-password"
+      }
+    }
+
+    clusterMode = true          # true if your clickhouse is running in cluster or a single node
+    clusterName = "clustername" # the name of the cluster. Relevant if clusterMode=true
+    database    = "your clickhouse db name"
+    dialTimeout = "10s"
+    enabled     = true
+    host        = "your clickhouse host details"
+    name        = "clickhouse demo integration"
+    port        = 9000
+    skipVerify  = false
+    version     = 1
+
+    labelSettings = {
+      extraLabels = {
+        env = "prod"
+      }
+    }
+
+    # Optional - generate metrics from custom sql's.
+    # metricsColumns - the list of metrics to be created
+    customMetricQueries = {
+      collectionInterval = "5m"
+
+      queries = [
+        {
+          name         = "test query"
+          metricPrefix = "gc_clickhouse"
+          extraLabels  = {}
+
+          metricsColumns = [
+            {
+              name       = "accounts_count"
+              metricName = "total"
+              type       = "counter"
+            }
+          ]
+
+          query = <<EOT
+SELECT
+    tier,
+    count() as accounts_count
+FROM my_accounts
+GROUP BY tier
+EOT
+        }
+      ]
+    }
+
+    # Optional - fetch query performance traces.
+    tables = {
+      queryLog = {
+        enabled       = true
+        filterInserts = true
+      }
+
+      queryViewsLog = {
+        enabled = true
+      }
+    }
+  })
+}
+
+# Example: Clickhouse System Metrics DataIntegration
+resource "groundcover_dataintegration" "clickhouse_system_metrics_example" {
+  type = "clickhousescrape"
+  config = jsonencode({
+    version        = 1
+    enabled        = true
+    name           = "clickhouse-system-metrics-config"
+    scheme         = "https"
+    metricsPath    = "/metrics"
+    scrapeInterval = 30000000000
+    scrapeTimeout  = 10000000000
+
+    staticTargets = [
+      "clickhouse-target.example.com:9090"
+    ]
+
+    metricsRelabels = {
+      # List of regex of metrics to keep. All other metrics will be dropped.
+      keepRegex = [
+        "[*]cpu[*]"
+      ]
+
+      # List of regex of metrics to drop
+      dropRegex = [
+        "DB1[*]"
+      ]
+      raw = <<-EOT
+# additional relabeling rules that can be applied such as adding a prefix
+  - action: labelmap
+    replacement: "groundcover_$1"
+EOT
+    }
+
+    labelSettings = {
+      extraLabels = {
+        env = "prod"
+      }
+    }
+
+    authentication = {
+      basicAuth = {
+        username = "clickhouse-user"
+        # refer to groundcover_secret to create a secret
+        password = "secretRef::store::d1fc037f11f8ce58"
+      }
+    }
+  })
+  is_paused = false
+}
+
+# Example: PostgreSQL - Slow Queries & Custom Metrics
+resource "groundcover_dataintegration" "postgresql_demo" {
+  type      = "postgresqldbm"
+  is_paused = false
+
+  config = jsonencode({
+    authentication = {
+      basicAuth = {
+        username = "postgres"
+
+        # use the groundcover_secret resource to create a secret
+        password = "secretRef::k8s::groundcover-incloud::groundcover-incloud-clickhouse::admin-password"
+      }
+    }
+
+    database    = "your postgressql db name"
+    dialTimeout = "10s"
+    enabled     = true
+    host        = "your postgres host details"
+    name        = "postgres demo integration"
+    port        = 5432
+    secure      = true
+    skipVerify  = true
+    version     = 1
+
+    labelSettings = {
+      extraLabels = {
+        env = "prod"
+      }
+    }
+
+    # Optional - generate metrics from custom sql's.
+    # metricsColumns - the list of metrics to be created
+    customMetricQueries = {
+      collectionInterval = "5m"
+
+      queries = [
+        {
+          name         = "test query"
+          metricPrefix = "gc_postgres"
+
+          metricsColumns = [
+            {
+              name       = "accounts_count"
+              metricName = "total"
+              type       = "counter"
+            }
+          ]
+
+          query = <<EOT
+SELECT
+    tier,
+    count() as accounts_count
+FROM my_accounts
+GROUP BY tier
+EOT
+        }
+      ]
+    }
+
+    # Optional - fetch query performance traces.
+    tables = {
+      pgStatStatements = {
+        enabled       = true
+        filterInserts = false
+        maxQueries    = 200
+      }
+    }
+  })
+}
+
+# Example: PostgreSQL System Metrics DataIntegration
+resource "groundcover_dataintegration" "postgresql_system_metrics_example" {
+  type = "postgresscrape"
+  config = jsonencode({
+    version        = 1
+    enabled        = true
+    name           = "postgre-system-metrics-config"
+    scheme         = "https"
+    metricsPath    = "/metrics"
+    scrapeInterval = 30000000000
+    scrapeTimeout  = 10000000000
+
+    staticTargets = [
+      "postgre-target.example.com:9090"
+    ]
+
+    metricsRelabels = {
+      # List of regex of metrics to keep. All other metrics will be dropped.
+      keepRegex = [
+        "[*]cpu[*]"
+      ]
+
+      # List of regex of metrics to drop
+      dropRegex = [
+        "DB1[*]"
+      ]
+      raw = <<-EOT
+# additional relabeling rules that can be applied such as adding a prefix
+  - action: labelmap
+    replacement: "groundcover_$1"
+EOT
+    }
+
+    labelSettings = {
+      extraLabels = {
+        env = "prod"
+      }
+    }
+
+    authentication = {
+      basicAuth = {
+        username = "postgre-user"
+        # refer to groundcover_secret to create a secret
+        password = "secretRef::store::d1fc037f11f8ce58"
+      }
+    }
+  })
+  is_paused = false
+}
+
 # Output the data integration IDs for reference
 output "cloudwatch_dataintegration_id" {
   description = "The ID of the CloudWatch data integration"
@@ -465,4 +714,24 @@ output "rabbitmq_dataintegration_id" {
 output "rediscloud_dataintegration_id" {
   description = "The ID of the Redis Cloud data integration"
   value       = groundcover_dataintegration.rediscloud_example.id
+}
+
+output "clickhouse_demo_dataintegration_id" {
+  description = "The ID of the Clickhouse Query Log & Custom Metrics data integration"
+  value       = groundcover_dataintegration.clickhouse_demo.id
+}
+
+output "clickhouse_system_metrics_dataintegration_id" {
+  description = "The ID of the Clickhouse System Metrics data integration"
+  value       = groundcover_dataintegration.clickhouse_system_metrics_example.id
+}
+
+output "postgresql_demo_dataintegration_id" {
+  description = "The ID of the PostgreSQL Slow Queries & Custom Metrics data integration"
+  value       = groundcover_dataintegration.postgresql_demo.id
+}
+
+output "postgresql_system_metrics_dataintegration_id" {
+  description = "The ID of the PostgreSQL System Metrics data integration"
+  value       = groundcover_dataintegration.postgresql_system_metrics_example.id
 }

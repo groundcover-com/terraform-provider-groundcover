@@ -1,3 +1,8 @@
+## 1.7.1
+
+* Added AWS CloudWatch `withContextTagsOnInfoMetrics` parameter and documentation for enriching with resource labels
+* Added Clickhouse (query log & custom metrics, system metrics) and PostgreSQL (slow queries & custom metrics, system metrics) examples to data integration resource documentation
+
 ## 1.7.0
 
 * Added synthetic_test resource for proactive HTTP endpoint monitoring with assertions, retries, and authentication (basic/bearer with secret store support)
