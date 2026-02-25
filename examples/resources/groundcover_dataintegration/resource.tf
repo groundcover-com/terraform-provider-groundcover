@@ -571,7 +571,7 @@ resource "groundcover_dataintegration" "postgresql_demo" {
       }
     }
 
-    database = "your postgressql db name"
+    database = "your postgresql db name"
 
     dialTimeout = "10s"
     enabled     = true
