@@ -39,6 +39,8 @@ resource "groundcover_dataintegration" "cloudwatch_example" {
     stsRegion = "us-east-1"
     regions   = ["us-east-1", "us-east-2"]
     roleArn   = "arn:aws:iam::123456789012:role/test-role"
+    # use awsNamespaces to pull all metrics from a namespace, or awsMetrics to pull specific metrics
+    awsNamespaces = ["AWS/ApplicationELB"]
     awsMetrics = [
       {
         namespace = "AWS/EC2"
@@ -584,7 +586,8 @@ resource "groundcover_dataintegration" "postgresql_demo" {
       }
     }
 
-    database    = "your postgressql db name"
+    database = "your postgressql db name"
+
     dialTimeout = "10s"
     enabled     = true
     host        = "your postgres host details"
@@ -748,6 +751,11 @@ output "postgresql_demo_dataintegration_id" {
 
 output "postgresql_system_metrics_dataintegration_id" {
   description = "The ID of the PostgreSQL System Metrics data integration"
+  value       = groundcover_dataintegration.postgresql_system_metrics_example.id
+}
+
+output "postgre_dataintegration_id" {
+  description = "The ID of the Prometheus Example data integration"
   value       = groundcover_dataintegration.postgresql_system_metrics_example.id
 }
 ```

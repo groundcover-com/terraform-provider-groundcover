@@ -1,6 +1,6 @@
 ## 1.7.1
 
-* Added AWS CloudWatch `withContextTagsOnInfoMetrics` parameter and documentation for enriching with resource labels
+* Added AWS CloudWatch `awsNamespaces` (pull all metrics from a namespace) and `withContextTagsOnInfoMetrics` (enrich with resource labels) options and documentation
 * Added Clickhouse (query log & custom metrics, system metrics) and PostgreSQL (slow queries & custom metrics, system metrics) examples to data integration resource documentation
 
 ## 1.7.0
