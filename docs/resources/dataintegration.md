@@ -456,7 +456,7 @@ resource "groundcover_dataintegration" "clickhouse_demo" {
         username = "default"
 
         # use the groundcover_secret resource to create a secret
-        password = "secretRef::k8s::groundcover-incloud::groundcover-incloud-clickhouse::admin-password"
+        password = "secretRef::k8s::groundcover::groundcover-clickhouse::admin-password"
       }
     }
 
@@ -582,7 +582,7 @@ resource "groundcover_dataintegration" "postgresql_demo" {
         username = "postgres"
 
         # use the groundcover_secret resource to create a secret
-        password = "secretRef::k8s::groundcover-incloud::groundcover-incloud-clickhouse::admin-password"
+        password = "secretRef::k8s::groundcover::groundcover-clickhouse::admin-password"
       }
     }
 
