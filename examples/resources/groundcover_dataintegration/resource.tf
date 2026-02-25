@@ -579,7 +579,7 @@ resource "groundcover_dataintegration" "postgresql_demo" {
     name        = "postgres demo integration"
     port        = 5432
     secure      = true
-    skipVerify  = false # set to true only for dev/test; never disable cert verification in production
+    skipVerify  = false
     version     = 1
 
     labelSettings = {
