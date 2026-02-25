@@ -445,7 +445,7 @@ resource "groundcover_dataintegration" "clickhouse_demo" {
       }
     }
 
-    clusterMode = true          # true if your clickhouse is running in cluster or a single node
+    clusterMode = true          # true if your ClickHouse is running in cluster mode; false for a single node
     clusterName = "clustername" # the name of the cluster. Relevant if clusterMode=true
     database    = "your clickhouse db name"
     dialTimeout = "10s"
