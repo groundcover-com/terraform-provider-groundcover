@@ -609,7 +609,7 @@ resource "groundcover_dataintegration" "postgresql_demo" {
           query = <<EOT
 SELECT
     tier,
-    count() as accounts_count
+    count(*) as accounts_count
 FROM my_accounts
 GROUP BY tier
 EOT
