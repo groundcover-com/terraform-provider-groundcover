@@ -2,6 +2,8 @@
 
 * Added AWS CloudWatch `awsNamespaces` (pull all metrics from a namespace) and `withContextTagsOnInfoMetrics` (enrich with resource labels) options and documentation
 * Added Clickhouse (query log & custom metrics, system metrics) and PostgreSQL (slow queries & custom metrics, system metrics) examples to data integration resource documentation
+* Updated groundcover SDK from v1.154.0 to v1.176.0
+* Fixed connected_app resource to preserve plan/state value for the sensitive `data` attribute when the API omits or returns a different value, resolving "inconsistent values for sensitive attribute" errors and apply failures after create/update
 
 ## 1.7.0
 

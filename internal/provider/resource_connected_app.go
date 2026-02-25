@@ -152,7 +152,7 @@ func (r *connectedAppResource) Create(ctx context.Context, req resource.CreateRe
 		return
 	}
 
-	mapConnectedAppResponseToModel(ctx, connectedApp, &plan)
+	mapConnectedAppResponseToModel(ctx, connectedApp, &plan, plan.Data)
 
 	diags = resp.State.Set(ctx, plan)
 	resp.Diagnostics.Append(diags...)
@@ -185,7 +185,7 @@ func (r *connectedAppResource) Read(ctx context.Context, req resource.ReadReques
 		return
 	}
 
-	mapConnectedAppResponseToModel(ctx, connectedApp, &state)
+	mapConnectedAppResponseToModel(ctx, connectedApp, &state, state.Data)
 
 	diags = resp.State.Set(ctx, &state)
 	resp.Diagnostics.Append(diags...)
@@ -236,7 +236,7 @@ func (r *connectedAppResource) Update(ctx context.Context, req resource.UpdateRe
 		return
 	}
 
-	mapConnectedAppResponseToModel(ctx, connectedApp, &plan)
+	mapConnectedAppResponseToModel(ctx, connectedApp, &plan, plan.Data)
 
 	diags = resp.State.Set(ctx, plan)
 	resp.Diagnostics.Append(diags...)
@@ -276,12 +276,16 @@ func (r *connectedAppResource) ImportState(ctx context.Context, req resource.Imp
 	resource.ImportStatePassthroughID(ctx, path.Root("id"), req, resp)
 }
 
-func mapConnectedAppResponseToModel(ctx context.Context, app *models.ConnectedAppResponse, model *connectedAppResourceModel) {
+func mapConnectedAppResponseToModel(ctx context.Context, app *models.ConnectedAppResponse, model *connectedAppResourceModel, preserveData types.Dynamic) {
 	model.Id = types.StringValue(app.ID)
 	model.Name = types.StringValue(app.Name)
 	model.Type = types.StringValue(app.Type)
 
-	if app.Data != nil {
+	// Prefer preserved plan/state value for sensitive data to avoid "inconsistent values for sensitive attribute"
+	// when the API returns nothing, a redacted value, or a differently shaped response.
+	if !preserveData.IsNull() && !preserveData.IsUnknown() {
+		model.Data = preserveData
+	} else if app.Data != nil {
 		dataMap, ok := app.Data.(map[string]any)
 		if !ok {
 			tflog.Warn(ctx, fmt.Sprintf("Connected app data is not a map[string]any, got %T", app.Data))
