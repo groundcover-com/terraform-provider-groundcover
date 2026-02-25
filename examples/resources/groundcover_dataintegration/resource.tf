@@ -634,14 +634,14 @@ resource "groundcover_dataintegration" "postgresql_system_metrics_example" {
   config = jsonencode({
     version        = 1
     enabled        = true
-    name           = "postgre-system-metrics-config"
+    name           = "postgresql-system-metrics-config"
     scheme         = "https"
     metricsPath    = "/metrics"
     scrapeInterval = 30000000000
     scrapeTimeout  = 10000000000
 
     staticTargets = [
-      "postgre-target.example.com:9090"
+      "postgresql-target.example.com:9090"
     ]
 
     metricsRelabels = {
@@ -669,7 +669,7 @@ EOT
 
     authentication = {
       basicAuth = {
-        username = "postgre-user"
+        username = "postgresql-user"
         # refer to groundcover_secret to create a secret
         password = "secretRef::store::d1fc037f11f8ce58"
       }
@@ -720,12 +720,12 @@ output "rediscloud_dataintegration_id" {
 }
 
 output "clickhouse_demo_dataintegration_id" {
-  description = "The ID of the Clickhouse Query Log & Custom Metrics data integration"
+  description = "The ID of the ClickHouse Query Log & Custom Metrics data integration"
   value       = groundcover_dataintegration.clickhouse_demo.id
 }
 
 output "clickhouse_system_metrics_dataintegration_id" {
-  description = "The ID of the Clickhouse System Metrics data integration"
+  description = "The ID of the ClickHouse System Metrics data integration"
   value       = groundcover_dataintegration.clickhouse_system_metrics_example.id
 }
 
