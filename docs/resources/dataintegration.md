@@ -456,7 +456,7 @@ resource "groundcover_dataintegration" "clickhouse_demo" {
         username = "default"
 
         # use the groundcover_secret resource to create a secret
-        password = "secretRef::k8s::groundcover::groundcover-clickhouse::admin-password"
+        password = "secretRef::k8s::groundcover-incloud::groundcover-incloud-clickhouse::admin-password"
       }
     }
 
@@ -582,11 +582,11 @@ resource "groundcover_dataintegration" "postgresql_demo" {
         username = "postgres"
 
         # use the groundcover_secret resource to create a secret
-        password = "secretRef::k8s::groundcover::groundcover-clickhouse::admin-password"
+        password = "secretRef::k8s::groundcover-incloud::groundcover-incloud-postgresql::admin-password"
       }
     }
 
-    database = "your postgressql db name"
+    database = "your postgresql db name"
 
     dialTimeout = "10s"
     enabled     = true
@@ -751,11 +751,6 @@ output "postgresql_demo_dataintegration_id" {
 
 output "postgresql_system_metrics_dataintegration_id" {
   description = "The ID of the PostgreSQL System Metrics data integration"
-  value       = groundcover_dataintegration.postgresql_system_metrics_example.id
-}
-
-output "postgre_dataintegration_id" {
-  description = "The ID of the Prometheus Example data integration"
   value       = groundcover_dataintegration.postgresql_system_metrics_example.id
 }
 ```
