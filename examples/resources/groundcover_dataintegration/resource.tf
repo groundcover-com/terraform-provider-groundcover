@@ -430,7 +430,7 @@ EOT
   is_paused = false
 }
 
-# Example: Clickhouse - Query Log & Custom Metrics
+# Example: ClickHouse - Query Log & Custom Metrics
 resource "groundcover_dataintegration" "clickhouse_demo" {
   type      = "clickhousedbm"
   is_paused = false
@@ -506,7 +506,7 @@ EOT
   })
 }
 
-# Example: Clickhouse System Metrics DataIntegration
+# Example: ClickHouse System Metrics DataIntegration
 resource "groundcover_dataintegration" "clickhouse_system_metrics_example" {
   type = "clickhousescrape"
   config = jsonencode({
@@ -579,7 +579,7 @@ resource "groundcover_dataintegration" "postgresql_demo" {
     name        = "postgres demo integration"
     port        = 5432
     secure      = true
-    skipVerify  = true
+    skipVerify  = false # set to true only for dev/test; never disable cert verification in production
     version     = 1
 
     labelSettings = {
