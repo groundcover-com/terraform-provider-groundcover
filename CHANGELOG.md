@@ -1,3 +1,8 @@
+## 1.7.1
+
+* Updated groundcover SDK from v1.154.0 to v1.176.0
+* Fixed connected_app resource to preserve plan/state value for the sensitive `data` attribute when the API omits or returns a different value, resolving "inconsistent values for sensitive attribute" errors and apply failures after create/update
+
 ## 1.7.0
 
 * Added synthetic_test resource for proactive HTTP endpoint monitoring with assertions, retries, and authentication (basic/bearer with secret store support)
