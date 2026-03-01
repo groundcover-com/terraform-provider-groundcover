@@ -67,11 +67,11 @@ func (r *connectedAppResource) Schema(_ context.Context, _ resource.SchemaReques
 				Required:    true,
 			},
 			"type": schema.StringAttribute{
-				Description: "Type of connected app (slack-webhook or pagerduty).",
+				Description: "Type of connected app (slack-webhook, pagerduty, opsgenie, incidentio, webhook, or rootly).",
 				Required:    true,
 			},
 			"data": schema.DynamicAttribute{
-				Description: "Type-specific configuration. Supports nested structures. For slack-webhook: {url = \"https://...\"}. For pagerduty: {routing_key = \"...\", severity_mapping = {critical = \"P1\", ...}}.",
+				Description: "Type-specific configuration. Supports nested structures. For slack-webhook: {url = \"https://...\"}. For pagerduty: {routing_key = \"...\", severity_mapping = {critical = \"P1\", ...}}. For rootly: {api_key = \"...\", webhook_url = \"https://...\"}.",
 				Required:    true,
 				Sensitive:   true,
 			},

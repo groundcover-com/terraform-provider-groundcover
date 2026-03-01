@@ -123,6 +123,31 @@ func TestAccConnectedApp_pagerdutyWithSeverityMapping(t *testing.T) {
 	})
 }
 
+func TestAccConnectedApp_rootly(t *testing.T) {
+	name := acctest.RandomWithPrefix("test-rootly-app")
+
+	resource.Test(t, resource.TestCase{
+		PreCheck:                 func() { testAccPreCheck(t) },
+		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
+		Steps: []resource.TestStep{
+			// Create and Read testing
+			{
+				Config: testAccConnectedAppConfig_rootly(name),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					resource.TestCheckResourceAttr("groundcover_connected_app.test", "name", name),
+					resource.TestCheckResourceAttr("groundcover_connected_app.test", "type", "rootly"),
+					resource.TestCheckResourceAttr("groundcover_connected_app.test", "data.api_key", "test-rootly-api-key-123"),
+					resource.TestCheckResourceAttr("groundcover_connected_app.test", "data.webhook_url", "https://rootly.example.com/webhook"),
+					resource.TestCheckResourceAttrSet("groundcover_connected_app.test", "id"),
+					resource.TestCheckResourceAttrSet("groundcover_connected_app.test", "created_by"),
+					resource.TestCheckResourceAttrSet("groundcover_connected_app.test", "created_at"),
+				),
+			},
+			// Delete testing automatically occurs in TestCase
+		},
+	})
+}
+
 // TestAccConnectedApp_applyLoop tests that applying the same configuration multiple times
 // doesn't cause an apply loop due to server-side normalization or formatting differences.
 func TestAccConnectedApp_applyLoop(t *testing.T) {
@@ -206,6 +231,48 @@ func TestAccConnectedApp_applyLoopWithSeverityMapping(t *testing.T) {
 	})
 }
 
+// TestAccConnectedApp_rootlyApplyLoop tests that applying a rootly config with only api_key
+// (no webhook_url) doesn't cause an apply loop due to the server returning an empty webhook_url.
+func TestAccConnectedApp_rootlyApplyLoop(t *testing.T) {
+	name := acctest.RandomWithPrefix("test-rootly-apply-loop")
+
+	resource.Test(t, resource.TestCase{
+		PreCheck:                 func() { testAccPreCheck(t) },
+		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
+		Steps: []resource.TestStep{
+			// Step 1: Create rootly app with only api_key (no webhook_url)
+			{
+				Config: testAccConnectedAppConfig_rootlyNoWebhookURL(name),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					resource.TestCheckResourceAttr("groundcover_connected_app.test", "name", name),
+					resource.TestCheckResourceAttr("groundcover_connected_app.test", "type", "rootly"),
+					resource.TestCheckResourceAttr("groundcover_connected_app.test", "data.api_key", "test-rootly-api-key-123"),
+					resource.TestCheckResourceAttrSet("groundcover_connected_app.test", "id"),
+				),
+			},
+			// Step 2: Apply the same config again - should not detect changes (no apply loop)
+			// Also verify webhook_url doesn't leak into state from the server's empty response
+			{
+				Config: testAccConnectedAppConfig_rootlyNoWebhookURL(name),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					resource.TestCheckResourceAttr("groundcover_connected_app.test", "name", name),
+					resource.TestCheckNoResourceAttr("groundcover_connected_app.test", "data.webhook_url"),
+					resource.TestCheckResourceAttrSet("groundcover_connected_app.test", "id"),
+				),
+			},
+			// Step 3: Apply one more time to be absolutely sure there's no apply loop
+			{
+				Config: testAccConnectedAppConfig_rootlyNoWebhookURL(name),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					resource.TestCheckResourceAttr("groundcover_connected_app.test", "name", name),
+					resource.TestCheckNoResourceAttr("groundcover_connected_app.test", "data.webhook_url"),
+					resource.TestCheckResourceAttrSet("groundcover_connected_app.test", "id"),
+				),
+			},
+		},
+	})
+}
+
 func TestAccConnectedApp_disappears(t *testing.T) {
 	name := acctest.RandomWithPrefix("test-slack-app")
 
@@ -244,6 +311,31 @@ resource "groundcover_connected_app" "test" {
   type = "pagerduty"
   data = {
     routing_key = "a1234567890123456789012345678901"
+  }
+}
+`, name)
+}
+
+func testAccConnectedAppConfig_rootly(name string) string {
+	return fmt.Sprintf(`
+resource "groundcover_connected_app" "test" {
+  name = %[1]q
+  type = "rootly"
+  data = {
+    api_key     = "test-rootly-api-key-123"
+    webhook_url = "https://rootly.example.com/webhook"
+  }
+}
+`, name)
+}
+
+func testAccConnectedAppConfig_rootlyNoWebhookURL(name string) string {
+	return fmt.Sprintf(`
+resource "groundcover_connected_app" "test" {
+  name = %[1]q
+  type = "rootly"
+  data = {
+    api_key = "test-rootly-api-key-123"
   }
 }
 `, name)
