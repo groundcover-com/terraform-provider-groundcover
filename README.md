@@ -18,6 +18,8 @@ Basic usage examples can be found in the `examples/` directory:
     *   Demonstrates how to create and manage ingestion keys for data ingestion.
 *   **Logs Pipeline Resource:** [`examples/resources/groundcover_logspipeline/resource.tf`](./examples/resources/groundcover_logspipeline/resource.tf)
     *   Shows how to configure logs processing pipelines.
+*   **Traces Pipeline Resource:** [`examples/resources/groundcover_tracespipeline/resource.tf`](./examples/resources/groundcover_tracespipeline/resource.tf)
+    *   Shows how to configure traces processing pipelines.
 *   **Metrics Aggregation Resource:** [`examples/resources/groundcover_metricsaggregation/resource.tf`](./examples/resources/groundcover_metricsaggregation/resource.tf)
     *   Demonstrates how to configure metrics aggregation rules for reducing cardinality.
 *   **Dashboard Resource:** [`examples/resources/groundcover_dashboard/resource.tf`](./examples/resources/groundcover_dashboard/resource.tf)
@@ -223,6 +225,7 @@ TF_ACC=1 go test ./internal/provider -v -run TestAccIngestionKeyResource
 TF_ACC=1 go test ./internal/provider -v -run TestAccDashboardResource
 TF_ACC=1 go test ./internal/provider -v -run TestAccDataIntegrationResource
 TF_ACC=1 go test ./internal/provider -v -run TestAccSyntheticTestResource
+TF_ACC=1 go test ./internal/provider -v -run TestAccTracesPipelineResource
 
 # Run unit tests only (no API calls required)
 go test ./internal/provider -v

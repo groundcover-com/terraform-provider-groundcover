@@ -1,3 +1,8 @@
+## 1.8.0
+
+* Added traces pipeline resource for configuring traces processing pipelines (singleton resource)
+* Updated groundcover SDK from v1.176.0 to v1.192.0
+
 ## 1.7.1
 
 * Added AWS CloudWatch `awsNamespaces` (pull all metrics from a namespace) and `withContextTagsOnInfoMetrics` (enrich with resource labels) options and documentation
