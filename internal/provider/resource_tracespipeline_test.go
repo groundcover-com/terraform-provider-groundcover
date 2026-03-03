@@ -28,6 +28,7 @@ func TestAccTracesPipelineResource(t *testing.T) {
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttrSet("groundcover_tracespipeline.test", "value"),
 					resource.TestCheckResourceAttrSet("groundcover_tracespipeline.test", "updated_at"),
+					resource.TestMatchResourceAttr("groundcover_tracespipeline.test", "value", regexp.MustCompile("test-rule-updated")),
 				),
 			},
 			// Delete testing automatically occurs in TestCase

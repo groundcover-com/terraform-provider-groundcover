@@ -155,7 +155,11 @@ func (r *tracesPipelineResource) Read(ctx context.Context, req resource.ReadRequ
 	if resp.Diagnostics.HasError() {
 		return
 	}
-	tflog.Debug(ctx, fmt.Sprintf("Successfully read TracesPipeline resource with UUID %s", configEntry.UUID))
+	if configEntry != nil {
+		tflog.Debug(ctx, fmt.Sprintf("Successfully read TracesPipeline resource with UUID %s", configEntry.UUID))
+	} else {
+		tflog.Debug(ctx, "Successfully read TracesPipeline resource (no existing config)")
+	}
 }
 
 // Update updates the resource and sets the updated Terraform state.
@@ -212,6 +216,10 @@ func (r *tracesPipelineResource) Delete(ctx context.Context, req resource.Delete
 	// Call API client to delete the traces pipeline
 	err := r.client.DeleteTracesPipeline(ctx)
 	if err != nil {
+		if err == ErrNotFound {
+			tflog.Warn(ctx, "TracesPipeline not found during delete, treating as already deleted")
+			return
+		}
 		resp.Diagnostics.AddError(
 			"Error Deleting TracesPipeline",
 			fmt.Sprintf("Could not delete TracesPipeline: %s", err.Error()),
@@ -225,11 +233,18 @@ func (r *tracesPipelineResource) Delete(ctx context.Context, req resource.Delete
 // For singleton resources, we don't need the ID for lookups
 // But we need to implement a custom import rather than using ImportStatePassthroughID
 func (r *tracesPipelineResource) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {
-	_, err := r.checkAndImportExisting(ctx, &resp.State, &resp.Diagnostics)
+	config, err := r.checkAndImportExisting(ctx, &resp.State, &resp.Diagnostics)
 	if err != nil {
 		resp.Diagnostics.AddError(
 			"Error Importing TracesPipeline",
 			fmt.Sprintf("Could not import TracesPipeline: %s", err.Error()),
+		)
+		return
+	}
+	if config == nil {
+		resp.Diagnostics.AddError(
+			"Error Importing TracesPipeline",
+			"TracesPipeline singleton not found. Create the resource first before importing.",
 		)
 	}
 }

@@ -37,7 +37,7 @@ func (c *SdkClientWrapper) GetTracesPipeline(ctx context.Context) (*models.Trace
 	}
 
 	var response *models.TracesPipelineConfig
-	if emptyGetResp == nil {
+	if emptyGetResp == nil && getResp != nil {
 		response = getResp.Payload
 	}
 
