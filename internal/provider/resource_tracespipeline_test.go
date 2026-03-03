@@ -63,7 +63,7 @@ resource "groundcover_tracespipeline" "test" {
 ottlRules:
 - ruleName: test-rule
   conditions:
-    - name == "http.request"
+    - workload == "nginx"
   statements:
     - set(attributes["test.key"], "test-value")
 YAML
@@ -78,7 +78,7 @@ resource "groundcover_tracespipeline" "test" {
 ottlRules:
 - ruleName: test-rule-updated
   conditions:
-    - name == "http.request"
+    - workload == "nginx"
   statements:
     - set(attributes["test.key"], "test-value-updated")
 YAML
@@ -93,14 +93,14 @@ resource "groundcover_tracespipeline" "test" {
 ottlRules:
 - ruleName: filter-errors
   conditions:
-    - name == "http.request"
+    - workload == "nginx"
   statements:
     - set(attributes["error.processed"], true)
 - ruleName: enrich-traces
   conditions:
-    - name == "grpc.request"
+    - workload == "web"
   statements:
-    - set(attributes["service.name"], "grpc-service")
+    - set(attributes["service.name"], "web-service")
 YAML
 }
 `

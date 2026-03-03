@@ -35,7 +35,7 @@ resource "groundcover_tracespipeline" "tracespipeline" {
 ottlRules:
   - ruleName: example-rule
     conditions:
-      - name == "http.request"
+      - workload == "nginx"
     statements:
       - set(attributes["test.key"], "test-value")
 EOT
