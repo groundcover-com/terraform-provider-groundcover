@@ -71,7 +71,7 @@ func (r *connectedAppResource) Schema(_ context.Context, _ resource.SchemaReques
 				Required:    true,
 			},
 			"data": schema.DynamicAttribute{
-				Description: "Type-specific configuration. Supports nested structures. For slack-webhook: {url = \"https://...\"}. For pagerduty: {routing_key = \"...\", severity_mapping = {critical = \"P1\", ...}}. For rootly: {api_key = \"...\", webhook_url = \"https://...\"}.",
+				Description: "Type-specific configuration. Supports nested structures. For slack-webhook: {url = \"https://...\"}. For pagerduty: {routing_key = \"...\", severity_mapping = {critical = \"P1\", ...}}. For rootly: {api_key = \"...\", webhook_url = \"https://...\"}. For opsgenie: {api_key = \"...\", region = \"us\", priority_mapping = {critical = \"P1\", ...}}. For incidentio: {url = \"https://...\", severity_mapping = {critical = \"SEV0\", ...}}. For webhook: {url = \"https://...\", method = \"POST\", headers = {key = \"value\"}, auth_type = \"bearer\", api_key = \"...\"}.",
 				Required:    true,
 				Sensitive:   true,
 			},
