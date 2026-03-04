@@ -67,11 +67,11 @@ func (r *connectedAppResource) Schema(_ context.Context, _ resource.SchemaReques
 				Required:    true,
 			},
 			"type": schema.StringAttribute{
-				Description: "Type of connected app (slack-webhook or pagerduty).",
+				Description: "Type of connected app (slack-webhook, pagerduty, opsgenie, incidentio, webhook, or rootly).",
 				Required:    true,
 			},
 			"data": schema.DynamicAttribute{
-				Description: "Type-specific configuration. Supports nested structures. For slack-webhook: {url = \"https://...\"}. For pagerduty: {routing_key = \"...\", severity_mapping = {critical = \"P1\", ...}}.",
+				Description: "Type-specific configuration. Supports nested structures. For slack-webhook: {url = \"https://...\"}. For pagerduty: {routing_key = \"...\", severity_mapping = {critical = \"P1\", ...}}. For rootly: {api_key = \"...\", webhook_url = \"https://...\"}. For opsgenie: {api_key = \"...\", region = \"us\", priority_mapping = {critical = \"P1\", ...}}. For incidentio: {url = \"https://...\", severity_mapping = {critical = \"SEV0\", ...}}. For webhook: {url = \"https://...\", method = \"POST\" (GET/POST/PUT/DELETE), headers = {key = \"value\"}, auth_type = \"bearer\"|\"basic\", api_key = \"...\" (for bearer), username = \"...\", password = \"...\" (for basic), custom_payload = \"JSON Jinja2 template string (max 64KB)\"}.",
 				Required:    true,
 				Sensitive:   true,
 			},
