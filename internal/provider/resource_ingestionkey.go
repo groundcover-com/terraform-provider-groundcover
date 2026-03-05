@@ -78,7 +78,7 @@ func (r *ingestionKeyResource) Schema(_ context.Context, _ resource.SchemaReques
 				Computed:    true,
 			},
 			"type": schema.StringAttribute{
-				Description: "The type of the ingestion key (e.g., 'ingestion').",
+				Description: "The type of the ingestion key. Valid values are: 'sensor', 'rum', 'thirdParty'.",
 				Required:    true,
 				PlanModifiers: []planmodifier.String{
 					stringplanmodifier.RequiresReplace(),

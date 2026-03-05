@@ -95,9 +95,9 @@ output "pagerduty_app_id" {
 
 ### Required
 
-- `data` (Dynamic, Sensitive) Type-specific configuration. Supports nested structures. For slack-webhook: {url = "https://..."}. For pagerduty: {routing_key = "...", severity_mapping = {critical = "P1", ...}}.
+- `data` (Dynamic, Sensitive) Type-specific configuration. Supports nested structures. For slack-webhook: {url = "https://..."}. For pagerduty: {routing_key = "...", severity_mapping = {critical = "P1", ...}}. For rootly: {api_key = "...", webhook_url = "https://..."}. For opsgenie: {api_key = "...", region = "us", priority_mapping = {critical = "P1", ...}}. For incidentio: {url = "https://...", severity_mapping = {critical = "SEV0", ...}}. For webhook: {url = "https://...", method = "POST" (GET/POST/PUT/DELETE), headers = {key = "value"}, auth_type = "bearer"|"basic", api_key = "..." (for bearer), username = "...", password = "..." (for basic), custom_payload = "JSON Jinja2 template string (max 64KB)"}.
 - `name` (String) Name of the connected app.
-- `type` (String) Type of connected app (slack-webhook or pagerduty).
+- `type` (String) Type of connected app (slack-webhook, pagerduty, opsgenie, incidentio, webhook, or rootly).
 
 ### Read-Only
 

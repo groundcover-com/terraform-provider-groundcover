@@ -44,22 +44,22 @@ variable "groundcover_backend_id" {
   description = "groundcover Backend ID"
 }
 
-# Example Ingestion Key
+# Example Ingestion Key with type "sensor"
 resource "groundcover_ingestionkey" "example" {
   name = "terraform-provider-example-ingestion-key"
-  type = "ingestion"
+  type = "sensor" # Valid values: "sensor", "rum", "thirdParty"
 
   # Optional: Enable remote configuration
   remote_config = true
 
   # Optional: Add tags
-  tags = ["terraform", "example", "ingestion"]
+  tags = ["terraform", "example", "sensor"]
 }
 
 # Example Ingestion Key with minimal configuration
 resource "groundcover_ingestionkey" "minimal" {
   name = "terraform-provider-minimal-key"
-  type = "ingestion"
+  type = "sensor"
 }
 
 output "ingestionkey_example_key" {
@@ -91,7 +91,7 @@ output "ingestionkey_minimal_key" {
 ### Required
 
 - `name` (String) The name of the ingestion key.
-- `type` (String) The type of the ingestion key (e.g., 'ingestion').
+- `type` (String) The type of the ingestion key. Valid values are: 'sensor', 'rum', 'thirdParty'.
 
 ### Optional
 
