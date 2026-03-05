@@ -1,3 +1,8 @@
+## 1.8.1
+
+* Fixed incorrect ingestion key `type` documentation — valid values are `sensor`, `rum`, and `thirdParty` (not `ingestion`)
+* Added acceptance tests for all ingestion key type options (`sensor`, `rum`, `thirdParty`)
+
 ## 1.8.0
 
 * Added traces pipeline resource for configuring traces processing pipelines (singleton resource)

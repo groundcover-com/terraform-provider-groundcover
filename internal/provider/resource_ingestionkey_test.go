@@ -59,6 +59,50 @@ func TestAccIngestionKeyResource(t *testing.T) {
 	})
 }
 
+func TestAccIngestionKeyResource_typeRum(t *testing.T) {
+	name := acctest.RandomWithPrefix("test-ingestionkey-rum")
+
+	resource.Test(t, resource.TestCase{
+		PreCheck: func() {
+			testAccPreCheckIngestionKey(t)
+		},
+		ProtoV6ProviderFactories: testAccProtoV6ProviderFactoriesWithInCloudBackend(t),
+		Steps: []resource.TestStep{
+			{
+				Config: testAccIngestionKeyResourceConfigWithType(name, "rum"),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					resource.TestCheckResourceAttr("groundcover_ingestionkey.test", "name", name),
+					resource.TestCheckResourceAttr("groundcover_ingestionkey.test", "type", "rum"),
+					resource.TestCheckResourceAttrSet("groundcover_ingestionkey.test", "key"),
+					resource.TestCheckResourceAttrSet("groundcover_ingestionkey.test", "created_by"),
+				),
+			},
+		},
+	})
+}
+
+func TestAccIngestionKeyResource_typeThirdParty(t *testing.T) {
+	name := acctest.RandomWithPrefix("test-ingestionkey-tp")
+
+	resource.Test(t, resource.TestCase{
+		PreCheck: func() {
+			testAccPreCheckIngestionKey(t)
+		},
+		ProtoV6ProviderFactories: testAccProtoV6ProviderFactoriesWithInCloudBackend(t),
+		Steps: []resource.TestStep{
+			{
+				Config: testAccIngestionKeyResourceConfigWithType(name, "thirdParty"),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					resource.TestCheckResourceAttr("groundcover_ingestionkey.test", "name", name),
+					resource.TestCheckResourceAttr("groundcover_ingestionkey.test", "type", "thirdParty"),
+					resource.TestCheckResourceAttrSet("groundcover_ingestionkey.test", "key"),
+					resource.TestCheckResourceAttrSet("groundcover_ingestionkey.test", "created_by"),
+				),
+			},
+		},
+	})
+}
+
 func TestAccIngestionKeyResource_disappears(t *testing.T) {
 	name := acctest.RandomWithPrefix("test-ingestionkey")
 
@@ -81,12 +125,16 @@ func TestAccIngestionKeyResource_disappears(t *testing.T) {
 }
 
 func testAccIngestionKeyResourceConfig(name string) string {
+	return testAccIngestionKeyResourceConfigWithType(name, "sensor")
+}
+
+func testAccIngestionKeyResourceConfigWithType(name, keyType string) string {
 	return fmt.Sprintf(`
 resource "groundcover_ingestionkey" "test" {
   name = %[1]q
-  type = "sensor"
+  type = %[2]q
 }
-`, name)
+`, name, keyType)
 }
 
 func testAccCheckIngestionKeyResourceExists(n string) resource.TestCheckFunc {
