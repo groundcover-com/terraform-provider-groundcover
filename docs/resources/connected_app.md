@@ -49,11 +49,25 @@ variable "pagerduty_routing_key" {
   sensitive   = true
 }
 
+variable "ms_teams_webhook_url" {
+  type        = string
+  description = "MS Teams Power Automate webhook URL"
+  sensitive   = true
+}
+
 resource "groundcover_connected_app" "slack" {
   name = "alerts-slack-channel"
   type = "slack-webhook"
   data = {
     url = var.slack_webhook_url
+  }
+}
+
+resource "groundcover_connected_app" "ms_teams" {
+  name = "alerts-ms-teams"
+  type = "ms-teams"
+  data = {
+    url = var.ms_teams_webhook_url
   }
 }
 
@@ -95,9 +109,9 @@ output "pagerduty_app_id" {
 
 ### Required
 
-- `data` (Dynamic, Sensitive) Type-specific configuration. Supports nested structures. For slack-webhook: {url = "https://..."}. For pagerduty: {routing_key = "...", severity_mapping = {critical = "P1", ...}}. For rootly: {api_key = "...", webhook_url = "https://..."}. For opsgenie: {api_key = "...", region = "us", priority_mapping = {critical = "P1", ...}}. For incidentio: {url = "https://...", severity_mapping = {critical = "SEV0", ...}}. For webhook: {url = "https://...", method = "POST" (GET/POST/PUT/DELETE), headers = {key = "value"}, auth_type = "bearer"|"basic", api_key = "..." (for bearer), username = "...", password = "..." (for basic), custom_payload = "JSON Jinja2 template string (max 64KB)"}.
+- `data` (Dynamic, Sensitive) Type-specific configuration. Supports nested structures. For slack-webhook: {url = "https://..."}. For pagerduty: {routing_key = "...", severity_mapping = {critical = "P1", ...}}. For rootly: {api_key = "...", webhook_url = "https://..."}. For opsgenie: {api_key = "...", region = "us", priority_mapping = {critical = "P1", ...}}. For incidentio: {url = "https://...", severity_mapping = {critical = "SEV0", ...}}. For ms-teams: {url = "https://..."}. For webhook: {url = "https://...", method = "POST" (GET/POST/PUT/DELETE), headers = {key = "value"}, auth_type = "bearer"|"basic", api_key = "..." (for bearer), username = "...", password = "..." (for basic), custom_payload = "JSON Jinja2 template string (max 64KB)"}.
 - `name` (String) Name of the connected app.
-- `type` (String) Type of connected app (slack-webhook, pagerduty, opsgenie, incidentio, webhook, or rootly).
+- `type` (String) Type of connected app (slack-webhook, pagerduty, opsgenie, incidentio, webhook, rootly, or ms-teams).
 
 ### Read-Only
 

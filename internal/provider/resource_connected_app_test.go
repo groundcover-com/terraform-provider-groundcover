@@ -452,6 +452,68 @@ func TestAccConnectedApp_incidentioApplyLoop(t *testing.T) {
 	})
 }
 
+// MS Teams tests
+
+func TestAccConnectedApp_msTeams(t *testing.T) {
+	name := acctest.RandomWithPrefix("test-msteams-app")
+
+	resource.Test(t, resource.TestCase{
+		PreCheck:                 func() { testAccPreCheck(t) },
+		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
+		Steps: []resource.TestStep{
+			{
+				Config: testAccConnectedAppConfig_msTeams(name),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					resource.TestCheckResourceAttr("groundcover_connected_app.test", "name", name),
+					resource.TestCheckResourceAttr("groundcover_connected_app.test", "type", "ms-teams"),
+					resource.TestCheckResourceAttr("groundcover_connected_app.test", "data.url", "https://prod-00.westus.logic.azure.com:443/workflows/test"),
+					resource.TestCheckResourceAttrSet("groundcover_connected_app.test", "id"),
+					resource.TestCheckResourceAttrSet("groundcover_connected_app.test", "created_by"),
+					resource.TestCheckResourceAttrSet("groundcover_connected_app.test", "created_at"),
+				),
+			},
+			{
+				ResourceName:            "groundcover_connected_app.test",
+				ImportState:             true,
+				ImportStateVerify:       true,
+				ImportStateVerifyIgnore: []string{"data"},
+			},
+		},
+	})
+}
+
+func TestAccConnectedApp_msTeamsApplyLoop(t *testing.T) {
+	name := acctest.RandomWithPrefix("test-msteams-apply-loop")
+
+	resource.Test(t, resource.TestCase{
+		PreCheck:                 func() { testAccPreCheck(t) },
+		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
+		Steps: []resource.TestStep{
+			{
+				Config: testAccConnectedAppConfig_msTeams(name),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					resource.TestCheckResourceAttr("groundcover_connected_app.test", "name", name),
+					resource.TestCheckResourceAttrSet("groundcover_connected_app.test", "id"),
+				),
+			},
+			{
+				Config: testAccConnectedAppConfig_msTeams(name),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					resource.TestCheckResourceAttr("groundcover_connected_app.test", "name", name),
+					resource.TestCheckResourceAttrSet("groundcover_connected_app.test", "id"),
+				),
+			},
+			{
+				Config: testAccConnectedAppConfig_msTeams(name),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					resource.TestCheckResourceAttr("groundcover_connected_app.test", "name", name),
+					resource.TestCheckResourceAttrSet("groundcover_connected_app.test", "id"),
+				),
+			},
+		},
+	})
+}
+
 // Webhook tests
 
 func TestAccConnectedApp_webhook(t *testing.T) {
@@ -728,6 +790,18 @@ resource "groundcover_connected_app" "test" {
       warning  = "SEV2"
       info     = "SEV3"
     }
+  }
+}
+`, name)
+}
+
+func testAccConnectedAppConfig_msTeams(name string) string {
+	return fmt.Sprintf(`
+resource "groundcover_connected_app" "test" {
+  name = %[1]q
+  type = "ms-teams"
+  data = {
+    url = "https://prod-00.westus.logic.azure.com:443/workflows/test"
   }
 }
 `, name)

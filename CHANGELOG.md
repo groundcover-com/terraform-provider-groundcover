@@ -1,3 +1,7 @@
+## 1.8.2
+
+* Added MS-teams connected app documentation and tests.
+
 ## 1.8.1
 
 * Fixed incorrect ingestion key `type` documentation — valid values are `sensor`, `rum`, and `thirdParty` (not `ingestion`)

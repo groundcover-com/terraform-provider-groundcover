@@ -34,11 +34,25 @@ variable "pagerduty_routing_key" {
   sensitive   = true
 }
 
+variable "ms_teams_webhook_url" {
+  type        = string
+  description = "MS Teams Power Automate webhook URL"
+  sensitive   = true
+}
+
 resource "groundcover_connected_app" "slack" {
   name = "alerts-slack-channel"
   type = "slack-webhook"
   data = {
     url = var.slack_webhook_url
+  }
+}
+
+resource "groundcover_connected_app" "ms_teams" {
+  name = "alerts-ms-teams"
+  type = "ms-teams"
+  data = {
+    url = var.ms_teams_webhook_url
   }
 }
 
