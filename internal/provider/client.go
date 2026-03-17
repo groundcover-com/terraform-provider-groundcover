@@ -210,6 +210,12 @@ type ApiClient interface {
 	UpdateSilence(ctx context.Context, id string, req *models.UpdateSilenceRequest) (*models.Silence, error)
 	DeleteSilence(ctx context.Context, id string) error
 
+	// Recurring Silences
+	CreateRecurringSilence(ctx context.Context, req *models.CreateRecurringSilenceRequest) (*models.RecurringSilenceResponse, error)
+	GetRecurringSilence(ctx context.Context, id string) (*models.RecurringSilenceResponse, error)
+	UpdateRecurringSilence(ctx context.Context, id string, req *models.UpdateRecurringSilenceRequest) (*models.RecurringSilenceResponse, error)
+	DeleteRecurringSilence(ctx context.Context, id string) error
+
 	// Connected Apps
 	CreateConnectedApp(ctx context.Context, req *models.CreateConnectedAppRequest) (*models.CreateConnectedAppResponse, error)
 	GetConnectedApp(ctx context.Context, id string) (*models.ConnectedAppResponse, error)
@@ -433,6 +439,12 @@ func handleApiError(ctx context.Context, err error, operation string, resourceId
 	// The API returns 500 instead of 404 when trying to delete a non-existent silence
 	if operation == "DeleteSilence" && (statusCode == http.StatusInternalServerError || strings.Contains(errStr, "[500]")) {
 		tflog.Warn(ctx, "Mapping SDK error to ErrNotFound for DeleteSilence 500 error (likely already deleted).", logFields)
+		return ErrNotFound
+	}
+
+	// Handle specific case for recurring silence deletion where 500 can mean the resource doesn't exist
+	if operation == "DeleteRecurringSilence" && (statusCode == http.StatusInternalServerError || strings.Contains(errStr, "[500]")) {
+		tflog.Warn(ctx, "Mapping SDK error to ErrNotFound for DeleteRecurringSilence 500 error (likely already deleted).", logFields)
 		return ErrNotFound
 	}
 

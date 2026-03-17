@@ -1,3 +1,9 @@
+## 1.9.0
+
+* Added recurring_silence resource for managing recurring alert silences with daily, weekly, and monthly schedules
+* Extracted shared matcher logic into a dedicated module for reuse across silence and recurring silence resources
+* Updated groundcover SDK from v1.192.0 to v1.218.0
+
 ## 1.8.2
 
 * Added MS-teams connected app documentation and tests.
