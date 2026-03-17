@@ -270,6 +270,15 @@ func (r *recurringSilenceResource) ValidateConfig(ctx context.Context, req resou
 		}
 	}
 
+	// Validate that matchers is not empty
+	if !config.Matchers.IsNull() && !config.Matchers.IsUnknown() && len(config.Matchers.Elements()) == 0 {
+		resp.Diagnostics.AddAttributeError(
+			path.Root("matchers"),
+			"Empty matchers",
+			"matchers must contain at least one matcher.",
+		)
+	}
+
 	// Validate that comment is not an empty string
 	if !config.Comment.IsNull() && !config.Comment.IsUnknown() && config.Comment.ValueString() == "" {
 		resp.Diagnostics.AddAttributeError(
