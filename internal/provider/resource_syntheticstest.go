@@ -840,12 +840,16 @@ func fromSDKResponse(ctx context.Context, sdkResp *models.SyntheticTestCreateReq
 			monitorModel.RenotificationInterval = types.StringValue(normalizeDuration(mon.RenotificationInterval))
 		}
 
-		if len(mon.EnabledWorkflows) > 0 {
-			workflowValues := make([]string, len(mon.EnabledWorkflows))
-			copy(workflowValues, mon.EnabledWorkflows)
-			workflowsList, diags := types.ListValueFrom(ctx, types.StringType, workflowValues)
-			if !diags.HasError() {
-				monitorModel.EnabledWorkflows = workflowsList
+		if !prev.EnabledWorkflows.IsNull() {
+			if len(mon.EnabledWorkflows) > 0 {
+				workflowValues := make([]string, len(mon.EnabledWorkflows))
+				copy(workflowValues, mon.EnabledWorkflows)
+				workflowsList, diags := types.ListValueFrom(ctx, types.StringType, workflowValues)
+				if !diags.HasError() {
+					monitorModel.EnabledWorkflows = workflowsList
+				}
+			} else {
+				monitorModel.EnabledWorkflows, _ = types.ListValueFrom(ctx, types.StringType, []string{})
 			}
 		}
 
