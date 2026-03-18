@@ -104,3 +104,12 @@ output "ingestionkey_minimal_key" {
 - `creation_date` (String, Deprecated) The creation date of the ingestion key. Deprecated: No longer provided by API v1.84.0+
 - `id` (String) The unique identifier of the ingestion key.
 - `key` (String) The actual key value for ingestion.
+
+## Import
+
+Import is supported using the following syntax:
+
+```shell
+# Ingestion keys are imported by name, not by ID
+terraform import groundcover_ingestionkey.example <name>
+```

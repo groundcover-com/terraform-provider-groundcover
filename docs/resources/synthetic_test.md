@@ -234,3 +234,11 @@ Optional:
 
 - `count` (Number) Number of retry attempts.
 - `interval` (String) Delay between retries (e.g. `1s`, `500ms`).
+
+## Import
+
+Import is supported using the following syntax:
+
+```shell
+terraform import groundcover_synthetic_test.example <id>
+```

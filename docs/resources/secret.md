@@ -112,3 +112,11 @@ output "password_secret_id" {
 ### Read-Only
 
 - `id` (String) The unique reference ID for the secret. Use this ID in other resources (e.g., data integrations) as a placeholder for the secret value.
+
+## Import
+
+Import is supported using the following syntax:
+
+```shell
+terraform import groundcover_secret.example <id>
+```

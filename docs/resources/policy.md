@@ -328,3 +328,11 @@ Required:
 
 - `op` (String) The filter operation (e.g., 'match').
 - `value` (String) The value to filter on.
+
+## Import
+
+Import is supported using the following syntax:
+
+```shell
+terraform import groundcover_policy.example <id>
+```

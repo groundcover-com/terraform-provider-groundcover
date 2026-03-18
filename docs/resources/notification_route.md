@@ -176,3 +176,11 @@ Required:
 Optional:
 
 - `renotification_interval` (String) Duration between renotifications (e.g., '1h', '30m'). The API may normalize this value.
+
+## Import
+
+Import is supported using the following syntax:
+
+```shell
+terraform import groundcover_notification_route.example <id>
+```

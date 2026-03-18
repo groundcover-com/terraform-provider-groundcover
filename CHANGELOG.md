@@ -1,3 +1,7 @@
+## 1.9.0
+
+* Added import documentation for all resources so `terraform import` usage is documented in the registry
+
 ## 1.8.2
 
 * Added MS-teams connected app documentation and tests.

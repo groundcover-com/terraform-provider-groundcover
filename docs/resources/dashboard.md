@@ -211,3 +211,11 @@ output "simple_dashboard_owner" {
 - `owner` (String) The owner of the dashboard.
 - `revision_number` (Number) The revision number of the dashboard.
 - `status` (String) The status of the dashboard.
+
+## Import
+
+Import is supported using the following syntax:
+
+```shell
+terraform import groundcover_dashboard.example <id>
+```

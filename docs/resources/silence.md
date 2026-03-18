@@ -164,3 +164,11 @@ Optional:
 
 - `is_contains` (Boolean) If true, the value is treated as a contains pattern (partial match). If false, the value must match exactly. Defaults to `false`.
 - `is_equal` (Boolean) If true, the matcher will match when the label value equals the specified value. If false, it matches when the value does NOT equal. Defaults to `true`.
+
+## Import
+
+Import is supported using the following syntax:
+
+```shell
+terraform import groundcover_silence.example <id>
+```
