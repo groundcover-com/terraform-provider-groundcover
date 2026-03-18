@@ -11,7 +11,6 @@ import (
 
 	"github.com/go-openapi/strfmt"
 	"github.com/groundcover-com/groundcover-sdk-go/pkg/models"
-	"github.com/hashicorp/terraform-plugin-framework/attr"
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
@@ -41,13 +40,6 @@ type silenceResourceModel struct {
 	EndsAt   types.String `tfsdk:"ends_at"`
 	Comment  types.String `tfsdk:"comment"`
 	Matchers types.List   `tfsdk:"matchers"`
-}
-
-type silenceMatcherModel struct {
-	Name       types.String `tfsdk:"name"`
-	Value      types.String `tfsdk:"value"`
-	IsEqual    types.Bool   `tfsdk:"is_equal"`
-	IsContains types.Bool   `tfsdk:"is_contains"`
 }
 
 func (r *silenceResource) Metadata(ctx context.Context, req resource.MetadataRequest, resp *resource.MetadataResponse) {
@@ -82,6 +74,9 @@ A silence is defined by: a time window (starts_at, ends_at), a comment describin
 				MarkdownDescription: "A comment describing the reason for the silence.",
 				Optional:            true,
 				Computed:            true,
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.UseStateForUnknown(),
+				},
 			},
 			"matchers": schema.ListNestedAttribute{
 				MarkdownDescription: "A list of matchers that define which alerts to silence. Each matcher specifies a label name and value to match against.",
@@ -172,6 +167,15 @@ func (r *silenceResource) ValidateConfig(ctx context.Context, req resource.Valid
 		)
 	}
 
+	// Validate that matchers is not empty
+	if !config.Matchers.IsNull() && !config.Matchers.IsUnknown() && len(config.Matchers.Elements()) == 0 {
+		resp.Diagnostics.AddAttributeError(
+			path.Root("matchers"),
+			"Empty matchers",
+			"matchers must contain at least one matcher.",
+		)
+	}
+
 	// Validate that comment is not an empty string
 	if !config.Comment.IsNull() && !config.Comment.IsUnknown() && config.Comment.ValueString() == "" {
 		resp.Diagnostics.AddAttributeError(
@@ -183,87 +187,6 @@ func (r *silenceResource) ValidateConfig(ctx context.Context, req resource.Valid
 }
 
 // --- Helper Functions ---
-
-func (r *silenceResource) matchersFromModel(ctx context.Context, matchersList types.List) (models.Matchers, error) {
-	if matchersList.IsNull() || matchersList.IsUnknown() {
-		return nil, nil
-	}
-
-	var matcherModels []silenceMatcherModel
-	diags := matchersList.ElementsAs(ctx, &matcherModels, false)
-	if diags.HasError() {
-		return nil, fmt.Errorf("failed to extract matchers from list")
-	}
-
-	matchers := make(models.Matchers, 0, len(matcherModels))
-	for _, m := range matcherModels {
-		isEqual := m.IsEqual.ValueBool()
-		isContains := m.IsContains.ValueBool()
-
-		matcher := &models.SilenceMatcher{
-			Name:    m.Name.ValueString(),
-			Value:   m.Value.ValueString(),
-			IsEqual: &isEqual,
-			IsRegex: &isContains, // SDK uses IsRegex, provider exposes as is_contains
-		}
-		matchers = append(matchers, matcher)
-	}
-
-	return matchers, nil
-}
-
-func (r *silenceResource) matchersToModel(ctx context.Context, apiMatchers models.Matchers) (types.List, error) {
-	matcherAttrType := types.ObjectType{
-		AttrTypes: map[string]attr.Type{
-			"name":        types.StringType,
-			"value":       types.StringType,
-			"is_equal":    types.BoolType,
-			"is_contains": types.BoolType,
-		},
-	}
-
-	if len(apiMatchers) == 0 {
-		return types.ListNull(matcherAttrType), nil
-	}
-
-	matcherValues := make([]attr.Value, 0, len(apiMatchers))
-	for _, m := range apiMatchers {
-		isEqual := true
-		if m.IsEqual != nil {
-			isEqual = *m.IsEqual
-		}
-		isContains := false
-		if m.IsRegex != nil {
-			isContains = *m.IsRegex // SDK uses IsRegex, provider exposes as is_contains
-		}
-
-		matcherObj, diags := types.ObjectValue(
-			map[string]attr.Type{
-				"name":        types.StringType,
-				"value":       types.StringType,
-				"is_equal":    types.BoolType,
-				"is_contains": types.BoolType,
-			},
-			map[string]attr.Value{
-				"name":        types.StringValue(m.Name),
-				"value":       types.StringValue(m.Value),
-				"is_equal":    types.BoolValue(isEqual),
-				"is_contains": types.BoolValue(isContains),
-			},
-		)
-		if diags.HasError() {
-			return types.ListNull(matcherAttrType), fmt.Errorf("failed to create matcher object")
-		}
-		matcherValues = append(matcherValues, matcherObj)
-	}
-
-	matcherList, diags := types.ListValue(matcherAttrType, matcherValues)
-	if diags.HasError() {
-		return types.ListNull(matcherAttrType), fmt.Errorf("failed to create matchers list")
-	}
-
-	return matcherList, nil
-}
 
 func parseRFC3339(value string) (strfmt.DateTime, error) {
 	t, err := time.Parse(time.RFC3339, value)
@@ -305,7 +228,7 @@ func (r *silenceResource) Create(ctx context.Context, req resource.CreateRequest
 	}
 
 	// Convert matchers
-	matchers, err := r.matchersFromModel(ctx, plan.Matchers)
+	matchers, err := silenceMatchersFromModel(ctx, plan.Matchers)
 	if err != nil {
 		resp.Diagnostics.AddError("Invalid matchers", err.Error())
 		return
@@ -354,7 +277,7 @@ func (r *silenceResource) Create(ctx context.Context, req resource.CreateRequest
 	}
 
 	// Update matchers from API response
-	matchersList, err := r.matchersToModel(ctx, apiResponse.Matchers)
+	matchersList, err := silenceMatchersToModel(apiResponse.Matchers)
 	if err != nil {
 		resp.Diagnostics.AddError("Error processing response matchers", err.Error())
 		return
@@ -402,7 +325,7 @@ func (r *silenceResource) Read(ctx context.Context, req resource.ReadRequest, re
 	state.Comment = types.StringValue(apiResponse.Comment)
 
 	// Update matchers from API response
-	matchersList, err := r.matchersToModel(ctx, apiResponse.Matchers)
+	matchersList, err := silenceMatchersToModel(apiResponse.Matchers)
 	if err != nil {
 		resp.Diagnostics.AddError("Error processing response matchers", err.Error())
 		return
@@ -451,7 +374,7 @@ func (r *silenceResource) Update(ctx context.Context, req resource.UpdateRequest
 	}
 
 	// Convert matchers
-	matchers, err := r.matchersFromModel(ctx, plan.Matchers)
+	matchers, err := silenceMatchersFromModel(ctx, plan.Matchers)
 	if err != nil {
 		resp.Diagnostics.AddError("Invalid matchers", err.Error())
 		return
@@ -488,7 +411,7 @@ func (r *silenceResource) Update(ctx context.Context, req resource.UpdateRequest
 		plan.StartsAt = types.StringValue(time.Time(apiResponse.StartsAt).Format(time.RFC3339))
 		plan.EndsAt = types.StringValue(time.Time(apiResponse.EndsAt).Format(time.RFC3339))
 		plan.Comment = types.StringValue(apiResponse.Comment)
-		matchersList, err := r.matchersToModel(ctx, apiResponse.Matchers)
+		matchersList, err := silenceMatchersToModel(apiResponse.Matchers)
 		if err != nil {
 			resp.Diagnostics.AddError("Error processing response matchers", err.Error())
 			return
