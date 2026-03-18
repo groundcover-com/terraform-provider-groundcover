@@ -128,11 +128,49 @@ resource "groundcover_synthetic_test" "performance_check" {
   }
 }
 
-# Output the synthetic test IDs
+# Example: With monitor and notification routing
+resource "groundcover_synthetic_test" "monitored_check" {
+  name     = "Monitored API Check"
+  interval = "1m"
+
+  http_check {
+    url     = "https://api.example.com/health"
+    method  = "GET"
+    timeout = "10s"
+  }
+
+  assertion {
+    source   = "statusCode"
+    operator = "eq"
+    target   = "200"
+  }
+
+  monitor {
+    monitor_name            = "API Health Monitor"
+    severity                = "S1"
+    issue_summary           = "Synthetic check failed: {{ name }}"
+    issue_description       = "The synthetic test {{ name }} is failing. Check the endpoint health."
+    no_data_state           = "Alerting"
+    execution_error_state   = "Alerting"
+    renotification_interval = "1h"
+
+    evaluation_interval {
+      interval    = "1m"
+      pending_for = "0s"
+    }
+
+    enabled_workflows = ["workflow-id-1", "workflow-id-2"]
+  }
+}
+
 output "http_health_check_id" {
   value = groundcover_synthetic_test.http_health_check.id
 }
 
 output "http_post_check_id" {
   value = groundcover_synthetic_test.http_post_check.id
+}
+
+output "monitored_check_id" {
+  value = groundcover_synthetic_test.monitored_check.id
 }

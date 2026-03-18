@@ -143,13 +143,51 @@ resource "groundcover_synthetic_test" "performance_check" {
   }
 }
 
-# Output the synthetic test IDs
+# Example: With monitor and notification routing
+resource "groundcover_synthetic_test" "monitored_check" {
+  name     = "Monitored API Check"
+  interval = "1m"
+
+  http_check {
+    url     = "https://api.example.com/health"
+    method  = "GET"
+    timeout = "10s"
+  }
+
+  assertion {
+    source   = "statusCode"
+    operator = "eq"
+    target   = "200"
+  }
+
+  monitor {
+    monitor_name            = "API Health Monitor"
+    severity                = "S1"
+    issue_summary           = "Synthetic check failed: {{ name }}"
+    issue_description       = "The synthetic test {{ name }} is failing. Check the endpoint health."
+    no_data_state           = "Alerting"
+    execution_error_state   = "Alerting"
+    renotification_interval = "1h"
+
+    evaluation_interval {
+      interval    = "1m"
+      pending_for = "0s"
+    }
+
+    enabled_workflows = ["workflow-id-1", "workflow-id-2"]
+  }
+}
+
 output "http_health_check_id" {
   value = groundcover_synthetic_test.http_health_check.id
 }
 
 output "http_post_check_id" {
   value = groundcover_synthetic_test.http_post_check.id
+}
+
+output "monitored_check_id" {
+  value = groundcover_synthetic_test.monitored_check.id
 }
 ```
 
@@ -167,6 +205,7 @@ output "http_post_check_id" {
 - `enabled` (Boolean) Whether the synthetic test is enabled. Default: `true`.
 - `http_check` (Block, Optional) HTTP check configuration. Defines the endpoint to monitor. (see [below for nested schema](#nestedblock--http_check))
 - `labels` (Map of String) Extra labels to attach to the synthetic test metrics.
+- `monitor` (Block, Optional) Monitor configuration for the synthetic test. Controls the monitor that is automatically created for this test, including alerting behavior and notification routing. (see [below for nested schema](#nestedblock--monitor))
 - `retry` (Block, Optional) Retry policy for failed checks. (see [below for nested schema](#nestedblock--retry))
 
 ### Read-Only
@@ -224,6 +263,32 @@ Optional:
 
 - `content` (String) Body content string.
 - `type` (String) Body content type: `json`, `text`, or `raw`.
+
+
+
+<a id="nestedblock--monitor"></a>
+### Nested Schema for `monitor`
+
+Optional:
+
+- `enabled_workflows` (List of String) List of workflow IDs to route notifications to. Workflows and notification policies run simultaneously.
+- `evaluation_interval` (Block, Optional) Evaluation interval settings for the monitor. (see [below for nested schema](#nestedblock--monitor--evaluation_interval))
+- `execution_error_state` (String) How the monitor behaves on execution errors. `OK` treats errors as normal, `Alerting` treats them as issues.
+- `issue_description` (String) Description template for issues created by this monitor. Supports Jinja2 templating with variables like `{{ workload }}`.
+- `issue_summary` (String) Summary template for issues created by this monitor. Supports Jinja2 templating.
+- `lookbehind_window` (String) The time window the monitor looks back for evaluation (e.g. `5m`, `10m`).
+- `monitor_name` (String) Custom name for the monitor. If not set, a default name is derived from the synthetic test name.
+- `no_data_state` (String) How the monitor behaves when there is no data. `OK` treats no data as normal, `Alerting` treats it as an issue.
+- `renotification_interval` (String) How long to wait before sending another notification while the alert is still firing (e.g. `15m`, `1h`, `4h`).
+- `severity` (String) Severity level for issues created by this monitor. Supported values: `S1`, `S2`, `S3`, `S4`, `none`.
+
+<a id="nestedblock--monitor--evaluation_interval"></a>
+### Nested Schema for `monitor.evaluation_interval`
+
+Optional:
+
+- `interval` (String) How often the monitor evaluates (e.g. `1m`, `5m`).
+- `pending_for` (String) How long all evaluations must stay true before firing (e.g. `0s`, `1m`, `5m`).
 
 
 
