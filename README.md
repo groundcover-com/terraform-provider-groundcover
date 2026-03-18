@@ -27,7 +27,7 @@ Basic usage examples can be found in the `examples/` directory:
 *   **Data Integration Resource:** [`examples/resources/groundcover_dataintegration/resource.tf`](./examples/resources/groundcover_dataintegration/resource.tf)
     *   Demonstrates how to create and manage data integrations.
 *   **Synthetic Test Resource:** [`examples/resources/groundcover_synthetic_test/resource.tf`](./examples/resources/groundcover_synthetic_test/resource.tf)
-    *   Demonstrates how to create and manage synthetic tests for proactive HTTP endpoint monitoring with assertions, retries, and authentication support.
+    *   Demonstrates how to create and manage synthetic tests for proactive HTTP endpoint monitoring with assertions, retries, authentication support, monitor configuration, and notification routing.
 *   **Silence Resource:** [`examples/resources/groundcover_silence/resource.tf`](./examples/resources/groundcover_silence/resource.tf)
     *   Demonstrates how to create and manage alert silences with matcher-based targeting.
 *   **Recurring Silence Resource:** [`examples/resources/groundcover_recurring_silence/resource.tf`](./examples/resources/groundcover_recurring_silence/resource.tf)

@@ -48,6 +48,7 @@ type syntheticTestResourceModel struct {
 	Assertion []syntheticAssertionModel `tfsdk:"assertion"`
 	Retry     *syntheticRetryModel      `tfsdk:"retry"`
 	Labels    types.Map                 `tfsdk:"labels"`
+	Monitor   *syntheticMonitorModel    `tfsdk:"monitor"`
 }
 
 type syntheticHTTPCheckModel struct {
@@ -85,6 +86,24 @@ type syntheticAssertionModel struct {
 type syntheticRetryModel struct {
 	Count    types.Int64  `tfsdk:"count"`
 	Interval types.String `tfsdk:"interval"`
+}
+
+type syntheticMonitorModel struct {
+	MonitorName            types.String                       `tfsdk:"monitor_name"`
+	Severity               types.String                       `tfsdk:"severity"`
+	IssueSummary           types.String                       `tfsdk:"issue_summary"`
+	IssueDescription       types.String                       `tfsdk:"issue_description"`
+	NoDataState            types.String                       `tfsdk:"no_data_state"`
+	ExecutionErrorState    types.String                       `tfsdk:"execution_error_state"`
+	LookbehindWindow       types.String                       `tfsdk:"lookbehind_window"`
+	RenotificationInterval types.String                       `tfsdk:"renotification_interval"`
+	EnabledWorkflows       types.List                         `tfsdk:"enabled_workflows"`
+	EvaluationInterval     *syntheticMonitorEvalIntervalModel `tfsdk:"evaluation_interval"`
+}
+
+type syntheticMonitorEvalIntervalModel struct {
+	Interval   types.String `tfsdk:"interval"`
+	PendingFor types.String `tfsdk:"pending_for"`
 }
 
 // --- Schema ---
@@ -260,6 +279,72 @@ func (r *syntheticTestResource) Schema(_ context.Context, _ resource.SchemaReque
 					"interval": schema.StringAttribute{
 						Description: "Delay between retries (e.g. `1s`, `500ms`).",
 						Optional:    true,
+					},
+				},
+			},
+			"monitor": schema.SingleNestedBlock{
+				Description: "Monitor configuration for the synthetic test. Controls the monitor that is automatically created for this test, including alerting behavior and notification routing.",
+				Attributes: map[string]schema.Attribute{
+					"monitor_name": schema.StringAttribute{
+						Description: "Custom name for the monitor. If not set, a default name is derived from the synthetic test name.",
+						Optional:    true,
+					},
+					"severity": schema.StringAttribute{
+						Description: "Severity level for issues created by this monitor. Supported values: `S1`, `S2`, `S3`, `S4`, `none`.",
+						Optional:    true,
+						Validators: []validator.String{
+							stringvalidator.OneOf("S1", "S2", "S3", "S4", "none"),
+						},
+					},
+					"issue_summary": schema.StringAttribute{
+						Description: "Summary template for issues created by this monitor. Supports Jinja2 templating.",
+						Optional:    true,
+					},
+					"issue_description": schema.StringAttribute{
+						Description: "Description template for issues created by this monitor. Supports Jinja2 templating with variables like `{{ workload }}`.",
+						Optional:    true,
+					},
+					"no_data_state": schema.StringAttribute{
+						Description: "How the monitor behaves when there is no data. `OK` treats no data as normal, `Alerting` treats it as an issue.",
+						Optional:    true,
+						Validators: []validator.String{
+							stringvalidator.OneOf("OK", "Alerting"),
+						},
+					},
+					"execution_error_state": schema.StringAttribute{
+						Description: "How the monitor behaves on execution errors. `OK` treats errors as normal, `Alerting` treats them as issues.",
+						Optional:    true,
+						Validators: []validator.String{
+							stringvalidator.OneOf("OK", "Alerting"),
+						},
+					},
+					"lookbehind_window": schema.StringAttribute{
+						Description: "The time window the monitor looks back for evaluation (e.g. `5m`, `10m`).",
+						Optional:    true,
+					},
+					"renotification_interval": schema.StringAttribute{
+						Description: "How long to wait before sending another notification while the alert is still firing (e.g. `15m`, `1h`, `4h`).",
+						Optional:    true,
+					},
+					"enabled_workflows": schema.ListAttribute{
+						Description: "List of workflow IDs to route notifications to. Workflows and notification policies run simultaneously.",
+						Optional:    true,
+						ElementType: types.StringType,
+					},
+				},
+				Blocks: map[string]schema.Block{
+					"evaluation_interval": schema.SingleNestedBlock{
+						Description: "Evaluation interval settings for the monitor.",
+						Attributes: map[string]schema.Attribute{
+							"interval": schema.StringAttribute{
+								Description: "How often the monitor evaluates (e.g. `1m`, `5m`).",
+								Optional:    true,
+							},
+							"pending_for": schema.StringAttribute{
+								Description: "How long all evaluations must stay true before firing (e.g. `0s`, `1m`, `5m`).",
+								Optional:    true,
+							},
+						},
 					},
 				},
 			},
@@ -549,6 +634,60 @@ func toSDKRequest(plan *syntheticTestResourceModel) *models.SyntheticTestCreateR
 	}
 
 	sdkReq.CheckConfig = checkConfig
+
+	// Monitor
+	if plan.Monitor != nil {
+		monitorConfig := &models.SyntheticMonitorConfig{}
+
+		if !plan.Monitor.MonitorName.IsNull() && !plan.Monitor.MonitorName.IsUnknown() {
+			monitorConfig.MonitorName = plan.Monitor.MonitorName.ValueString()
+		}
+		if !plan.Monitor.Severity.IsNull() && !plan.Monitor.Severity.IsUnknown() {
+			monitorConfig.Severity = plan.Monitor.Severity.ValueString()
+		}
+		if !plan.Monitor.IssueSummary.IsNull() && !plan.Monitor.IssueSummary.IsUnknown() {
+			monitorConfig.IssueSummary = plan.Monitor.IssueSummary.ValueString()
+		}
+		if !plan.Monitor.IssueDescription.IsNull() && !plan.Monitor.IssueDescription.IsUnknown() {
+			monitorConfig.IssueDescription = plan.Monitor.IssueDescription.ValueString()
+		}
+		if !plan.Monitor.NoDataState.IsNull() && !plan.Monitor.NoDataState.IsUnknown() {
+			monitorConfig.NoDataState = plan.Monitor.NoDataState.ValueString()
+		}
+		if !plan.Monitor.ExecutionErrorState.IsNull() && !plan.Monitor.ExecutionErrorState.IsUnknown() {
+			monitorConfig.ExecutionErrorState = plan.Monitor.ExecutionErrorState.ValueString()
+		}
+		if !plan.Monitor.LookbehindWindow.IsNull() && !plan.Monitor.LookbehindWindow.IsUnknown() {
+			monitorConfig.LookbehindWindow = plan.Monitor.LookbehindWindow.ValueString()
+		}
+		if !plan.Monitor.RenotificationInterval.IsNull() && !plan.Monitor.RenotificationInterval.IsUnknown() {
+			monitorConfig.RenotificationInterval = plan.Monitor.RenotificationInterval.ValueString()
+		}
+
+		if !plan.Monitor.EnabledWorkflows.IsNull() && !plan.Monitor.EnabledWorkflows.IsUnknown() {
+			workflows := make([]string, 0, len(plan.Monitor.EnabledWorkflows.Elements()))
+			for _, v := range plan.Monitor.EnabledWorkflows.Elements() {
+				if sv, ok := v.(types.String); ok {
+					workflows = append(workflows, sv.ValueString())
+				}
+			}
+			monitorConfig.EnabledWorkflows = workflows
+		}
+
+		if plan.Monitor.EvaluationInterval != nil {
+			evalInterval := &models.SyntheticMonitorEvalInterval{}
+			if !plan.Monitor.EvaluationInterval.Interval.IsNull() && !plan.Monitor.EvaluationInterval.Interval.IsUnknown() {
+				evalInterval.Interval = plan.Monitor.EvaluationInterval.Interval.ValueString()
+			}
+			if !plan.Monitor.EvaluationInterval.PendingFor.IsNull() && !plan.Monitor.EvaluationInterval.PendingFor.IsUnknown() {
+				evalInterval.PendingFor = plan.Monitor.EvaluationInterval.PendingFor.ValueString()
+			}
+			monitorConfig.EvaluationInterval = evalInterval
+		}
+
+		sdkReq.Monitor = monitorConfig
+	}
+
 	return sdkReq
 }
 
@@ -666,5 +805,67 @@ func fromSDKResponse(ctx context.Context, sdkResp *models.SyntheticTestCreateReq
 		}
 	} else {
 		state.Retry = nil
+	}
+
+	if sdkResp.Monitor != nil && state.Monitor != nil {
+		mon := sdkResp.Monitor
+		prev := state.Monitor
+
+		monitorModel := &syntheticMonitorModel{
+			EnabledWorkflows: types.ListNull(types.StringType),
+		}
+
+		if !prev.MonitorName.IsNull() {
+			monitorModel.MonitorName = types.StringValue(mon.MonitorName)
+		}
+		if !prev.Severity.IsNull() {
+			monitorModel.Severity = types.StringValue(mon.Severity)
+		}
+		if !prev.IssueSummary.IsNull() {
+			monitorModel.IssueSummary = types.StringValue(mon.IssueSummary)
+		}
+		if !prev.IssueDescription.IsNull() {
+			monitorModel.IssueDescription = types.StringValue(mon.IssueDescription)
+		}
+		if !prev.NoDataState.IsNull() {
+			monitorModel.NoDataState = types.StringValue(mon.NoDataState)
+		}
+		if !prev.ExecutionErrorState.IsNull() {
+			monitorModel.ExecutionErrorState = types.StringValue(mon.ExecutionErrorState)
+		}
+		if !prev.LookbehindWindow.IsNull() {
+			monitorModel.LookbehindWindow = types.StringValue(normalizeDuration(mon.LookbehindWindow))
+		}
+		if !prev.RenotificationInterval.IsNull() {
+			monitorModel.RenotificationInterval = types.StringValue(normalizeDuration(mon.RenotificationInterval))
+		}
+
+		if !prev.EnabledWorkflows.IsNull() {
+			if len(mon.EnabledWorkflows) > 0 {
+				workflowValues := make([]string, len(mon.EnabledWorkflows))
+				copy(workflowValues, mon.EnabledWorkflows)
+				workflowsList, diags := types.ListValueFrom(ctx, types.StringType, workflowValues)
+				if !diags.HasError() {
+					monitorModel.EnabledWorkflows = workflowsList
+				}
+			} else {
+				monitorModel.EnabledWorkflows, _ = types.ListValueFrom(ctx, types.StringType, []string{})
+			}
+		}
+
+		if mon.EvaluationInterval != nil && prev.EvaluationInterval != nil {
+			evalModel := &syntheticMonitorEvalIntervalModel{}
+			if !prev.EvaluationInterval.Interval.IsNull() {
+				evalModel.Interval = types.StringValue(normalizeDuration(mon.EvaluationInterval.Interval))
+			}
+			if !prev.EvaluationInterval.PendingFor.IsNull() {
+				evalModel.PendingFor = types.StringValue(normalizeDuration(mon.EvaluationInterval.PendingFor))
+			}
+			monitorModel.EvaluationInterval = evalModel
+		}
+
+		state.Monitor = monitorModel
+	} else if state.Monitor != nil {
+		state.Monitor = nil
 	}
 }
