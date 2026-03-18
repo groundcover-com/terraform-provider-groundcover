@@ -185,12 +185,27 @@ func TestAccSyntheticTestResource_withMonitor(t *testing.T) {
 				ResourceName:      "groundcover_synthetic_test.test",
 				ImportState:       true,
 				ImportStateVerify: true,
-				ImportStateVerifyIgnore: []string{"http_check.auth", "monitor.%",
-					"monitor.monitor_name", "monitor.severity", "monitor.issue_summary",
-					"monitor.issue_description", "monitor.no_data_state", "monitor.execution_error_state",
-					"monitor.lookbehind_window", "monitor.renotification_interval", "monitor.enabled_workflows",
-					"monitor.evaluation_interval.%", "monitor.evaluation_interval.interval",
-					"monitor.evaluation_interval.pending_for"},
+				// http_check.auth: sensitive fields (password/token) are never read back from the API.
+				// monitor.*: the monitor block is only tracked in state when explicitly configured;
+				// on import the prior state is empty so fromSDKResponse skips the block to avoid
+				// server-default values (issue_summary, lookbehind_window) leaking into state and
+				// causing perpetual plan diffs. Users add the monitor block to their config post-import.
+				ImportStateVerifyIgnore: []string{
+					"http_check.auth",
+					"monitor.%",
+					"monitor.monitor_name",
+					"monitor.severity",
+					"monitor.issue_summary",
+					"monitor.issue_description",
+					"monitor.no_data_state",
+					"monitor.execution_error_state",
+					"monitor.lookbehind_window",
+					"monitor.renotification_interval",
+					"monitor.enabled_workflows",
+					"monitor.evaluation_interval.%",
+					"monitor.evaluation_interval.interval",
+					"monitor.evaluation_interval.pending_for",
+				},
 			},
 			// Update monitor settings
 			{

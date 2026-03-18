@@ -807,8 +807,7 @@ func fromSDKResponse(ctx context.Context, sdkResp *models.SyntheticTestCreateReq
 		state.Retry = nil
 	}
 
-	isImport := state.Monitor == nil && state.Name.IsNull()
-	if sdkResp.Monitor != nil && (state.Monitor != nil || isImport) {
+	if sdkResp.Monitor != nil && state.Monitor != nil {
 		mon := sdkResp.Monitor
 		prev := state.Monitor
 
@@ -816,45 +815,29 @@ func fromSDKResponse(ctx context.Context, sdkResp *models.SyntheticTestCreateReq
 			EnabledWorkflows: types.ListNull(types.StringType),
 		}
 
-		if isImport || !prev.MonitorName.IsNull() {
-			if mon.MonitorName != "" {
-				monitorModel.MonitorName = types.StringValue(mon.MonitorName)
-			}
+		if !prev.MonitorName.IsNull() {
+			monitorModel.MonitorName = types.StringValue(mon.MonitorName)
 		}
-		if isImport || !prev.Severity.IsNull() {
-			if mon.Severity != "" {
-				monitorModel.Severity = types.StringValue(mon.Severity)
-			}
+		if !prev.Severity.IsNull() {
+			monitorModel.Severity = types.StringValue(mon.Severity)
 		}
-		if isImport || !prev.IssueSummary.IsNull() {
-			if mon.IssueSummary != "" {
-				monitorModel.IssueSummary = types.StringValue(mon.IssueSummary)
-			}
+		if !prev.IssueSummary.IsNull() {
+			monitorModel.IssueSummary = types.StringValue(mon.IssueSummary)
 		}
-		if isImport || !prev.IssueDescription.IsNull() {
-			if mon.IssueDescription != "" {
-				monitorModel.IssueDescription = types.StringValue(mon.IssueDescription)
-			}
+		if !prev.IssueDescription.IsNull() {
+			monitorModel.IssueDescription = types.StringValue(mon.IssueDescription)
 		}
-		if isImport || !prev.NoDataState.IsNull() {
-			if mon.NoDataState != "" {
-				monitorModel.NoDataState = types.StringValue(mon.NoDataState)
-			}
+		if !prev.NoDataState.IsNull() {
+			monitorModel.NoDataState = types.StringValue(mon.NoDataState)
 		}
-		if isImport || !prev.ExecutionErrorState.IsNull() {
-			if mon.ExecutionErrorState != "" {
-				monitorModel.ExecutionErrorState = types.StringValue(mon.ExecutionErrorState)
-			}
+		if !prev.ExecutionErrorState.IsNull() {
+			monitorModel.ExecutionErrorState = types.StringValue(mon.ExecutionErrorState)
 		}
-		if isImport || !prev.LookbehindWindow.IsNull() {
-			if mon.LookbehindWindow != "" {
-				monitorModel.LookbehindWindow = types.StringValue(normalizeDuration(mon.LookbehindWindow))
-			}
+		if !prev.LookbehindWindow.IsNull() {
+			monitorModel.LookbehindWindow = types.StringValue(normalizeDuration(mon.LookbehindWindow))
 		}
-		if isImport || !prev.RenotificationInterval.IsNull() {
-			if mon.RenotificationInterval != "" {
-				monitorModel.RenotificationInterval = types.StringValue(normalizeDuration(mon.RenotificationInterval))
-			}
+		if !prev.RenotificationInterval.IsNull() {
+			monitorModel.RenotificationInterval = types.StringValue(normalizeDuration(mon.RenotificationInterval))
 		}
 
 		if len(mon.EnabledWorkflows) > 0 {
@@ -866,17 +849,13 @@ func fromSDKResponse(ctx context.Context, sdkResp *models.SyntheticTestCreateReq
 			}
 		}
 
-		if mon.EvaluationInterval != nil && (isImport || prev.EvaluationInterval != nil) {
+		if mon.EvaluationInterval != nil && prev.EvaluationInterval != nil {
 			evalModel := &syntheticMonitorEvalIntervalModel{}
-			if isImport || !prev.EvaluationInterval.Interval.IsNull() {
-				if mon.EvaluationInterval.Interval != "" {
-					evalModel.Interval = types.StringValue(normalizeDuration(mon.EvaluationInterval.Interval))
-				}
+			if !prev.EvaluationInterval.Interval.IsNull() {
+				evalModel.Interval = types.StringValue(normalizeDuration(mon.EvaluationInterval.Interval))
 			}
-			if isImport || !prev.EvaluationInterval.PendingFor.IsNull() {
-				if mon.EvaluationInterval.PendingFor != "" {
-					evalModel.PendingFor = types.StringValue(normalizeDuration(mon.EvaluationInterval.PendingFor))
-				}
+			if !prev.EvaluationInterval.PendingFor.IsNull() {
+				evalModel.PendingFor = types.StringValue(normalizeDuration(mon.EvaluationInterval.PendingFor))
 			}
 			monitorModel.EvaluationInterval = evalModel
 		}
