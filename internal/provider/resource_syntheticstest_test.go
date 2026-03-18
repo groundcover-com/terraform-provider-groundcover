@@ -158,6 +158,75 @@ func TestAccSyntheticTestResource_disappears(t *testing.T) {
 	})
 }
 
+func TestAccSyntheticTestResource_withMonitor(t *testing.T) {
+	name := acctest.RandomWithPrefix("test-synth-monitor")
+
+	resource.Test(t, resource.TestCase{
+		PreCheck:                 func() { testAccPreCheck(t) },
+		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
+		Steps: []resource.TestStep{
+			// Create with monitor block
+			{
+				Config: testAccSyntheticTestResourceConfig_withMonitor(name),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					resource.TestCheckResourceAttr("groundcover_synthetic_test.test", "name", name),
+					resource.TestCheckResourceAttr("groundcover_synthetic_test.test", "monitor.monitor_name", "Monitor for "+name),
+					resource.TestCheckResourceAttr("groundcover_synthetic_test.test", "monitor.severity", "S1"),
+					resource.TestCheckResourceAttr("groundcover_synthetic_test.test", "monitor.no_data_state", "Alerting"),
+					resource.TestCheckResourceAttr("groundcover_synthetic_test.test", "monitor.execution_error_state", "Alerting"),
+					resource.TestCheckResourceAttr("groundcover_synthetic_test.test", "monitor.renotification_interval", "1h"),
+					resource.TestCheckResourceAttr("groundcover_synthetic_test.test", "monitor.evaluation_interval.interval", "1m"),
+					resource.TestCheckResourceAttr("groundcover_synthetic_test.test", "monitor.evaluation_interval.pending_for", "0s"),
+					resource.TestCheckResourceAttrSet("groundcover_synthetic_test.test", "id"),
+				),
+			},
+			// ImportState testing
+			{
+				ResourceName:      "groundcover_synthetic_test.test",
+				ImportState:       true,
+				ImportStateVerify: true,
+				ImportStateVerifyIgnore: []string{"http_check.auth", "monitor.%",
+					"monitor.monitor_name", "monitor.severity", "monitor.issue_summary",
+					"monitor.issue_description", "monitor.no_data_state", "monitor.execution_error_state",
+					"monitor.lookbehind_window", "monitor.renotification_interval", "monitor.enabled_workflows",
+					"monitor.evaluation_interval.%", "monitor.evaluation_interval.interval",
+					"monitor.evaluation_interval.pending_for"},
+			},
+			// Update monitor settings
+			{
+				Config: testAccSyntheticTestResourceConfig_withMonitorUpdated(name),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					resource.TestCheckResourceAttr("groundcover_synthetic_test.test", "monitor.severity", "S2"),
+					resource.TestCheckResourceAttr("groundcover_synthetic_test.test", "monitor.no_data_state", "OK"),
+					resource.TestCheckResourceAttr("groundcover_synthetic_test.test", "monitor.renotification_interval", "4h"),
+					resource.TestCheckResourceAttr("groundcover_synthetic_test.test", "monitor.evaluation_interval.pending_for", "5m"),
+				),
+			},
+			// Delete testing automatically occurs in TestCase
+		},
+	})
+}
+
+func TestAccSyntheticTestResource_withMonitorMinimal(t *testing.T) {
+	name := acctest.RandomWithPrefix("test-synth-mon-min")
+
+	resource.Test(t, resource.TestCase{
+		PreCheck:                 func() { testAccPreCheck(t) },
+		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
+		Steps: []resource.TestStep{
+			// Create with minimal monitor (just severity)
+			{
+				Config: testAccSyntheticTestResourceConfig_withMonitorMinimal(name),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					resource.TestCheckResourceAttr("groundcover_synthetic_test.test", "name", name),
+					resource.TestCheckResourceAttr("groundcover_synthetic_test.test", "monitor.severity", "S2"),
+					resource.TestCheckResourceAttrSet("groundcover_synthetic_test.test", "id"),
+				),
+			},
+		},
+	})
+}
+
 // --- Config helpers ---
 
 func testAccSyntheticTestResourceConfig_basic(name string) string {
@@ -231,6 +300,101 @@ resource "groundcover_synthetic_test" "test" {
   retry {
     count    = 3
     interval = "500ms"
+  }
+}
+`, name)
+}
+
+func testAccSyntheticTestResourceConfig_withMonitor(name string) string {
+	return fmt.Sprintf(`
+resource "groundcover_synthetic_test" "test" {
+  name     = %[1]q
+  enabled  = true
+  interval = "1m"
+
+  http_check {
+    url     = "https://httpbin.org/status/200"
+    method  = "GET"
+    timeout = "10s"
+  }
+
+  assertion {
+    source   = "statusCode"
+    operator = "eq"
+    target   = "200"
+  }
+
+  monitor {
+    monitor_name            = "Monitor for %[1]s"
+    severity                = "S1"
+    no_data_state           = "Alerting"
+    execution_error_state   = "Alerting"
+    renotification_interval = "1h"
+
+    evaluation_interval {
+      interval    = "1m"
+      pending_for = "0s"
+    }
+  }
+}
+`, name)
+}
+
+func testAccSyntheticTestResourceConfig_withMonitorUpdated(name string) string {
+	return fmt.Sprintf(`
+resource "groundcover_synthetic_test" "test" {
+  name     = %[1]q
+  enabled  = true
+  interval = "1m"
+
+  http_check {
+    url     = "https://httpbin.org/status/200"
+    method  = "GET"
+    timeout = "10s"
+  }
+
+  assertion {
+    source   = "statusCode"
+    operator = "eq"
+    target   = "200"
+  }
+
+  monitor {
+    monitor_name            = "Monitor for %[1]s"
+    severity                = "S2"
+    no_data_state           = "OK"
+    execution_error_state   = "Alerting"
+    renotification_interval = "4h"
+
+    evaluation_interval {
+      interval    = "1m"
+      pending_for = "5m"
+    }
+  }
+}
+`, name)
+}
+
+func testAccSyntheticTestResourceConfig_withMonitorMinimal(name string) string {
+	return fmt.Sprintf(`
+resource "groundcover_synthetic_test" "test" {
+  name     = %[1]q
+  interval = "1m"
+
+  http_check {
+    url     = "https://httpbin.org/status/200"
+    method  = "GET"
+    timeout = "10s"
+  }
+
+  assertion {
+    source   = "statusCode"
+    operator = "eq"
+    target   = "200"
+  }
+
+  monitor {
+    severity = "S2"
   }
 }
 `, name)
