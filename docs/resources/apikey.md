@@ -119,3 +119,11 @@ Read-Only:
 
 - `name` (String) Policy name.
 - `uuid` (String) Policy UUID.
+
+## Import
+
+Import is supported using the following syntax:
+
+```shell
+terraform import groundcover_apikey.example "<id>"
+```

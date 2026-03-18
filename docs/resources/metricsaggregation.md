@@ -79,3 +79,11 @@ output "metrics_aggregation_updated_at" {
 ### Read-Only
 
 - `updated_at` (String) The last update timestamp of the metrics aggregation configuration.
+
+## Import
+
+Import is supported using the following syntax:
+
+```shell
+terraform import groundcover_metricsaggregation.example "<id>"
+```

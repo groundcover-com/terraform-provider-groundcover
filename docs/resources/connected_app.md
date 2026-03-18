@@ -120,3 +120,11 @@ output "pagerduty_app_id" {
 - `id` (String) The unique identifier for the connected app.
 - `updated_at` (String) The date the connected app was last updated (RFC3339 format).
 - `updated_by` (String) The user who last updated the connected app.
+
+## Import
+
+Import is supported using the following syntax:
+
+```shell
+terraform import groundcover_connected_app.example "<id>"
+```

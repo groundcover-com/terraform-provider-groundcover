@@ -72,3 +72,12 @@ output "logs_pipeline_updated_at" {
 ### Read-Only
 
 - `updated_at` (String) The last update timestamp of the logs pipeline configuration.
+
+## Import
+
+Import is supported using the following syntax:
+
+```shell
+# Logs pipeline is a singleton resource. The import ID value is ignored.
+terraform import groundcover_logspipeline.example any
+```

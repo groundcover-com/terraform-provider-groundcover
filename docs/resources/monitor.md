@@ -121,3 +121,11 @@ output "monitor_example_yaml_output" {
 ### Read-Only
 
 - `id` (String) Monitor identifier (UUID).
+
+## Import
+
+Import is supported using the following syntax:
+
+```shell
+terraform import groundcover_monitor.example "<id>"
+```
