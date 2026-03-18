@@ -1,1 +1,1 @@
-terraform import groundcover_apikey.example <id>
+terraform import groundcover_apikey.example "<id>"

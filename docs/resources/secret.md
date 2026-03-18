@@ -118,5 +118,5 @@ output "password_secret_id" {
 Import is supported using the following syntax:
 
 ```shell
-terraform import groundcover_secret.example <id>
+terraform import groundcover_secret.example "<id>"
 ```

@@ -1,1 +1,1 @@
-terraform import groundcover_monitor.example <id>
+terraform import groundcover_monitor.example "<id>"

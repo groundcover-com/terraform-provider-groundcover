@@ -1,1 +1,1 @@
-terraform import groundcover_dashboard.example <id>
+terraform import groundcover_dashboard.example "<id>"

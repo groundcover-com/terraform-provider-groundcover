@@ -126,5 +126,5 @@ output "pagerduty_app_id" {
 Import is supported using the following syntax:
 
 ```shell
-terraform import groundcover_connected_app.example <id>
+terraform import groundcover_connected_app.example "<id>"
 ```

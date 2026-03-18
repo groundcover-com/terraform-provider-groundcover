@@ -334,5 +334,5 @@ Required:
 Import is supported using the following syntax:
 
 ```shell
-terraform import groundcover_policy.example <id>
+terraform import groundcover_policy.example "<id>"
 ```

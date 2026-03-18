@@ -1,1 +1,1 @@
-terraform import groundcover_secret.example <id>
+terraform import groundcover_secret.example "<id>"

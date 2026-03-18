@@ -127,5 +127,5 @@ output "monitor_example_yaml_output" {
 Import is supported using the following syntax:
 
 ```shell
-terraform import groundcover_monitor.example <id>
+terraform import groundcover_monitor.example "<id>"
 ```

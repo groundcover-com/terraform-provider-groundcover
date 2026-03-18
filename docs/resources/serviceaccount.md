@@ -97,5 +97,5 @@ output "serviceaccount_example_email" {
 Import is supported using the following syntax:
 
 ```shell
-terraform import groundcover_serviceaccount.example <id>
+terraform import groundcover_serviceaccount.example "<id>"
 ```

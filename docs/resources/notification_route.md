@@ -182,5 +182,5 @@ Optional:
 Import is supported using the following syntax:
 
 ```shell
-terraform import groundcover_notification_route.example <id>
+terraform import groundcover_notification_route.example "<id>"
 ```

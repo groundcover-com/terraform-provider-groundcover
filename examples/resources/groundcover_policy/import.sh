@@ -1,1 +1,1 @@
-terraform import groundcover_policy.example <id>
+terraform import groundcover_policy.example "<id>"

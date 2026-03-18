@@ -1,1 +1,1 @@
-terraform import groundcover_metricsaggregation.example <id>
+terraform import groundcover_metricsaggregation.example "<id>"

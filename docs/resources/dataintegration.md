@@ -780,5 +780,5 @@ Import is supported using the following syntax:
 
 ```shell
 # Import format: type:id (e.g., cloudwatch:abc123)
-terraform import groundcover_dataintegration.example <type>:<id>
+terraform import groundcover_dataintegration.example "<type>:<id>"
 ```

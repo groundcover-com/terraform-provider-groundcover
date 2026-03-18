@@ -1,1 +1,1 @@
-terraform import groundcover_silence.example <id>
+terraform import groundcover_silence.example "<id>"

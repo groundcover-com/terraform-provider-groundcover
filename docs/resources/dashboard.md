@@ -217,5 +217,5 @@ output "simple_dashboard_owner" {
 Import is supported using the following syntax:
 
 ```shell
-terraform import groundcover_dashboard.example <id>
+terraform import groundcover_dashboard.example "<id>"
 ```

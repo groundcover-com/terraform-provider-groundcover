@@ -85,5 +85,5 @@ output "metrics_aggregation_updated_at" {
 Import is supported using the following syntax:
 
 ```shell
-terraform import groundcover_metricsaggregation.example <id>
+terraform import groundcover_metricsaggregation.example "<id>"
 ```
