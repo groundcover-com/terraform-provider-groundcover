@@ -26,8 +26,32 @@ Basic usage examples can be found in the `examples/` directory:
     *   Demonstrates how to create and manage dashboards with customizable widgets and layouts.
 *   **Data Integration Resource:** [`examples/resources/groundcover_dataintegration/resource.tf`](./examples/resources/groundcover_dataintegration/resource.tf)
     *   Demonstrates how to create and manage data integrations.
+*   **Silence Resource:** [`examples/resources/groundcover_silence/resource.tf`](./examples/resources/groundcover_silence/resource.tf)
+    *   Demonstrates how to create and manage alert silences with time windows and matchers.
+*   **Connected App Resource:** [`examples/resources/groundcover_connected_app/resource.tf`](./examples/resources/groundcover_connected_app/resource.tf)
+    *   Demonstrates how to create and manage integrations with external services (Slack, PagerDuty, MS Teams).
+*   **Notification Route Resource:** [`examples/resources/groundcover_notification_route/resource.tf`](./examples/resources/groundcover_notification_route/resource.tf)
+    *   Demonstrates how to create and manage notification routes for routing alerts to connected apps.
+*   **Secret Resource:** [`examples/resources/groundcover_secret/resource.tf`](./examples/resources/groundcover_secret/resource.tf)
+    *   Demonstrates how to securely store sensitive values and receive reference IDs for use in other resources.
 *   **Synthetic Test Resource:** [`examples/resources/groundcover_synthetic_test/resource.tf`](./examples/resources/groundcover_synthetic_test/resource.tf)
     *   Demonstrates how to create and manage synthetic tests for proactive HTTP endpoint monitoring with assertions, retries, authentication support, monitor configuration, and notification routing.
+
+## Importing Resources
+
+All resources support `terraform import`. To import an existing resource into your Terraform state:
+
+```bash
+terraform import groundcover_<resource_type>.<name> <id>
+```
+
+For most resources, the import ID is the resource's UUID. Some exceptions:
+
+*   **Ingestion Key:** Import by name: `terraform import groundcover_ingestionkey.example <name>`
+*   **Data Integration:** Import using composite key: `terraform import groundcover_dataintegration.example <type>:<id>`
+*   **Logs Pipeline:** Singleton resource — use any value: `terraform import groundcover_logspipeline.example any`
+*   **Traces Pipeline:** Singleton resource — use any value: `terraform import groundcover_tracespipeline.example any`
+See each resource's documentation in `docs/resources/` for the exact import syntax.
 
 ## Local Development and Testing
 

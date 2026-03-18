@@ -91,3 +91,11 @@ output "serviceaccount_example_email" {
 ### Read-Only
 
 - `id` (String) The unique identifier for the service account.
+
+## Import
+
+Import is supported using the following syntax:
+
+```shell
+terraform import groundcover_serviceaccount.example "<id>"
+```

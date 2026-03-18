@@ -72,3 +72,12 @@ output "traces_pipeline_updated_at" {
 ### Read-Only
 
 - `updated_at` (String) The last update timestamp of the traces pipeline configuration.
+
+## Import
+
+Import is supported using the following syntax:
+
+```shell
+# Traces pipeline is a singleton resource. The import ID value is ignored.
+terraform import groundcover_tracespipeline.example any
+```

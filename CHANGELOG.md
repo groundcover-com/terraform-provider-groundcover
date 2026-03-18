@@ -1,5 +1,6 @@
 ## 1.9.0
 
+* Added import documentation for all resources so `terraform import` usage is documented in the registry
 * Added monitor and notification routing controls to `groundcover_synthetic_test` resource — supports `monitor_name`, `severity`, `issue_summary`, `issue_description`, `no_data_state`, `execution_error_state`, `lookbehind_window`, `renotification_interval`, `enabled_workflows`, and `evaluation_interval` (interval + pending_for)
 
 ## 1.8.2

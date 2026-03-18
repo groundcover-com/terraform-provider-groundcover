@@ -773,3 +773,12 @@ output "postgresql_system_metrics_dataintegration_id" {
 - `id` (String) The unique identifier of the data integration configuration.
 - `updated_at` (String) The last update timestamp of the data integration configuration.
 - `updated_by` (String) The user who last updated the data integration configuration.
+
+## Import
+
+Import is supported using the following syntax:
+
+```shell
+# Import format: type:id (e.g., cloudwatch:abc123)
+terraform import groundcover_dataintegration.example "<type>:<id>"
+```
