@@ -49,8 +49,8 @@ For most resources, the import ID is the resource's UUID. Some exceptions:
 
 *   **Ingestion Key:** Import by name: `terraform import groundcover_ingestionkey.example <name>`
 *   **Data Integration:** Import using composite key: `terraform import groundcover_dataintegration.example <type>:<id>`
-*   **Logs Pipeline / Traces Pipeline:** Singleton resources — use any value: `terraform import groundcover_logspipeline.example any`
-
+*   **Logs Pipeline:** Singleton resource — use any value: `terraform import groundcover_logspipeline.example any`
+*   **Traces Pipeline:** Singleton resource — use any value: `terraform import groundcover_tracespipeline.example any`
 See each resource's documentation in `docs/resources/` for the exact import syntax.
 
 ## Local Development and Testing
