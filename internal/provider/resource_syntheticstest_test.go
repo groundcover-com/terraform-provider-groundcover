@@ -308,34 +308,34 @@ resource "groundcover_synthetic_test" "test" {
 func testAccSyntheticTestResourceConfig_withMonitor(name string) string {
 	return fmt.Sprintf(`
 resource "groundcover_synthetic_test" "test" {
-  name     = %[1]q
-  enabled  = true
-  interval = "1m"
+	name     = %[1]q
+	enabled  = true
+	interval = "1m"
 
-  http_check {
-    url     = "https://httpbin.org/status/200"
-    method  = "GET"
-    timeout = "10s"
-  }
+	http_check {
+		url     = "https://httpbin.org/status/200"
+		method  = "GET"
+		timeout = "10s"
+	}
 
-  assertion {
-    source   = "statusCode"
-    operator = "eq"
-    target   = "200"
-  }
+	assertion {
+		source   = "statusCode"
+		operator = "eq"
+		target   = "200"
+	}
 
-  monitor {
-    monitor_name            = "Monitor for %[1]s"
-    severity                = "S1"
-    no_data_state           = "Alerting"
-    execution_error_state   = "Alerting"
-    renotification_interval = "1h"
+	monitor {
+		monitor_name            = "Monitor for %[1]s"
+		severity                = "S1"
+		no_data_state           = "Alerting"
+		execution_error_state   = "Alerting"
+		renotification_interval = "1h"
 
-    evaluation_interval {
-      interval    = "1m"
-      pending_for = "0s"
-    }
-  }
+		evaluation_interval {
+			interval    = "1m"
+			pending_for = "0s"
+		}
+	}
 }
 `, name)
 }
@@ -343,34 +343,34 @@ resource "groundcover_synthetic_test" "test" {
 func testAccSyntheticTestResourceConfig_withMonitorUpdated(name string) string {
 	return fmt.Sprintf(`
 resource "groundcover_synthetic_test" "test" {
-  name     = %[1]q
-  enabled  = true
-  interval = "1m"
+	name     = %[1]q
+	enabled  = true
+	interval = "1m"
 
-  http_check {
-    url     = "https://httpbin.org/status/200"
-    method  = "GET"
-    timeout = "10s"
-  }
+	http_check {
+		url     = "https://httpbin.org/status/200"
+		method  = "GET"
+		timeout = "10s"
+	}
 
-  assertion {
-    source   = "statusCode"
-    operator = "eq"
-    target   = "200"
-  }
+	assertion {
+		source   = "statusCode"
+		operator = "eq"
+		target   = "200"
+	}
 
-  monitor {
-    monitor_name            = "Monitor for %[1]s"
-    severity                = "S2"
-    no_data_state           = "OK"
-    execution_error_state   = "Alerting"
-    renotification_interval = "4h"
+	monitor {
+		monitor_name            = "Monitor for %[1]s"
+		severity                = "S2"
+		no_data_state           = "OK"
+		execution_error_state   = "Alerting"
+		renotification_interval = "4h"
 
-    evaluation_interval {
-      interval    = "1m"
-      pending_for = "5m"
-    }
-  }
+		evaluation_interval {
+			interval    = "1m"
+			pending_for = "5m"
+		}
+	}
 }
 `, name)
 }
@@ -378,24 +378,24 @@ resource "groundcover_synthetic_test" "test" {
 func testAccSyntheticTestResourceConfig_withMonitorMinimal(name string) string {
 	return fmt.Sprintf(`
 resource "groundcover_synthetic_test" "test" {
-  name     = %[1]q
-  interval = "1m"
+	name     = %[1]q
+	interval = "1m"
 
-  http_check {
-    url     = "https://httpbin.org/status/200"
-    method  = "GET"
-    timeout = "10s"
-  }
+	http_check {
+		url     = "https://httpbin.org/status/200"
+		method  = "GET"
+		timeout = "10s"
+	}
 
-  assertion {
-    source   = "statusCode"
-    operator = "eq"
-    target   = "200"
-  }
+	assertion {
+		source   = "statusCode"
+		operator = "eq"
+		target   = "200"
+	}
 
-  monitor {
-    severity = "S2"
-  }
+	monitor {
+		severity = "S2"
+	}
 }
 `, name)
 }
