@@ -194,6 +194,44 @@ func TestAccRecurringSilenceResource_applyLoop(t *testing.T) {
 	})
 }
 
+// TestAccRecurringSilenceResource_applyLoop_noComment tests that consecutive applies
+// do not require plan changes when the comment attribute is omitted from the config.
+// This verifies that UseStateForUnknown prevents drift from server-generated comments.
+func TestAccRecurringSilenceResource_applyLoop_noComment(t *testing.T) {
+	config := testAccRecurringSilenceResourceConfig_daily_noComment("09:00", "17:00", "UTC", true)
+
+	resource.Test(t, resource.TestCase{
+		PreCheck:                 func() { testAccPreCheck(t) },
+		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
+		Steps: []resource.TestStep{
+			// Step 1: Create without comment (server auto-generates one)
+			{
+				Config: config,
+				Check: resource.ComposeAggregateTestCheckFunc(
+					resource.TestCheckResourceAttrSet("groundcover_recurring_silence.test", "id"),
+					resource.TestCheckResourceAttrSet("groundcover_recurring_silence.test", "comment"),
+				),
+			},
+			// Step 2: Apply same config — expect no changes
+			{
+				Config: config,
+				Check: resource.ComposeAggregateTestCheckFunc(
+					resource.TestCheckResourceAttrSet("groundcover_recurring_silence.test", "id"),
+					resource.TestCheckResourceAttrSet("groundcover_recurring_silence.test", "comment"),
+				),
+			},
+			// Step 3: Apply again — expect no changes
+			{
+				Config: config,
+				Check: resource.ComposeAggregateTestCheckFunc(
+					resource.TestCheckResourceAttrSet("groundcover_recurring_silence.test", "id"),
+					resource.TestCheckResourceAttrSet("groundcover_recurring_silence.test", "comment"),
+				),
+			},
+		},
+	})
+}
+
 func TestAccRecurringSilenceResource_disabled(t *testing.T) {
 	comment := acctest.RandomWithPrefix("test-recurring-silence-disabled")
 
@@ -225,6 +263,27 @@ func intsToTerraformList(values []int) string {
 	}
 	result += "]"
 	return result
+}
+
+func testAccRecurringSilenceResourceConfig_daily_noComment(startTime, endTime, timezone string, enabled bool) string {
+	return fmt.Sprintf(`
+resource "groundcover_recurring_silence" "test" {
+  recurrence_type = "daily"
+  start_time      = %[1]q
+  end_time        = %[2]q
+  timezone        = %[3]q
+  enabled         = %[4]t
+
+  matchers = [
+    {
+      name        = "service"
+      value       = "test-service"
+      is_equal    = true
+      is_contains = false
+    }
+  ]
+}
+`, startTime, endTime, timezone, enabled)
 }
 
 func testAccRecurringSilenceResourceConfig_daily(comment, startTime, endTime, timezone string, enabled bool) string {

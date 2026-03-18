@@ -74,6 +74,9 @@ A silence is defined by: a time window (starts_at, ends_at), a comment describin
 				MarkdownDescription: "A comment describing the reason for the silence.",
 				Optional:            true,
 				Computed:            true,
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.UseStateForUnknown(),
+				},
 			},
 			"matchers": schema.ListNestedAttribute{
 				MarkdownDescription: "A list of matchers that define which alerts to silence. Each matcher specifies a label name and value to match against.",

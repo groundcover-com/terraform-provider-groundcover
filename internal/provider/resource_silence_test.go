@@ -216,6 +216,65 @@ func TestAccSilenceResource_applyLoop(t *testing.T) {
 	})
 }
 
+// TestAccSilenceResource_applyLoop_noComment tests that consecutive applies do not
+// require plan changes when the comment attribute is omitted from the config.
+// This verifies that UseStateForUnknown prevents drift from server-generated comments.
+func TestAccSilenceResource_applyLoop_noComment(t *testing.T) {
+	startsAt := time.Now().Add(1 * time.Hour).UTC().Format(time.RFC3339)
+	endsAt := time.Now().Add(2 * time.Hour).UTC().Format(time.RFC3339)
+
+	config := testAccSilenceResourceConfig_noComment(startsAt, endsAt)
+
+	resource.Test(t, resource.TestCase{
+		PreCheck:                 func() { testAccPreCheck(t) },
+		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
+		Steps: []resource.TestStep{
+			// Step 1: Create silence without comment (server auto-generates one)
+			{
+				Config: config,
+				Check: resource.ComposeAggregateTestCheckFunc(
+					resource.TestCheckResourceAttrSet("groundcover_silence.test", "id"),
+					resource.TestCheckResourceAttrSet("groundcover_silence.test", "comment"),
+				),
+			},
+			// Step 2: Apply same config — expect no changes
+			{
+				Config: config,
+				Check: resource.ComposeAggregateTestCheckFunc(
+					resource.TestCheckResourceAttrSet("groundcover_silence.test", "id"),
+					resource.TestCheckResourceAttrSet("groundcover_silence.test", "comment"),
+				),
+			},
+			// Step 3: Apply again — expect no changes
+			{
+				Config: config,
+				Check: resource.ComposeAggregateTestCheckFunc(
+					resource.TestCheckResourceAttrSet("groundcover_silence.test", "id"),
+					resource.TestCheckResourceAttrSet("groundcover_silence.test", "comment"),
+				),
+			},
+		},
+	})
+}
+
+func testAccSilenceResourceConfig_noComment(startsAt, endsAt string) string {
+	return fmt.Sprintf(`
+resource "groundcover_silence" "test" {
+  starts_at = %[1]q
+  ends_at   = %[2]q
+
+  matchers = [
+    {
+      name        = "service"
+      value       = "test-service"
+      is_equal    = true
+      is_contains = false
+    }
+  ]
+}
+`, startsAt, endsAt)
+}
+
 func testAccSilenceResourceConfig(comment, startsAt, endsAt, matcherName, matcherValue string, isEqual, isContains bool) string {
 	return fmt.Sprintf(`
 resource "groundcover_silence" "test" {

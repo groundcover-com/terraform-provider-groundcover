@@ -28,6 +28,10 @@ Basic usage examples can be found in the `examples/` directory:
     *   Demonstrates how to create and manage data integrations.
 *   **Synthetic Test Resource:** [`examples/resources/groundcover_synthetic_test/resource.tf`](./examples/resources/groundcover_synthetic_test/resource.tf)
     *   Demonstrates how to create and manage synthetic tests for proactive HTTP endpoint monitoring with assertions, retries, and authentication support.
+*   **Silence Resource:** [`examples/resources/groundcover_silence/resource.tf`](./examples/resources/groundcover_silence/resource.tf)
+    *   Demonstrates how to create and manage alert silences with matcher-based targeting.
+*   **Recurring Silence Resource:** [`examples/resources/groundcover_recurring_silence/resource.tf`](./examples/resources/groundcover_recurring_silence/resource.tf)
+    *   Demonstrates how to create and manage recurring alert silences with daily, weekly, or monthly schedules.
 
 ## Local Development and Testing
 
@@ -226,6 +230,8 @@ TF_ACC=1 go test ./internal/provider -v -run TestAccDashboardResource
 TF_ACC=1 go test ./internal/provider -v -run TestAccDataIntegrationResource
 TF_ACC=1 go test ./internal/provider -v -run TestAccSyntheticTestResource
 TF_ACC=1 go test ./internal/provider -v -run TestAccTracesPipelineResource
+TF_ACC=1 go test ./internal/provider -v -run TestAccSilenceResource
+TF_ACC=1 go test ./internal/provider -v -run TestAccRecurringSilenceResource
 
 # Run unit tests only (no API calls required)
 go test ./internal/provider -v

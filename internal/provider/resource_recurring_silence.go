@@ -72,6 +72,9 @@ A recurring silence is defined by: a recurrence schedule (daily, weekly, or mont
 				MarkdownDescription: "A comment describing the reason for the recurring silence.",
 				Optional:            true,
 				Computed:            true,
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.UseStateForUnknown(),
+				},
 			},
 			"recurrence_type": schema.StringAttribute{
 				MarkdownDescription: "The recurrence type. Must be one of: `daily`, `weekly`, `monthly`.",
