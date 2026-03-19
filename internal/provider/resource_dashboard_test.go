@@ -60,7 +60,6 @@ func TestAccDashboardResource(t *testing.T) {
 				ImportState:       true,
 				ImportStateVerify: true,
 				ImportStateVerifyIgnore: []string{
-					"override",
 					"preset",
 				},
 			},
@@ -71,6 +70,48 @@ func TestAccDashboardResource(t *testing.T) {
 					resource.TestCheckResourceAttr("groundcover_dashboard.test", "description", "Updated dashboard description"),
 					resource.TestCheckResourceAttr("groundcover_dashboard.test", "team", "engineering"),
 					resource.TestCheckResourceAttrSet("groundcover_dashboard.test", "preset"),
+				),
+			},
+		},
+	})
+}
+
+func TestAccDashboardResource_Update(t *testing.T) {
+	timestamp := time.Now().Unix()
+	dashboardName := fmt.Sprintf("update_dashboard_%d", timestamp)
+	updatedName := fmt.Sprintf("updated_dashboard_%d", timestamp)
+
+	resource.Test(t, resource.TestCase{
+		PreCheck:                 func() { testAccPreCheck(t) },
+		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
+		Steps: []resource.TestStep{
+			// Create
+			{
+				Config: testAccDashboardResourceConfigSimple(dashboardName),
+				Check: resource.ComposeTestCheckFunc(
+					resource.TestCheckResourceAttr("groundcover_dashboard.test", "name", dashboardName),
+					resource.TestCheckResourceAttr("groundcover_dashboard.test", "description", "Simple test dashboard"),
+					resource.TestCheckResourceAttrSet("groundcover_dashboard.test", "id"),
+					resource.TestCheckResourceAttrSet("groundcover_dashboard.test", "revision_number"),
+				),
+			},
+			// Update name and description
+			{
+				Config: testAccDashboardResourceConfigUpdatedNameAndDescription(updatedName),
+				Check: resource.ComposeTestCheckFunc(
+					resource.TestCheckResourceAttr("groundcover_dashboard.test", "name", updatedName),
+					resource.TestCheckResourceAttr("groundcover_dashboard.test", "description", "Updated description"),
+					resource.TestCheckResourceAttrSet("groundcover_dashboard.test", "id"),
+					resource.TestCheckResourceAttrSet("groundcover_dashboard.test", "revision_number"),
+				),
+			},
+			// Update preset (spec change)
+			{
+				Config: testAccDashboardResourceConfigUpdatedPreset(updatedName),
+				Check: resource.ComposeTestCheckFunc(
+					resource.TestCheckResourceAttr("groundcover_dashboard.test", "name", updatedName),
+					resource.TestCheckResourceAttrSet("groundcover_dashboard.test", "preset"),
+					resource.TestCheckResourceAttrSet("groundcover_dashboard.test", "revision_number"),
 				),
 			},
 		},
@@ -340,6 +381,65 @@ resource "groundcover_dashboard" "test" {
     duration      = "Last 1 hour"
     widgets       = []
     layout        = []
+    variables     = {}
+    schemaVersion = 3
+  })
+}
+`, name)
+}
+
+func testAccDashboardResourceConfigUpdatedNameAndDescription(name string) string {
+	return fmt.Sprintf(`
+resource "groundcover_dashboard" "test" {
+  name        = "%s"
+  description = "Updated description"
+  preset      = jsonencode({
+    duration      = "Last 1 hour"
+    widgets       = []
+    layout        = []
+    variables     = {}
+    schemaVersion = 3
+  })
+}
+`, name)
+}
+
+func testAccDashboardResourceConfigUpdatedPreset(name string) string {
+	return fmt.Sprintf(`
+resource "groundcover_dashboard" "test" {
+  name        = "%s"
+  description = "Updated description"
+  preset      = jsonencode({
+    duration = "Last 6 hours"
+    layout = [
+      {
+        id   = "A"
+        x    = 0
+        y    = 0
+        w    = 12
+        h    = 6
+        minH = 2
+      }
+    ]
+    widgets = [
+      {
+        id   = "A"
+        type = "widget"
+        name = "Updated Widget"
+        queries = [
+          {
+            id         = "A"
+            expr       = "avg(groundcover_node_rt_disk_space_used_percent{})"
+            dataType   = "metrics"
+            step       = null
+            editorMode = "builder"
+          }
+        ]
+        visualizationConfig = {
+          type = "time-series"
+        }
+      }
+    ]
     variables     = {}
     schemaVersion = 3
   })
