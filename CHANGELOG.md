@@ -1,3 +1,7 @@
+## 1.9.1
+
+* Fixed dashboard update failing with `CurrentRevision excluded_if` validation error — use `Override: true` instead of sending `CurrentRevision` in update requests
+
 ## 1.9.0
 
 * Added import documentation for all resources so `terraform import` usage is documented in the registry
