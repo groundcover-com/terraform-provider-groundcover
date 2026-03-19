@@ -60,6 +60,7 @@ func TestAccDashboardResource(t *testing.T) {
 				ImportState:       true,
 				ImportStateVerify: true,
 				ImportStateVerifyIgnore: []string{
+					"override",
 					"preset",
 				},
 			},

@@ -37,6 +37,7 @@ type dashboardResourceModel struct {
 	Team           types.String `tfsdk:"team"`
 	Preset         types.String `tfsdk:"preset"`
 	RevisionNumber types.Int32  `tfsdk:"revision_number"`
+	Override       types.Bool   `tfsdk:"override"`
 	Owner          types.String `tfsdk:"owner"`
 	Status         types.String `tfsdk:"status"`
 }
@@ -75,6 +76,11 @@ func (r *dashboardResource) Schema(_ context.Context, _ resource.SchemaRequest, 
 			"revision_number": schema.Int32Attribute{
 				Description: "The revision number of the dashboard.",
 				Computed:    true,
+			},
+			"override": schema.BoolAttribute{
+				Description:        "Deprecated: this attribute is ignored. Override is always enabled for terraform-managed updates.",
+				Optional:           true,
+				DeprecationMessage: "This attribute is ignored and will be removed in a future version. Override is always enabled for terraform-managed updates.",
 			},
 			"owner": schema.StringAttribute{
 				Description: "The owner of the dashboard.",
