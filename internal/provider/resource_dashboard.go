@@ -360,13 +360,11 @@ func (r *dashboardResource) Update(ctx context.Context, req resource.UpdateReque
 		"state_preset_len":  len(state.Preset.ValueString()),
 	})
 
-	// First, read the current state from the API to get the latest revision number
-	// This prevents concurrency conflicts when the resource was modified externally
-	// and ensures we use the most up-to-date revision number
-	tflog.Debug(ctx, "Update: Reading current dashboard state before update to get latest revision", map[string]interface{}{
+	// Verify the dashboard still exists before updating
+	tflog.Debug(ctx, "Update: Verifying dashboard exists before update", map[string]interface{}{
 		"uuid": state.UUID.ValueString(),
 	})
-	apiCurrentState, err := r.client.GetDashboard(ctx, state.UUID.ValueString())
+	_, err := r.client.GetDashboard(ctx, state.UUID.ValueString())
 	if err != nil {
 		if errors.Is(err, ErrNotFound) {
 			resp.Diagnostics.AddError(
@@ -382,56 +380,29 @@ func (r *dashboardResource) Update(ctx context.Context, req resource.UpdateReque
 		return
 	}
 
-	// Log API current state for comparison
-	tflog.Debug(ctx, "Update: API current state before update", map[string]interface{}{
-		"uuid":            state.UUID.ValueString(),
-		"api_name":        apiCurrentState.Name,
-		"api_description": apiCurrentState.Description,
-		"api_team":        apiCurrentState.Team,
-		"api_revision":    apiCurrentState.RevisionNumber,
-		"api_preset_len":  len(apiCurrentState.Preset),
-		"api_owner":       apiCurrentState.Owner,
-		"api_status":      apiCurrentState.Status,
-	})
-
-	// Use the current revision number from the API for the update request
-	currentRevision := apiCurrentState.RevisionNumber
-	tflog.Debug(ctx, "Update: Using current revision from API for update", map[string]interface{}{
-		"uuid":             state.UUID.ValueString(),
-		"state_revision":   state.RevisionNumber.ValueInt32(),
-		"api_revision":     currentRevision,
-		"revision_changed": state.RevisionNumber.ValueInt32() != int32(currentRevision),
-	})
-
 	// Build update request - always use plan values for all fields
-	// The API requires all fields to be present in the update request
+	// Use Override: true since Terraform is the source of truth.
+	// Don't send CurrentRevision — the API rejects it with excluded_if when Override is true.
 	updateReq := &models.UpdateDashboardRequest{
-		Name:            plan.Name.ValueString(),
-		Description:     plan.Description.ValueString(),
-		Team:            plan.Team.ValueString(),
-		Preset:          plan.Preset.ValueString(),
-		IsProvisioned:   true, // Always set to true as requested
-		CurrentRevision: currentRevision,
-		Override:        false, // Use false by default to avoid conflicts
+		Name:          plan.Name.ValueString(),
+		Description:   plan.Description.ValueString(),
+		Team:          plan.Team.ValueString(),
+		Preset:        plan.Preset.ValueString(),
+		IsProvisioned: true,
+		Override:      true,
 	}
 
 	// Log what we're sending in the update request
 	tflog.Debug(ctx, "Update: Sending update request", map[string]interface{}{
-		"uuid":                     state.UUID.ValueString(),
-		"request_name":             updateReq.Name,
-		"request_description":      updateReq.Description,
-		"request_team":             updateReq.Team,
-		"request_preset_len":       len(updateReq.Preset),
-		"request_is_provisioned":   updateReq.IsProvisioned,
-		"request_current_revision": updateReq.CurrentRevision,
-		"request_override":         updateReq.Override,
-		"request_preset_preview":   getPreview(updateReq.Preset, 200),
+		"uuid":                   state.UUID.ValueString(),
+		"request_name":           updateReq.Name,
+		"request_description":    updateReq.Description,
+		"request_team":           updateReq.Team,
+		"request_preset_len":     len(updateReq.Preset),
+		"request_is_provisioned": updateReq.IsProvisioned,
+		"request_override":       updateReq.Override,
+		"request_preset_preview": getPreview(updateReq.Preset, 200),
 	})
-
-	// Only set override to true if explicitly set in the plan
-	if !plan.Override.IsNull() && !plan.Override.IsUnknown() && plan.Override.ValueBool() {
-		updateReq.Override = true
-	}
 
 	dashboard, err := r.client.UpdateDashboard(ctx, state.UUID.ValueString(), updateReq)
 	if err != nil {
@@ -462,9 +433,7 @@ func (r *dashboardResource) Update(ctx context.Context, req resource.UpdateReque
 		"description_match":    updateReq.Description == dashboard.Description,
 		"team_match":           updateReq.Team == dashboard.Team,
 		"preset_string_match":  updateReq.Preset == dashboard.Preset,
-		"revision_incremented": dashboard.RevisionNumber > currentRevision,
-		"revision_before":      currentRevision,
-		"revision_after":       dashboard.RevisionNumber,
+		"revision_after": dashboard.RevisionNumber,
 	})
 
 	plan.UUID = types.StringValue(dashboard.UUID)
@@ -492,8 +461,7 @@ func (r *dashboardResource) Update(ctx context.Context, req resource.UpdateReque
 		"plan_eq_state":    planPresetStr == statePresetStr,
 		"plan_eq_api":      planPresetStr == apiPresetStr,
 		"state_eq_api":     statePresetStr == apiPresetStr,
-		"revision_before":  currentRevision,
-		"revision_after":   dashboard.RevisionNumber,
+		"revision_after": dashboard.RevisionNumber,
 	})
 
 	// Normalize all three presets for detailed comparison
