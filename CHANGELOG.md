@@ -1,6 +1,8 @@
 ## 1.9.1
 
 * Fixed dashboard update failing with `CurrentRevision excluded_if` validation error — use `Override: true` instead of sending `CurrentRevision` in update requests
+* Deprecated the `override` attribute on `groundcover_dashboard` — it is now always enabled internally and the attribute will be removed in a future version
+* Added `TestAccDashboardResource_Update` acceptance test covering name, description, and preset (spec) updates
 
 ## 1.9.0
 
