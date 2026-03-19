@@ -202,7 +202,7 @@ output "simple_dashboard_owner" {
 ### Optional
 
 - `description` (String) The description of the dashboard.
-- `override` (Boolean) Whether to override the dashboard on update.
+- `override` (Boolean, Deprecated) Deprecated: this attribute is ignored. Override is always enabled for terraform-managed updates.
 - `team` (String) The team that owns the dashboard.
 
 ### Read-Only
