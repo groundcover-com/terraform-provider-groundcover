@@ -428,12 +428,12 @@ func (r *dashboardResource) Update(ctx context.Context, req resource.UpdateReque
 
 	// Log field-by-field comparison: request vs response
 	tflog.Debug(ctx, "Update: Request vs Response comparison", map[string]interface{}{
-		"uuid":                 state.UUID.ValueString(),
-		"name_match":           updateReq.Name == dashboard.Name,
-		"description_match":    updateReq.Description == dashboard.Description,
-		"team_match":           updateReq.Team == dashboard.Team,
-		"preset_string_match":  updateReq.Preset == dashboard.Preset,
-		"revision_after": dashboard.RevisionNumber,
+		"uuid":                state.UUID.ValueString(),
+		"name_match":          updateReq.Name == dashboard.Name,
+		"description_match":   updateReq.Description == dashboard.Description,
+		"team_match":          updateReq.Team == dashboard.Team,
+		"preset_string_match": updateReq.Preset == dashboard.Preset,
+		"revision_after":      dashboard.RevisionNumber,
 	})
 
 	plan.UUID = types.StringValue(dashboard.UUID)
@@ -461,7 +461,7 @@ func (r *dashboardResource) Update(ctx context.Context, req resource.UpdateReque
 		"plan_eq_state":    planPresetStr == statePresetStr,
 		"plan_eq_api":      planPresetStr == apiPresetStr,
 		"state_eq_api":     statePresetStr == apiPresetStr,
-		"revision_after": dashboard.RevisionNumber,
+		"revision_after":   dashboard.RevisionNumber,
 	})
 
 	// Normalize all three presets for detailed comparison
