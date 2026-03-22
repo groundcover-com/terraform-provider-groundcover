@@ -65,7 +65,16 @@ jobs:
     
     - name: Download dependencies
       run: go mod download
-    
+
+    - name: Set up Terraform
+      uses: hashicorp/setup-terraform@v3
+      with:
+        terraform_wrapper: false
+
+    - name: Get Terraform path
+      id: terraform-path
+      run: echo "path=$(which terraform)" >> $GITHUB_OUTPUT
+
     - name: Check if secrets are available
       id: check-secrets
       run: |
@@ -86,6 +95,7 @@ jobs:
       if: steps.check-secrets.outputs.secrets-available == 'true'
       env:
         TF_ACC: 1
+        TF_ACC_TERRAFORM_PATH: ${{ steps.terraform-path.outputs.path }}
         GROUNDCOVER_API_KEY: ${{ secrets.GROUNDCOVER_API_KEY }}
         GROUNDCOVER_API_URL: ${{ secrets.GROUNDCOVER_API_URL }}
         GROUNDCOVER_BACKEND_ID: ${{ secrets.GROUNDCOVER_BACKEND_ID }}
