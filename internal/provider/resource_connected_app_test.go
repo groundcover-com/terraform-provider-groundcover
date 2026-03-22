@@ -16,7 +16,7 @@ import (
 func TestAccConnectedApp_basic(t *testing.T) {
 	name := acctest.RandomWithPrefix("test-slack-app")
 
-	resource.ParallelTest(t, resource.TestCase{
+	resource.Test(t, resource.TestCase{
 		PreCheck:                 func() { testAccPreCheck(t) },
 		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
 		Steps: []resource.TestStep{
@@ -48,7 +48,7 @@ func TestAccConnectedApp_update(t *testing.T) {
 	initialName := acctest.RandomWithPrefix("test-slack-app-initial")
 	updatedName := acctest.RandomWithPrefix("test-slack-app-updated")
 
-	resource.ParallelTest(t, resource.TestCase{
+	resource.Test(t, resource.TestCase{
 		PreCheck:                 func() { testAccPreCheck(t) },
 		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
 		Steps: []resource.TestStep{
@@ -78,7 +78,7 @@ func TestAccConnectedApp_update(t *testing.T) {
 func TestAccConnectedApp_pagerduty(t *testing.T) {
 	name := acctest.RandomWithPrefix("test-pagerduty-app")
 
-	resource.ParallelTest(t, resource.TestCase{
+	resource.Test(t, resource.TestCase{
 		PreCheck:                 func() { testAccPreCheck(t) },
 		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
 		Steps: []resource.TestStep{
@@ -102,7 +102,7 @@ func TestAccConnectedApp_pagerduty(t *testing.T) {
 func TestAccConnectedApp_pagerdutyWithSeverityMapping(t *testing.T) {
 	name := acctest.RandomWithPrefix("test-pagerduty-severity")
 
-	resource.ParallelTest(t, resource.TestCase{
+	resource.Test(t, resource.TestCase{
 		PreCheck:                 func() { testAccPreCheck(t) },
 		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
 		Steps: []resource.TestStep{
@@ -126,7 +126,7 @@ func TestAccConnectedApp_pagerdutyWithSeverityMapping(t *testing.T) {
 func TestAccConnectedApp_rootly(t *testing.T) {
 	name := acctest.RandomWithPrefix("test-rootly-app")
 
-	resource.ParallelTest(t, resource.TestCase{
+	resource.Test(t, resource.TestCase{
 		PreCheck:                 func() { testAccPreCheck(t) },
 		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
 		Steps: []resource.TestStep{
@@ -153,7 +153,7 @@ func TestAccConnectedApp_rootly(t *testing.T) {
 func TestAccConnectedApp_applyLoop(t *testing.T) {
 	name := acctest.RandomWithPrefix("test-slack-apply-loop")
 
-	resource.ParallelTest(t, resource.TestCase{
+	resource.Test(t, resource.TestCase{
 		PreCheck:                 func() { testAccPreCheck(t) },
 		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
 		Steps: []resource.TestStep{
@@ -193,7 +193,7 @@ func TestAccConnectedApp_applyLoop(t *testing.T) {
 func TestAccConnectedApp_applyLoopWithSeverityMapping(t *testing.T) {
 	name := acctest.RandomWithPrefix("test-pagerduty-apply-loop")
 
-	resource.ParallelTest(t, resource.TestCase{
+	resource.Test(t, resource.TestCase{
 		PreCheck:                 func() { testAccPreCheck(t) },
 		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
 		Steps: []resource.TestStep{
@@ -236,7 +236,7 @@ func TestAccConnectedApp_applyLoopWithSeverityMapping(t *testing.T) {
 func TestAccConnectedApp_rootlyApplyLoop(t *testing.T) {
 	name := acctest.RandomWithPrefix("test-rootly-apply-loop")
 
-	resource.ParallelTest(t, resource.TestCase{
+	resource.Test(t, resource.TestCase{
 		PreCheck:                 func() { testAccPreCheck(t) },
 		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
 		Steps: []resource.TestStep{
@@ -278,7 +278,7 @@ func TestAccConnectedApp_rootlyApplyLoop(t *testing.T) {
 func TestAccConnectedApp_opsgenie(t *testing.T) {
 	name := acctest.RandomWithPrefix("test-opsgenie-app")
 
-	resource.ParallelTest(t, resource.TestCase{
+	resource.Test(t, resource.TestCase{
 		PreCheck:                 func() { testAccPreCheck(t) },
 		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
 		Steps: []resource.TestStep{
@@ -306,7 +306,7 @@ func TestAccConnectedApp_opsgenie(t *testing.T) {
 func TestAccConnectedApp_opsgenieWithPriorityMapping(t *testing.T) {
 	name := acctest.RandomWithPrefix("test-opsgenie-priority")
 
-	resource.ParallelTest(t, resource.TestCase{
+	resource.Test(t, resource.TestCase{
 		PreCheck:                 func() { testAccPreCheck(t) },
 		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
 		Steps: []resource.TestStep{
@@ -331,7 +331,7 @@ func TestAccConnectedApp_opsgenieWithPriorityMapping(t *testing.T) {
 func TestAccConnectedApp_opsgenieApplyLoop(t *testing.T) {
 	name := acctest.RandomWithPrefix("test-opsgenie-apply-loop")
 
-	resource.ParallelTest(t, resource.TestCase{
+	resource.Test(t, resource.TestCase{
 		PreCheck:                 func() { testAccPreCheck(t) },
 		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
 		Steps: []resource.TestStep{
@@ -368,7 +368,7 @@ func TestAccConnectedApp_opsgenieApplyLoop(t *testing.T) {
 func TestAccConnectedApp_incidentio(t *testing.T) {
 	name := acctest.RandomWithPrefix("test-incidentio-app")
 
-	resource.ParallelTest(t, resource.TestCase{
+	resource.Test(t, resource.TestCase{
 		PreCheck:                 func() { testAccPreCheck(t) },
 		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
 		Steps: []resource.TestStep{
@@ -396,7 +396,7 @@ func TestAccConnectedApp_incidentio(t *testing.T) {
 func TestAccConnectedApp_incidentioWithSeverityMapping(t *testing.T) {
 	name := acctest.RandomWithPrefix("test-incidentio-severity")
 
-	resource.ParallelTest(t, resource.TestCase{
+	resource.Test(t, resource.TestCase{
 		PreCheck:                 func() { testAccPreCheck(t) },
 		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
 		Steps: []resource.TestStep{
@@ -420,7 +420,7 @@ func TestAccConnectedApp_incidentioWithSeverityMapping(t *testing.T) {
 func TestAccConnectedApp_incidentioApplyLoop(t *testing.T) {
 	name := acctest.RandomWithPrefix("test-incidentio-apply-loop")
 
-	resource.ParallelTest(t, resource.TestCase{
+	resource.Test(t, resource.TestCase{
 		PreCheck:                 func() { testAccPreCheck(t) },
 		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
 		Steps: []resource.TestStep{
@@ -457,7 +457,7 @@ func TestAccConnectedApp_incidentioApplyLoop(t *testing.T) {
 func TestAccConnectedApp_msTeams(t *testing.T) {
 	name := acctest.RandomWithPrefix("test-msteams-app")
 
-	resource.ParallelTest(t, resource.TestCase{
+	resource.Test(t, resource.TestCase{
 		PreCheck:                 func() { testAccPreCheck(t) },
 		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
 		Steps: []resource.TestStep{
@@ -485,7 +485,7 @@ func TestAccConnectedApp_msTeams(t *testing.T) {
 func TestAccConnectedApp_msTeamsApplyLoop(t *testing.T) {
 	name := acctest.RandomWithPrefix("test-msteams-apply-loop")
 
-	resource.ParallelTest(t, resource.TestCase{
+	resource.Test(t, resource.TestCase{
 		PreCheck:                 func() { testAccPreCheck(t) },
 		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
 		Steps: []resource.TestStep{
@@ -519,7 +519,7 @@ func TestAccConnectedApp_msTeamsApplyLoop(t *testing.T) {
 func TestAccConnectedApp_webhook(t *testing.T) {
 	name := acctest.RandomWithPrefix("test-webhook-app")
 
-	resource.ParallelTest(t, resource.TestCase{
+	resource.Test(t, resource.TestCase{
 		PreCheck:                 func() { testAccPreCheck(t) },
 		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
 		Steps: []resource.TestStep{
@@ -547,7 +547,7 @@ func TestAccConnectedApp_webhook(t *testing.T) {
 func TestAccConnectedApp_webhookWithBearerAuth(t *testing.T) {
 	name := acctest.RandomWithPrefix("test-webhook-bearer")
 
-	resource.ParallelTest(t, resource.TestCase{
+	resource.Test(t, resource.TestCase{
 		PreCheck:                 func() { testAccPreCheck(t) },
 		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
 		Steps: []resource.TestStep{
@@ -570,7 +570,7 @@ func TestAccConnectedApp_webhookWithBearerAuth(t *testing.T) {
 func TestAccConnectedApp_webhookWithBasicAuth(t *testing.T) {
 	name := acctest.RandomWithPrefix("test-webhook-basic")
 
-	resource.ParallelTest(t, resource.TestCase{
+	resource.Test(t, resource.TestCase{
 		PreCheck:                 func() { testAccPreCheck(t) },
 		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
 		Steps: []resource.TestStep{
@@ -593,7 +593,7 @@ func TestAccConnectedApp_webhookWithBasicAuth(t *testing.T) {
 func TestAccConnectedApp_webhookWithCustomPayload(t *testing.T) {
 	name := acctest.RandomWithPrefix("test-webhook-payload")
 
-	resource.ParallelTest(t, resource.TestCase{
+	resource.Test(t, resource.TestCase{
 		PreCheck:                 func() { testAccPreCheck(t) },
 		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
 		Steps: []resource.TestStep{
@@ -616,7 +616,7 @@ func TestAccConnectedApp_webhookWithCustomPayload(t *testing.T) {
 func TestAccConnectedApp_webhookApplyLoop(t *testing.T) {
 	name := acctest.RandomWithPrefix("test-webhook-apply-loop")
 
-	resource.ParallelTest(t, resource.TestCase{
+	resource.Test(t, resource.TestCase{
 		PreCheck:                 func() { testAccPreCheck(t) },
 		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
 		Steps: []resource.TestStep{
@@ -651,7 +651,7 @@ func TestAccConnectedApp_webhookApplyLoop(t *testing.T) {
 func TestAccConnectedApp_disappears(t *testing.T) {
 	name := acctest.RandomWithPrefix("test-slack-app")
 
-	resource.ParallelTest(t, resource.TestCase{
+	resource.Test(t, resource.TestCase{
 		PreCheck:                 func() { testAccPreCheck(t) },
 		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
 		Steps: []resource.TestStep{
