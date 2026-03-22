@@ -111,28 +111,30 @@ jobs:
 
         for attempt in $(seq 0 $MAX_RETRIES); do
           echo "=== Test attempt $((attempt + 1)) of $((MAX_RETRIES + 1)) ==="
+          LOG_FILE=$(mktemp)
 
           set +e
-          OUTPUT=$(go test ./internal/provider -v -failfast -parallel=4 -timeout 30m 2>&1)
-          EXIT_CODE=$?
+          go test ./internal/provider -v -failfast -parallel=4 -timeout 30m 2>&1 | tee "$LOG_FILE"
+          EXIT_CODE=${PIPESTATUS[0]}
           set -e
-
-          echo "$OUTPUT"
 
           if [ $EXIT_CODE -eq 0 ]; then
             echo "✅ Tests passed on attempt $((attempt + 1))"
+            rm -f "$LOG_FILE"
             exit 0
           fi
 
-          if echo "$OUTPUT" | grep -qE "$TRANSIENT_PATTERNS"; then
+          if grep -qE "$TRANSIENT_PATTERNS" "$LOG_FILE"; then
             if [ $attempt -lt $MAX_RETRIES ]; then
               SLEEP_TIME=$(( (attempt + 1) * 30 ))
               echo "⚠️ Transient error detected. Retrying in ${SLEEP_TIME}s..."
+              rm -f "$LOG_FILE"
               sleep $SLEEP_TIME
               continue
             fi
           fi
 
+          rm -f "$LOG_FILE"
           echo "❌ Non-transient failure or max retries reached."
           exit $EXIT_CODE
         done
