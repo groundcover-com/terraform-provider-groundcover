@@ -107,7 +107,7 @@ jobs:
       run: |
         echo "✅ Running acceptance tests with available secrets..."
         MAX_RETRIES=2
-        TRANSIENT_PATTERNS="503|502|504|Service Unavailable|Bad Gateway|Gateway Timeout|connection refused|connection reset|EOF"
+        TRANSIENT_PATTERNS="503|502|504|Service Unavailable|Bad Gateway|Gateway Timeout|connection refused|connection reset|EOF|resource not found"
 
         for attempt in $(seq 0 $MAX_RETRIES); do
           echo "=== Test attempt $((attempt + 1)) of $((MAX_RETRIES + 1)) ==="
