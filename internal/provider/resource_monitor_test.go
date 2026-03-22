@@ -18,7 +18,7 @@ func TestAccMonitorResource(t *testing.T) {
 	name := acctest.RandomWithPrefix("test-monitor")
 	updatedName := acctest.RandomWithPrefix("test-monitor-updated")
 
-	resource.Test(t, resource.TestCase{
+	resource.ParallelTest(t, resource.TestCase{
 		PreCheck:                 func() { testAccPreCheck(t) },
 		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
 		Steps: []resource.TestStep{
@@ -55,7 +55,7 @@ func TestAccMonitorResource(t *testing.T) {
 func TestAccMonitorResource_complex(t *testing.T) {
 	name := acctest.RandomWithPrefix("test-monitor-complex")
 
-	resource.Test(t, resource.TestCase{
+	resource.ParallelTest(t, resource.TestCase{
 		PreCheck:                 func() { testAccPreCheck(t) },
 		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
 		Steps: []resource.TestStep{
@@ -77,7 +77,7 @@ func TestAccMonitorResource_complex(t *testing.T) {
 func TestAccMonitorResource_disappears(t *testing.T) {
 	name := acctest.RandomWithPrefix("test-monitor")
 
-	resource.Test(t, resource.TestCase{
+	resource.ParallelTest(t, resource.TestCase{
 		PreCheck:                 func() { testAccPreCheck(t) },
 		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
 		Steps: []resource.TestStep{
@@ -100,7 +100,7 @@ func TestAccMonitorResource_disappears(t *testing.T) {
 func TestAccMonitorResource_trailingNewline(t *testing.T) {
 	name := acctest.RandomWithPrefix("test-monitor-newline")
 
-	resource.Test(t, resource.TestCase{
+	resource.ParallelTest(t, resource.TestCase{
 		PreCheck:                 func() { testAccPreCheck(t) },
 		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
 		Steps: []resource.TestStep{
@@ -362,7 +362,7 @@ func TestAccMonitorResource_multilinePipeSyntax(t *testing.T) {
 	titleValue := fmt.Sprintf("CloudSql Connection Count %s", name)
 	headerValue := fmt.Sprintf("CloudSql Connection Count %s", name)
 
-	resource.Test(t, resource.TestCase{
+	resource.ParallelTest(t, resource.TestCase{
 		PreCheck:                 func() { testAccPreCheck(t) },
 		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
 		Steps: []resource.TestStep{
@@ -442,7 +442,7 @@ YAML
 func TestAccMonitorResource_applyLoopIssue(t *testing.T) {
 	title := acctest.RandomWithPrefix("k8s eu-povs node not ready")
 
-	resource.Test(t, resource.TestCase{
+	resource.ParallelTest(t, resource.TestCase{
 		PreCheck:                 func() { testAccPreCheck(t) },
 		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
 		Steps: []resource.TestStep{
@@ -541,7 +541,7 @@ YAML
 func TestAccMonitorResource_multilineExpression(t *testing.T) {
 	name := acctest.RandomWithPrefix("test-monitor-multiline-expr")
 
-	resource.Test(t, resource.TestCase{
+	resource.ParallelTest(t, resource.TestCase{
 		PreCheck:                 func() { testAccPreCheck(t) },
 		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
 		Steps: []resource.TestStep{
@@ -640,7 +640,7 @@ YAML
 func TestAccMonitorResource_oomKilled(t *testing.T) {
 	title := fmt.Sprintf("K8s Pod OOM Killed Monitor %s", acctest.RandomWithPrefix("test"))
 
-	resource.Test(t, resource.TestCase{
+	resource.ParallelTest(t, resource.TestCase{
 		PreCheck:                 func() { testAccPreCheck(t) },
 		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
 		Steps: []resource.TestStep{

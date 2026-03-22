@@ -13,7 +13,7 @@ import (
 func TestAccNotificationRoute_basic(t *testing.T) {
 	name := acctest.RandomWithPrefix("test-route")
 
-	resource.Test(t, resource.TestCase{
+	resource.ParallelTest(t, resource.TestCase{
 		PreCheck:                 func() { testAccPreCheck(t) },
 		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
 		Steps: []resource.TestStep{
@@ -49,7 +49,7 @@ func TestAccNotificationRoute_basic(t *testing.T) {
 func TestAccNotificationRoute_update(t *testing.T) {
 	name := acctest.RandomWithPrefix("test-route-update")
 
-	resource.Test(t, resource.TestCase{
+	resource.ParallelTest(t, resource.TestCase{
 		PreCheck:                 func() { testAccPreCheck(t) },
 		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
 		Steps: []resource.TestStep{
@@ -85,7 +85,7 @@ func TestAccNotificationRoute_update(t *testing.T) {
 func TestAccNotificationRoute_multipleRoutes(t *testing.T) {
 	name := acctest.RandomWithPrefix("test-route-multi")
 
-	resource.Test(t, resource.TestCase{
+	resource.ParallelTest(t, resource.TestCase{
 		PreCheck:                 func() { testAccPreCheck(t) },
 		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
 		Steps: []resource.TestStep{
@@ -117,7 +117,7 @@ func TestAccNotificationRoute_multipleRoutes(t *testing.T) {
 func TestAccNotificationRoute_durationNormalization(t *testing.T) {
 	name := acctest.RandomWithPrefix("test-route-duration")
 
-	resource.Test(t, resource.TestCase{
+	resource.ParallelTest(t, resource.TestCase{
 		PreCheck:                 func() { testAccPreCheck(t) },
 		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
 		Steps: []resource.TestStep{
@@ -144,7 +144,7 @@ func TestAccNotificationRoute_durationNormalization(t *testing.T) {
 func TestAccNotificationRoute_applyLoop(t *testing.T) {
 	name := acctest.RandomWithPrefix("test-route-apply-loop")
 
-	resource.Test(t, resource.TestCase{
+	resource.ParallelTest(t, resource.TestCase{
 		PreCheck:                 func() { testAccPreCheck(t) },
 		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
 		Steps: []resource.TestStep{
@@ -352,7 +352,7 @@ resource "groundcover_notification_route" "test" {
 func TestAccNotificationRoute_noNotificationSettings(t *testing.T) {
 	name := acctest.RandomWithPrefix("test-route-no-settings")
 
-	resource.Test(t, resource.TestCase{
+	resource.ParallelTest(t, resource.TestCase{
 		PreCheck:                 func() { testAccPreCheck(t) },
 		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
 		Steps: []resource.TestStep{

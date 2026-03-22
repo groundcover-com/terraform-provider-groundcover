@@ -13,7 +13,7 @@ import (
 func TestAccPolicyResourceSimple(t *testing.T) {
 	name := acctest.RandomWithPrefix("test-policy-simple")
 
-	resource.Test(t, resource.TestCase{
+	resource.ParallelTest(t, resource.TestCase{
 		PreCheck:                 func() { testAccPreCheck(t) },
 		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
 		Steps: []resource.TestStep{

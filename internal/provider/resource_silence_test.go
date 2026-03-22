@@ -24,7 +24,7 @@ func TestAccSilenceResource(t *testing.T) {
 	updatedStartsAt := time.Now().Add(2 * time.Hour).UTC().Format(time.RFC3339)
 	updatedEndsAt := time.Now().Add(4 * time.Hour).UTC().Format(time.RFC3339)
 
-	resource.Test(t, resource.TestCase{
+	resource.ParallelTest(t, resource.TestCase{
 		PreCheck:                 func() { testAccPreCheck(t) },
 		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
 		Steps: []resource.TestStep{
@@ -69,7 +69,7 @@ func TestAccSilenceResource_multipleMatchers(t *testing.T) {
 	startsAt := time.Now().Add(1 * time.Hour).UTC().Format(time.RFC3339)
 	endsAt := time.Now().Add(2 * time.Hour).UTC().Format(time.RFC3339)
 
-	resource.Test(t, resource.TestCase{
+	resource.ParallelTest(t, resource.TestCase{
 		PreCheck:                 func() { testAccPreCheck(t) },
 		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
 		Steps: []resource.TestStep{
@@ -106,7 +106,7 @@ func TestAccSilenceResource_containsMatcher(t *testing.T) {
 	startsAt := time.Now().Add(1 * time.Hour).UTC().Format(time.RFC3339)
 	endsAt := time.Now().Add(2 * time.Hour).UTC().Format(time.RFC3339)
 
-	resource.Test(t, resource.TestCase{
+	resource.ParallelTest(t, resource.TestCase{
 		PreCheck:                 func() { testAccPreCheck(t) },
 		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
 		Steps: []resource.TestStep{
@@ -131,7 +131,7 @@ func TestAccSilenceResource_negation(t *testing.T) {
 	startsAt := time.Now().Add(1 * time.Hour).UTC().Format(time.RFC3339)
 	endsAt := time.Now().Add(2 * time.Hour).UTC().Format(time.RFC3339)
 
-	resource.Test(t, resource.TestCase{
+	resource.ParallelTest(t, resource.TestCase{
 		PreCheck:                 func() { testAccPreCheck(t) },
 		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
 		Steps: []resource.TestStep{
@@ -156,7 +156,7 @@ func TestAccSilenceResource_disappears(t *testing.T) {
 	startsAt := time.Now().Add(1 * time.Hour).UTC().Format(time.RFC3339)
 	endsAt := time.Now().Add(2 * time.Hour).UTC().Format(time.RFC3339)
 
-	resource.Test(t, resource.TestCase{
+	resource.ParallelTest(t, resource.TestCase{
 		PreCheck:                 func() { testAccPreCheck(t) },
 		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
 		Steps: []resource.TestStep{
@@ -181,7 +181,7 @@ func TestAccSilenceResource_applyLoop(t *testing.T) {
 	startsAt := time.Now().Add(1 * time.Hour).UTC().Format(time.RFC3339)
 	endsAt := time.Now().Add(2 * time.Hour).UTC().Format(time.RFC3339)
 
-	resource.Test(t, resource.TestCase{
+	resource.ParallelTest(t, resource.TestCase{
 		PreCheck:                 func() { testAccPreCheck(t) },
 		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
 		Steps: []resource.TestStep{
@@ -225,7 +225,7 @@ func TestAccSilenceResource_applyLoop_noComment(t *testing.T) {
 
 	config := testAccSilenceResourceConfig_noComment(startsAt, endsAt)
 
-	resource.Test(t, resource.TestCase{
+	resource.ParallelTest(t, resource.TestCase{
 		PreCheck:                 func() { testAccPreCheck(t) },
 		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
 		Steps: []resource.TestStep{

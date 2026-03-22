@@ -15,7 +15,7 @@ import (
 )
 
 func TestAccDataIntegrationResource(t *testing.T) {
-	resource.Test(t, resource.TestCase{
+	resource.ParallelTest(t, resource.TestCase{
 		PreCheck:                 func() { testAccPreCheck(t) },
 		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
 		Steps: []resource.TestStep{
@@ -62,7 +62,7 @@ func TestAccDataIntegrationResource(t *testing.T) {
 func TestAccDataIntegrationResource_withCluster(t *testing.T) {
 	cluster := acctest.RandomWithPrefix("test-cluster")
 
-	resource.Test(t, resource.TestCase{
+	resource.ParallelTest(t, resource.TestCase{
 		PreCheck:                 func() { testAccPreCheck(t) },
 		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
 		Steps: []resource.TestStep{
@@ -82,7 +82,7 @@ func TestAccDataIntegrationResource_withCluster(t *testing.T) {
 }
 
 func TestAccDataIntegrationResource_disappears(t *testing.T) {
-	resource.Test(t, resource.TestCase{
+	resource.ParallelTest(t, resource.TestCase{
 		PreCheck:                 func() { testAccPreCheck(t) },
 		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
 		Steps: []resource.TestStep{
