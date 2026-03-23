@@ -1,3 +1,8 @@
+## 1.9.2
+
+* Fixed `handleApiError` incorrectly mapping non-404 API errors to "resource not found" when the error message contained the substring "not found" — the status code regex now handles go-swagger's `[STATUS_CODE]` error format, and substring-based fallbacks are only used when no HTTP status code can be extracted
+* Same fix applied to the "read-only" error mapping to prevent similar false positives
+
 ## 1.9.1
 
 * Fixed dashboard update failing with `CurrentRevision excluded_if` validation error — use `Override: true` instead of sending `CurrentRevision` in update requests
