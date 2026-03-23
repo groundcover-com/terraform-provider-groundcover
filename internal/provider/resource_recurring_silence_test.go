@@ -17,7 +17,7 @@ func TestAccRecurringSilenceResource(t *testing.T) {
 	comment := acctest.RandomWithPrefix("test-recurring-silence")
 	updatedComment := acctest.RandomWithPrefix("test-recurring-silence-updated")
 
-	resource.ParallelTest(t, resource.TestCase{
+	resource.Test(t, resource.TestCase{
 		PreCheck:                 func() { testAccPreCheck(t) },
 		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
 		Steps: []resource.TestStep{
@@ -64,7 +64,7 @@ func TestAccRecurringSilenceResource(t *testing.T) {
 func TestAccRecurringSilenceResource_weekly(t *testing.T) {
 	comment := acctest.RandomWithPrefix("test-recurring-silence-weekly")
 
-	resource.ParallelTest(t, resource.TestCase{
+	resource.Test(t, resource.TestCase{
 		PreCheck:                 func() { testAccPreCheck(t) },
 		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
 		Steps: []resource.TestStep{
@@ -87,7 +87,7 @@ func TestAccRecurringSilenceResource_weekly(t *testing.T) {
 func TestAccRecurringSilenceResource_monthly(t *testing.T) {
 	comment := acctest.RandomWithPrefix("test-recurring-silence-monthly")
 
-	resource.ParallelTest(t, resource.TestCase{
+	resource.Test(t, resource.TestCase{
 		PreCheck:                 func() { testAccPreCheck(t) },
 		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
 		Steps: []resource.TestStep{
@@ -109,7 +109,7 @@ func TestAccRecurringSilenceResource_monthly(t *testing.T) {
 func TestAccRecurringSilenceResource_multipleMatchers(t *testing.T) {
 	comment := acctest.RandomWithPrefix("test-recurring-silence-multi")
 
-	resource.ParallelTest(t, resource.TestCase{
+	resource.Test(t, resource.TestCase{
 		PreCheck:                 func() { testAccPreCheck(t) },
 		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
 		Steps: []resource.TestStep{
@@ -143,7 +143,7 @@ func TestAccRecurringSilenceResource_multipleMatchers(t *testing.T) {
 func TestAccRecurringSilenceResource_disappears(t *testing.T) {
 	comment := acctest.RandomWithPrefix("test-recurring-silence-disappears")
 
-	resource.ParallelTest(t, resource.TestCase{
+	resource.Test(t, resource.TestCase{
 		PreCheck:                 func() { testAccPreCheck(t) },
 		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
 		Steps: []resource.TestStep{
@@ -162,7 +162,7 @@ func TestAccRecurringSilenceResource_disappears(t *testing.T) {
 func TestAccRecurringSilenceResource_applyLoop(t *testing.T) {
 	comment := acctest.RandomWithPrefix("test-recurring-silence-apply-loop")
 
-	resource.ParallelTest(t, resource.TestCase{
+	resource.Test(t, resource.TestCase{
 		PreCheck:                 func() { testAccPreCheck(t) },
 		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
 		Steps: []resource.TestStep{
@@ -200,7 +200,7 @@ func TestAccRecurringSilenceResource_applyLoop(t *testing.T) {
 func TestAccRecurringSilenceResource_applyLoop_noComment(t *testing.T) {
 	config := testAccRecurringSilenceResourceConfig_daily_noComment("09:00", "17:00", "UTC", true)
 
-	resource.ParallelTest(t, resource.TestCase{
+	resource.Test(t, resource.TestCase{
 		PreCheck:                 func() { testAccPreCheck(t) },
 		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
 		Steps: []resource.TestStep{
@@ -235,7 +235,7 @@ func TestAccRecurringSilenceResource_applyLoop_noComment(t *testing.T) {
 func TestAccRecurringSilenceResource_disabled(t *testing.T) {
 	comment := acctest.RandomWithPrefix("test-recurring-silence-disabled")
 
-	resource.ParallelTest(t, resource.TestCase{
+	resource.Test(t, resource.TestCase{
 		PreCheck:                 func() { testAccPreCheck(t) },
 		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
 		Steps: []resource.TestStep{
