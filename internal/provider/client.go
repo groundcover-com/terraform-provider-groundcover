@@ -201,6 +201,7 @@ type ApiClient interface {
 
 	// Secrets
 	CreateSecret(ctx context.Context, req *models.CreateSecretRequest) (*models.SecretResponse, error)
+	GetSecretHash(ctx context.Context, id string) (*models.SecretHashResponse, error)
 	UpdateSecret(ctx context.Context, id string, req *models.UpdateSecretRequest) (*models.SecretResponse, error)
 	DeleteSecret(ctx context.Context, id string) error
 

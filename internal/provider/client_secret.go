@@ -41,6 +41,24 @@ func (c *SdkClientWrapper) CreateSecret(ctx context.Context, req *models.CreateS
 	return resp.Payload, nil
 }
 
+func (c *SdkClientWrapper) GetSecretHash(ctx context.Context, id string) (*models.SecretHashResponse, error) {
+	logFields := map[string]any{"id": id}
+	tflog.Debug(ctx, "Executing SDK Call: Get Secret Hash", logFields)
+
+	params := secret.NewGetSecretHashParams().
+		WithContext(ctx).
+		WithTimeout(defaultTimeout).
+		WithID(id)
+
+	resp, err := c.sdkClient.Secret.GetSecretHash(params, nil)
+	if err != nil {
+		return nil, handleApiError(ctx, err, "GetSecretHash", id)
+	}
+
+	tflog.Debug(ctx, "SDK Call Successful: Get Secret Hash", logFields)
+	return resp.Payload, nil
+}
+
 func (c *SdkClientWrapper) UpdateSecret(ctx context.Context, id string, req *models.UpdateSecretRequest) (*models.SecretResponse, error) {
 	logFields := map[string]any{"id": id}
 	tflog.Debug(ctx, "Executing SDK Call: Update Secret", logFields)

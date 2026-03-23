@@ -5,6 +5,7 @@ package provider
 
 import (
 	"context"
+	"errors"
 	"fmt"
 
 	models "github.com/groundcover-com/groundcover-sdk-go/pkg/models"
@@ -33,10 +34,11 @@ type secretResource struct {
 }
 
 type secretResourceModel struct {
-	ID      types.String `tfsdk:"id"`      // Secret reference ID (computed) - use this in other resources
-	Name    types.String `tfsdk:"name"`    // Secret Name (required)
-	Type    types.String `tfsdk:"type"`    // Secret Type: api_key, password, basic_auth (required)
-	Content types.String `tfsdk:"content"` // Secret Content (required, sensitive, write-only)
+	ID          types.String `tfsdk:"id"`           // Secret reference ID (computed) - use this in other resources
+	Name        types.String `tfsdk:"name"`         // Secret Name (required)
+	Type        types.String `tfsdk:"type"`         // Secret Type: api_key, password, basic_auth (required)
+	Content     types.String `tfsdk:"content"`      // Secret Content (required, sensitive, write-only)
+	ContentHash types.String `tfsdk:"content_hash"` // FNV1a hash of content (computed) - for change detection
 }
 
 func (r *secretResource) Metadata(ctx context.Context, req resource.MetadataRequest, resp *resource.MetadataResponse) {
@@ -75,6 +77,10 @@ Secrets allow you to securely store sensitive values (like API keys, passwords, 
 				Required:            true,
 				Sensitive:           true,
 				WriteOnly:           true,
+			},
+			"content_hash": schema.StringAttribute{
+				MarkdownDescription: "FNV1a hash of the secret content (hex encoded). This is computed by the API and can be used to detect if the secret content has changed.",
+				Computed:            true,
 			},
 		},
 	}
@@ -142,6 +148,18 @@ func (r *secretResource) Create(ctx context.Context, req resource.CreateRequest,
 	plan.ID = types.StringValue(apiResponse.ID)
 	// Name and Type are preserved from the plan; Content is write-only and not saved to state
 
+	// Fetch the content hash for the newly created secret
+	hashResp, err := r.client.GetSecretHash(ctx, apiResponse.ID)
+	if err != nil {
+		tflog.Warn(ctx, "Failed to get secret hash after creation", map[string]any{"id": apiResponse.ID, "error": err.Error()})
+		plan.ContentHash = types.StringNull()
+	} else if hashResp != nil {
+		plan.ContentHash = types.StringValue(hashResp.ContentHash)
+		tflog.Debug(ctx, "Secret content hash retrieved", map[string]any{"id": apiResponse.ID, "content_hash": hashResp.ContentHash})
+	} else {
+		plan.ContentHash = types.StringNull()
+	}
+
 	tflog.Info(ctx, "Saving new secret to state", map[string]any{"id": plan.ID.ValueString()})
 	resp.Diagnostics.Append(resp.State.Set(ctx, &plan)...)
 }
@@ -156,11 +174,30 @@ func (r *secretResource) Read(ctx context.Context, req resource.ReadRequest, res
 	secretID := state.ID.ValueString()
 	tflog.Debug(ctx, "Reading Secret info", map[string]any{"id": secretID})
 
-	// Note: There is no Get/List endpoint for secrets in the API.
-	// The secret content is write-only and cannot be retrieved.
-	// We preserve the state as-is since we cannot verify the secret still exists
-	// without a read endpoint. The secret will be validated on next update/delete.
-	tflog.Info(ctx, "Secret read completed (no API verification available - preserving state)", map[string]any{"id": secretID})
+	// Use GetSecretHash to verify the secret exists and get its current content hash
+	hashResp, err := r.client.GetSecretHash(ctx, secretID)
+	if err != nil {
+		// Check if the secret was deleted outside of Terraform
+		if errors.Is(err, ErrNotFound) {
+			tflog.Warn(ctx, "Secret not found, removing from state", map[string]any{"id": secretID})
+			resp.State.RemoveResource(ctx)
+			return
+		}
+		// For other errors, log warning but preserve state
+		tflog.Warn(ctx, "Failed to get secret hash during read", map[string]any{"id": secretID, "error": err.Error()})
+		resp.Diagnostics.Append(resp.State.Set(ctx, &state)...)
+		return
+	}
+
+	// Update state with the current values from the API
+	if hashResp != nil {
+		state.Name = types.StringValue(hashResp.Name)
+		state.Type = types.StringValue(hashResp.Type)
+		state.ContentHash = types.StringValue(hashResp.ContentHash)
+		tflog.Debug(ctx, "Secret hash retrieved during read", map[string]any{"id": secretID, "content_hash": hashResp.ContentHash})
+	}
+
+	tflog.Info(ctx, "Secret read completed", map[string]any{"id": secretID})
 	resp.Diagnostics.Append(resp.State.Set(ctx, &state)...)
 }
 
@@ -211,6 +248,18 @@ func (r *secretResource) Update(ctx context.Context, req resource.UpdateRequest,
 		plan.ID = types.StringValue(apiResponse.ID)
 	} else {
 		plan.ID = state.ID // Preserve existing ID
+	}
+
+	// Fetch the updated content hash
+	hashResp, err := r.client.GetSecretHash(ctx, plan.ID.ValueString())
+	if err != nil {
+		tflog.Warn(ctx, "Failed to get secret hash after update", map[string]any{"id": plan.ID.ValueString(), "error": err.Error()})
+		plan.ContentHash = state.ContentHash // Preserve existing hash
+	} else if hashResp != nil {
+		plan.ContentHash = types.StringValue(hashResp.ContentHash)
+		tflog.Debug(ctx, "Secret content hash retrieved after update", map[string]any{"id": plan.ID.ValueString(), "content_hash": hashResp.ContentHash})
+	} else {
+		plan.ContentHash = state.ContentHash // Preserve existing hash
 	}
 
 	tflog.Info(ctx, "Saving updated secret to state", map[string]any{"id": plan.ID.ValueString()})

@@ -1,3 +1,10 @@
+## 1.9.2
+
+* Added `content_hash` computed attribute to `groundcover_secret` resource — returns FNV1a hash (hex encoded) of the secret content, enabling drift detection for external changes
+* Secret resource now uses the GetSecretHash API endpoint to verify secret existence and detect external modifications during `terraform plan` and `terraform apply`
+* Secrets deleted outside of Terraform are now properly detected and removed from state
+* Updated groundcover SDK from v1.218.0 to v1.225.0
+
 ## 1.9.1
 
 * Fixed dashboard update failing with `CurrentRevision excluded_if` validation error — use `Override: true` instead of sending `CurrentRevision` in update requests

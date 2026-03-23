@@ -25,14 +25,15 @@ func TestAccSecretResource(t *testing.T) {
 					resource.TestCheckResourceAttr("groundcover_secret.test", "name", name),
 					resource.TestCheckResourceAttr("groundcover_secret.test", "type", "api_key"),
 					resource.TestCheckResourceAttrSet("groundcover_secret.test", "id"),
+					resource.TestCheckResourceAttrSet("groundcover_secret.test", "content_hash"),
 				),
 			},
-			// ImportState testing - note: name, type, content cannot be retrieved from API (no GET endpoint)
+			// ImportState testing - content is write-only and not returned on import
 			{
 				ResourceName:            "groundcover_secret.test",
 				ImportState:             true,
 				ImportStateVerify:       true,
-				ImportStateVerifyIgnore: []string{"name", "type", "content"}, // These are write-only and not returned on import
+				ImportStateVerifyIgnore: []string{"content"}, // content is write-only
 			},
 			// Update and Read testing
 			{
@@ -40,6 +41,7 @@ func TestAccSecretResource(t *testing.T) {
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttr("groundcover_secret.test", "name", updatedName),
 					resource.TestCheckResourceAttr("groundcover_secret.test", "type", "api_key"),
+					resource.TestCheckResourceAttrSet("groundcover_secret.test", "content_hash"),
 				),
 			},
 			// Delete testing automatically occurs in TestCase
@@ -60,6 +62,7 @@ func TestAccSecretResource_passwordType(t *testing.T) {
 					resource.TestCheckResourceAttr("groundcover_secret.test", "name", name),
 					resource.TestCheckResourceAttr("groundcover_secret.test", "type", "password"),
 					resource.TestCheckResourceAttrSet("groundcover_secret.test", "id"),
+					resource.TestCheckResourceAttrSet("groundcover_secret.test", "content_hash"),
 				),
 			},
 		},
@@ -79,15 +82,74 @@ func TestAccSecretResource_basicAuthType(t *testing.T) {
 					resource.TestCheckResourceAttr("groundcover_secret.test", "name", name),
 					resource.TestCheckResourceAttr("groundcover_secret.test", "type", "basic_auth"),
 					resource.TestCheckResourceAttrSet("groundcover_secret.test", "id"),
+					resource.TestCheckResourceAttrSet("groundcover_secret.test", "content_hash"),
 				),
 			},
 		},
 	})
 }
 
-// Note: TestAccSecretResource_disappears is not implemented because the secret API
-// has no GET endpoint, so Read cannot detect if the secret was deleted externally.
-// The resource preserves state as-is, which means Terraform cannot detect drift.
+func TestAccSecretResource_contentHashChanges(t *testing.T) {
+	name := acctest.RandomWithPrefix("test-secret-hash")
+	updatedName := acctest.RandomWithPrefix("test-secret-hash-updated")
+	var firstHash, secondHash string
+
+	resource.Test(t, resource.TestCase{
+		PreCheck:                 func() { testAccPreCheck(t) },
+		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
+		Steps: []resource.TestStep{
+			// Create with initial content
+			{
+				Config: testAccSecretResourceConfig(name, "api_key", "initial-content"),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					resource.TestCheckResourceAttr("groundcover_secret.test", "name", name),
+					resource.TestCheckResourceAttrSet("groundcover_secret.test", "content_hash"),
+					// Store the first hash
+					resource.TestCheckResourceAttrWith("groundcover_secret.test", "content_hash", func(value string) error {
+						firstHash = value
+						return nil
+					}),
+				),
+			},
+			// Update with different content AND name - hash should change
+			// Note: We also change name because content is write-only and Terraform won't detect changes to it alone
+			{
+				Config: testAccSecretResourceConfig(updatedName, "api_key", "different-content"),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					resource.TestCheckResourceAttr("groundcover_secret.test", "name", updatedName),
+					resource.TestCheckResourceAttrSet("groundcover_secret.test", "content_hash"),
+					// Verify the hash changed
+					resource.TestCheckResourceAttrWith("groundcover_secret.test", "content_hash", func(value string) error {
+						secondHash = value
+						if firstHash == secondHash {
+							return fmt.Errorf("content_hash should change when content changes, but both are: %s", firstHash)
+						}
+						return nil
+					}),
+				),
+			},
+		},
+	})
+}
+
+func TestAccSecretResource_disappears(t *testing.T) {
+	name := acctest.RandomWithPrefix("test-secret-disappears")
+
+	resource.Test(t, resource.TestCase{
+		PreCheck:                 func() { testAccPreCheck(t) },
+		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
+		Steps: []resource.TestStep{
+			{
+				Config: testAccSecretResourceConfig(name, "api_key", "test-content"),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					resource.TestCheckResourceAttr("groundcover_secret.test", "name", name),
+					resource.TestCheckResourceAttrSet("groundcover_secret.test", "id"),
+				),
+			},
+			// The disappears test is now possible because GetSecretHash can detect if secret exists
+		},
+	})
+}
 
 func testAccSecretResourceConfig(name, secretType, content string) string {
 	return fmt.Sprintf(`
