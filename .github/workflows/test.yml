@@ -108,13 +108,14 @@ jobs:
         echo "✅ Running acceptance tests with available secrets..."
         MAX_RETRIES=2
         TRANSIENT_PATTERNS="503|502|504|Service Unavailable|Bad Gateway|Gateway Timeout|connection refused|connection reset|EOF|resource not found"
+        RUN_FILTER=""
 
         for attempt in $(seq 0 $MAX_RETRIES); do
           echo "=== Test attempt $((attempt + 1)) of $((MAX_RETRIES + 1)) ==="
           LOG_FILE=$(mktemp)
 
           set +e
-          go test ./internal/provider -v -failfast -parallel=4 -timeout 30m 2>&1 | tee "$LOG_FILE"
+          go test ./internal/provider -v -failfast -parallel=4 -timeout 30m ${RUN_FILTER:+-run "$RUN_FILTER"} 2>&1 | tee "$LOG_FILE"
           EXIT_CODE=${PIPESTATUS[0]}
           set -e
 
@@ -126,10 +127,18 @@ jobs:
 
           if grep -qE "$TRANSIENT_PATTERNS" "$LOG_FILE"; then
             if [ $attempt -lt $MAX_RETRIES ]; then
+              # Extract failed test names for targeted retry
+              FAILED_TESTS=$(grep -E "^--- FAIL:" "$LOG_FILE" | sed 's/--- FAIL: \([^ ]*\).*/\1/' | paste -sd'|' -)
+              if [ -n "$FAILED_TESTS" ]; then
+                RUN_FILTER="$FAILED_TESTS"
+                echo "⚠️ Transient error detected. Retrying only failed tests: $FAILED_TESTS"
+              else
+                echo "⚠️ Transient error detected. Retrying all tests..."
+              fi
               SLEEP_TIME=$(( (attempt + 1) * 30 ))
-              echo "⚠️ Transient error detected. Retrying in ${SLEEP_TIME}s..."
-              rm -f "$LOG_FILE"
+              echo "Waiting ${SLEEP_TIME}s before retry..."
               sleep $SLEEP_TIME
+              rm -f "$LOG_FILE"
               continue
             fi
           fi
