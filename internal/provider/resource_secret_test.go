@@ -3,11 +3,14 @@
 package provider
 
 import (
+	"context"
 	"fmt"
+	"os"
 	"testing"
 
 	"github.com/hashicorp/terraform-plugin-testing/helper/acctest"
 	"github.com/hashicorp/terraform-plugin-testing/helper/resource"
+	"github.com/hashicorp/terraform-plugin-testing/terraform"
 )
 
 func TestAccSecretResource(t *testing.T) {
@@ -144,11 +147,47 @@ func TestAccSecretResource_disappears(t *testing.T) {
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttr("groundcover_secret.test", "name", name),
 					resource.TestCheckResourceAttrSet("groundcover_secret.test", "id"),
+					testAccCheckSecretResourceDisappears("groundcover_secret.test"),
 				),
+				ExpectNonEmptyPlan: true,
 			},
-			// The disappears test is now possible because GetSecretHash can detect if secret exists
 		},
 	})
+}
+
+func testAccCheckSecretResourceDisappears(n string) resource.TestCheckFunc {
+	return func(s *terraform.State) error {
+		rs, ok := s.RootModule().Resources[n]
+		if !ok {
+			return fmt.Errorf("Not found: %s", n)
+		}
+
+		if rs.Primary.ID == "" {
+			return fmt.Errorf("No Secret ID is set")
+		}
+
+		ctx := context.Background()
+
+		apiKey := os.Getenv("GROUNDCOVER_API_KEY")
+		apiURL := os.Getenv("GROUNDCOVER_API_URL")
+		if apiURL == "" {
+			apiURL = "https://api.groundcover.io"
+		}
+		backendID := os.Getenv("GROUNDCOVER_BACKEND_ID")
+
+		client, err := NewSdkClientWrapper(ctx, apiURL, apiKey, backendID)
+		if err != nil {
+			return fmt.Errorf("Failed to create client: %v", err)
+		}
+
+		// Delete the secret outside of Terraform
+		err = client.DeleteSecret(ctx, rs.Primary.ID)
+		if err != nil {
+			return fmt.Errorf("Failed to delete secret %s: %v", rs.Primary.ID, err)
+		}
+
+		return nil
+	}
 }
 
 func testAccSecretResourceConfig(name, secretType, content string) string {
