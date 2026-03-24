@@ -81,6 +81,9 @@ Secrets allow you to securely store sensitive values (like API keys, passwords, 
 			"content_hash": schema.StringAttribute{
 				MarkdownDescription: "FNV1a hash of the secret content (hex encoded). This is computed by the API and can be used to detect if the secret content has changed.",
 				Computed:            true,
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.UseStateForUnknown(),
+				},
 			},
 		},
 	}
@@ -183,8 +186,9 @@ func (r *secretResource) Read(ctx context.Context, req resource.ReadRequest, res
 			resp.State.RemoveResource(ctx)
 			return
 		}
-		// For other errors, log warning but preserve state
+		// For other errors, warn the user and preserve state
 		tflog.Warn(ctx, "Failed to get secret hash during read", map[string]any{"id": secretID, "error": err.Error()})
+		resp.Diagnostics.AddWarning("Unable to verify secret", fmt.Sprintf("Failed to read secret '%s' from API: %s. The state may be stale.", secretID, err.Error()))
 		resp.Diagnostics.Append(resp.State.Set(ctx, &state)...)
 		return
 	}
