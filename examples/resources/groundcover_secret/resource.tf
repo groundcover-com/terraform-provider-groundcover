@@ -76,3 +76,9 @@ output "password_secret_id" {
   value       = groundcover_secret.password_example.id
 }
 
+# The content_hash can be used to detect if the secret content has changed externally
+output "api_key_content_hash" {
+  description = "FNV1a hash of the API key secret content. Changes when the secret content changes."
+  value       = groundcover_secret.api_key_example.content_hash
+}
+
