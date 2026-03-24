@@ -81,9 +81,6 @@ Secrets allow you to securely store sensitive values (like API keys, passwords, 
 			"content_hash": schema.StringAttribute{
 				MarkdownDescription: "FNV1a hash of the secret content (hex encoded). This is computed by the API and can be used to detect if the secret content has changed.",
 				Computed:            true,
-				PlanModifiers: []planmodifier.String{
-					stringplanmodifier.UseStateForUnknown(),
-				},
 			},
 		},
 	}
