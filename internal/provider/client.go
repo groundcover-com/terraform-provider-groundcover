@@ -355,7 +355,8 @@ func NewSdkClientWrapper(ctx context.Context, baseURLStr, apiKey, backendID stri
 }
 
 // statusCodeRegex extracts the HTTP status code from SDK error strings.
-var statusCodeRegex = regexp.MustCompile(`status code (\d+)`)
+// Matches both "status code 400" and go-swagger's "[METHOD PATH][400]" format.
+var statusCodeRegex = regexp.MustCompile(`(?:status code (\d+)|\]\[(\d{3})\] )`)
 
 // handleApiError maps SDK error strings to standard provider errors (ErrNotFound, etc.)
 // or returns a wrapped generic error if no specific mapping applies.
@@ -378,7 +379,11 @@ func handleApiError(ctx context.Context, err error, operation string, resourceId
 
 	match := statusCodeRegex.FindStringSubmatch(errStr)
 	if len(match) > 1 {
-		extractedCode, parseErr := strconv.Atoi(match[1])
+		codeStr := match[1]
+		if codeStr == "" {
+			codeStr = match[2]
+		}
+		extractedCode, parseErr := strconv.Atoi(codeStr)
 		if parseErr == nil {
 			statusCode = extractedCode
 			logFields["extracted_status_code_regex"] = statusCode
@@ -420,7 +425,7 @@ func handleApiError(ctx context.Context, err error, operation string, resourceId
 		tflog.Warn(ctx, "Mapping SDK error to ErrNotFound based on 404 status code.", logFields)
 		return ErrNotFound
 	}
-	if strings.Contains(lowerErrStr, "not found") || strings.Contains(errStr, " 404 ") || strings.Contains(errStr, "[404]") {
+	if statusCode == -1 && (strings.Contains(lowerErrStr, "not found") || strings.Contains(errStr, " 404 ") || strings.Contains(errStr, "[404]")) {
 		tflog.Warn(ctx, "Mapping SDK error to ErrNotFound based on substring match ('not found', ' 404 ', or '[404]').", logFields)
 		return ErrNotFound
 	}
@@ -449,7 +454,7 @@ func handleApiError(ctx context.Context, err error, operation string, resourceId
 		return ErrNotFound
 	}
 
-	if strings.Contains(lowerErrStr, "read-only") || strings.Contains(lowerErrStr, "read only") {
+	if statusCode == -1 && (strings.Contains(lowerErrStr, "read-only") || strings.Contains(lowerErrStr, "read only")) {
 		tflog.Warn(ctx, "Mapping SDK error to ErrReadOnly based on substring match.", logFields)
 		return ErrReadOnly
 	}
