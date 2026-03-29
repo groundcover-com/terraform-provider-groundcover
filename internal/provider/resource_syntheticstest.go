@@ -509,34 +509,41 @@ func (r *syntheticTestResource) ValidateConfig(ctx context.Context, req resource
 	// Validate notification routing invariants
 	if config.Monitor != nil {
 		method := config.Monitor.NotificationMethod
-		hasMethod := !method.IsNull() && !method.IsUnknown()
-		hasApps := !config.Monitor.ConnectedApps.IsNull() && !config.Monitor.ConnectedApps.IsUnknown() && len(config.Monitor.ConnectedApps.Elements()) > 0
-		hasFilters := !config.Monitor.StatusFilters.IsNull() && !config.Monitor.StatusFilters.IsUnknown() && len(config.Monitor.StatusFilters.Elements()) > 0
+		methodUnknown := method.IsUnknown()
+		methodSet := !method.IsNull() && !methodUnknown
+		isConnectedApps := methodSet && method.ValueString() == "connectedApps"
 
-		isConnectedApps := hasMethod && method.ValueString() == "connectedApps"
+		hasAppsSet := !config.Monitor.ConnectedApps.IsNull() && !config.Monitor.ConnectedApps.IsUnknown()
+		hasAppsNonEmpty := hasAppsSet && len(config.Monitor.ConnectedApps.Elements()) > 0
+		hasFiltersSet := !config.Monitor.StatusFilters.IsNull() && !config.Monitor.StatusFilters.IsUnknown()
 
-		if isConnectedApps && !hasApps {
-			resp.Diagnostics.AddAttributeError(
-				path.Root("monitor").AtName("connected_apps"),
-				"Missing required attribute",
-				`"connected_apps" must be set and non-empty when "notification_method" is "connectedApps".`,
-			)
+		// Skip cross-field validation when method is unknown (e.g. from another resource)
+		if !methodUnknown {
+			if isConnectedApps && !hasAppsNonEmpty {
+				resp.Diagnostics.AddAttributeError(
+					path.Root("monitor").AtName("connected_apps"),
+					"Missing required attribute",
+					`"connected_apps" must be set and non-empty when "notification_method" is "connectedApps".`,
+				)
+			}
+			if !isConnectedApps && hasAppsSet {
+				resp.Diagnostics.AddAttributeError(
+					path.Root("monitor").AtName("connected_apps"),
+					"Invalid attribute combination",
+					`"connected_apps" can only be set when "notification_method" is "connectedApps".`,
+				)
+			}
+			if !isConnectedApps && hasFiltersSet {
+				resp.Diagnostics.AddAttributeError(
+					path.Root("monitor").AtName("status_filters"),
+					"Invalid attribute combination",
+					`"status_filters" can only be set when "notification_method" is "connectedApps".`,
+				)
+			}
 		}
-		if !isConnectedApps && hasApps {
-			resp.Diagnostics.AddAttributeError(
-				path.Root("monitor").AtName("connected_apps"),
-				"Invalid attribute combination",
-				`"connected_apps" can only be set when "notification_method" is "connectedApps".`,
-			)
-		}
-		if !isConnectedApps && hasFilters {
-			resp.Diagnostics.AddAttributeError(
-				path.Root("monitor").AtName("status_filters"),
-				"Invalid attribute combination",
-				`"status_filters" can only be set when "notification_method" is "connectedApps".`,
-			)
-		}
-		if hasFilters {
+
+		// Validate status_filter values regardless of method
+		if hasFiltersSet {
 			validStatuses := map[string]bool{"Alerting": true, "Resolved": true}
 			for _, v := range config.Monitor.StatusFilters.Elements() {
 				if sv, ok := v.(types.String); ok && !sv.IsNull() && !sv.IsUnknown() {
