@@ -787,6 +787,39 @@ resource "groundcover_synthetic_test" "test" {
 `, name)
 }
 
+func TestAccSyntheticTestResource_notificationMethodApplyLoop(t *testing.T) {
+	name := acctest.RandomWithPrefix("test-synth-notif-loop")
+
+	resource.Test(t, resource.TestCase{
+		PreCheck:                 func() { testAccPreCheck(t) },
+		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
+		Steps: []resource.TestStep{
+			{
+				Config: testAccSyntheticTestResourceConfig_notificationRoutes(name),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					resource.TestCheckResourceAttr("groundcover_synthetic_test.test", "name", name),
+					resource.TestCheckResourceAttr("groundcover_synthetic_test.test", "monitor.notification_method", "notificationRoutes"),
+					resource.TestCheckResourceAttr("groundcover_synthetic_test.test", "monitor.disable_renotification", "true"),
+				),
+			},
+			{
+				Config: testAccSyntheticTestResourceConfig_notificationRoutes(name),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					resource.TestCheckResourceAttr("groundcover_synthetic_test.test", "name", name),
+					resource.TestCheckResourceAttr("groundcover_synthetic_test.test", "monitor.notification_method", "notificationRoutes"),
+				),
+			},
+			{
+				Config: testAccSyntheticTestResourceConfig_notificationRoutes(name),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					resource.TestCheckResourceAttr("groundcover_synthetic_test.test", "name", name),
+					resource.TestCheckResourceAttr("groundcover_synthetic_test.test", "monitor.notification_method", "notificationRoutes"),
+				),
+			},
+		},
+	})
+}
+
 func testAccSyntheticTestResourceConfig_conflicting(name string) string {
 	return fmt.Sprintf(`
 resource "groundcover_synthetic_test" "test" {
