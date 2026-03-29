@@ -505,6 +505,52 @@ func (r *syntheticTestResource) ValidateConfig(ctx context.Context, req resource
 			)
 		}
 	}
+
+	// Validate notification routing invariants
+	if config.Monitor != nil {
+		method := config.Monitor.NotificationMethod
+		hasMethod := !method.IsNull() && !method.IsUnknown()
+		hasApps := !config.Monitor.ConnectedApps.IsNull() && !config.Monitor.ConnectedApps.IsUnknown() && len(config.Monitor.ConnectedApps.Elements()) > 0
+		hasFilters := !config.Monitor.StatusFilters.IsNull() && !config.Monitor.StatusFilters.IsUnknown() && len(config.Monitor.StatusFilters.Elements()) > 0
+
+		isConnectedApps := hasMethod && method.ValueString() == "connectedApps"
+
+		if isConnectedApps && !hasApps {
+			resp.Diagnostics.AddAttributeError(
+				path.Root("monitor").AtName("connected_apps"),
+				"Missing required attribute",
+				`"connected_apps" must be set and non-empty when "notification_method" is "connectedApps".`,
+			)
+		}
+		if !isConnectedApps && hasApps {
+			resp.Diagnostics.AddAttributeError(
+				path.Root("monitor").AtName("connected_apps"),
+				"Invalid attribute combination",
+				`"connected_apps" can only be set when "notification_method" is "connectedApps".`,
+			)
+		}
+		if !isConnectedApps && hasFilters {
+			resp.Diagnostics.AddAttributeError(
+				path.Root("monitor").AtName("status_filters"),
+				"Invalid attribute combination",
+				`"status_filters" can only be set when "notification_method" is "connectedApps".`,
+			)
+		}
+		if hasFilters {
+			validStatuses := map[string]bool{"Alerting": true, "Resolved": true}
+			for _, v := range config.Monitor.StatusFilters.Elements() {
+				if sv, ok := v.(types.String); ok && !sv.IsNull() && !sv.IsUnknown() {
+					if !validStatuses[sv.ValueString()] {
+						resp.Diagnostics.AddAttributeError(
+							path.Root("monitor").AtName("status_filters"),
+							"Invalid status filter",
+							fmt.Sprintf("Invalid status_filter %q; allowed values: \"Alerting\", \"Resolved\".", sv.ValueString()),
+						)
+					}
+				}
+			}
+		}
+	}
 }
 
 // --- CRUD ---
