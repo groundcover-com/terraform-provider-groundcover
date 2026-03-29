@@ -557,6 +557,42 @@ func TestAccSyntheticTestResource_sslTimeoutUpdate(t *testing.T) {
 	})
 }
 
+func TestAccSyntheticTestResource_sslApplyLoop(t *testing.T) {
+	name := acctest.RandomWithPrefix("test-synth-ssl-loop")
+
+	resource.Test(t, resource.TestCase{
+		PreCheck:                 func() { testAccPreCheck(t) },
+		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
+		Steps: []resource.TestStep{
+			// Step 1: Create with sni omitted (server defaults it to host)
+			{
+				Config: testAccSyntheticTestResourceConfig_sslBasic(name),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					resource.TestCheckResourceAttr("groundcover_synthetic_test.test", "name", name),
+					resource.TestCheckResourceAttr("groundcover_synthetic_test.test", "ssl_check.host", "google.com"),
+					resource.TestCheckResourceAttrSet("groundcover_synthetic_test.test", "id"),
+				),
+			},
+			// Step 2: Re-apply same config — should detect no changes
+			{
+				Config: testAccSyntheticTestResourceConfig_sslBasic(name),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					resource.TestCheckResourceAttr("groundcover_synthetic_test.test", "name", name),
+					resource.TestCheckResourceAttrSet("groundcover_synthetic_test.test", "id"),
+				),
+			},
+			// Step 3: One more time to be sure
+			{
+				Config: testAccSyntheticTestResourceConfig_sslBasic(name),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					resource.TestCheckResourceAttr("groundcover_synthetic_test.test", "name", name),
+					resource.TestCheckResourceAttrSet("groundcover_synthetic_test.test", "id"),
+				),
+			},
+		},
+	})
+}
+
 func TestAccSyntheticTestResource_conflictingChecks(t *testing.T) {
 	name := acctest.RandomWithPrefix("test-synth-conflict")
 

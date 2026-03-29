@@ -8,6 +8,7 @@ import (
 	"github.com/groundcover-com/groundcover-sdk-go/pkg/models"
 	"github.com/hashicorp/terraform-plugin-framework-validators/int64validator"
 	"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
+	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
@@ -441,29 +442,35 @@ func (r *syntheticTestResource) ValidateConfig(ctx context.Context, req resource
 
 	// Validate required fields independently, skipping unknown values (e.g., computed or from other resources)
 	if hasHTTP {
-		if !config.HTTPCheck.URL.IsUnknown() && config.HTTPCheck.URL.IsNull() {
-			resp.Diagnostics.AddAttributeError(
-				path.Root("http_check").AtName("url"),
-				"Missing required attribute",
-				"The url attribute is required when http_check is configured.",
-			)
+		if !config.HTTPCheck.URL.IsUnknown() {
+			if config.HTTPCheck.URL.IsNull() || config.HTTPCheck.URL.ValueString() == "" {
+				resp.Diagnostics.AddAttributeError(
+					path.Root("http_check").AtName("url"),
+					"Missing required attribute",
+					"The url attribute is required and must not be empty when http_check is configured.",
+				)
+			}
 		}
-		if !config.HTTPCheck.Method.IsUnknown() && config.HTTPCheck.Method.IsNull() {
-			resp.Diagnostics.AddAttributeError(
-				path.Root("http_check").AtName("method"),
-				"Missing required attribute",
-				"The method attribute is required when http_check is configured.",
-			)
+		if !config.HTTPCheck.Method.IsUnknown() {
+			if config.HTTPCheck.Method.IsNull() || config.HTTPCheck.Method.ValueString() == "" {
+				resp.Diagnostics.AddAttributeError(
+					path.Root("http_check").AtName("method"),
+					"Missing required attribute",
+					"The method attribute is required and must not be empty when http_check is configured.",
+				)
+			}
 		}
 	}
 
 	if hasSSL {
-		if !config.SSLCheck.Host.IsUnknown() && config.SSLCheck.Host.IsNull() {
-			resp.Diagnostics.AddAttributeError(
-				path.Root("ssl_check").AtName("host"),
-				"Missing required attribute",
-				"The host attribute is required when ssl_check is configured.",
-			)
+		if !config.SSLCheck.Host.IsUnknown() {
+			if config.SSLCheck.Host.IsNull() || config.SSLCheck.Host.ValueString() == "" {
+				resp.Diagnostics.AddAttributeError(
+					path.Root("ssl_check").AtName("host"),
+					"Missing required attribute",
+					"The host attribute is required and must not be empty when ssl_check is configured.",
+				)
+			}
 		}
 		if !config.SSLCheck.Port.IsUnknown() && config.SSLCheck.Port.IsNull() {
 			resp.Diagnostics.AddAttributeError(
@@ -487,11 +494,7 @@ func (r *syntheticTestResource) Create(ctx context.Context, req resource.CreateR
 
 	tflog.Debug(ctx, "Creating Synthetic Test", map[string]any{"name": plan.Name.ValueString()})
 
-	if plan.HTTPCheck == nil {
-		resp.Diagnostics.AddError(
-			"Missing http_check",
-			"An http_check block is required to define the synthetic test check configuration.",
-		)
+	if !validateCheckPresent(&plan, &resp.Diagnostics) {
 		return
 	}
 
@@ -561,11 +564,7 @@ func (r *syntheticTestResource) Update(ctx context.Context, req resource.UpdateR
 
 	tflog.Debug(ctx, "Updating Synthetic Test", map[string]any{"id": plan.ID.ValueString()})
 
-	if plan.HTTPCheck == nil {
-		resp.Diagnostics.AddError(
-			"Missing http_check",
-			"An http_check block is required to define the synthetic test check configuration.",
-		)
+	if !validateCheckPresent(&plan, &resp.Diagnostics) {
 		return
 	}
 
@@ -617,6 +616,18 @@ func (r *syntheticTestResource) ImportState(ctx context.Context, req resource.Im
 }
 
 // --- Conversion: Terraform model → SDK request ---
+
+// validateCheckPresent ensures at least one check type is configured.
+func validateCheckPresent(plan *syntheticTestResourceModel, diags *diag.Diagnostics) bool {
+	if plan.HTTPCheck == nil && plan.SSLCheck == nil {
+		diags.AddError(
+			"Missing check configuration",
+			"Either an http_check or ssl_check block is required to define the synthetic test check configuration.",
+		)
+		return false
+	}
+	return true
+}
 
 func toSDKRequest(plan *syntheticTestResourceModel) *models.SyntheticTestCreateRequest {
 	sdkReq := &models.SyntheticTestCreateRequest{
@@ -920,21 +931,22 @@ func fromSDKResponse(ctx context.Context, sdkResp *models.SyntheticTestCreateReq
 			sslModel.Verify = types.BoolValue(ssl.Verify)
 		}
 
-		if ssl.MinVersion != "" {
-			sslModel.MinVersion = types.StringValue(ssl.MinVersion)
-		} else if state.SSLCheck != nil && !state.SSLCheck.MinVersion.IsNull() {
+		if state.SSLCheck == nil {
+			// Import: no prior state — reflect whatever the API returned
+			if ssl.MinVersion != "" {
+				sslModel.MinVersion = types.StringValue(ssl.MinVersion)
+			}
+			if ssl.Sni != "" {
+				sslModel.Sni = types.StringValue(ssl.Sni)
+			}
+			if ssl.Timeout != "" {
+				sslModel.Timeout = types.StringValue(ssl.Timeout)
+			}
+		} else {
+			// Normal read: preserve user's config values to avoid perpetual
+			// diffs caused by server-side defaults the user never configured.
 			sslModel.MinVersion = state.SSLCheck.MinVersion
-		}
-
-		if ssl.Sni != "" {
-			sslModel.Sni = types.StringValue(ssl.Sni)
-		} else if state.SSLCheck != nil && !state.SSLCheck.Sni.IsNull() {
 			sslModel.Sni = state.SSLCheck.Sni
-		}
-
-		if ssl.Timeout != "" {
-			sslModel.Timeout = types.StringValue(ssl.Timeout)
-		} else if state.SSLCheck != nil && !state.SSLCheck.Timeout.IsNull() {
 			sslModel.Timeout = state.SSLCheck.Timeout
 		}
 
