@@ -6,6 +6,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"regexp"
 	"testing"
 
 	"github.com/hashicorp/terraform-plugin-testing/helper/acctest"
@@ -432,6 +433,145 @@ func testAccCheckSyntheticTestResourceExists(n string) resource.TestCheckFunc {
 	}
 }
 
+// --- SSL check tests ---
+
+func TestAccSyntheticTestResource_sslBasic(t *testing.T) {
+	name := acctest.RandomWithPrefix("test-synth-ssl")
+
+	resource.Test(t, resource.TestCase{
+		PreCheck:                 func() { testAccPreCheck(t) },
+		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
+		Steps: []resource.TestStep{
+			{
+				Config: testAccSyntheticTestResourceConfig_sslBasic(name),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					resource.TestCheckResourceAttr("groundcover_synthetic_test.test", "name", name),
+					resource.TestCheckResourceAttr("groundcover_synthetic_test.test", "enabled", "true"),
+					resource.TestCheckResourceAttr("groundcover_synthetic_test.test", "interval", "1m"),
+					resource.TestCheckResourceAttr("groundcover_synthetic_test.test", "ssl_check.host", "google.com"),
+					resource.TestCheckResourceAttr("groundcover_synthetic_test.test", "ssl_check.port", "443"),
+					resource.TestCheckResourceAttr("groundcover_synthetic_test.test", "assertion.#", "1"),
+					resource.TestCheckResourceAttr("groundcover_synthetic_test.test", "assertion.0.source", "ssl"),
+					resource.TestCheckResourceAttr("groundcover_synthetic_test.test", "assertion.0.operator", "exists"),
+					resource.TestCheckResourceAttr("groundcover_synthetic_test.test", "assertion.0.target", "true"),
+					resource.TestCheckResourceAttrSet("groundcover_synthetic_test.test", "id"),
+				),
+			},
+			// ImportState testing
+			{
+				ResourceName:      "groundcover_synthetic_test.test",
+				ImportState:       true,
+				ImportStateVerify: true,
+			},
+		},
+	})
+}
+
+func TestAccSyntheticTestResource_sslFull(t *testing.T) {
+	name := acctest.RandomWithPrefix("test-synth-ssl-full")
+
+	resource.Test(t, resource.TestCase{
+		PreCheck:                 func() { testAccPreCheck(t) },
+		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
+		Steps: []resource.TestStep{
+			{
+				Config: testAccSyntheticTestResourceConfig_sslFull(name),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					resource.TestCheckResourceAttr("groundcover_synthetic_test.test", "name", name),
+					resource.TestCheckResourceAttr("groundcover_synthetic_test.test", "ssl_check.host", "google.com"),
+					resource.TestCheckResourceAttr("groundcover_synthetic_test.test", "ssl_check.port", "443"),
+					resource.TestCheckResourceAttr("groundcover_synthetic_test.test", "ssl_check.verify", "true"),
+					resource.TestCheckResourceAttr("groundcover_synthetic_test.test", "ssl_check.min_version", "1.2"),
+					resource.TestCheckResourceAttr("groundcover_synthetic_test.test", "ssl_check.sni", "google.com"),
+					resource.TestCheckResourceAttr("groundcover_synthetic_test.test", "ssl_check.timeout", "10s"),
+					resource.TestCheckResourceAttrSet("groundcover_synthetic_test.test", "id"),
+				),
+			},
+			// ImportState testing
+			{
+				ResourceName:      "groundcover_synthetic_test.test",
+				ImportState:       true,
+				ImportStateVerify: true,
+			},
+		},
+	})
+}
+
+func TestAccSyntheticTestResource_sslUpdate(t *testing.T) {
+	name := acctest.RandomWithPrefix("test-synth-ssl")
+	updatedName := name + "-updated"
+
+	resource.Test(t, resource.TestCase{
+		PreCheck:                 func() { testAccPreCheck(t) },
+		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
+		Steps: []resource.TestStep{
+			{
+				Config: testAccSyntheticTestResourceConfig_sslBasic(name),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					resource.TestCheckResourceAttr("groundcover_synthetic_test.test", "name", name),
+					resource.TestCheckResourceAttr("groundcover_synthetic_test.test", "interval", "1m"),
+					resource.TestCheckResourceAttr("groundcover_synthetic_test.test", "ssl_check.host", "google.com"),
+					resource.TestCheckResourceAttrSet("groundcover_synthetic_test.test", "id"),
+				),
+			},
+			{
+				Config: testAccSyntheticTestResourceConfig_sslUpdated(updatedName),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					resource.TestCheckResourceAttr("groundcover_synthetic_test.test", "name", updatedName),
+					resource.TestCheckResourceAttr("groundcover_synthetic_test.test", "interval", "5m"),
+					resource.TestCheckResourceAttr("groundcover_synthetic_test.test", "ssl_check.host", "github.com"),
+					resource.TestCheckResourceAttr("groundcover_synthetic_test.test", "ssl_check.port", "443"),
+				),
+			},
+		},
+	})
+}
+
+func TestAccSyntheticTestResource_sslTimeoutUpdate(t *testing.T) {
+	name := acctest.RandomWithPrefix("test-synth-ssl-timeout")
+
+	resource.Test(t, resource.TestCase{
+		PreCheck:                 func() { testAccPreCheck(t) },
+		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
+		Steps: []resource.TestStep{
+			{
+				Config: testAccSyntheticTestResourceConfig_sslBasic(name),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					resource.TestCheckResourceAttr("groundcover_synthetic_test.test", "name", name),
+					resource.TestCheckResourceAttr("groundcover_synthetic_test.test", "ssl_check.host", "google.com"),
+					resource.TestCheckResourceAttr("groundcover_synthetic_test.test", "ssl_check.port", "443"),
+					resource.TestCheckNoResourceAttr("groundcover_synthetic_test.test", "ssl_check.timeout"),
+					resource.TestCheckResourceAttrSet("groundcover_synthetic_test.test", "id"),
+				),
+			},
+			{
+				Config: testAccSyntheticTestResourceConfig_sslWithTimeout(name),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					resource.TestCheckResourceAttr("groundcover_synthetic_test.test", "name", name),
+					resource.TestCheckResourceAttr("groundcover_synthetic_test.test", "ssl_check.host", "google.com"),
+					resource.TestCheckResourceAttr("groundcover_synthetic_test.test", "ssl_check.port", "443"),
+					resource.TestCheckResourceAttr("groundcover_synthetic_test.test", "ssl_check.timeout", "5s"),
+				),
+			},
+		},
+	})
+}
+
+func TestAccSyntheticTestResource_conflictingChecks(t *testing.T) {
+	name := acctest.RandomWithPrefix("test-synth-conflict")
+
+	resource.Test(t, resource.TestCase{
+		PreCheck:                 func() { testAccPreCheck(t) },
+		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
+		Steps: []resource.TestStep{
+			{
+				Config:      testAccSyntheticTestResourceConfig_conflicting(name),
+				ExpectError: regexp.MustCompile(`Conflicting check configuration`),
+			},
+		},
+	})
+}
+
 func testAccCheckSyntheticTestResourceDisappears(n string) resource.TestCheckFunc {
 	return func(s *terraform.State) error {
 		rs, ok := s.RootModule().Resources[n]
@@ -463,4 +603,120 @@ func testAccCheckSyntheticTestResourceDisappears(n string) resource.TestCheckFun
 
 		return nil
 	}
+}
+
+// --- SSL config helpers ---
+
+func testAccSyntheticTestResourceConfig_sslBasic(name string) string {
+	return fmt.Sprintf(`
+resource "groundcover_synthetic_test" "test" {
+  name     = %[1]q
+  enabled  = true
+  interval = "1m"
+
+  ssl_check {
+    host = "google.com"
+    port = 443
+  }
+
+  assertion {
+    source   = "ssl"
+    operator = "exists"
+    target   = "true"
+  }
+}
+`, name)
+}
+
+func testAccSyntheticTestResourceConfig_sslFull(name string) string {
+	return fmt.Sprintf(`
+resource "groundcover_synthetic_test" "test" {
+  name     = %[1]q
+  interval = "1m"
+
+  ssl_check {
+    host        = "google.com"
+    port        = 443
+    verify      = true
+    min_version = "1.2"
+    sni         = "google.com"
+    timeout     = "10s"
+  }
+
+  assertion {
+    source   = "ssl"
+    operator = "exists"
+    target   = "true"
+    property = "certificateValid"
+  }
+}
+`, name)
+}
+
+func testAccSyntheticTestResourceConfig_sslUpdated(name string) string {
+	return fmt.Sprintf(`
+resource "groundcover_synthetic_test" "test" {
+  name     = %[1]q
+  enabled  = true
+  interval = "5m"
+
+  ssl_check {
+    host = "github.com"
+    port = 443
+  }
+
+  assertion {
+    source   = "ssl"
+    operator = "exists"
+    target   = "true"
+  }
+}
+`, name)
+}
+
+func testAccSyntheticTestResourceConfig_sslWithTimeout(name string) string {
+	return fmt.Sprintf(`
+resource "groundcover_synthetic_test" "test" {
+  name     = %[1]q
+  enabled  = true
+  interval = "1m"
+
+  ssl_check {
+    host    = "google.com"
+    port    = 443
+    timeout = "5s"
+  }
+
+  assertion {
+    source   = "ssl"
+    operator = "exists"
+    target   = "true"
+  }
+}
+`, name)
+}
+
+func testAccSyntheticTestResourceConfig_conflicting(name string) string {
+	return fmt.Sprintf(`
+resource "groundcover_synthetic_test" "test" {
+  name     = %[1]q
+  interval = "1m"
+
+  http_check {
+    url    = "https://example.com"
+    method = "GET"
+  }
+
+  ssl_check {
+    host = "example.com"
+    port = 443
+  }
+
+  assertion {
+    source   = "statusCode"
+    operator = "eq"
+    target   = "200"
+  }
+}
+`, name)
 }

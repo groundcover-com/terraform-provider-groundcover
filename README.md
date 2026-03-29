@@ -35,7 +35,7 @@ Basic usage examples can be found in the `examples/` directory:
 *   **Secret Resource:** [`examples/resources/groundcover_secret/resource.tf`](./examples/resources/groundcover_secret/resource.tf)
     *   Demonstrates how to securely store sensitive values and receive reference IDs for use in other resources.
 *   **Synthetic Test Resource:** [`examples/resources/groundcover_synthetic_test/resource.tf`](./examples/resources/groundcover_synthetic_test/resource.tf)
-    *   Demonstrates how to create and manage synthetic tests for proactive HTTP endpoint monitoring with assertions, retries, authentication support, monitor configuration, and notification routing.
+    *   Demonstrates how to create and manage synthetic tests for proactive HTTP and SSL/TLS endpoint monitoring with assertions, retries, authentication support, monitor configuration, and notification routing.
 *   **Silence Resource:** [`examples/resources/groundcover_silence/resource.tf`](./examples/resources/groundcover_silence/resource.tf)
     *   Demonstrates how to create and manage alert silences with matcher-based targeting.
 *   **Recurring Silence Resource:** [`examples/resources/groundcover_recurring_silence/resource.tf`](./examples/resources/groundcover_recurring_silence/resource.tf)

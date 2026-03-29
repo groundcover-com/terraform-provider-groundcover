@@ -6,6 +6,7 @@ import (
 	"fmt"
 
 	"github.com/groundcover-com/groundcover-sdk-go/pkg/models"
+	"github.com/hashicorp/terraform-plugin-framework-validators/int64validator"
 	"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
@@ -22,9 +23,10 @@ import (
 
 // Ensure resource implements required interfaces
 var (
-	_ resource.Resource                = &syntheticTestResource{}
-	_ resource.ResourceWithConfigure   = &syntheticTestResource{}
-	_ resource.ResourceWithImportState = &syntheticTestResource{}
+	_ resource.Resource                   = &syntheticTestResource{}
+	_ resource.ResourceWithConfigure      = &syntheticTestResource{}
+	_ resource.ResourceWithImportState    = &syntheticTestResource{}
+	_ resource.ResourceWithValidateConfig = &syntheticTestResource{}
 )
 
 func NewSyntheticTestResource() resource.Resource {
@@ -45,6 +47,7 @@ type syntheticTestResourceModel struct {
 	Version  types.Int64  `tfsdk:"version"`
 
 	HTTPCheck *syntheticHTTPCheckModel  `tfsdk:"http_check"`
+	SSLCheck  *syntheticSSLCheckModel   `tfsdk:"ssl_check"`
 	Assertion []syntheticAssertionModel `tfsdk:"assertion"`
 	Retry     *syntheticRetryModel      `tfsdk:"retry"`
 	Labels    types.Map                 `tfsdk:"labels"`
@@ -73,6 +76,15 @@ type syntheticHTTPAuthModel struct {
 	Username types.String `tfsdk:"username"`
 	Password types.String `tfsdk:"password"`
 	Token    types.String `tfsdk:"token"`
+}
+
+type syntheticSSLCheckModel struct {
+	Host       types.String `tfsdk:"host"`
+	Port       types.Int64  `tfsdk:"port"`
+	Verify     types.Bool   `tfsdk:"verify"`
+	MinVersion types.String `tfsdk:"min_version"`
+	Sni        types.String `tfsdk:"sni"`
+	Timeout    types.String `tfsdk:"timeout"`
 }
 
 type syntheticAssertionModel struct {
@@ -114,7 +126,7 @@ func (r *syntheticTestResource) Metadata(_ context.Context, req resource.Metadat
 
 func (r *syntheticTestResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *resource.SchemaResponse) {
 	resp.Schema = schema.Schema{
-		Description: "Manages a groundcover Synthetic Test. Synthetic tests allow you to proactively monitor your services by running periodic HTTP checks against specified endpoints.",
+		Description: "Manages a groundcover Synthetic Test. Synthetic tests allow you to proactively monitor your services by running periodic HTTP or SSL/TLS checks against specified endpoints.",
 		Attributes: map[string]schema.Attribute{
 			"id": schema.StringAttribute{
 				Description: "The unique identifier (UUID) of the synthetic test.",
@@ -159,11 +171,11 @@ func (r *syntheticTestResource) Schema(_ context.Context, _ resource.SchemaReque
 				Attributes: map[string]schema.Attribute{
 					"url": schema.StringAttribute{
 						Description: "The URL to check (must include http:// or https://).",
-						Required:    true,
+						Optional:    true,
 					},
 					"method": schema.StringAttribute{
 						Description: "HTTP method. Supported: `GET`, `POST`, `PUT`, `PATCH`, `DELETE`, `HEAD`, `OPTIONS`.",
-						Required:    true,
+						Optional:    true,
 						Validators: []validator.String{
 							stringvalidator.OneOf("GET", "POST", "PUT", "PATCH", "DELETE", "HEAD", "OPTIONS"),
 						},
@@ -233,15 +245,47 @@ func (r *syntheticTestResource) Schema(_ context.Context, _ resource.SchemaReque
 					},
 				},
 			},
+			"ssl_check": schema.SingleNestedBlock{
+				Description: "SSL/TLS check configuration. Validates SSL certificates and TLS connections.",
+				Attributes: map[string]schema.Attribute{
+					"host": schema.StringAttribute{
+						Description: "The hostname to connect to for the SSL check.",
+						Optional:    true,
+					},
+					"port": schema.Int64Attribute{
+						Description: "The port to connect to (1-65535).",
+						Optional:    true,
+						Validators: []validator.Int64{
+							int64validator.Between(1, 65535),
+						},
+					},
+					"verify": schema.BoolAttribute{
+						Description: "Whether to verify the SSL certificate.",
+						Optional:    true,
+					},
+					"min_version": schema.StringAttribute{
+						Description: "Minimum TLS version to accept (e.g. `1.2`, `1.3`).",
+						Optional:    true,
+					},
+					"sni": schema.StringAttribute{
+						Description: "Server Name Indication (SNI) value for the TLS handshake. Defaults to the host value.",
+						Optional:    true,
+					},
+					"timeout": schema.StringAttribute{
+						Description: "Timeout for the SSL check (e.g. `5s`, `10s`).",
+						Optional:    true,
+					},
+				},
+			},
 			"assertion": schema.ListNestedBlock{
 				Description: "Assertions to validate the check result.",
 				NestedObject: schema.NestedBlockObject{
 					Attributes: map[string]schema.Attribute{
 						"source": schema.StringAttribute{
-							Description: "What to assert on: `statusCode`, `responseTime`, `responseHeader`, `jsonBody`, `responseBody`.",
+							Description: "What to assert on: `statusCode`, `responseTime`, `responseHeader`, `jsonBody`, `responseBody`, `ssl`.",
 							Required:    true,
 							Validators: []validator.String{
-								stringvalidator.OneOf("statusCode", "responseTime", "responseHeader", "jsonBody", "responseBody"),
+								stringvalidator.OneOf("statusCode", "responseTime", "responseHeader", "jsonBody", "responseBody", "ssl"),
 							},
 						},
 						"operator": schema.StringAttribute{
@@ -256,7 +300,7 @@ func (r *syntheticTestResource) Schema(_ context.Context, _ resource.SchemaReque
 							Optional:    true,
 						},
 						"property": schema.StringAttribute{
-							Description: "Property path for header or JSON body assertions (e.g. `Content-Type` or `data.id`).",
+							Description: "Property path for header, JSON body, or SSL assertions (e.g. `Content-Type`, `data.id`, `certificateValid`, `certificateExpiresIn`, `tlsVersion`, `chainValid`).",
 							Optional:    true,
 						},
 						"severity": schema.StringAttribute{
@@ -367,6 +411,68 @@ func (r *syntheticTestResource) Configure(_ context.Context, req resource.Config
 		return
 	}
 	r.client = client
+}
+
+// ValidateConfig ensures exactly one check type is configured.
+func (r *syntheticTestResource) ValidateConfig(ctx context.Context, req resource.ValidateConfigRequest, resp *resource.ValidateConfigResponse) {
+	var config syntheticTestResourceModel
+	resp.Diagnostics.Append(req.Config.Get(ctx, &config)...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+
+	hasHTTP := config.HTTPCheck != nil
+	hasSSL := config.SSLCheck != nil
+
+	if hasHTTP && hasSSL {
+		resp.Diagnostics.AddError(
+			"Conflicting check configuration",
+			"Only one of http_check or ssl_check may be specified.",
+		)
+		return
+	}
+
+	if !hasHTTP && !hasSSL {
+		resp.Diagnostics.AddError(
+			"Missing check configuration",
+			"Exactly one of http_check or ssl_check must be specified.",
+		)
+	}
+
+	// Skip required-field validation if values are unknown (e.g., computed or from other resources)
+	if hasHTTP && !config.HTTPCheck.URL.IsUnknown() && !config.HTTPCheck.Method.IsUnknown() {
+		if config.HTTPCheck.URL.IsNull() {
+			resp.Diagnostics.AddAttributeError(
+				path.Root("http_check").AtName("url"),
+				"Missing required attribute",
+				"The url attribute is required when http_check is configured.",
+			)
+		}
+		if config.HTTPCheck.Method.IsNull() {
+			resp.Diagnostics.AddAttributeError(
+				path.Root("http_check").AtName("method"),
+				"Missing required attribute",
+				"The method attribute is required when http_check is configured.",
+			)
+		}
+	}
+
+	if hasSSL && !config.SSLCheck.Host.IsUnknown() && !config.SSLCheck.Port.IsUnknown() {
+		if config.SSLCheck.Host.IsNull() {
+			resp.Diagnostics.AddAttributeError(
+				path.Root("ssl_check").AtName("host"),
+				"Missing required attribute",
+				"The host attribute is required when ssl_check is configured.",
+			)
+		}
+		if config.SSLCheck.Port.IsNull() {
+			resp.Diagnostics.AddAttributeError(
+				path.Root("ssl_check").AtName("port"),
+				"Missing required attribute",
+				"The port attribute is required when ssl_check is configured.",
+			)
+		}
+	}
 }
 
 // --- CRUD ---
@@ -603,6 +709,34 @@ func toSDKRequest(plan *syntheticTestResourceModel) *models.SyntheticTestCreateR
 		checkConfig.Request = &models.Request{HTTP: httpReq}
 	}
 
+	// SSL Check
+	if plan.SSLCheck != nil {
+		checkConfig.Kind = "ssl"
+		sslReq := &models.SslRequest{
+			Kind: "ssl",
+			Host: plan.SSLCheck.Host.ValueString(),
+			Port: plan.SSLCheck.Port.ValueInt64(),
+		}
+
+		if !plan.SSLCheck.Verify.IsNull() {
+			sslReq.Verify = plan.SSLCheck.Verify.ValueBool()
+		}
+
+		if !plan.SSLCheck.MinVersion.IsNull() {
+			sslReq.MinVersion = plan.SSLCheck.MinVersion.ValueString()
+		}
+
+		if !plan.SSLCheck.Sni.IsNull() {
+			sslReq.Sni = plan.SSLCheck.Sni.ValueString()
+		}
+
+		if !plan.SSLCheck.Timeout.IsNull() {
+			sslReq.Timeout = plan.SSLCheck.Timeout.ValueString()
+		}
+
+		checkConfig.Request = &models.Request{Ssl: sslReq}
+	}
+
 	// Assertions
 	if len(plan.Assertion) > 0 {
 		assertions := make([]*models.Assertion, 0, len(plan.Assertion))
@@ -771,6 +905,41 @@ func fromSDKResponse(ctx context.Context, sdkResp *models.SyntheticTestCreateReq
 		}
 
 		state.HTTPCheck = httpModel
+		state.SSLCheck = nil
+	}
+
+	// SSL Check
+	if cc.Request != nil && cc.Request.Ssl != nil {
+		ssl := cc.Request.Ssl
+		sslModel := &syntheticSSLCheckModel{
+			Host: types.StringValue(ssl.Host),
+			Port: types.Int64Value(ssl.Port),
+		}
+
+		if ssl.Verify || (state.SSLCheck != nil && !state.SSLCheck.Verify.IsNull()) {
+			sslModel.Verify = types.BoolValue(ssl.Verify)
+		}
+
+		if ssl.MinVersion != "" {
+			sslModel.MinVersion = types.StringValue(ssl.MinVersion)
+		} else if state.SSLCheck != nil && !state.SSLCheck.MinVersion.IsNull() {
+			sslModel.MinVersion = state.SSLCheck.MinVersion
+		}
+
+		if ssl.Sni != "" {
+			sslModel.Sni = types.StringValue(ssl.Sni)
+		} else if state.SSLCheck != nil && !state.SSLCheck.Sni.IsNull() {
+			sslModel.Sni = state.SSLCheck.Sni
+		}
+
+		if ssl.Timeout != "" {
+			sslModel.Timeout = types.StringValue(ssl.Timeout)
+		} else if state.SSLCheck != nil && !state.SSLCheck.Timeout.IsNull() {
+			sslModel.Timeout = state.SSLCheck.Timeout
+		}
+
+		state.SSLCheck = sslModel
+		state.HTTPCheck = nil
 	}
 
 	// Assertions
