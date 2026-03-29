@@ -171,11 +171,11 @@ func (r *syntheticTestResource) Schema(_ context.Context, _ resource.SchemaReque
 				Description: "HTTP check configuration. Defines the endpoint to monitor.",
 				Attributes: map[string]schema.Attribute{
 					"url": schema.StringAttribute{
-						Description: "The URL to check (must include http:// or https://).",
+						Description: "(Required) The URL to check (must include http:// or https://).",
 						Optional:    true,
 					},
 					"method": schema.StringAttribute{
-						Description: "HTTP method. Supported: `GET`, `POST`, `PUT`, `PATCH`, `DELETE`, `HEAD`, `OPTIONS`.",
+						Description: "(Required) HTTP method. Supported: `GET`, `POST`, `PUT`, `PATCH`, `DELETE`, `HEAD`, `OPTIONS`.",
 						Optional:    true,
 						Validators: []validator.String{
 							stringvalidator.OneOf("GET", "POST", "PUT", "PATCH", "DELETE", "HEAD", "OPTIONS"),
