@@ -1168,7 +1168,7 @@ func fromSDKResponse(ctx context.Context, sdkResp *models.SyntheticTestCreateReq
 				monitorModel.StatusFilters, _ = types.ListValueFrom(ctx, types.StringType, []string{})
 			}
 		}
-		if !prev.DisableRenotification.IsNull() {
+		if !prev.DisableRenotification.IsNull() || mon.DisableRenotification {
 			monitorModel.DisableRenotification = types.BoolValue(mon.DisableRenotification)
 		}
 
