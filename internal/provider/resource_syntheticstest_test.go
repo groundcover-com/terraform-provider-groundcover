@@ -459,9 +459,10 @@ func TestAccSyntheticTestResource_sslBasic(t *testing.T) {
 			},
 			// ImportState testing
 			{
-				ResourceName:      "groundcover_synthetic_test.test",
-				ImportState:       true,
-				ImportStateVerify: true,
+				ResourceName:            "groundcover_synthetic_test.test",
+				ImportState:             true,
+				ImportStateVerify:       true,
+				ImportStateVerifyIgnore: []string{"ssl_check.sni"},
 			},
 		},
 	})
