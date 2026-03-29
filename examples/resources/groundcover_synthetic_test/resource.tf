@@ -181,11 +181,11 @@ resource "groundcover_synthetic_test" "connected_apps_check" {
   }
 
   monitor {
-    severity                = "S2"
-    notification_method     = "connectedApps"
-    connected_apps          = ["slack-app-id", "pagerduty-app-id"]
-    status_filters          = ["Alerting", "Resolved"]
-    disable_renotification  = true
+    severity               = "S2"
+    notification_method    = "connectedApps"
+    connected_apps         = ["slack-app-id", "pagerduty-app-id"]
+    status_filters         = ["Alerting", "Resolved"]
+    disable_renotification = true
   }
 }
 

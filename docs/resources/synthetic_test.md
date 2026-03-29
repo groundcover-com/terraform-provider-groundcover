@@ -178,6 +178,32 @@ resource "groundcover_synthetic_test" "monitored_check" {
   }
 }
 
+# Example: With connected apps notification routing
+resource "groundcover_synthetic_test" "connected_apps_check" {
+  name     = "Connected Apps Notification Check"
+  interval = "1m"
+
+  http_check {
+    url     = "https://api.example.com/health"
+    method  = "GET"
+    timeout = "10s"
+  }
+
+  assertion {
+    source   = "statusCode"
+    operator = "eq"
+    target   = "200"
+  }
+
+  monitor {
+    severity               = "S2"
+    notification_method    = "connectedApps"
+    connected_apps         = ["slack-app-id", "pagerduty-app-id"]
+    status_filters         = ["Alerting", "Resolved"]
+    disable_renotification = true
+  }
+}
+
 # Example: SSL certificate check
 resource "groundcover_synthetic_test" "ssl_check" {
   name     = "SSL Certificate Check"
@@ -290,9 +316,9 @@ Optional:
 - `body` (Block, Optional) HTTP request body. (see [below for nested schema](#nestedblock--http_check--body))
 - `follow_redirects` (Boolean) Whether to follow HTTP redirects.
 - `headers` (Map of String) HTTP headers to send with the request.
-- `method` (String) HTTP method. Supported: `GET`, `POST`, `PUT`, `PATCH`, `DELETE`, `HEAD`, `OPTIONS`.
+- `method` (String) (Required) HTTP method. Supported: `GET`, `POST`, `PUT`, `PATCH`, `DELETE`, `HEAD`, `OPTIONS`.
 - `timeout` (String) Request timeout (e.g. `10s`, `30s`).
-- `url` (String) The URL to check (must include http:// or https://).
+- `url` (String) (Required) The URL to check (must include http:// or https://).
 
 <a id="nestedblock--http_check--auth"></a>
 ### Nested Schema for `http_check.auth`
@@ -320,6 +346,8 @@ Optional:
 
 Optional:
 
+- `connected_apps` (List of String) List of connected app IDs for direct notification delivery. Required when `notification_method` is `connectedApps`.
+- `disable_renotification` (Boolean) Disable repeated notifications for the same issue.
 - `enabled_workflows` (List of String) List of workflow IDs to route notifications to. Workflows and notification policies run simultaneously.
 - `evaluation_interval` (Block, Optional) Evaluation interval settings for the monitor. (see [below for nested schema](#nestedblock--monitor--evaluation_interval))
 - `execution_error_state` (String) How the monitor behaves on execution errors. `OK` treats errors as normal, `Alerting` treats them as issues.
@@ -328,8 +356,10 @@ Optional:
 - `lookbehind_window` (String) The time window the monitor looks back for evaluation (e.g. `5m`, `10m`).
 - `monitor_name` (String) Custom name for the monitor. If not set, a default name is derived from the synthetic test name.
 - `no_data_state` (String) How the monitor behaves when there is no data. `OK` treats no data as normal, `Alerting` treats it as an issue.
+- `notification_method` (String) How the synthetic monitor delivers alert notifications. Supported values: `notificationRoutes` (default), `connectedApps`, `noNotifications`.
 - `renotification_interval` (String) How long to wait before sending another notification while the alert is still firing (e.g. `15m`, `1h`, `4h`).
 - `severity` (String) Severity level for issues created by this monitor. Supported values: `S1`, `S2`, `S3`, `S4`, `none`.
+- `status_filters` (List of String) Which issue statuses trigger notifications. Supported values: `Alerting`, `Resolved`. Only applicable when `notification_method` is `connectedApps`.
 
 <a id="nestedblock--monitor--evaluation_interval"></a>
 ### Nested Schema for `monitor.evaluation_interval`
