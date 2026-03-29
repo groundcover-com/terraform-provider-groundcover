@@ -787,6 +787,207 @@ resource "groundcover_synthetic_test" "test" {
 `, name)
 }
 
+func TestAccSyntheticTestResource_notificationValidation_connectedAppsWithoutApps(t *testing.T) {
+	name := acctest.RandomWithPrefix("test-synth-val")
+
+	resource.Test(t, resource.TestCase{
+		PreCheck:                 func() { testAccPreCheck(t) },
+		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
+		Steps: []resource.TestStep{
+			{
+				Config: fmt.Sprintf(`
+resource "groundcover_synthetic_test" "test" {
+  name     = %[1]q
+  interval = "1m"
+  http_check {
+    url    = "https://httpbin.org/status/200"
+    method = "GET"
+  }
+  assertion {
+    source   = "statusCode"
+    operator = "eq"
+    target   = "200"
+  }
+  monitor {
+    notification_method = "connectedApps"
+  }
+}
+`, name),
+				ExpectError: regexp.MustCompile(`"connected_apps" must be set and non-empty`),
+			},
+		},
+	})
+}
+
+func TestAccSyntheticTestResource_notificationValidation_appsWithoutMethod(t *testing.T) {
+	name := acctest.RandomWithPrefix("test-synth-val")
+
+	resource.Test(t, resource.TestCase{
+		PreCheck:                 func() { testAccPreCheck(t) },
+		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
+		Steps: []resource.TestStep{
+			{
+				Config: fmt.Sprintf(`
+resource "groundcover_synthetic_test" "test" {
+  name     = %[1]q
+  interval = "1m"
+  http_check {
+    url    = "https://httpbin.org/status/200"
+    method = "GET"
+  }
+  assertion {
+    source   = "statusCode"
+    operator = "eq"
+    target   = "200"
+  }
+  monitor {
+    notification_method = "notificationRoutes"
+    connected_apps      = ["app-1"]
+  }
+}
+`, name),
+				ExpectError: regexp.MustCompile(`(?s)connected_apps.*can only be set`),
+			},
+		},
+	})
+}
+
+func TestAccSyntheticTestResource_notificationValidation_invalidStatusFilter(t *testing.T) {
+	name := acctest.RandomWithPrefix("test-synth-val")
+
+	resource.Test(t, resource.TestCase{
+		PreCheck:                 func() { testAccPreCheck(t) },
+		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
+		Steps: []resource.TestStep{
+			{
+				Config: fmt.Sprintf(`
+resource "groundcover_synthetic_test" "test" {
+  name     = %[1]q
+  interval = "1m"
+  http_check {
+    url    = "https://httpbin.org/status/200"
+    method = "GET"
+  }
+  assertion {
+    source   = "statusCode"
+    operator = "eq"
+    target   = "200"
+  }
+  monitor {
+    notification_method = "connectedApps"
+    connected_apps      = ["app-1"]
+    status_filters      = ["Alerting", "InvalidStatus"]
+  }
+}
+`, name),
+				ExpectError: regexp.MustCompile(`Invalid status_filter "InvalidStatus"`),
+			},
+		},
+	})
+}
+
+func TestAccSyntheticTestResource_notificationMethodConnectedApps(t *testing.T) {
+	name := acctest.RandomWithPrefix("test-synth-ca")
+
+	resource.Test(t, resource.TestCase{
+		PreCheck:                 func() { testAccPreCheck(t) },
+		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
+		Steps: []resource.TestStep{
+			// Step 1: Create with connectedApps
+			{
+				Config: testAccSyntheticTestResourceConfig_connectedApps(name),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					resource.TestCheckResourceAttr("groundcover_synthetic_test.test", "name", name),
+					resource.TestCheckResourceAttr("groundcover_synthetic_test.test", "monitor.notification_method", "connectedApps"),
+					resource.TestCheckResourceAttr("groundcover_synthetic_test.test", "monitor.connected_apps.#", "1"),
+					resource.TestCheckResourceAttr("groundcover_synthetic_test.test", "monitor.status_filters.#", "2"),
+					resource.TestCheckResourceAttr("groundcover_synthetic_test.test", "monitor.status_filters.0", "Alerting"),
+					resource.TestCheckResourceAttr("groundcover_synthetic_test.test", "monitor.status_filters.1", "Resolved"),
+					resource.TestCheckResourceAttr("groundcover_synthetic_test.test", "monitor.disable_renotification", "true"),
+				),
+			},
+			// Step 2: Switch to notificationRoutes — clears connected app reference so destroy succeeds
+			{
+				Config: testAccSyntheticTestResourceConfig_connectedAppsToRoutes(name),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					resource.TestCheckResourceAttr("groundcover_synthetic_test.test", "monitor.notification_method", "notificationRoutes"),
+				),
+			},
+		},
+	})
+}
+
+func testAccSyntheticTestResourceConfig_connectedApps(name string) string {
+	return fmt.Sprintf(`
+resource "groundcover_connected_app" "test" {
+  name = "%[1]s-app"
+  type = "slack-webhook"
+  data = {
+    url = "https://hooks.slack.com/services/TEST/WEBHOOK/URL"
+  }
+}
+
+resource "groundcover_synthetic_test" "test" {
+  name     = %[1]q
+  enabled  = true
+  interval = "1m"
+
+  http_check {
+    url    = "https://httpbin.org/status/200"
+    method = "GET"
+  }
+
+  assertion {
+    source   = "statusCode"
+    operator = "eq"
+    target   = "200"
+  }
+
+  monitor {
+    severity                = "S3"
+    notification_method     = "connectedApps"
+    connected_apps          = [groundcover_connected_app.test.id]
+    status_filters          = ["Alerting", "Resolved"]
+    disable_renotification  = true
+  }
+}
+`, name)
+}
+
+func testAccSyntheticTestResourceConfig_connectedAppsToRoutes(name string) string {
+	return fmt.Sprintf(`
+resource "groundcover_connected_app" "test" {
+  name = "%[1]s-app"
+  type = "slack-webhook"
+  data = {
+    url = "https://hooks.slack.com/services/TEST/WEBHOOK/URL"
+  }
+}
+
+resource "groundcover_synthetic_test" "test" {
+  name     = %[1]q
+  enabled  = true
+  interval = "1m"
+
+  http_check {
+    url    = "https://httpbin.org/status/200"
+    method = "GET"
+  }
+
+  assertion {
+    source   = "statusCode"
+    operator = "eq"
+    target   = "200"
+  }
+
+  monitor {
+    severity            = "S3"
+    notification_method = "notificationRoutes"
+  }
+}
+`, name)
+}
+
 func TestAccSyntheticTestResource_notificationMethodApplyLoop(t *testing.T) {
 	name := acctest.RandomWithPrefix("test-synth-notif-loop")
 
