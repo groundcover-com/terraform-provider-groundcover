@@ -733,6 +733,60 @@ resource "groundcover_synthetic_test" "test" {
 `, name)
 }
 
+func TestAccSyntheticTestResource_notificationMethod(t *testing.T) {
+	name := acctest.RandomWithPrefix("test-synth-notif")
+
+	resource.Test(t, resource.TestCase{
+		PreCheck:                 func() { testAccPreCheck(t) },
+		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
+		Steps: []resource.TestStep{
+			// Create with notificationRoutes method
+			{
+				Config: testAccSyntheticTestResourceConfig_notificationRoutes(name),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					resource.TestCheckResourceAttr("groundcover_synthetic_test.test", "name", name),
+					resource.TestCheckResourceAttr("groundcover_synthetic_test.test", "monitor.notification_method", "notificationRoutes"),
+					resource.TestCheckResourceAttr("groundcover_synthetic_test.test", "monitor.disable_renotification", "true"),
+				),
+			},
+			// ImportState testing
+			{
+				ResourceName:            "groundcover_synthetic_test.test",
+				ImportState:             true,
+				ImportStateVerify:       true,
+				ImportStateVerifyIgnore: []string{"monitor"},
+			},
+		},
+	})
+}
+
+func testAccSyntheticTestResourceConfig_notificationRoutes(name string) string {
+	return fmt.Sprintf(`
+resource "groundcover_synthetic_test" "test" {
+  name     = %[1]q
+  enabled  = true
+  interval = "1m"
+
+  http_check {
+    url    = "https://httpbin.org/status/200"
+    method = "GET"
+  }
+
+  assertion {
+    source   = "statusCode"
+    operator = "eq"
+    target   = "200"
+  }
+
+  monitor {
+    severity                = "S3"
+    notification_method     = "notificationRoutes"
+    disable_renotification  = true
+  }
+}
+`, name)
+}
+
 func testAccSyntheticTestResourceConfig_conflicting(name string) string {
 	return fmt.Sprintf(`
 resource "groundcover_synthetic_test" "test" {

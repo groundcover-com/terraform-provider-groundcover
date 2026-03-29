@@ -163,6 +163,32 @@ resource "groundcover_synthetic_test" "monitored_check" {
   }
 }
 
+# Example: With connected apps notification routing
+resource "groundcover_synthetic_test" "connected_apps_check" {
+  name     = "Connected Apps Notification Check"
+  interval = "1m"
+
+  http_check {
+    url     = "https://api.example.com/health"
+    method  = "GET"
+    timeout = "10s"
+  }
+
+  assertion {
+    source   = "statusCode"
+    operator = "eq"
+    target   = "200"
+  }
+
+  monitor {
+    severity                = "S2"
+    notification_method     = "connectedApps"
+    connected_apps          = ["slack-app-id", "pagerduty-app-id"]
+    status_filters          = ["Alerting", "Resolved"]
+    disable_renotification  = true
+  }
+}
+
 # Example: SSL certificate check
 resource "groundcover_synthetic_test" "ssl_check" {
   name     = "SSL Certificate Check"

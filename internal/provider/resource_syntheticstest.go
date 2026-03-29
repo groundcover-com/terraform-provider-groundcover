@@ -111,6 +111,10 @@ type syntheticMonitorModel struct {
 	LookbehindWindow       types.String                       `tfsdk:"lookbehind_window"`
 	RenotificationInterval types.String                       `tfsdk:"renotification_interval"`
 	EnabledWorkflows       types.List                         `tfsdk:"enabled_workflows"`
+	NotificationMethod     types.String                       `tfsdk:"notification_method"`
+	ConnectedApps          types.List                         `tfsdk:"connected_apps"`
+	StatusFilters          types.List                         `tfsdk:"status_filters"`
+	DisableRenotification  types.Bool                         `tfsdk:"disable_renotification"`
 	EvaluationInterval     *syntheticMonitorEvalIntervalModel `tfsdk:"evaluation_interval"`
 }
 
@@ -375,6 +379,27 @@ func (r *syntheticTestResource) Schema(_ context.Context, _ resource.SchemaReque
 						Description: "List of workflow IDs to route notifications to. Workflows and notification policies run simultaneously.",
 						Optional:    true,
 						ElementType: types.StringType,
+					},
+					"notification_method": schema.StringAttribute{
+						Description: "How the synthetic monitor delivers alert notifications. Supported values: `notificationRoutes` (default), `connectedApps`, `noNotifications`.",
+						Optional:    true,
+						Validators: []validator.String{
+							stringvalidator.OneOf("notificationRoutes", "connectedApps", "noNotifications"),
+						},
+					},
+					"connected_apps": schema.ListAttribute{
+						Description: "List of connected app IDs for direct notification delivery. Required when `notification_method` is `connectedApps`.",
+						Optional:    true,
+						ElementType: types.StringType,
+					},
+					"status_filters": schema.ListAttribute{
+						Description: "Which issue statuses trigger notifications. Supported values: `Alerting`, `Resolved`. Only applicable when `notification_method` is `connectedApps`.",
+						Optional:    true,
+						ElementType: types.StringType,
+					},
+					"disable_renotification": schema.BoolAttribute{
+						Description: "Disable repeated notifications for the same issue.",
+						Optional:    true,
 					},
 				},
 				Blocks: map[string]schema.Block{
@@ -819,6 +844,31 @@ func toSDKRequest(plan *syntheticTestResourceModel) *models.SyntheticTestCreateR
 			monitorConfig.EnabledWorkflows = workflows
 		}
 
+		if !plan.Monitor.NotificationMethod.IsNull() && !plan.Monitor.NotificationMethod.IsUnknown() {
+			monitorConfig.NotificationMethod = plan.Monitor.NotificationMethod.ValueString()
+		}
+		if !plan.Monitor.ConnectedApps.IsNull() && !plan.Monitor.ConnectedApps.IsUnknown() {
+			apps := make([]string, 0, len(plan.Monitor.ConnectedApps.Elements()))
+			for _, v := range plan.Monitor.ConnectedApps.Elements() {
+				if sv, ok := v.(types.String); ok {
+					apps = append(apps, sv.ValueString())
+				}
+			}
+			monitorConfig.ConnectedApps = apps
+		}
+		if !plan.Monitor.StatusFilters.IsNull() && !plan.Monitor.StatusFilters.IsUnknown() {
+			filters := make([]models.IssueStatus, 0, len(plan.Monitor.StatusFilters.Elements()))
+			for _, v := range plan.Monitor.StatusFilters.Elements() {
+				if sv, ok := v.(types.String); ok {
+					filters = append(filters, models.IssueStatus(sv.ValueString()))
+				}
+			}
+			monitorConfig.StatusFilters = filters
+		}
+		if !plan.Monitor.DisableRenotification.IsNull() && !plan.Monitor.DisableRenotification.IsUnknown() {
+			monitorConfig.DisableRenotification = plan.Monitor.DisableRenotification.ValueBool()
+		}
+
 		if plan.Monitor.EvaluationInterval != nil {
 			evalInterval := &models.SyntheticMonitorEvalInterval{}
 			if !plan.Monitor.EvaluationInterval.Interval.IsNull() && !plan.Monitor.EvaluationInterval.Interval.IsUnknown() {
@@ -994,6 +1044,8 @@ func fromSDKResponse(ctx context.Context, sdkResp *models.SyntheticTestCreateReq
 
 		monitorModel := &syntheticMonitorModel{
 			EnabledWorkflows: types.ListNull(types.StringType),
+			ConnectedApps:    types.ListNull(types.StringType),
+			StatusFilters:    types.ListNull(types.StringType),
 		}
 
 		if !prev.MonitorName.IsNull() {
@@ -1032,6 +1084,39 @@ func fromSDKResponse(ctx context.Context, sdkResp *models.SyntheticTestCreateReq
 			} else {
 				monitorModel.EnabledWorkflows, _ = types.ListValueFrom(ctx, types.StringType, []string{})
 			}
+		}
+
+		if !prev.NotificationMethod.IsNull() {
+			monitorModel.NotificationMethod = types.StringValue(mon.NotificationMethod)
+		}
+		if !prev.ConnectedApps.IsNull() {
+			if len(mon.ConnectedApps) > 0 {
+				appValues := make([]string, len(mon.ConnectedApps))
+				copy(appValues, mon.ConnectedApps)
+				appsList, diags := types.ListValueFrom(ctx, types.StringType, appValues)
+				if !diags.HasError() {
+					monitorModel.ConnectedApps = appsList
+				}
+			} else {
+				monitorModel.ConnectedApps, _ = types.ListValueFrom(ctx, types.StringType, []string{})
+			}
+		}
+		if !prev.StatusFilters.IsNull() {
+			if len(mon.StatusFilters) > 0 {
+				filterValues := make([]string, len(mon.StatusFilters))
+				for i, f := range mon.StatusFilters {
+					filterValues[i] = string(f)
+				}
+				filtersList, diags := types.ListValueFrom(ctx, types.StringType, filterValues)
+				if !diags.HasError() {
+					monitorModel.StatusFilters = filtersList
+				}
+			} else {
+				monitorModel.StatusFilters, _ = types.ListValueFrom(ctx, types.StringType, []string{})
+			}
+		}
+		if !prev.DisableRenotification.IsNull() {
+			monitorModel.DisableRenotification = types.BoolValue(mon.DisableRenotification)
 		}
 
 		if mon.EvaluationInterval != nil && prev.EvaluationInterval != nil {
