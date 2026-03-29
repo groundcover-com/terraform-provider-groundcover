@@ -439,16 +439,16 @@ func (r *syntheticTestResource) ValidateConfig(ctx context.Context, req resource
 		)
 	}
 
-	// Skip required-field validation if values are unknown (e.g., computed or from other resources)
-	if hasHTTP && !config.HTTPCheck.URL.IsUnknown() && !config.HTTPCheck.Method.IsUnknown() {
-		if config.HTTPCheck.URL.IsNull() {
+	// Validate required fields independently, skipping unknown values (e.g., computed or from other resources)
+	if hasHTTP {
+		if !config.HTTPCheck.URL.IsUnknown() && config.HTTPCheck.URL.IsNull() {
 			resp.Diagnostics.AddAttributeError(
 				path.Root("http_check").AtName("url"),
 				"Missing required attribute",
 				"The url attribute is required when http_check is configured.",
 			)
 		}
-		if config.HTTPCheck.Method.IsNull() {
+		if !config.HTTPCheck.Method.IsUnknown() && config.HTTPCheck.Method.IsNull() {
 			resp.Diagnostics.AddAttributeError(
 				path.Root("http_check").AtName("method"),
 				"Missing required attribute",
@@ -457,15 +457,15 @@ func (r *syntheticTestResource) ValidateConfig(ctx context.Context, req resource
 		}
 	}
 
-	if hasSSL && !config.SSLCheck.Host.IsUnknown() && !config.SSLCheck.Port.IsUnknown() {
-		if config.SSLCheck.Host.IsNull() {
+	if hasSSL {
+		if !config.SSLCheck.Host.IsUnknown() && config.SSLCheck.Host.IsNull() {
 			resp.Diagnostics.AddAttributeError(
 				path.Root("ssl_check").AtName("host"),
 				"Missing required attribute",
 				"The host attribute is required when ssl_check is configured.",
 			)
 		}
-		if config.SSLCheck.Port.IsNull() {
+		if !config.SSLCheck.Port.IsUnknown() && config.SSLCheck.Port.IsNull() {
 			resp.Diagnostics.AddAttributeError(
 				path.Root("ssl_check").AtName("port"),
 				"Missing required attribute",
