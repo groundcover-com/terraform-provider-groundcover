@@ -163,6 +163,53 @@ resource "groundcover_synthetic_test" "monitored_check" {
   }
 }
 
+# Example: SSL certificate check
+resource "groundcover_synthetic_test" "ssl_check" {
+  name     = "SSL Certificate Check"
+  interval = "5m"
+
+  ssl_check {
+    host = "example.com"
+    port = 443
+  }
+
+  assertion {
+    source   = "ssl"
+    operator = "exists"
+    target   = "true"
+    property = "certificateValid"
+  }
+}
+
+# Example: SSL check with TLS version requirement
+resource "groundcover_synthetic_test" "ssl_tls_check" {
+  name     = "TLS Version Check"
+  interval = "10m"
+
+  ssl_check {
+    host        = "api.example.com"
+    port        = 443
+    verify      = true
+    min_version = "1.2"
+    sni         = "api.example.com"
+    timeout     = "10s"
+  }
+
+  assertion {
+    source   = "ssl"
+    operator = "exists"
+    target   = "true"
+    property = "certificateValid"
+  }
+
+  assertion {
+    source   = "ssl"
+    operator = "exists"
+    target   = "true"
+    property = "chainValid"
+  }
+}
+
 output "http_health_check_id" {
   value = groundcover_synthetic_test.http_health_check.id
 }
@@ -173,4 +220,8 @@ output "http_post_check_id" {
 
 output "monitored_check_id" {
   value = groundcover_synthetic_test.monitored_check.id
+}
+
+output "ssl_check_id" {
+  value = groundcover_synthetic_test.ssl_check.id
 }

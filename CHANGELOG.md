@@ -1,3 +1,9 @@
+## 1.10.0
+
+* Added SSL/TLS check support to `groundcover_synthetic_test` resource — supports `host`, `port`, `verify`, `min_version`, `sni`, and `timeout` configuration for proactive certificate and TLS connection monitoring
+* Added SSL assertion source (`ssl`) with properties: `certificateValid`, `certificateExpiresIn`, `tlsVersion`, `chainValid`
+* Updated groundcover SDK from v1.225.0 to v1.232.0
+
 ## 1.9.1
 
 * Added `content_hash` computed attribute to `groundcover_secret` resource — returns FNV1a hash (hex encoded) of the secret content, enabling drift detection for external changes

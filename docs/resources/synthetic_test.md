@@ -3,12 +3,12 @@
 page_title: "groundcover_synthetic_test Resource - groundcover"
 subcategory: ""
 description: |-
-  Manages a groundcover Synthetic Test. Synthetic tests allow you to proactively monitor your services by running periodic HTTP checks against specified endpoints.
+  Manages a groundcover Synthetic Test. Synthetic tests allow you to proactively monitor your services by running periodic HTTP or SSL/TLS checks against specified endpoints.
 ---
 
 # groundcover_synthetic_test (Resource)
 
-Manages a groundcover Synthetic Test. Synthetic tests allow you to proactively monitor your services by running periodic HTTP checks against specified endpoints.
+Manages a groundcover Synthetic Test. Synthetic tests allow you to proactively monitor your services by running periodic HTTP or SSL/TLS checks against specified endpoints.
 
 ## Example Usage
 
@@ -178,6 +178,53 @@ resource "groundcover_synthetic_test" "monitored_check" {
   }
 }
 
+# Example: SSL certificate check
+resource "groundcover_synthetic_test" "ssl_check" {
+  name     = "SSL Certificate Check"
+  interval = "5m"
+
+  ssl_check {
+    host = "example.com"
+    port = 443
+  }
+
+  assertion {
+    source   = "ssl"
+    operator = "exists"
+    target   = "true"
+    property = "certificateValid"
+  }
+}
+
+# Example: SSL check with TLS version requirement
+resource "groundcover_synthetic_test" "ssl_tls_check" {
+  name     = "TLS Version Check"
+  interval = "10m"
+
+  ssl_check {
+    host        = "api.example.com"
+    port        = 443
+    verify      = true
+    min_version = "1.2"
+    sni         = "api.example.com"
+    timeout     = "10s"
+  }
+
+  assertion {
+    source   = "ssl"
+    operator = "exists"
+    target   = "true"
+    property = "certificateValid"
+  }
+
+  assertion {
+    source   = "ssl"
+    operator = "exists"
+    target   = "true"
+    property = "chainValid"
+  }
+}
+
 output "http_health_check_id" {
   value = groundcover_synthetic_test.http_health_check.id
 }
@@ -188,6 +235,10 @@ output "http_post_check_id" {
 
 output "monitored_check_id" {
   value = groundcover_synthetic_test.monitored_check.id
+}
+
+output "ssl_check_id" {
+  value = groundcover_synthetic_test.ssl_check.id
 }
 ```
 
@@ -207,6 +258,7 @@ output "monitored_check_id" {
 - `labels` (Map of String) Extra labels to attach to the synthetic test metrics.
 - `monitor` (Block, Optional) Monitor configuration for the synthetic test. Controls the monitor that is automatically created for this test, including alerting behavior and notification routing. (see [below for nested schema](#nestedblock--monitor))
 - `retry` (Block, Optional) Retry policy for failed checks. (see [below for nested schema](#nestedblock--retry))
+- `ssl_check` (Block, Optional) SSL/TLS check configuration. Validates SSL certificates and TLS connections. (see [below for nested schema](#nestedblock--ssl_check))
 
 ### Read-Only
 
@@ -219,22 +271,17 @@ output "monitored_check_id" {
 Required:
 
 - `operator` (String) Comparison operator: `eq`, `ne`, `gt`, `lt`, `contains`, `exists`, `notExists`, `startsWith`, `endsWith`, `regex`, `oneOf`.
-- `source` (String) What to assert on: `statusCode`, `responseTime`, `responseHeader`, `jsonBody`, `responseBody`.
+- `source` (String) What to assert on: `statusCode`, `responseTime`, `responseHeader`, `jsonBody`, `responseBody`, `ssl`.
 
 Optional:
 
-- `property` (String) Property path for header or JSON body assertions (e.g. `Content-Type` or `data.id`).
+- `property` (String) Property path for header, JSON body, or SSL assertions (e.g. `Content-Type`, `data.id`, `certificateValid`, `certificateExpiresIn`, `tlsVersion`, `chainValid`).
 - `severity` (String) Assertion severity: `critical` (default) or `degraded`.
 - `target` (String) Expected value to compare against (as string, e.g. `"200"` for status code).
 
 
 <a id="nestedblock--http_check"></a>
 ### Nested Schema for `http_check`
-
-Required:
-
-- `method` (String) HTTP method. Supported: `GET`, `POST`, `PUT`, `PATCH`, `DELETE`, `HEAD`, `OPTIONS`.
-- `url` (String) The URL to check (must include http:// or https://).
 
 Optional:
 
@@ -243,7 +290,9 @@ Optional:
 - `body` (Block, Optional) HTTP request body. (see [below for nested schema](#nestedblock--http_check--body))
 - `follow_redirects` (Boolean) Whether to follow HTTP redirects.
 - `headers` (Map of String) HTTP headers to send with the request.
+- `method` (String) HTTP method. Supported: `GET`, `POST`, `PUT`, `PATCH`, `DELETE`, `HEAD`, `OPTIONS`.
 - `timeout` (String) Request timeout (e.g. `10s`, `30s`).
+- `url` (String) The URL to check (must include http:// or https://).
 
 <a id="nestedblock--http_check--auth"></a>
 ### Nested Schema for `http_check.auth`
@@ -299,6 +348,19 @@ Optional:
 
 - `count` (Number) Number of retry attempts.
 - `interval` (String) Delay between retries (e.g. `1s`, `500ms`).
+
+
+<a id="nestedblock--ssl_check"></a>
+### Nested Schema for `ssl_check`
+
+Optional:
+
+- `host` (String) The hostname to connect to for the SSL check.
+- `min_version` (String) Minimum TLS version to accept (e.g. `1.2`, `1.3`).
+- `port` (Number) The port to connect to (1-65535).
+- `sni` (String) Server Name Indication (SNI) value for the TLS handshake. Defaults to the host value.
+- `timeout` (String) Timeout for the SSL check (e.g. `5s`, `10s`).
+- `verify` (Boolean) Whether to verify the SSL certificate.
 
 ## Import
 
