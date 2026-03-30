@@ -17,7 +17,7 @@ func TestAccApiKeyResource(t *testing.T) {
 	name := acctest.RandomWithPrefix("test-apikey")
 	updatedName := acctest.RandomWithPrefix("test-apikey-updated")
 
-	resource.Test(t, resource.TestCase{
+	resource.ParallelTest(t, resource.TestCase{
 		PreCheck:                 func() { testAccPreCheck(t) },
 		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
 		Steps: []resource.TestStep{
@@ -54,7 +54,7 @@ func TestAccApiKeyResource(t *testing.T) {
 func TestAccApiKeyResource_disappears(t *testing.T) {
 	name := acctest.RandomWithPrefix("test-apikey")
 
-	resource.Test(t, resource.TestCase{
+	resource.ParallelTest(t, resource.TestCase{
 		PreCheck:                 func() { testAccPreCheck(t) },
 		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
 		Steps: []resource.TestStep{

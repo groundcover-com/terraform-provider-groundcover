@@ -17,7 +17,7 @@ func TestAccSecretResource(t *testing.T) {
 	name := acctest.RandomWithPrefix("test-secret")
 	updatedName := acctest.RandomWithPrefix("test-secret-updated")
 
-	resource.Test(t, resource.TestCase{
+	resource.ParallelTest(t, resource.TestCase{
 		PreCheck:                 func() { testAccPreCheck(t) },
 		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
 		Steps: []resource.TestStep{
@@ -55,7 +55,7 @@ func TestAccSecretResource(t *testing.T) {
 func TestAccSecretResource_passwordType(t *testing.T) {
 	name := acctest.RandomWithPrefix("test-secret-password")
 
-	resource.Test(t, resource.TestCase{
+	resource.ParallelTest(t, resource.TestCase{
 		PreCheck:                 func() { testAccPreCheck(t) },
 		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
 		Steps: []resource.TestStep{
@@ -75,7 +75,7 @@ func TestAccSecretResource_passwordType(t *testing.T) {
 func TestAccSecretResource_basicAuthType(t *testing.T) {
 	name := acctest.RandomWithPrefix("test-secret-basicauth")
 
-	resource.Test(t, resource.TestCase{
+	resource.ParallelTest(t, resource.TestCase{
 		PreCheck:                 func() { testAccPreCheck(t) },
 		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
 		Steps: []resource.TestStep{

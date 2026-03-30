@@ -15,7 +15,7 @@ func TestAccDashboardResource_Simple(t *testing.T) {
 	timestamp := time.Now().Unix()
 	dashboardName := fmt.Sprintf("simple_dashboard_%d", timestamp)
 
-	resource.Test(t, resource.TestCase{
+	resource.ParallelTest(t, resource.TestCase{
 		PreCheck:                 func() { testAccPreCheck(t) },
 		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
 		Steps: []resource.TestStep{
@@ -36,7 +36,7 @@ func TestAccDashboardResource(t *testing.T) {
 	timestamp := time.Now().Unix()
 	dashboardName := fmt.Sprintf("test_dashboard_%d", timestamp)
 
-	resource.Test(t, resource.TestCase{
+	resource.ParallelTest(t, resource.TestCase{
 		PreCheck:                 func() { testAccPreCheck(t) },
 		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
 		Steps: []resource.TestStep{
@@ -82,7 +82,7 @@ func TestAccDashboardResource_Update(t *testing.T) {
 	dashboardName := fmt.Sprintf("update_dashboard_%d", timestamp)
 	updatedName := fmt.Sprintf("updated_dashboard_%d", timestamp)
 
-	resource.Test(t, resource.TestCase{
+	resource.ParallelTest(t, resource.TestCase{
 		PreCheck:                 func() { testAccPreCheck(t) },
 		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
 		Steps: []resource.TestStep{
@@ -123,7 +123,7 @@ func TestAccDashboardResource_EmptyTeam(t *testing.T) {
 	timestamp := time.Now().Unix()
 	dashboardName := fmt.Sprintf("empty_team_dashboard_%d", timestamp)
 
-	resource.Test(t, resource.TestCase{
+	resource.ParallelTest(t, resource.TestCase{
 		PreCheck:                 func() { testAccPreCheck(t) },
 		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
 		Steps: []resource.TestStep{
@@ -155,7 +155,7 @@ func TestAccDashboardResource_ApplyLoopIssue(t *testing.T) {
 	timestamp := time.Now().Unix()
 	dashboardName := fmt.Sprintf("apply_loop_test_%d", timestamp)
 
-	resource.Test(t, resource.TestCase{
+	resource.ParallelTest(t, resource.TestCase{
 		PreCheck:                 func() { testAccPreCheck(t) },
 		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
 		Steps: []resource.TestStep{
@@ -197,7 +197,7 @@ func TestAccDashboardResource_disappears(t *testing.T) {
 	timestamp := time.Now().Unix()
 	dashboardName := fmt.Sprintf("disappears_dashboard_%d", timestamp)
 
-	resource.Test(t, resource.TestCase{
+	resource.ParallelTest(t, resource.TestCase{
 		PreCheck:                 func() { testAccPreCheck(t) },
 		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
 		Steps: []resource.TestStep{

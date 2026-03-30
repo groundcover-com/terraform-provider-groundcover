@@ -17,7 +17,7 @@ func TestAccServiceAccountResource(t *testing.T) {
 	name := acctest.RandomWithPrefix("test-serviceaccount")
 	updatedEmail := "updated-" + name + "@example.com"
 
-	resource.Test(t, resource.TestCase{
+	resource.ParallelTest(t, resource.TestCase{
 		PreCheck:                 func() { testAccPreCheck(t) },
 		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
 		Steps: []resource.TestStep{
@@ -47,7 +47,7 @@ func TestAccServiceAccountResource_withPolicy(t *testing.T) {
 	name := acctest.RandomWithPrefix("test-serviceaccount")
 	policyName := acctest.RandomWithPrefix("test-policy")
 
-	resource.Test(t, resource.TestCase{
+	resource.ParallelTest(t, resource.TestCase{
 		PreCheck:                 func() { testAccPreCheck(t) },
 		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
 		Steps: []resource.TestStep{
@@ -69,7 +69,7 @@ func TestAccServiceAccountResource_withPolicy(t *testing.T) {
 func TestAccServiceAccountResource_disappears(t *testing.T) {
 	name := acctest.RandomWithPrefix("test-serviceaccount")
 
-	resource.Test(t, resource.TestCase{
+	resource.ParallelTest(t, resource.TestCase{
 		PreCheck:                 func() { testAccPreCheck(t) },
 		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
 		Steps: []resource.TestStep{

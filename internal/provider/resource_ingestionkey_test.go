@@ -21,7 +21,7 @@ func TestAccIngestionKeyResource(t *testing.T) {
 	name := acctest.RandomWithPrefix("test-ingestionkey")
 	updatedName := acctest.RandomWithPrefix("test-ingestionkey-updated")
 
-	resource.Test(t, resource.TestCase{
+	resource.ParallelTest(t, resource.TestCase{
 		PreCheck: func() {
 			testAccPreCheckIngestionKey(t)
 		},
@@ -62,7 +62,7 @@ func TestAccIngestionKeyResource(t *testing.T) {
 func TestAccIngestionKeyResource_typeRum(t *testing.T) {
 	name := acctest.RandomWithPrefix("test-ingestionkey-rum")
 
-	resource.Test(t, resource.TestCase{
+	resource.ParallelTest(t, resource.TestCase{
 		PreCheck: func() {
 			testAccPreCheckIngestionKey(t)
 		},
@@ -84,7 +84,7 @@ func TestAccIngestionKeyResource_typeRum(t *testing.T) {
 func TestAccIngestionKeyResource_typeThirdParty(t *testing.T) {
 	name := acctest.RandomWithPrefix("test-ingestionkey-tp")
 
-	resource.Test(t, resource.TestCase{
+	resource.ParallelTest(t, resource.TestCase{
 		PreCheck: func() {
 			testAccPreCheckIngestionKey(t)
 		},
@@ -106,7 +106,7 @@ func TestAccIngestionKeyResource_typeThirdParty(t *testing.T) {
 func TestAccIngestionKeyResource_disappears(t *testing.T) {
 	name := acctest.RandomWithPrefix("test-ingestionkey")
 
-	resource.Test(t, resource.TestCase{
+	resource.ParallelTest(t, resource.TestCase{
 		PreCheck: func() {
 			testAccPreCheckIngestionKey(t)
 		},

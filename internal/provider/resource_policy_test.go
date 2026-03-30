@@ -20,7 +20,7 @@ func TestAccPolicyResource(t *testing.T) {
 	name := acctest.RandomWithPrefix("test-policy")
 	updatedName := acctest.RandomWithPrefix("test-policy-updated")
 
-	resource.Test(t, resource.TestCase{
+	resource.ParallelTest(t, resource.TestCase{
 		PreCheck:                 func() { testAccPreCheck(t) },
 		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
 		Steps: []resource.TestStep{
@@ -57,7 +57,7 @@ func TestAccPolicyResource(t *testing.T) {
 func TestAccPolicyResource_complex(t *testing.T) {
 	name := acctest.RandomWithPrefix("test-policy-complex")
 
-	resource.Test(t, resource.TestCase{
+	resource.ParallelTest(t, resource.TestCase{
 		PreCheck:                 func() { testAccPreCheck(t) },
 		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
 		Steps: []resource.TestStep{
@@ -78,7 +78,7 @@ func TestAccPolicyResource_complex(t *testing.T) {
 func TestAccPolicyResource_disappears(t *testing.T) {
 	name := acctest.RandomWithPrefix("test-policy")
 
-	resource.Test(t, resource.TestCase{
+	resource.ParallelTest(t, resource.TestCase{
 		PreCheck:                 func() { testAccPreCheck(t) },
 		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
 		Steps: []resource.TestStep{
@@ -97,7 +97,7 @@ func TestAccPolicyResource_disappears(t *testing.T) {
 func TestAccPolicyResource_advanced(t *testing.T) {
 	name := acctest.RandomWithPrefix("test-policy-advanced")
 
-	resource.Test(t, resource.TestCase{
+	resource.ParallelTest(t, resource.TestCase{
 		PreCheck:                 func() { testAccPreCheck(t) },
 		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
 		Steps: []resource.TestStep{
@@ -120,7 +120,7 @@ func TestAccPolicyResource_advancedUpdate(t *testing.T) {
 	name := acctest.RandomWithPrefix("test-policy-advanced-update")
 	updatedName := acctest.RandomWithPrefix("test-policy-advanced-updated")
 
-	resource.Test(t, resource.TestCase{
+	resource.ParallelTest(t, resource.TestCase{
 		PreCheck:                 func() { testAccPreCheck(t) },
 		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
 		Steps: []resource.TestStep{
@@ -252,7 +252,7 @@ resource "groundcover_policy" "test" {
 func TestAccPolicyResource_noData(t *testing.T) {
 	name := acctest.RandomWithPrefix("test-policy-no-data")
 
-	resource.Test(t, resource.TestCase{
+	resource.ParallelTest(t, resource.TestCase{
 		PreCheck:                 func() { testAccPreCheck(t) },
 		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
 		Steps: []resource.TestStep{
@@ -291,7 +291,7 @@ resource "groundcover_policy" "test" {
 func TestAccPolicyResource_invalidBothScopes(t *testing.T) {
 	name := acctest.RandomWithPrefix("test-policy-invalid")
 
-	resource.Test(t, resource.TestCase{
+	resource.ParallelTest(t, resource.TestCase{
 		PreCheck:                 func() { testAccPreCheck(t) },
 		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
 		Steps: []resource.TestStep{
@@ -306,7 +306,7 @@ func TestAccPolicyResource_invalidBothScopes(t *testing.T) {
 func TestAccPolicyResource_invalidNeitherScope(t *testing.T) {
 	name := acctest.RandomWithPrefix("test-policy-invalid-neither")
 
-	resource.Test(t, resource.TestCase{
+	resource.ParallelTest(t, resource.TestCase{
 		PreCheck:                 func() { testAccPreCheck(t) },
 		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
 		Steps: []resource.TestStep{

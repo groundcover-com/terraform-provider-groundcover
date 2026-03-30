@@ -17,7 +17,7 @@ import (
 func TestAccSyntheticTestResource_basic(t *testing.T) {
 	name := acctest.RandomWithPrefix("test-synth")
 
-	resource.Test(t, resource.TestCase{
+	resource.ParallelTest(t, resource.TestCase{
 		PreCheck:                 func() { testAccPreCheck(t) },
 		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
 		Steps: []resource.TestStep{
@@ -56,7 +56,7 @@ func TestAccSyntheticTestResource_update(t *testing.T) {
 	name := acctest.RandomWithPrefix("test-synth")
 	updatedName := name + "-updated"
 
-	resource.Test(t, resource.TestCase{
+	resource.ParallelTest(t, resource.TestCase{
 		PreCheck:                 func() { testAccPreCheck(t) },
 		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
 		Steps: []resource.TestStep{
@@ -88,7 +88,7 @@ func TestAccSyntheticTestResource_update(t *testing.T) {
 func TestAccSyntheticTestResource_withRetry(t *testing.T) {
 	name := acctest.RandomWithPrefix("test-synth-retry")
 
-	resource.Test(t, resource.TestCase{
+	resource.ParallelTest(t, resource.TestCase{
 		PreCheck:                 func() { testAccPreCheck(t) },
 		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
 		Steps: []resource.TestStep{
@@ -108,7 +108,7 @@ func TestAccSyntheticTestResource_withRetry(t *testing.T) {
 func TestAccSyntheticTestResource_applyLoop(t *testing.T) {
 	name := acctest.RandomWithPrefix("test-synth-loop")
 
-	resource.Test(t, resource.TestCase{
+	resource.ParallelTest(t, resource.TestCase{
 		PreCheck:                 func() { testAccPreCheck(t) },
 		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
 		Steps: []resource.TestStep{
@@ -143,7 +143,7 @@ func TestAccSyntheticTestResource_applyLoop(t *testing.T) {
 func TestAccSyntheticTestResource_disappears(t *testing.T) {
 	name := acctest.RandomWithPrefix("test-synth-disappear")
 
-	resource.Test(t, resource.TestCase{
+	resource.ParallelTest(t, resource.TestCase{
 		PreCheck:                 func() { testAccPreCheck(t) },
 		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
 		Steps: []resource.TestStep{
@@ -162,7 +162,7 @@ func TestAccSyntheticTestResource_disappears(t *testing.T) {
 func TestAccSyntheticTestResource_withMonitor(t *testing.T) {
 	name := acctest.RandomWithPrefix("test-synth-monitor")
 
-	resource.Test(t, resource.TestCase{
+	resource.ParallelTest(t, resource.TestCase{
 		PreCheck:                 func() { testAccPreCheck(t) },
 		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
 		Steps: []resource.TestStep{
@@ -226,7 +226,7 @@ func TestAccSyntheticTestResource_withMonitor(t *testing.T) {
 func TestAccSyntheticTestResource_withMonitorMinimal(t *testing.T) {
 	name := acctest.RandomWithPrefix("test-synth-mon-min")
 
-	resource.Test(t, resource.TestCase{
+	resource.ParallelTest(t, resource.TestCase{
 		PreCheck:                 func() { testAccPreCheck(t) },
 		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
 		Steps: []resource.TestStep{
