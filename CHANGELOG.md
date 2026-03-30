@@ -1,8 +1,9 @@
 ## 1.10.0
 
+* Added notification routing support to `groundcover_synthetic_test` monitor block — supports `notification_method`, `connected_apps`, `status_filters`, and `disable_renotification` for controlling how synthetic monitor alerts are delivered
 * Added SSL/TLS check support to `groundcover_synthetic_test` resource — supports `host`, `port`, `verify`, `min_version`, `sni`, and `timeout` configuration for proactive certificate and TLS connection monitoring
 * Added SSL assertion source (`ssl`) with properties: `certificateValid`, `certificateExpiresIn`, `tlsVersion`, `chainValid`
-* Updated groundcover SDK from v1.225.0 to v1.232.0
+* Updated groundcover SDK from v1.225.0 to v1.235.0
 
 ## 1.9.1
 
