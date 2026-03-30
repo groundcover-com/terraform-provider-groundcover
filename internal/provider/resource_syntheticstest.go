@@ -6,7 +6,9 @@ import (
 	"fmt"
 
 	"github.com/groundcover-com/groundcover-sdk-go/pkg/models"
+	"github.com/hashicorp/terraform-plugin-framework-validators/int64validator"
 	"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
+	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
@@ -22,9 +24,10 @@ import (
 
 // Ensure resource implements required interfaces
 var (
-	_ resource.Resource                = &syntheticTestResource{}
-	_ resource.ResourceWithConfigure   = &syntheticTestResource{}
-	_ resource.ResourceWithImportState = &syntheticTestResource{}
+	_ resource.Resource                   = &syntheticTestResource{}
+	_ resource.ResourceWithConfigure      = &syntheticTestResource{}
+	_ resource.ResourceWithImportState    = &syntheticTestResource{}
+	_ resource.ResourceWithValidateConfig = &syntheticTestResource{}
 )
 
 func NewSyntheticTestResource() resource.Resource {
@@ -45,6 +48,7 @@ type syntheticTestResourceModel struct {
 	Version  types.Int64  `tfsdk:"version"`
 
 	HTTPCheck *syntheticHTTPCheckModel  `tfsdk:"http_check"`
+	SSLCheck  *syntheticSSLCheckModel   `tfsdk:"ssl_check"`
 	Assertion []syntheticAssertionModel `tfsdk:"assertion"`
 	Retry     *syntheticRetryModel      `tfsdk:"retry"`
 	Labels    types.Map                 `tfsdk:"labels"`
@@ -75,6 +79,15 @@ type syntheticHTTPAuthModel struct {
 	Token    types.String `tfsdk:"token"`
 }
 
+type syntheticSSLCheckModel struct {
+	Host       types.String `tfsdk:"host"`
+	Port       types.Int64  `tfsdk:"port"`
+	Verify     types.Bool   `tfsdk:"verify"`
+	MinVersion types.String `tfsdk:"min_version"`
+	Sni        types.String `tfsdk:"sni"`
+	Timeout    types.String `tfsdk:"timeout"`
+}
+
 type syntheticAssertionModel struct {
 	Source   types.String `tfsdk:"source"`
 	Operator types.String `tfsdk:"operator"`
@@ -98,6 +111,10 @@ type syntheticMonitorModel struct {
 	LookbehindWindow       types.String                       `tfsdk:"lookbehind_window"`
 	RenotificationInterval types.String                       `tfsdk:"renotification_interval"`
 	EnabledWorkflows       types.List                         `tfsdk:"enabled_workflows"`
+	NotificationMethod     types.String                       `tfsdk:"notification_method"`
+	ConnectedApps          types.List                         `tfsdk:"connected_apps"`
+	StatusFilters          types.List                         `tfsdk:"status_filters"`
+	DisableRenotification  types.Bool                         `tfsdk:"disable_renotification"`
 	EvaluationInterval     *syntheticMonitorEvalIntervalModel `tfsdk:"evaluation_interval"`
 }
 
@@ -114,7 +131,7 @@ func (r *syntheticTestResource) Metadata(_ context.Context, req resource.Metadat
 
 func (r *syntheticTestResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *resource.SchemaResponse) {
 	resp.Schema = schema.Schema{
-		Description: "Manages a groundcover Synthetic Test. Synthetic tests allow you to proactively monitor your services by running periodic HTTP checks against specified endpoints.",
+		Description: "Manages a groundcover Synthetic Test. Synthetic tests allow you to proactively monitor your services by running periodic HTTP or SSL/TLS checks against specified endpoints.",
 		Attributes: map[string]schema.Attribute{
 			"id": schema.StringAttribute{
 				Description: "The unique identifier (UUID) of the synthetic test.",
@@ -158,12 +175,12 @@ func (r *syntheticTestResource) Schema(_ context.Context, _ resource.SchemaReque
 				Description: "HTTP check configuration. Defines the endpoint to monitor.",
 				Attributes: map[string]schema.Attribute{
 					"url": schema.StringAttribute{
-						Description: "The URL to check (must include http:// or https://).",
-						Required:    true,
+						Description: "(Required) The URL to check (must include http:// or https://).",
+						Optional:    true,
 					},
 					"method": schema.StringAttribute{
-						Description: "HTTP method. Supported: `GET`, `POST`, `PUT`, `PATCH`, `DELETE`, `HEAD`, `OPTIONS`.",
-						Required:    true,
+						Description: "(Required) HTTP method. Supported: `GET`, `POST`, `PUT`, `PATCH`, `DELETE`, `HEAD`, `OPTIONS`.",
+						Optional:    true,
 						Validators: []validator.String{
 							stringvalidator.OneOf("GET", "POST", "PUT", "PATCH", "DELETE", "HEAD", "OPTIONS"),
 						},
@@ -233,15 +250,47 @@ func (r *syntheticTestResource) Schema(_ context.Context, _ resource.SchemaReque
 					},
 				},
 			},
+			"ssl_check": schema.SingleNestedBlock{
+				Description: "SSL/TLS check configuration. Validates SSL certificates and TLS connections.",
+				Attributes: map[string]schema.Attribute{
+					"host": schema.StringAttribute{
+						Description: "The hostname to connect to for the SSL check.",
+						Optional:    true,
+					},
+					"port": schema.Int64Attribute{
+						Description: "The port to connect to (1-65535).",
+						Optional:    true,
+						Validators: []validator.Int64{
+							int64validator.Between(1, 65535),
+						},
+					},
+					"verify": schema.BoolAttribute{
+						Description: "Whether to verify the SSL certificate.",
+						Optional:    true,
+					},
+					"min_version": schema.StringAttribute{
+						Description: "Minimum TLS version to accept (e.g. `1.2`, `1.3`).",
+						Optional:    true,
+					},
+					"sni": schema.StringAttribute{
+						Description: "Server Name Indication (SNI) value for the TLS handshake. Defaults to the host value.",
+						Optional:    true,
+					},
+					"timeout": schema.StringAttribute{
+						Description: "Timeout for the SSL check (e.g. `5s`, `10s`).",
+						Optional:    true,
+					},
+				},
+			},
 			"assertion": schema.ListNestedBlock{
 				Description: "Assertions to validate the check result.",
 				NestedObject: schema.NestedBlockObject{
 					Attributes: map[string]schema.Attribute{
 						"source": schema.StringAttribute{
-							Description: "What to assert on: `statusCode`, `responseTime`, `responseHeader`, `jsonBody`, `responseBody`.",
+							Description: "What to assert on: `statusCode`, `responseTime`, `responseHeader`, `jsonBody`, `responseBody`, `ssl`.",
 							Required:    true,
 							Validators: []validator.String{
-								stringvalidator.OneOf("statusCode", "responseTime", "responseHeader", "jsonBody", "responseBody"),
+								stringvalidator.OneOf("statusCode", "responseTime", "responseHeader", "jsonBody", "responseBody", "ssl"),
 							},
 						},
 						"operator": schema.StringAttribute{
@@ -256,7 +305,7 @@ func (r *syntheticTestResource) Schema(_ context.Context, _ resource.SchemaReque
 							Optional:    true,
 						},
 						"property": schema.StringAttribute{
-							Description: "Property path for header or JSON body assertions (e.g. `Content-Type` or `data.id`).",
+							Description: "Property path for header, JSON body, or SSL assertions (e.g. `Content-Type`, `data.id`, `certificateValid`, `certificateExpiresIn`, `tlsVersion`, `chainValid`).",
 							Optional:    true,
 						},
 						"severity": schema.StringAttribute{
@@ -331,6 +380,27 @@ func (r *syntheticTestResource) Schema(_ context.Context, _ resource.SchemaReque
 						Optional:    true,
 						ElementType: types.StringType,
 					},
+					"notification_method": schema.StringAttribute{
+						Description: "How the synthetic monitor delivers alert notifications. Supported values: `notificationRoutes` (default), `connectedApps`, `noNotifications`.",
+						Optional:    true,
+						Validators: []validator.String{
+							stringvalidator.OneOf("notificationRoutes", "connectedApps", "noNotifications"),
+						},
+					},
+					"connected_apps": schema.ListAttribute{
+						Description: "List of connected app IDs for direct notification delivery. Required when `notification_method` is `connectedApps`.",
+						Optional:    true,
+						ElementType: types.StringType,
+					},
+					"status_filters": schema.ListAttribute{
+						Description: "Which issue statuses trigger notifications. Supported values: `Alerting`, `Resolved`. Only applicable when `notification_method` is `connectedApps`.",
+						Optional:    true,
+						ElementType: types.StringType,
+					},
+					"disable_renotification": schema.BoolAttribute{
+						Description: "Disable repeated notifications for the same issue.",
+						Optional:    true,
+					},
 				},
 				Blocks: map[string]schema.Block{
 					"evaluation_interval": schema.SingleNestedBlock{
@@ -369,6 +439,127 @@ func (r *syntheticTestResource) Configure(_ context.Context, req resource.Config
 	r.client = client
 }
 
+// ValidateConfig ensures exactly one check type is configured.
+func (r *syntheticTestResource) ValidateConfig(ctx context.Context, req resource.ValidateConfigRequest, resp *resource.ValidateConfigResponse) {
+	var config syntheticTestResourceModel
+	resp.Diagnostics.Append(req.Config.Get(ctx, &config)...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+
+	hasHTTP := config.HTTPCheck != nil
+	hasSSL := config.SSLCheck != nil
+
+	if hasHTTP && hasSSL {
+		resp.Diagnostics.AddError(
+			"Conflicting check configuration",
+			"Only one of http_check or ssl_check may be specified.",
+		)
+		return
+	}
+
+	if !hasHTTP && !hasSSL {
+		resp.Diagnostics.AddError(
+			"Missing check configuration",
+			"Exactly one of http_check or ssl_check must be specified.",
+		)
+	}
+
+	// Validate required fields independently, skipping unknown values (e.g., computed or from other resources)
+	if hasHTTP {
+		if !config.HTTPCheck.URL.IsUnknown() {
+			if config.HTTPCheck.URL.IsNull() || config.HTTPCheck.URL.ValueString() == "" {
+				resp.Diagnostics.AddAttributeError(
+					path.Root("http_check").AtName("url"),
+					"Missing required attribute",
+					"The url attribute is required and must not be empty when http_check is configured.",
+				)
+			}
+		}
+		if !config.HTTPCheck.Method.IsUnknown() {
+			if config.HTTPCheck.Method.IsNull() || config.HTTPCheck.Method.ValueString() == "" {
+				resp.Diagnostics.AddAttributeError(
+					path.Root("http_check").AtName("method"),
+					"Missing required attribute",
+					"The method attribute is required and must not be empty when http_check is configured.",
+				)
+			}
+		}
+	}
+
+	if hasSSL {
+		if !config.SSLCheck.Host.IsUnknown() {
+			if config.SSLCheck.Host.IsNull() || config.SSLCheck.Host.ValueString() == "" {
+				resp.Diagnostics.AddAttributeError(
+					path.Root("ssl_check").AtName("host"),
+					"Missing required attribute",
+					"The host attribute is required and must not be empty when ssl_check is configured.",
+				)
+			}
+		}
+		if !config.SSLCheck.Port.IsUnknown() && config.SSLCheck.Port.IsNull() {
+			resp.Diagnostics.AddAttributeError(
+				path.Root("ssl_check").AtName("port"),
+				"Missing required attribute",
+				"The port attribute is required when ssl_check is configured.",
+			)
+		}
+	}
+
+	// Validate notification routing invariants
+	if config.Monitor != nil {
+		method := config.Monitor.NotificationMethod
+		methodUnknown := method.IsUnknown()
+		methodSet := !method.IsNull() && !methodUnknown
+		isConnectedApps := methodSet && method.ValueString() == "connectedApps"
+
+		hasAppsSet := !config.Monitor.ConnectedApps.IsNull() && !config.Monitor.ConnectedApps.IsUnknown()
+		hasAppsNonEmpty := hasAppsSet && len(config.Monitor.ConnectedApps.Elements()) > 0
+		hasFiltersSet := !config.Monitor.StatusFilters.IsNull() && !config.Monitor.StatusFilters.IsUnknown()
+
+		// Skip cross-field validation when method is unknown (e.g. from another resource)
+		if !methodUnknown {
+			if isConnectedApps && !hasAppsNonEmpty {
+				resp.Diagnostics.AddAttributeError(
+					path.Root("monitor").AtName("connected_apps"),
+					"Missing required attribute",
+					`"connected_apps" must be set and non-empty when "notification_method" is "connectedApps".`,
+				)
+			}
+			if !isConnectedApps && hasAppsSet {
+				resp.Diagnostics.AddAttributeError(
+					path.Root("monitor").AtName("connected_apps"),
+					"Invalid attribute combination",
+					`"connected_apps" can only be set when "notification_method" is "connectedApps".`,
+				)
+			}
+			if !isConnectedApps && hasFiltersSet {
+				resp.Diagnostics.AddAttributeError(
+					path.Root("monitor").AtName("status_filters"),
+					"Invalid attribute combination",
+					`"status_filters" can only be set when "notification_method" is "connectedApps".`,
+				)
+			}
+		}
+
+		// Validate status_filter values regardless of method
+		if hasFiltersSet {
+			validStatuses := map[string]bool{"Alerting": true, "Resolved": true}
+			for _, v := range config.Monitor.StatusFilters.Elements() {
+				if sv, ok := v.(types.String); ok && !sv.IsNull() && !sv.IsUnknown() {
+					if !validStatuses[sv.ValueString()] {
+						resp.Diagnostics.AddAttributeError(
+							path.Root("monitor").AtName("status_filters"),
+							"Invalid status filter",
+							fmt.Sprintf("Invalid status_filter %q; allowed values: \"Alerting\", \"Resolved\".", sv.ValueString()),
+						)
+					}
+				}
+			}
+		}
+	}
+}
+
 // --- CRUD ---
 
 func (r *syntheticTestResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
@@ -381,11 +572,7 @@ func (r *syntheticTestResource) Create(ctx context.Context, req resource.CreateR
 
 	tflog.Debug(ctx, "Creating Synthetic Test", map[string]any{"name": plan.Name.ValueString()})
 
-	if plan.HTTPCheck == nil {
-		resp.Diagnostics.AddError(
-			"Missing http_check",
-			"An http_check block is required to define the synthetic test check configuration.",
-		)
+	if !validateCheckPresent(&plan, &resp.Diagnostics) {
 		return
 	}
 
@@ -455,11 +642,7 @@ func (r *syntheticTestResource) Update(ctx context.Context, req resource.UpdateR
 
 	tflog.Debug(ctx, "Updating Synthetic Test", map[string]any{"id": plan.ID.ValueString()})
 
-	if plan.HTTPCheck == nil {
-		resp.Diagnostics.AddError(
-			"Missing http_check",
-			"An http_check block is required to define the synthetic test check configuration.",
-		)
+	if !validateCheckPresent(&plan, &resp.Diagnostics) {
 		return
 	}
 
@@ -511,6 +694,18 @@ func (r *syntheticTestResource) ImportState(ctx context.Context, req resource.Im
 }
 
 // --- Conversion: Terraform model → SDK request ---
+
+// validateCheckPresent ensures at least one check type is configured.
+func validateCheckPresent(plan *syntheticTestResourceModel, diags *diag.Diagnostics) bool {
+	if plan.HTTPCheck == nil && plan.SSLCheck == nil {
+		diags.AddError(
+			"Missing check configuration",
+			"Either an http_check or ssl_check block is required to define the synthetic test check configuration.",
+		)
+		return false
+	}
+	return true
+}
 
 func toSDKRequest(plan *syntheticTestResourceModel) *models.SyntheticTestCreateRequest {
 	sdkReq := &models.SyntheticTestCreateRequest{
@@ -603,6 +798,34 @@ func toSDKRequest(plan *syntheticTestResourceModel) *models.SyntheticTestCreateR
 		checkConfig.Request = &models.Request{HTTP: httpReq}
 	}
 
+	// SSL Check
+	if plan.SSLCheck != nil {
+		checkConfig.Kind = "ssl"
+		sslReq := &models.SslRequest{
+			Kind: "ssl",
+			Host: plan.SSLCheck.Host.ValueString(),
+			Port: plan.SSLCheck.Port.ValueInt64(),
+		}
+
+		if !plan.SSLCheck.Verify.IsNull() {
+			sslReq.Verify = plan.SSLCheck.Verify.ValueBool()
+		}
+
+		if !plan.SSLCheck.MinVersion.IsNull() {
+			sslReq.MinVersion = plan.SSLCheck.MinVersion.ValueString()
+		}
+
+		if !plan.SSLCheck.Sni.IsNull() {
+			sslReq.Sni = plan.SSLCheck.Sni.ValueString()
+		}
+
+		if !plan.SSLCheck.Timeout.IsNull() {
+			sslReq.Timeout = plan.SSLCheck.Timeout.ValueString()
+		}
+
+		checkConfig.Request = &models.Request{Ssl: sslReq}
+	}
+
 	// Assertions
 	if len(plan.Assertion) > 0 {
 		assertions := make([]*models.Assertion, 0, len(plan.Assertion))
@@ -672,6 +895,31 @@ func toSDKRequest(plan *syntheticTestResourceModel) *models.SyntheticTestCreateR
 				}
 			}
 			monitorConfig.EnabledWorkflows = workflows
+		}
+
+		if !plan.Monitor.NotificationMethod.IsNull() && !plan.Monitor.NotificationMethod.IsUnknown() {
+			monitorConfig.NotificationMethod = plan.Monitor.NotificationMethod.ValueString()
+		}
+		if !plan.Monitor.ConnectedApps.IsNull() && !plan.Monitor.ConnectedApps.IsUnknown() {
+			apps := make([]string, 0, len(plan.Monitor.ConnectedApps.Elements()))
+			for _, v := range plan.Monitor.ConnectedApps.Elements() {
+				if sv, ok := v.(types.String); ok {
+					apps = append(apps, sv.ValueString())
+				}
+			}
+			monitorConfig.ConnectedApps = apps
+		}
+		if !plan.Monitor.StatusFilters.IsNull() && !plan.Monitor.StatusFilters.IsUnknown() {
+			filters := make([]models.IssueStatus, 0, len(plan.Monitor.StatusFilters.Elements()))
+			for _, v := range plan.Monitor.StatusFilters.Elements() {
+				if sv, ok := v.(types.String); ok {
+					filters = append(filters, models.IssueStatus(sv.ValueString()))
+				}
+			}
+			monitorConfig.StatusFilters = filters
+		}
+		if !plan.Monitor.DisableRenotification.IsNull() && !plan.Monitor.DisableRenotification.IsUnknown() {
+			monitorConfig.DisableRenotification = plan.Monitor.DisableRenotification.ValueBool()
 		}
 
 		if plan.Monitor.EvaluationInterval != nil {
@@ -771,6 +1019,42 @@ func fromSDKResponse(ctx context.Context, sdkResp *models.SyntheticTestCreateReq
 		}
 
 		state.HTTPCheck = httpModel
+		state.SSLCheck = nil
+	}
+
+	// SSL Check
+	if cc.Request != nil && cc.Request.Ssl != nil {
+		ssl := cc.Request.Ssl
+		sslModel := &syntheticSSLCheckModel{
+			Host: types.StringValue(ssl.Host),
+			Port: types.Int64Value(ssl.Port),
+		}
+
+		if ssl.Verify || (state.SSLCheck != nil && !state.SSLCheck.Verify.IsNull()) {
+			sslModel.Verify = types.BoolValue(ssl.Verify)
+		}
+
+		if state.SSLCheck == nil {
+			// Import: no prior state — reflect whatever the API returned
+			if ssl.MinVersion != "" {
+				sslModel.MinVersion = types.StringValue(ssl.MinVersion)
+			}
+			if ssl.Sni != "" {
+				sslModel.Sni = types.StringValue(ssl.Sni)
+			}
+			if ssl.Timeout != "" {
+				sslModel.Timeout = types.StringValue(ssl.Timeout)
+			}
+		} else {
+			// Normal read: preserve user's config values to avoid perpetual
+			// diffs caused by server-side defaults the user never configured.
+			sslModel.MinVersion = state.SSLCheck.MinVersion
+			sslModel.Sni = state.SSLCheck.Sni
+			sslModel.Timeout = state.SSLCheck.Timeout
+		}
+
+		state.SSLCheck = sslModel
+		state.HTTPCheck = nil
 	}
 
 	// Assertions
@@ -813,6 +1097,8 @@ func fromSDKResponse(ctx context.Context, sdkResp *models.SyntheticTestCreateReq
 
 		monitorModel := &syntheticMonitorModel{
 			EnabledWorkflows: types.ListNull(types.StringType),
+			ConnectedApps:    types.ListNull(types.StringType),
+			StatusFilters:    types.ListNull(types.StringType),
 		}
 
 		if !prev.MonitorName.IsNull() {
@@ -851,6 +1137,39 @@ func fromSDKResponse(ctx context.Context, sdkResp *models.SyntheticTestCreateReq
 			} else {
 				monitorModel.EnabledWorkflows, _ = types.ListValueFrom(ctx, types.StringType, []string{})
 			}
+		}
+
+		if !prev.NotificationMethod.IsNull() {
+			monitorModel.NotificationMethod = types.StringValue(mon.NotificationMethod)
+		}
+		if !prev.ConnectedApps.IsNull() {
+			if len(mon.ConnectedApps) > 0 {
+				appValues := make([]string, len(mon.ConnectedApps))
+				copy(appValues, mon.ConnectedApps)
+				appsList, diags := types.ListValueFrom(ctx, types.StringType, appValues)
+				if !diags.HasError() {
+					monitorModel.ConnectedApps = appsList
+				}
+			} else {
+				monitorModel.ConnectedApps, _ = types.ListValueFrom(ctx, types.StringType, []string{})
+			}
+		}
+		if !prev.StatusFilters.IsNull() {
+			if len(mon.StatusFilters) > 0 {
+				filterValues := make([]string, len(mon.StatusFilters))
+				for i, f := range mon.StatusFilters {
+					filterValues[i] = string(f)
+				}
+				filtersList, diags := types.ListValueFrom(ctx, types.StringType, filterValues)
+				if !diags.HasError() {
+					monitorModel.StatusFilters = filtersList
+				}
+			} else {
+				monitorModel.StatusFilters, _ = types.ListValueFrom(ctx, types.StringType, []string{})
+			}
+		}
+		if !prev.DisableRenotification.IsNull() || mon.DisableRenotification {
+			monitorModel.DisableRenotification = types.BoolValue(mon.DisableRenotification)
 		}
 
 		if mon.EvaluationInterval != nil && prev.EvaluationInterval != nil {

@@ -1,5 +1,18 @@
+## 1.10.0
+
+* Added notification routing support to `groundcover_synthetic_test` monitor block — supports `notification_method`, `connected_apps`, `status_filters`, and `disable_renotification` for controlling how synthetic monitor alerts are delivered
+* Added SSL/TLS check support to `groundcover_synthetic_test` resource — supports `host`, `port`, `verify`, `min_version`, `sni`, and `timeout` configuration for proactive certificate and TLS connection monitoring
+* Added SSL assertion source (`ssl`) with properties: `certificateValid`, `certificateExpiresIn`, `tlsVersion`, `chainValid`
+* Updated groundcover SDK from v1.225.0 to v1.235.0
+
 ## 1.9.1
 
+* Added `content_hash` computed attribute to `groundcover_secret` resource — returns FNV1a hash (hex encoded) of the secret content, enabling drift detection for external changes
+* Secret resource now uses the GetSecretHash API endpoint to verify secret existence and detect external modifications during `terraform plan` and `terraform apply`
+* Secrets deleted outside of Terraform are now properly detected and removed from state
+* Updated groundcover SDK from v1.218.0 to v1.225.0
+* Fixed `handleApiError` incorrectly mapping non-404 API errors to "resource not found" when the error message contained the substring "not found" — the status code regex now handles go-swagger's `[STATUS_CODE]` error format, and substring-based fallbacks are only used when no HTTP status code can be extracted
+* Same fix applied to the "read-only" error mapping to prevent similar false positives
 * Fixed dashboard update failing with `CurrentRevision excluded_if` validation error — use `Override: true` instead of sending `CurrentRevision` in update requests
 * Deprecated the `override` attribute on `groundcover_dashboard` — it is now always enabled internally and the attribute will be removed in a future version
 * Added `TestAccDashboardResource_Update` acceptance test covering name, description, and preset (spec) updates
