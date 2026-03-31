@@ -42,6 +42,10 @@ jobs:
       - name: Run GoReleaser
         uses: goreleaser/goreleaser-action@9c156ee8a17a598857849441385a2041ef570552 # v6.3.0
         with:
+          # Pin to v2.14.3 to work around https://github.com/goreleaser/goreleaser/issues/6514
+          # GoReleaser v2.15.x adds SHA256SUMS.sig to the checksums file, which breaks
+          # Terraform Registry validation. Remove this pin once a patched version is released.
+          version: "v2.14.3"
           args: release --clean
         env:
           # GitHub sets the GITHUB_TOKEN secret automatically.
