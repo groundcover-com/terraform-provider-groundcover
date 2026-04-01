@@ -317,6 +317,9 @@ func (r *syntheticTestResource) Schema(_ context.Context, _ resource.SchemaReque
 					"receive_max_bytes": schema.Int64Attribute{
 						Description: "Maximum number of bytes to receive in the response.",
 						Optional:    true,
+						Validators: []validator.Int64{
+							int64validator.AtLeast(0),
+						},
 					},
 					"timeout": schema.StringAttribute{
 						Description: "Timeout for the TCP check (e.g. `5s`, `10s`).",
