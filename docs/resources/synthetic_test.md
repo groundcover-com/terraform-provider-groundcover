@@ -290,9 +290,9 @@ Optional:
 - `body` (Block, Optional) HTTP request body. (see [below for nested schema](#nestedblock--http_check--body))
 - `follow_redirects` (Boolean) Whether to follow HTTP redirects.
 - `headers` (Map of String) HTTP headers to send with the request.
-- `method` (String) HTTP method. Supported: `GET`, `POST`, `PUT`, `PATCH`, `DELETE`, `HEAD`, `OPTIONS`.
+- `method` (String) (Required) HTTP method. Supported: `GET`, `POST`, `PUT`, `PATCH`, `DELETE`, `HEAD`, `OPTIONS`.
 - `timeout` (String) Request timeout (e.g. `10s`, `30s`).
-- `url` (String) The URL to check (must include http:// or https://).
+- `url` (String) (Required) The URL to check (must include http:// or https://).
 
 <a id="nestedblock--http_check--auth"></a>
 ### Nested Schema for `http_check.auth`
@@ -355,9 +355,9 @@ Optional:
 
 Optional:
 
-- `host` (String) The hostname to connect to for the SSL check.
+- `host` (String) (Required) The hostname to connect to for the SSL check.
 - `min_version` (String) Minimum TLS version to accept (e.g. `1.2`, `1.3`).
-- `port` (Number) The port to connect to (1-65535).
+- `port` (Number) (Required) The port to connect to (1-65535).
 - `sni` (String) Server Name Indication (SNI) value for the TLS handshake. Defaults to the host value.
 - `timeout` (String) Timeout for the SSL check (e.g. `5s`, `10s`).
 - `verify` (Boolean) Whether to verify the SSL certificate.

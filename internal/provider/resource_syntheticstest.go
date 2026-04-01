@@ -250,11 +250,11 @@ func (r *syntheticTestResource) Schema(_ context.Context, _ resource.SchemaReque
 				Description: "SSL/TLS check configuration. Validates SSL certificates and TLS connections.",
 				Attributes: map[string]schema.Attribute{
 					"host": schema.StringAttribute{
-						Description: "The hostname to connect to for the SSL check.",
+						Description: "(Required) The hostname to connect to for the SSL check.",
 						Optional:    true,
 					},
 					"port": schema.Int64Attribute{
-						Description: "The port to connect to (1-65535).",
+						Description: "(Required) The port to connect to (1-65535).",
 						Optional:    true,
 						Validators: []validator.Int64{
 							int64validator.Between(1, 65535),
