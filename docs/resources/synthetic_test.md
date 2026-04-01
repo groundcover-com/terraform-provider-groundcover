@@ -385,9 +385,9 @@ Optional:
 
 Optional:
 
-- `host` (String) The hostname to connect to for the SSL check.
+- `host` (String) (Required) The hostname to connect to for the SSL check.
 - `min_version` (String) Minimum TLS version to accept (e.g. `1.2`, `1.3`).
-- `port` (Number) The port to connect to (1-65535).
+- `port` (Number) (Required) The port to connect to (1-65535).
 - `sni` (String) Server Name Indication (SNI) value for the TLS handshake. Defaults to the host value.
 - `timeout` (String) Timeout for the SSL check (e.g. `5s`, `10s`).
 - `verify` (Boolean) Whether to verify the SSL certificate.
