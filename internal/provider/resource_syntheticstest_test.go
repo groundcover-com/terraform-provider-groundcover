@@ -1045,3 +1045,303 @@ resource "groundcover_synthetic_test" "test" {
 }
 `, name)
 }
+
+// --- TCP check tests ---
+
+func TestAccSyntheticTestResource_tcpBasic(t *testing.T) {
+	name := acctest.RandomWithPrefix("test-synth-tcp")
+
+	resource.Test(t, resource.TestCase{
+		PreCheck:                 func() { testAccPreCheck(t) },
+		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
+		Steps: []resource.TestStep{
+			{
+				Config: testAccSyntheticTestResourceConfig_tcpBasic(name),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					resource.TestCheckResourceAttr("groundcover_synthetic_test.test", "name", name),
+					resource.TestCheckResourceAttr("groundcover_synthetic_test.test", "enabled", "true"),
+					resource.TestCheckResourceAttr("groundcover_synthetic_test.test", "interval", "1m"),
+					resource.TestCheckResourceAttr("groundcover_synthetic_test.test", "tcp_check.host", "google.com"),
+					resource.TestCheckResourceAttr("groundcover_synthetic_test.test", "tcp_check.port", "443"),
+					resource.TestCheckResourceAttr("groundcover_synthetic_test.test", "assertion.#", "1"),
+					resource.TestCheckResourceAttr("groundcover_synthetic_test.test", "assertion.0.source", "tcp"),
+					resource.TestCheckResourceAttr("groundcover_synthetic_test.test", "assertion.0.operator", "exists"),
+					resource.TestCheckResourceAttr("groundcover_synthetic_test.test", "assertion.0.target", "true"),
+					resource.TestCheckResourceAttrSet("groundcover_synthetic_test.test", "id"),
+				),
+			},
+			// ImportState testing
+			{
+				ResourceName:      "groundcover_synthetic_test.test",
+				ImportState:       true,
+				ImportStateVerify: true,
+			},
+		},
+	})
+}
+
+func TestAccSyntheticTestResource_tcpFull(t *testing.T) {
+	name := acctest.RandomWithPrefix("test-synth-tcp-full")
+
+	resource.Test(t, resource.TestCase{
+		PreCheck:                 func() { testAccPreCheck(t) },
+		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
+		Steps: []resource.TestStep{
+			{
+				Config: testAccSyntheticTestResourceConfig_tcpFull(name),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					resource.TestCheckResourceAttr("groundcover_synthetic_test.test", "name", name),
+					resource.TestCheckResourceAttr("groundcover_synthetic_test.test", "tcp_check.host", "google.com"),
+					resource.TestCheckResourceAttr("groundcover_synthetic_test.test", "tcp_check.port", "443"),
+					resource.TestCheckResourceAttr("groundcover_synthetic_test.test", "tcp_check.send", "PING"),
+					resource.TestCheckResourceAttr("groundcover_synthetic_test.test", "tcp_check.expect_response", "true"),
+					resource.TestCheckResourceAttr("groundcover_synthetic_test.test", "tcp_check.receive_max_bytes", "1024"),
+					resource.TestCheckResourceAttrSet("groundcover_synthetic_test.test", "id"),
+				),
+			},
+			// ImportState testing
+			{
+				ResourceName:      "groundcover_synthetic_test.test",
+				ImportState:       true,
+				ImportStateVerify: true,
+			},
+		},
+	})
+}
+
+func TestAccSyntheticTestResource_tcpUpdate(t *testing.T) {
+	name := acctest.RandomWithPrefix("test-synth-tcp")
+	updatedName := name + "-updated"
+
+	resource.Test(t, resource.TestCase{
+		PreCheck:                 func() { testAccPreCheck(t) },
+		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
+		Steps: []resource.TestStep{
+			{
+				Config: testAccSyntheticTestResourceConfig_tcpBasic(name),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					resource.TestCheckResourceAttr("groundcover_synthetic_test.test", "name", name),
+					resource.TestCheckResourceAttr("groundcover_synthetic_test.test", "interval", "1m"),
+					resource.TestCheckResourceAttr("groundcover_synthetic_test.test", "tcp_check.host", "google.com"),
+					resource.TestCheckResourceAttrSet("groundcover_synthetic_test.test", "id"),
+				),
+			},
+			{
+				Config: testAccSyntheticTestResourceConfig_tcpUpdated(updatedName),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					resource.TestCheckResourceAttr("groundcover_synthetic_test.test", "name", updatedName),
+					resource.TestCheckResourceAttr("groundcover_synthetic_test.test", "interval", "5m"),
+					resource.TestCheckResourceAttr("groundcover_synthetic_test.test", "tcp_check.host", "github.com"),
+					resource.TestCheckResourceAttr("groundcover_synthetic_test.test", "tcp_check.port", "443"),
+				),
+			},
+		},
+	})
+}
+
+func TestAccSyntheticTestResource_tcpApplyLoop(t *testing.T) {
+	name := acctest.RandomWithPrefix("test-synth-tcp-loop")
+
+	resource.Test(t, resource.TestCase{
+		PreCheck:                 func() { testAccPreCheck(t) },
+		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
+		Steps: []resource.TestStep{
+			// Step 1: Create
+			{
+				Config: testAccSyntheticTestResourceConfig_tcpBasic(name),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					resource.TestCheckResourceAttr("groundcover_synthetic_test.test", "name", name),
+					resource.TestCheckResourceAttr("groundcover_synthetic_test.test", "tcp_check.host", "google.com"),
+					resource.TestCheckResourceAttrSet("groundcover_synthetic_test.test", "id"),
+				),
+			},
+			// Step 2: Re-apply same config — should detect no changes
+			{
+				Config: testAccSyntheticTestResourceConfig_tcpBasic(name),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					resource.TestCheckResourceAttr("groundcover_synthetic_test.test", "name", name),
+					resource.TestCheckResourceAttrSet("groundcover_synthetic_test.test", "id"),
+				),
+			},
+			// Step 3: One more time to be sure
+			{
+				Config: testAccSyntheticTestResourceConfig_tcpBasic(name),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					resource.TestCheckResourceAttr("groundcover_synthetic_test.test", "name", name),
+					resource.TestCheckResourceAttrSet("groundcover_synthetic_test.test", "id"),
+				),
+			},
+		},
+	})
+}
+
+func TestAccSyntheticTestResource_tcpTimeoutUpdate(t *testing.T) {
+	name := acctest.RandomWithPrefix("test-synth-tcp-timeout")
+
+	resource.Test(t, resource.TestCase{
+		PreCheck:                 func() { testAccPreCheck(t) },
+		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
+		Steps: []resource.TestStep{
+			{
+				Config: testAccSyntheticTestResourceConfig_tcpBasic(name),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					resource.TestCheckResourceAttr("groundcover_synthetic_test.test", "name", name),
+					resource.TestCheckResourceAttr("groundcover_synthetic_test.test", "tcp_check.host", "google.com"),
+					resource.TestCheckResourceAttr("groundcover_synthetic_test.test", "tcp_check.port", "443"),
+					resource.TestCheckNoResourceAttr("groundcover_synthetic_test.test", "tcp_check.timeout"),
+					resource.TestCheckResourceAttrSet("groundcover_synthetic_test.test", "id"),
+				),
+			},
+			{
+				Config: testAccSyntheticTestResourceConfig_tcpWithTimeout(name),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					resource.TestCheckResourceAttr("groundcover_synthetic_test.test", "name", name),
+					resource.TestCheckResourceAttr("groundcover_synthetic_test.test", "tcp_check.host", "google.com"),
+					resource.TestCheckResourceAttr("groundcover_synthetic_test.test", "tcp_check.port", "443"),
+					resource.TestCheckResourceAttr("groundcover_synthetic_test.test", "tcp_check.timeout", "5s"),
+				),
+			},
+		},
+	})
+}
+
+func TestAccSyntheticTestResource_tcpSendUpdate(t *testing.T) {
+	name := acctest.RandomWithPrefix("test-synth-tcp-send")
+
+	resource.Test(t, resource.TestCase{
+		PreCheck:                 func() { testAccPreCheck(t) },
+		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
+		Steps: []resource.TestStep{
+			{
+				Config: testAccSyntheticTestResourceConfig_tcpBasic(name),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					resource.TestCheckResourceAttr("groundcover_synthetic_test.test", "name", name),
+					resource.TestCheckResourceAttr("groundcover_synthetic_test.test", "tcp_check.host", "google.com"),
+					resource.TestCheckResourceAttr("groundcover_synthetic_test.test", "tcp_check.port", "443"),
+					resource.TestCheckNoResourceAttr("groundcover_synthetic_test.test", "tcp_check.send"),
+					resource.TestCheckResourceAttrSet("groundcover_synthetic_test.test", "id"),
+				),
+			},
+			{
+				Config: testAccSyntheticTestResourceConfig_tcpWithSend(name),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					resource.TestCheckResourceAttr("groundcover_synthetic_test.test", "name", name),
+					resource.TestCheckResourceAttr("groundcover_synthetic_test.test", "tcp_check.host", "google.com"),
+					resource.TestCheckResourceAttr("groundcover_synthetic_test.test", "tcp_check.port", "443"),
+					resource.TestCheckResourceAttr("groundcover_synthetic_test.test", "tcp_check.send", "PING"),
+				),
+			},
+		},
+	})
+}
+
+// --- TCP config helpers ---
+
+func testAccSyntheticTestResourceConfig_tcpBasic(name string) string {
+	return fmt.Sprintf(`
+resource "groundcover_synthetic_test" "test" {
+  name     = %[1]q
+  enabled  = true
+  interval = "1m"
+
+  tcp_check {
+    host = "google.com"
+    port = 443
+  }
+
+  assertion {
+    source   = "tcp"
+    operator = "exists"
+    target   = "true"
+  }
+}
+`, name)
+}
+
+func testAccSyntheticTestResourceConfig_tcpFull(name string) string {
+	return fmt.Sprintf(`
+resource "groundcover_synthetic_test" "test" {
+  name     = %[1]q
+  interval = "1m"
+
+  tcp_check {
+    host              = "google.com"
+    port              = 443
+    send              = "PING"
+    expect_response   = true
+    receive_max_bytes = 1024
+  }
+
+  assertion {
+    source   = "tcp"
+    operator = "exists"
+    target   = "true"
+  }
+}
+`, name)
+}
+
+func testAccSyntheticTestResourceConfig_tcpWithSend(name string) string {
+	return fmt.Sprintf(`
+resource "groundcover_synthetic_test" "test" {
+  name     = %[1]q
+  enabled  = true
+  interval = "1m"
+
+  tcp_check {
+    host = "google.com"
+    port = 443
+    send = "PING"
+  }
+
+  assertion {
+    source   = "tcp"
+    operator = "exists"
+    target   = "true"
+  }
+}
+`, name)
+}
+
+func testAccSyntheticTestResourceConfig_tcpWithTimeout(name string) string {
+	return fmt.Sprintf(`
+resource "groundcover_synthetic_test" "test" {
+  name     = %[1]q
+  enabled  = true
+  interval = "1m"
+
+  tcp_check {
+    host    = "google.com"
+    port    = 443
+    timeout = "5s"
+  }
+
+  assertion {
+    source   = "tcp"
+    operator = "exists"
+    target   = "true"
+  }
+}
+`, name)
+}
+
+func testAccSyntheticTestResourceConfig_tcpUpdated(name string) string {
+	return fmt.Sprintf(`
+resource "groundcover_synthetic_test" "test" {
+  name     = %[1]q
+  enabled  = true
+  interval = "5m"
+
+  tcp_check {
+    host = "github.com"
+    port = 443
+  }
+
+  assertion {
+    source   = "tcp"
+    operator = "exists"
+    target   = "true"
+  }
+}
+`, name)
+}

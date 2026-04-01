@@ -1,3 +1,9 @@
+## 1.11.0
+
+* Added TCP check support to `groundcover_synthetic_test` resource — supports `host`, `port`, `send`, `expect_response`, and `receive_max_bytes` configuration for TCP connectivity monitoring
+* Added TCP assertion source (`tcp`) for TCP check assertions
+* Updated groundcover SDK from v1.232.0 to v1.237.0
+
 ## 1.10.0
 
 * Added notification routing support to `groundcover_synthetic_test` monitor block — supports `notification_method`, `connected_apps`, `status_filters`, and `disable_renotification` for controlling how synthetic monitor alerts are delivered

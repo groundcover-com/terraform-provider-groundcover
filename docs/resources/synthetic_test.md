@@ -3,12 +3,12 @@
 page_title: "groundcover_synthetic_test Resource - groundcover"
 subcategory: ""
 description: |-
-  Manages a groundcover Synthetic Test. Synthetic tests allow you to proactively monitor your services by running periodic HTTP or SSL/TLS checks against specified endpoints.
+  Manages a groundcover Synthetic Test. Synthetic tests allow you to proactively monitor your services by running periodic HTTP, SSL/TLS, or TCP checks against specified endpoints.
 ---
 
 # groundcover_synthetic_test (Resource)
 
-Manages a groundcover Synthetic Test. Synthetic tests allow you to proactively monitor your services by running periodic HTTP or SSL/TLS checks against specified endpoints.
+Manages a groundcover Synthetic Test. Synthetic tests allow you to proactively monitor your services by running periodic HTTP, SSL/TLS, or TCP checks against specified endpoints.
 
 ## Example Usage
 
@@ -251,6 +251,44 @@ resource "groundcover_synthetic_test" "ssl_tls_check" {
   }
 }
 
+# Example: Basic TCP port check
+resource "groundcover_synthetic_test" "tcp_check" {
+  name     = "TCP Port Check"
+  interval = "1m"
+
+  tcp_check {
+    host = "example.com"
+    port = 5432
+  }
+
+  assertion {
+    source   = "tcp"
+    operator = "exists"
+    target   = "true"
+  }
+}
+
+# Example: TCP check with send/receive
+resource "groundcover_synthetic_test" "tcp_send_check" {
+  name     = "TCP Send/Receive Check"
+  interval = "5m"
+
+  tcp_check {
+    host              = "example.com"
+    port              = 6379
+    send              = "PING"
+    expect_response   = true
+    receive_max_bytes = 1024
+    timeout           = "10s"
+  }
+
+  assertion {
+    source   = "tcp"
+    operator = "exists"
+    target   = "true"
+  }
+}
+
 output "http_health_check_id" {
   value = groundcover_synthetic_test.http_health_check.id
 }
@@ -265,6 +303,10 @@ output "monitored_check_id" {
 
 output "ssl_check_id" {
   value = groundcover_synthetic_test.ssl_check.id
+}
+
+output "tcp_check_id" {
+  value = groundcover_synthetic_test.tcp_check.id
 }
 ```
 
@@ -285,6 +327,7 @@ output "ssl_check_id" {
 - `monitor` (Block, Optional) Monitor configuration for the synthetic test. Controls the monitor that is automatically created for this test, including alerting behavior and notification routing. (see [below for nested schema](#nestedblock--monitor))
 - `retry` (Block, Optional) Retry policy for failed checks. (see [below for nested schema](#nestedblock--retry))
 - `ssl_check` (Block, Optional) SSL/TLS check configuration. Validates SSL certificates and TLS connections. (see [below for nested schema](#nestedblock--ssl_check))
+- `tcp_check` (Block, Optional) TCP check configuration. Tests TCP connectivity and optionally sends/receives data. (see [below for nested schema](#nestedblock--tcp_check))
 
 ### Read-Only
 
@@ -297,7 +340,7 @@ output "ssl_check_id" {
 Required:
 
 - `operator` (String) Comparison operator: `eq`, `ne`, `gt`, `lt`, `contains`, `exists`, `notExists`, `startsWith`, `endsWith`, `regex`, `oneOf`.
-- `source` (String) What to assert on: `statusCode`, `responseTime`, `responseHeader`, `jsonBody`, `responseBody`, `ssl`.
+- `source` (String) What to assert on: `statusCode`, `responseTime`, `responseHeader`, `jsonBody`, `responseBody`, `ssl`, `tcp`.
 
 Optional:
 
@@ -391,6 +434,19 @@ Optional:
 - `sni` (String) Server Name Indication (SNI) value for the TLS handshake. Defaults to the host value.
 - `timeout` (String) Timeout for the SSL check (e.g. `5s`, `10s`).
 - `verify` (Boolean) Whether to verify the SSL certificate.
+
+
+<a id="nestedblock--tcp_check"></a>
+### Nested Schema for `tcp_check`
+
+Optional:
+
+- `expect_response` (Boolean) Whether to expect a response from the TCP endpoint.
+- `host` (String) (Required) The hostname to connect to for the TCP check.
+- `port` (Number) (Required) The port to connect to (1-65535).
+- `receive_max_bytes` (Number) Maximum number of bytes to receive in the response.
+- `send` (String) Data to send over the TCP connection.
+- `timeout` (String) Timeout for the TCP check (e.g. `5s`, `10s`).
 
 ## Import
 
