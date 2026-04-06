@@ -159,6 +159,25 @@ func TestAccSyntheticTestResource_disappears(t *testing.T) {
 	})
 }
 
+func TestAccSyntheticTestResource_tcpDisappears(t *testing.T) {
+	name := acctest.RandomWithPrefix("test-synth-tcp-disappear")
+
+	resource.Test(t, resource.TestCase{
+		PreCheck:                 func() { testAccPreCheck(t) },
+		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
+		Steps: []resource.TestStep{
+			{
+				Config: testAccSyntheticTestResourceConfig_tcpBasic(name),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					testAccCheckSyntheticTestResourceExists("groundcover_synthetic_test.test"),
+					testAccCheckSyntheticTestResourceDisappears("groundcover_synthetic_test.test"),
+				),
+				ExpectNonEmptyPlan: true,
+			},
+		},
+	})
+}
+
 func TestAccSyntheticTestResource_withMonitor(t *testing.T) {
 	name := acctest.RandomWithPrefix("test-synth-monitor")
 

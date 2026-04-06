@@ -1091,12 +1091,18 @@ func fromSDKResponse(ctx context.Context, sdkResp *models.SyntheticTestCreateReq
 			httpModel.Headers = types.MapNull(types.StringType)
 		}
 
-		// Set bool fields: preserve explicit user values, set from API if true or if user had set them
-		if http.FollowRedirects || (state.HTTPCheck != nil && !state.HTTPCheck.FollowRedirects.IsNull()) {
-			httpModel.FollowRedirects = types.BoolValue(http.FollowRedirects)
-		}
-		if http.AllowInsecure || (state.HTTPCheck != nil && !state.HTTPCheck.AllowInsecure.IsNull()) {
-			httpModel.AllowInsecure = types.BoolValue(http.AllowInsecure)
+		if state.HTTPCheck == nil {
+			// Import: no prior state — only reflect non-default API values
+			if http.FollowRedirects {
+				httpModel.FollowRedirects = types.BoolValue(http.FollowRedirects)
+			}
+			if http.AllowInsecure {
+				httpModel.AllowInsecure = types.BoolValue(http.AllowInsecure)
+			}
+		} else {
+			// Normal read: preserve user's config values to avoid perpetual diffs
+			httpModel.FollowRedirects = state.HTTPCheck.FollowRedirects
+			httpModel.AllowInsecure = state.HTTPCheck.AllowInsecure
 		}
 
 		if http.Body != nil && (http.Body.Content != "" || string(http.Body.Type) != "") {
@@ -1135,12 +1141,11 @@ func fromSDKResponse(ctx context.Context, sdkResp *models.SyntheticTestCreateReq
 			Port: types.Int64Value(ssl.Port),
 		}
 
-		if ssl.Verify || (state.SSLCheck != nil && !state.SSLCheck.Verify.IsNull()) {
-			sslModel.Verify = types.BoolValue(ssl.Verify)
-		}
-
 		if state.SSLCheck == nil {
 			// Import: no prior state — reflect whatever the API returned
+			if ssl.Verify {
+				sslModel.Verify = types.BoolValue(ssl.Verify)
+			}
 			if ssl.MinVersion != "" {
 				sslModel.MinVersion = types.StringValue(ssl.MinVersion)
 			}
@@ -1153,6 +1158,7 @@ func fromSDKResponse(ctx context.Context, sdkResp *models.SyntheticTestCreateReq
 		} else {
 			// Normal read: preserve user's config values to avoid perpetual
 			// diffs caused by server-side defaults the user never configured.
+			sslModel.Verify = state.SSLCheck.Verify
 			sslModel.MinVersion = state.SSLCheck.MinVersion
 			sslModel.Sni = state.SSLCheck.Sni
 			sslModel.Timeout = state.SSLCheck.Timeout
@@ -1171,12 +1177,11 @@ func fromSDKResponse(ctx context.Context, sdkResp *models.SyntheticTestCreateReq
 			Port: types.Int64Value(tcp.Port),
 		}
 
-		if tcp.ExpectResponse || (state.TCPCheck != nil && !state.TCPCheck.ExpectResponse.IsNull()) {
-			tcpModel.ExpectResponse = types.BoolValue(tcp.ExpectResponse)
-		}
-
 		if state.TCPCheck == nil {
 			// Import: no prior state — reflect whatever the API returned
+			if tcp.ExpectResponse {
+				tcpModel.ExpectResponse = types.BoolValue(tcp.ExpectResponse)
+			}
 			if tcp.Send != "" {
 				tcpModel.Send = types.StringValue(tcp.Send)
 			}
@@ -1189,6 +1194,7 @@ func fromSDKResponse(ctx context.Context, sdkResp *models.SyntheticTestCreateReq
 		} else {
 			// Normal read: preserve user's config values to avoid perpetual
 			// diffs caused by server-side defaults the user never configured.
+			tcpModel.ExpectResponse = state.TCPCheck.ExpectResponse
 			tcpModel.Send = state.TCPCheck.Send
 			tcpModel.ReceiveMaxBytes = state.TCPCheck.ReceiveMaxBytes
 			tcpModel.Timeout = state.TCPCheck.Timeout
