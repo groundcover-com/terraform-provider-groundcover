@@ -1,3 +1,7 @@
+## 1.11.0
+
+* Removed `groundcover_recurring_silence` resource — backend API is being reworked
+
 ## 1.10.0
 
 * Added notification routing support to `groundcover_synthetic_test` monitor block — supports `notification_method`, `connected_apps`, `status_filters`, and `disable_renotification` for controlling how synthetic monitor alerts are delivered

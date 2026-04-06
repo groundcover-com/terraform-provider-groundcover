@@ -159,7 +159,6 @@ func (p *GroundcoverProvider) Resources(ctx context.Context) []func() resource.R
 		NewDataIntegrationResource,
 		NewSecretResource,
 		NewSilenceResource,
-		NewRecurringSilenceResource,
 		NewConnectedAppResource,
 		NewNotificationRouteResource,
 		NewSyntheticTestResource,
