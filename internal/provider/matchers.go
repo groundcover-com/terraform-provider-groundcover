@@ -13,9 +13,9 @@ import (
 )
 
 // matcherObjectAttrTypes defines the attribute types for a silence matcher object.
-// Shared by both silence and recurring silence resources.
+// Shared silence matcher helpers.
 // silenceMatcherModel is the Terraform model for a silence matcher.
-// Shared by both silence and recurring silence resources.
+// Shared silence matcher helpers.
 type silenceMatcherModel struct {
 	Name       types.String `tfsdk:"name"`
 	Value      types.String `tfsdk:"value"`
@@ -33,7 +33,7 @@ var matcherObjectAttrTypes = map[string]attr.Type{
 var matcherObjectType = types.ObjectType{AttrTypes: matcherObjectAttrTypes}
 
 // silenceMatchersFromModel converts a Terraform list of matcher models to SDK Matchers.
-// Used by both silence and recurring silence resources.
+// Used by silence resources.
 func silenceMatchersFromModel(ctx context.Context, matchersList types.List) (models.Matchers, error) {
 	if matchersList.IsNull() || matchersList.IsUnknown() {
 		return nil, nil
@@ -63,7 +63,7 @@ func silenceMatchersFromModel(ctx context.Context, matchersList types.List) (mod
 }
 
 // silenceMatchersToModel converts SDK Matchers to a Terraform list of matcher models.
-// Used by both silence and recurring silence resources.
+// Used by silence resources.
 func silenceMatchersToModel(apiMatchers models.Matchers) (types.List, error) {
 	if len(apiMatchers) == 0 {
 		return types.ListNull(matcherObjectType), nil

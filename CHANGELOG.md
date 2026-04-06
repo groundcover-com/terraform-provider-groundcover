@@ -1,8 +1,12 @@
-## 1.11.0
+## 1.12.0
 
 * Added TCP check support to `groundcover_synthetic_test` resource — supports `host`, `port`, `send`, `expect_response`, and `receive_max_bytes` configuration for TCP connectivity monitoring
 * Added TCP assertion source (`tcp`) for TCP check assertions
 * Updated groundcover SDK from v1.235.0 to v1.237.0
+
+## 1.11.0
+
+* Removed `groundcover_recurring_silence` resource — backend API is being reworked
 
 ## 1.10.0
 
