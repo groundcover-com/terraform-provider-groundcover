@@ -49,6 +49,7 @@ type syntheticTestResourceModel struct {
 
 	HTTPCheck *syntheticHTTPCheckModel  `tfsdk:"http_check"`
 	SSLCheck  *syntheticSSLCheckModel   `tfsdk:"ssl_check"`
+	TCPCheck  *syntheticTCPCheckModel   `tfsdk:"tcp_check"`
 	Assertion []syntheticAssertionModel `tfsdk:"assertion"`
 	Retry     *syntheticRetryModel      `tfsdk:"retry"`
 	Labels    types.Map                 `tfsdk:"labels"`
@@ -86,6 +87,15 @@ type syntheticSSLCheckModel struct {
 	MinVersion types.String `tfsdk:"min_version"`
 	Sni        types.String `tfsdk:"sni"`
 	Timeout    types.String `tfsdk:"timeout"`
+}
+
+type syntheticTCPCheckModel struct {
+	Host            types.String `tfsdk:"host"`
+	Port            types.Int64  `tfsdk:"port"`
+	Send            types.String `tfsdk:"send"`
+	ExpectResponse  types.Bool   `tfsdk:"expect_response"`
+	ReceiveMaxBytes types.Int64  `tfsdk:"receive_max_bytes"`
+	Timeout         types.String `tfsdk:"timeout"`
 }
 
 type syntheticAssertionModel struct {
@@ -131,7 +141,7 @@ func (r *syntheticTestResource) Metadata(_ context.Context, req resource.Metadat
 
 func (r *syntheticTestResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *resource.SchemaResponse) {
 	resp.Schema = schema.Schema{
-		Description: "Manages a groundcover Synthetic Test. Synthetic tests allow you to proactively monitor your services by running periodic HTTP or SSL/TLS checks against specified endpoints.",
+		Description: "Manages a groundcover Synthetic Test. Synthetic tests allow you to proactively monitor your services by running periodic HTTP, SSL/TLS, or TCP checks against specified endpoints.",
 		Attributes: map[string]schema.Attribute{
 			"id": schema.StringAttribute{
 				Description: "The unique identifier (UUID) of the synthetic test.",
@@ -254,11 +264,11 @@ func (r *syntheticTestResource) Schema(_ context.Context, _ resource.SchemaReque
 				Description: "SSL/TLS check configuration. Validates SSL certificates and TLS connections.",
 				Attributes: map[string]schema.Attribute{
 					"host": schema.StringAttribute{
-						Description: "The hostname to connect to for the SSL check.",
+						Description: "(Required) The hostname to connect to for the SSL check.",
 						Optional:    true,
 					},
 					"port": schema.Int64Attribute{
-						Description: "The port to connect to (1-65535).",
+						Description: "(Required) The port to connect to (1-65535).",
 						Optional:    true,
 						Validators: []validator.Int64{
 							int64validator.Between(1, 65535),
@@ -282,15 +292,50 @@ func (r *syntheticTestResource) Schema(_ context.Context, _ resource.SchemaReque
 					},
 				},
 			},
+			"tcp_check": schema.SingleNestedBlock{
+				Description: "TCP check configuration. Tests TCP connectivity and optionally sends/receives data.",
+				Attributes: map[string]schema.Attribute{
+					"host": schema.StringAttribute{
+						Description: "(Required) The hostname to connect to for the TCP check.",
+						Optional:    true,
+					},
+					"port": schema.Int64Attribute{
+						Description: "(Required) The port to connect to (1-65535).",
+						Optional:    true,
+						Validators: []validator.Int64{
+							int64validator.Between(1, 65535),
+						},
+					},
+					"send": schema.StringAttribute{
+						Description: "Data to send over the TCP connection.",
+						Optional:    true,
+					},
+					"expect_response": schema.BoolAttribute{
+						Description: "Whether to expect a response from the TCP endpoint.",
+						Optional:    true,
+					},
+					"receive_max_bytes": schema.Int64Attribute{
+						Description: "Maximum number of bytes to receive in the response.",
+						Optional:    true,
+						Validators: []validator.Int64{
+							int64validator.AtLeast(0),
+						},
+					},
+					"timeout": schema.StringAttribute{
+						Description: "Timeout for the TCP check (e.g. `5s`, `10s`).",
+						Optional:    true,
+					},
+				},
+			},
 			"assertion": schema.ListNestedBlock{
 				Description: "Assertions to validate the check result.",
 				NestedObject: schema.NestedBlockObject{
 					Attributes: map[string]schema.Attribute{
 						"source": schema.StringAttribute{
-							Description: "What to assert on: `statusCode`, `responseTime`, `responseHeader`, `jsonBody`, `responseBody`, `ssl`.",
+							Description: "What to assert on: `statusCode`, `responseTime`, `responseHeader`, `jsonBody`, `responseBody`, `ssl`, `tcp`.",
 							Required:    true,
 							Validators: []validator.String{
-								stringvalidator.OneOf("statusCode", "responseTime", "responseHeader", "jsonBody", "responseBody", "ssl"),
+								stringvalidator.OneOf("statusCode", "responseTime", "responseHeader", "jsonBody", "responseBody", "ssl", "tcp"),
 							},
 						},
 						"operator": schema.StringAttribute{
@@ -449,19 +494,31 @@ func (r *syntheticTestResource) ValidateConfig(ctx context.Context, req resource
 
 	hasHTTP := config.HTTPCheck != nil
 	hasSSL := config.SSLCheck != nil
+	hasTCP := config.TCPCheck != nil
 
-	if hasHTTP && hasSSL {
+	checkCount := 0
+	if hasHTTP {
+		checkCount++
+	}
+	if hasSSL {
+		checkCount++
+	}
+	if hasTCP {
+		checkCount++
+	}
+
+	if checkCount > 1 {
 		resp.Diagnostics.AddError(
 			"Conflicting check configuration",
-			"Only one of http_check or ssl_check may be specified.",
+			"Only one of http_check, ssl_check, or tcp_check may be specified.",
 		)
 		return
 	}
 
-	if !hasHTTP && !hasSSL {
+	if checkCount == 0 {
 		resp.Diagnostics.AddError(
 			"Missing check configuration",
-			"Exactly one of http_check or ssl_check must be specified.",
+			"Exactly one of http_check, ssl_check, or tcp_check must be specified.",
 		)
 	}
 
@@ -502,6 +559,25 @@ func (r *syntheticTestResource) ValidateConfig(ctx context.Context, req resource
 				path.Root("ssl_check").AtName("port"),
 				"Missing required attribute",
 				"The port attribute is required when ssl_check is configured.",
+			)
+		}
+	}
+
+	if hasTCP {
+		if !config.TCPCheck.Host.IsUnknown() {
+			if config.TCPCheck.Host.IsNull() || config.TCPCheck.Host.ValueString() == "" {
+				resp.Diagnostics.AddAttributeError(
+					path.Root("tcp_check").AtName("host"),
+					"Missing required attribute",
+					"The host attribute is required and must not be empty when tcp_check is configured.",
+				)
+			}
+		}
+		if !config.TCPCheck.Port.IsUnknown() && config.TCPCheck.Port.IsNull() {
+			resp.Diagnostics.AddAttributeError(
+				path.Root("tcp_check").AtName("port"),
+				"Missing required attribute",
+				"The port attribute is required when tcp_check is configured.",
 			)
 		}
 	}
@@ -697,10 +773,10 @@ func (r *syntheticTestResource) ImportState(ctx context.Context, req resource.Im
 
 // validateCheckPresent ensures at least one check type is configured.
 func validateCheckPresent(plan *syntheticTestResourceModel, diags *diag.Diagnostics) bool {
-	if plan.HTTPCheck == nil && plan.SSLCheck == nil {
+	if plan.HTTPCheck == nil && plan.SSLCheck == nil && plan.TCPCheck == nil {
 		diags.AddError(
 			"Missing check configuration",
-			"Either an http_check or ssl_check block is required to define the synthetic test check configuration.",
+			"Either an http_check, ssl_check, or tcp_check block is required to define the synthetic test check configuration.",
 		)
 		return false
 	}
@@ -824,6 +900,34 @@ func toSDKRequest(plan *syntheticTestResourceModel) *models.SyntheticTestCreateR
 		}
 
 		checkConfig.Request = &models.Request{Ssl: sslReq}
+	}
+
+	// TCP Check
+	if plan.TCPCheck != nil {
+		checkConfig.Kind = "tcp"
+		tcpReq := &models.TCPRequest{
+			Kind: "tcp",
+			Host: plan.TCPCheck.Host.ValueString(),
+			Port: plan.TCPCheck.Port.ValueInt64(),
+		}
+
+		if !plan.TCPCheck.Send.IsNull() {
+			tcpReq.Send = plan.TCPCheck.Send.ValueString()
+		}
+
+		if !plan.TCPCheck.ExpectResponse.IsNull() {
+			tcpReq.ExpectResponse = plan.TCPCheck.ExpectResponse.ValueBool()
+		}
+
+		if !plan.TCPCheck.ReceiveMaxBytes.IsNull() {
+			tcpReq.ReceiveMaxBytes = plan.TCPCheck.ReceiveMaxBytes.ValueInt64()
+		}
+
+		if !plan.TCPCheck.Timeout.IsNull() {
+			tcpReq.Timeout = plan.TCPCheck.Timeout.ValueString()
+		}
+
+		checkConfig.Request = &models.Request{TCP: tcpReq}
 	}
 
 	// Assertions
@@ -1020,6 +1124,7 @@ func fromSDKResponse(ctx context.Context, sdkResp *models.SyntheticTestCreateReq
 
 		state.HTTPCheck = httpModel
 		state.SSLCheck = nil
+		state.TCPCheck = nil
 	}
 
 	// SSL Check
@@ -1055,6 +1160,43 @@ func fromSDKResponse(ctx context.Context, sdkResp *models.SyntheticTestCreateReq
 
 		state.SSLCheck = sslModel
 		state.HTTPCheck = nil
+		state.TCPCheck = nil
+	}
+
+	// TCP Check
+	if cc.Request != nil && cc.Request.TCP != nil {
+		tcp := cc.Request.TCP
+		tcpModel := &syntheticTCPCheckModel{
+			Host: types.StringValue(tcp.Host),
+			Port: types.Int64Value(tcp.Port),
+		}
+
+		if tcp.ExpectResponse || (state.TCPCheck != nil && !state.TCPCheck.ExpectResponse.IsNull()) {
+			tcpModel.ExpectResponse = types.BoolValue(tcp.ExpectResponse)
+		}
+
+		if state.TCPCheck == nil {
+			// Import: no prior state — reflect whatever the API returned
+			if tcp.Send != "" {
+				tcpModel.Send = types.StringValue(tcp.Send)
+			}
+			if tcp.ReceiveMaxBytes != 0 {
+				tcpModel.ReceiveMaxBytes = types.Int64Value(tcp.ReceiveMaxBytes)
+			}
+			if tcp.Timeout != "" {
+				tcpModel.Timeout = types.StringValue(tcp.Timeout)
+			}
+		} else {
+			// Normal read: preserve user's config values to avoid perpetual
+			// diffs caused by server-side defaults the user never configured.
+			tcpModel.Send = state.TCPCheck.Send
+			tcpModel.ReceiveMaxBytes = state.TCPCheck.ReceiveMaxBytes
+			tcpModel.Timeout = state.TCPCheck.Timeout
+		}
+
+		state.TCPCheck = tcpModel
+		state.HTTPCheck = nil
+		state.SSLCheck = nil
 	}
 
 	// Assertions

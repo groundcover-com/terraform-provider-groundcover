@@ -236,6 +236,44 @@ resource "groundcover_synthetic_test" "ssl_tls_check" {
   }
 }
 
+# Example: Basic TCP port check
+resource "groundcover_synthetic_test" "tcp_check" {
+  name     = "TCP Port Check"
+  interval = "1m"
+
+  tcp_check {
+    host = "example.com"
+    port = 5432
+  }
+
+  assertion {
+    source   = "tcp"
+    operator = "exists"
+    target   = "true"
+  }
+}
+
+# Example: TCP check with send/receive
+resource "groundcover_synthetic_test" "tcp_send_check" {
+  name     = "TCP Send/Receive Check"
+  interval = "5m"
+
+  tcp_check {
+    host              = "example.com"
+    port              = 6379
+    send              = "PING"
+    expect_response   = true
+    receive_max_bytes = 1024
+    timeout           = "10s"
+  }
+
+  assertion {
+    source   = "tcp"
+    operator = "exists"
+    target   = "true"
+  }
+}
+
 output "http_health_check_id" {
   value = groundcover_synthetic_test.http_health_check.id
 }
@@ -250,4 +288,8 @@ output "monitored_check_id" {
 
 output "ssl_check_id" {
   value = groundcover_synthetic_test.ssl_check.id
+}
+
+output "tcp_check_id" {
+  value = groundcover_synthetic_test.tcp_check.id
 }
