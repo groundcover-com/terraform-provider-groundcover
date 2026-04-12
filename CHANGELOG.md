@@ -1,7 +1,13 @@
-## 1.11.1
+## 1.12.1
 
 * Fixed `follow_redirects` and `allow_insecure` state handling in `groundcover_synthetic_test` HTTP checks — the SDK changed these fields from `bool` to `*bool`, and the provider now uses an import/normal-read pattern to avoid perpetual diffs from server-side defaults
-* Updated groundcover SDK from v1.235.0 to v1.244.0
+* Updated groundcover SDK from v1.237.0 to v1.244.0
+
+## 1.12.0
+
+* Added TCP check support to `groundcover_synthetic_test` resource — supports `host`, `port`, `send`, `expect_response`, and `receive_max_bytes` configuration for TCP connectivity monitoring
+* Added TCP assertion source (`tcp`) for TCP check assertions
+* Updated groundcover SDK from v1.235.0 to v1.237.0
 
 ## 1.11.0
 
