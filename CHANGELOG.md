@@ -1,3 +1,8 @@
+## 1.11.1
+
+* Fixed `follow_redirects` and `allow_insecure` state handling in `groundcover_synthetic_test` HTTP checks — the SDK changed these fields from `bool` to `*bool`, and the provider now uses an import/normal-read pattern to avoid perpetual diffs from server-side defaults
+* Updated groundcover SDK from v1.235.0 to v1.244.0
+
 ## 1.11.0
 
 * Removed `groundcover_recurring_silence` resource — backend API is being reworked

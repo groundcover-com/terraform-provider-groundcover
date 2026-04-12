@@ -752,11 +752,13 @@ func toSDKRequest(plan *syntheticTestResourceModel) *models.SyntheticTestCreateR
 		}
 
 		if !plan.HTTPCheck.FollowRedirects.IsNull() {
-			httpReq.FollowRedirects = plan.HTTPCheck.FollowRedirects.ValueBool()
+			v := plan.HTTPCheck.FollowRedirects.ValueBool()
+			httpReq.FollowRedirects = &v
 		}
 
 		if !plan.HTTPCheck.AllowInsecure.IsNull() {
-			httpReq.AllowInsecure = plan.HTTPCheck.AllowInsecure.ValueBool()
+			v := plan.HTTPCheck.AllowInsecure.ValueBool()
+			httpReq.AllowInsecure = &v
 		}
 
 		if !plan.HTTPCheck.Headers.IsNull() && !plan.HTTPCheck.Headers.IsUnknown() {
@@ -987,12 +989,18 @@ func fromSDKResponse(ctx context.Context, sdkResp *models.SyntheticTestCreateReq
 			httpModel.Headers = types.MapNull(types.StringType)
 		}
 
-		// Set bool fields: preserve explicit user values, set from API if true or if user had set them
-		if http.FollowRedirects || (state.HTTPCheck != nil && !state.HTTPCheck.FollowRedirects.IsNull()) {
-			httpModel.FollowRedirects = types.BoolValue(http.FollowRedirects)
-		}
-		if http.AllowInsecure || (state.HTTPCheck != nil && !state.HTTPCheck.AllowInsecure.IsNull()) {
-			httpModel.AllowInsecure = types.BoolValue(http.AllowInsecure)
+		if state.HTTPCheck == nil {
+			// Import: no prior state — only reflect non-default API values
+			if http.FollowRedirects != nil && *http.FollowRedirects {
+				httpModel.FollowRedirects = types.BoolValue(*http.FollowRedirects)
+			}
+			if http.AllowInsecure != nil && *http.AllowInsecure {
+				httpModel.AllowInsecure = types.BoolValue(*http.AllowInsecure)
+			}
+		} else {
+			// Normal read: preserve user's config values to avoid perpetual diffs
+			httpModel.FollowRedirects = state.HTTPCheck.FollowRedirects
+			httpModel.AllowInsecure = state.HTTPCheck.AllowInsecure
 		}
 
 		if http.Body != nil && (http.Body.Content != "" || string(http.Body.Type) != "") {
