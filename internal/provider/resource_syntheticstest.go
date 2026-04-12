@@ -1094,17 +1094,25 @@ func fromSDKResponse(ctx context.Context, sdkResp *models.SyntheticTestCreateReq
 		}
 
 		if state.HTTPCheck == nil {
-			// Import: no prior state — only reflect non-default API values
-			if http.FollowRedirects != nil && *http.FollowRedirects {
+			// Import: no prior state — set from API when explicitly present
+			if http.FollowRedirects != nil {
 				httpModel.FollowRedirects = types.BoolValue(*http.FollowRedirects)
 			}
-			if http.AllowInsecure != nil && *http.AllowInsecure {
+			if http.AllowInsecure != nil {
 				httpModel.AllowInsecure = types.BoolValue(*http.AllowInsecure)
 			}
 		} else {
-			// Normal read: preserve user's config values to avoid perpetual diffs
-			httpModel.FollowRedirects = state.HTTPCheck.FollowRedirects
-			httpModel.AllowInsecure = state.HTTPCheck.AllowInsecure
+			// Normal read: use API value when present (drift detection), fall back to state
+			if http.FollowRedirects != nil {
+				httpModel.FollowRedirects = types.BoolValue(*http.FollowRedirects)
+			} else {
+				httpModel.FollowRedirects = state.HTTPCheck.FollowRedirects
+			}
+			if http.AllowInsecure != nil {
+				httpModel.AllowInsecure = types.BoolValue(*http.AllowInsecure)
+			} else {
+				httpModel.AllowInsecure = state.HTTPCheck.AllowInsecure
+			}
 		}
 
 		if http.Body != nil && (http.Body.Content != "" || string(http.Body.Type) != "") {
