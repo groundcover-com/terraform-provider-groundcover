@@ -1,3 +1,8 @@
+## 1.13.0
+
+* Added DNS check support to `groundcover_synthetic_test` resource — supports `domain`, `record_type`, `port`, `resolver`, `dnssec`, and `timeout` configuration for DNS resolution monitoring
+* Added DNS assertion source (`dns`) for DNS check assertions
+
 ## 1.12.0
 
 * Added TCP check support to `groundcover_synthetic_test` resource — supports `host`, `port`, `send`, `expect_response`, and `receive_max_bytes` configuration for TCP connectivity monitoring
