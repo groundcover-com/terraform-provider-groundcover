@@ -28,6 +28,10 @@ var (
 	timeRegex      = regexp.MustCompile(`\d+h(?:\d+m)?(?:\d+s)?|\d+m(?:\d+s)?|\d+s`)
 	componentRegex = regexp.MustCompile(`(\d+)([hms])`)
 	zeroRegex      = regexp.MustCompile(`^0[hms]$`)
+
+	// Match human-readable duration patterns like "10 minutes", "1 hour", "30 seconds"
+	// These are converted to Go duration format during normalization
+	humanDurationRegex = regexp.MustCompile(`(\d+)\s+(hours?|minutes?|seconds?)`)
 )
 
 // NormalizeMonitorYaml sorts keys in a YAML string alphabetically using AST manipulation.
@@ -316,8 +320,10 @@ func filterAstNodeByKeys(ctx context.Context, node ast.Node, allowedKeys map[str
 }
 
 // NormalizeTimeStringsInYaml normalizes time duration strings in YAML to a consistent format
-// e.g., "30m0s" -> "30m", "1h0m0s" -> "1h"
+// e.g., "30m0s" -> "30m", "1h0m0s" -> "1h", "10 minutes" -> "10m"
 func NormalizeTimeStringsInYaml(yamlString string) string {
+	// First convert human-readable durations to Go format
+	yamlString = normalizeHumanDurations(yamlString)
 	result := timeRegex.ReplaceAllStringFunc(yamlString, func(match string) string {
 		// Try to parse as duration to validate it's a valid duration
 		if _, err := time.ParseDuration(match); err == nil {
@@ -693,8 +699,33 @@ func normalizeStringValues(data interface{}) interface{} {
 	}
 }
 
+// normalizeHumanDurations converts human-readable duration strings to Go duration format.
+// For example: "10 minutes" -> "10m", "1 hour" -> "1h", "30 seconds" -> "30s"
+func normalizeHumanDurations(s string) string {
+	return humanDurationRegex.ReplaceAllStringFunc(s, func(match string) string {
+		parts := humanDurationRegex.FindStringSubmatch(match)
+		if len(parts) != 3 {
+			return match
+		}
+		num := parts[1]
+		unit := parts[2]
+		switch {
+		case strings.HasPrefix(unit, "hour"):
+			return num + "h"
+		case strings.HasPrefix(unit, "minute"):
+			return num + "m"
+		case strings.HasPrefix(unit, "second"):
+			return num + "s"
+		default:
+			return match
+		}
+	})
+}
+
 // normalizeTimeString normalizes a single time string
 func normalizeTimeString(s string) string {
+	// First convert human-readable durations to Go format
+	s = normalizeHumanDurations(s)
 	return timeRegex.ReplaceAllStringFunc(s, func(match string) string {
 		// Try to parse as duration to validate it's a valid duration
 		if duration, err := time.ParseDuration(match); err == nil {
@@ -951,6 +982,18 @@ func deepEqual(a, b interface{}) bool {
 			bFloat, bOk := toFloat64(b)
 			if aOk && bOk {
 				return aFloat == bFloat
+			}
+		}
+		// Handle bool/string equivalence
+		// The API may return boolean values as quoted strings (e.g., pagerduty: "true" instead of true)
+		if aBool, aIsBool := a.(bool); aIsBool {
+			if bStr, bIsStr := b.(string); bIsStr {
+				return (aBool && bStr == "true") || (!aBool && bStr == "false")
+			}
+		}
+		if bBool, bIsBool := b.(bool); bIsBool {
+			if aStr, aIsStr := a.(string); aIsStr {
+				return (bBool && aStr == "true") || (!bBool && aStr == "false")
 			}
 		}
 		return av == b
