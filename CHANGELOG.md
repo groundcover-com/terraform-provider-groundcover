@@ -1,8 +1,11 @@
+## 1.11.1
+
+* Fixed perpetual plan diffs on `groundcover_monitor` when the API returns boolean label values as quoted strings (e.g., `pagerduty: "true"` instead of `pagerduty: true`) — `deepEqual` now treats bool/string equivalents as semantically identical
+* Fixed perpetual plan diffs on `groundcover_monitor` when using human-readable durations (e.g., `instantRollup: 10 minutes`) — time normalization now converts human-readable formats to Go duration format before comparison
+
 ## 1.11.0
 
 * Removed `groundcover_recurring_silence` resource — backend API is being reworked
-* Fixed perpetual plan diffs on `groundcover_monitor` when the API returns boolean label values as quoted strings (e.g., `pagerduty: "true"` instead of `pagerduty: true`) — `deepEqual` now treats bool/string equivalents as semantically identical
-* Fixed perpetual plan diffs on `groundcover_monitor` when using human-readable durations (e.g., `instantRollup: 10 minutes`) — time normalization now converts human-readable formats to Go duration format before comparison
 
 ## 1.10.0
 
