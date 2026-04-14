@@ -289,6 +289,22 @@ resource "groundcover_synthetic_test" "tcp_send_check" {
   }
 }
 
+output "http_health_check_id" {
+  value = groundcover_synthetic_test.http_health_check.id
+}
+
+output "http_post_check_id" {
+  value = groundcover_synthetic_test.http_post_check.id
+}
+
+output "monitored_check_id" {
+  value = groundcover_synthetic_test.monitored_check.id
+}
+
+output "ssl_check_id" {
+  value = groundcover_synthetic_test.ssl_check.id
+}
+
 # Example: Basic DNS resolution check
 resource "groundcover_synthetic_test" "dns_check" {
   name     = "DNS Resolution Check"
@@ -325,22 +341,6 @@ resource "groundcover_synthetic_test" "dns_full_check" {
     operator = "exists"
     target   = "true"
   }
-}
-
-output "http_health_check_id" {
-  value = groundcover_synthetic_test.http_health_check.id
-}
-
-output "http_post_check_id" {
-  value = groundcover_synthetic_test.http_post_check.id
-}
-
-output "monitored_check_id" {
-  value = groundcover_synthetic_test.monitored_check.id
-}
-
-output "ssl_check_id" {
-  value = groundcover_synthetic_test.ssl_check.id
 }
 
 output "tcp_check_id" {
