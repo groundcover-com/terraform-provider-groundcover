@@ -356,8 +356,11 @@ func (r *syntheticTestResource) Schema(_ context.Context, _ resource.SchemaReque
 						Optional:    true,
 					},
 					"record_type": schema.StringAttribute{
-						Description: "(Required) DNS record type to query (e.g. `A`, `AAAA`, `CNAME`, `MX`, `NS`, `TXT`, `SOA`, `SRV`, `PTR`).",
+						Description: "(Required) DNS record type to query. Supported values: `A`, `AAAA`, `CNAME`, `MX`, `NS`, `TXT`, `SOA`, `SRV`, `PTR`.",
 						Optional:    true,
+						Validators: []validator.String{
+							stringvalidator.OneOf("A", "AAAA", "CNAME", "MX", "NS", "TXT", "SOA", "SRV", "PTR"),
+						},
 					},
 					"dnssec": schema.BoolAttribute{
 						Description: "Whether to validate DNSSEC.",
