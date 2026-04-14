@@ -204,7 +204,7 @@ resource "groundcover_synthetic_test" "connected_apps_check" {
   }
 }
 
-# Example: SSL certificate check
+# Example: SSL certificate check with property assertions
 resource "groundcover_synthetic_test" "ssl_check" {
   name     = "SSL Certificate Check"
   interval = "5m"
@@ -214,11 +214,20 @@ resource "groundcover_synthetic_test" "ssl_check" {
     port = 443
   }
 
+  # Check that the certificate is valid
   assertion {
     source   = "ssl"
-    operator = "exists"
-    target   = "true"
     property = "certificateValid"
+    operator = "eq"
+    target   = "true"
+  }
+
+  # Check that the certificate expires in more than 30 days
+  assertion {
+    source   = "ssl"
+    property = "certificateExpiresIn"
+    operator = "gt"
+    target   = "30"
   }
 }
 
@@ -238,16 +247,16 @@ resource "groundcover_synthetic_test" "ssl_tls_check" {
 
   assertion {
     source   = "ssl"
-    operator = "exists"
-    target   = "true"
     property = "certificateValid"
+    operator = "eq"
+    target   = "true"
   }
 
   assertion {
     source   = "ssl"
-    operator = "exists"
-    target   = "true"
     property = "chainValid"
+    operator = "eq"
+    target   = "true"
   }
 }
 
@@ -344,7 +353,7 @@ Required:
 
 Optional:
 
-- `property` (String) Property path for header, JSON body, or SSL assertions (e.g. `Content-Type`, `data.id`, `certificateValid`, `certificateExpiresIn`, `tlsVersion`, `chainValid`).
+- `property` (String) Specifies which property to evaluate within the assertion source. Usage varies by source: responseHeader — Header name (case-insensitive), operators: exists, notExists, eq, ne, contains. jsonBody — Dot-notation path (e.g. `user.name`), operators: exists, notExists, eq, ne, contains. ssl — One of `certificateValid` (eq `true`/`false`), `certificateExpiresIn` (gt/lt days), `tlsVersion` (eq/gt/lt version string like `1.2`), `chainValid` (eq `true`/`false`), or `cipherSuite` (eq/contains string). tcp — `connection` to check connectivity (exists/notExists/eq/ne), or `responseContains` to match response body content.
 - `severity` (String) Assertion severity: `critical` (default) or `degraded`.
 - `target` (String) Expected value to compare against (as string, e.g. `"200"` for status code).
 

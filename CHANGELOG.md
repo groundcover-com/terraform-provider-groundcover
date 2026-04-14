@@ -1,3 +1,7 @@
+## 1.12.1
+
+* Improved `property` field documentation for `groundcover_synthetic_test` assertions — added per-source usage details and HCL examples for SSL properties (`certificateValid`, `certificateExpiresIn`, `chainValid`)
+
 ## 1.12.0
 
 * Added TCP check support to `groundcover_synthetic_test` resource — supports `host`, `port`, `send`, `expect_response`, and `receive_max_bytes` configuration for TCP connectivity monitoring
