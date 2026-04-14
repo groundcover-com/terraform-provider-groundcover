@@ -400,7 +400,7 @@ Optional:
 - `dnssec` (Boolean) Whether to validate DNSSEC.
 - `domain` (String) (Required) The domain name to resolve.
 - `port` (Number) The DNS server port (1-65535). Defaults to 53.
-- `record_type` (String) (Required) DNS record type to query (e.g. `A`, `AAAA`, `CNAME`, `MX`, `NS`, `TXT`, `SOA`, `SRV`, `PTR`).
+- `record_type` (String) (Required) DNS record type to query. Supported values: `A`, `AAAA`, `CNAME`, `MX`, `NS`, `TXT`, `SOA`, `SRV`, `PTR`.
 - `resolver` (String) Custom DNS resolver address (e.g. `8.8.8.8`).
 - `timeout` (String) Timeout for the DNS check (e.g. `5s`, `10s`).
 
