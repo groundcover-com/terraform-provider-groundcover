@@ -1332,12 +1332,29 @@ func fromSDKResponse(ctx context.Context, sdkResp *models.SyntheticTestCreateReq
 				dnsModel.Timeout = types.StringValue(dns.Timeout)
 			}
 		} else {
-			// Normal read: preserve user's config values to avoid perpetual
-			// diffs caused by server-side defaults the user never configured.
-			dnsModel.Port = state.DNSCheck.Port
-			dnsModel.Resolver = state.DNSCheck.Resolver
-			dnsModel.Dnssec = state.DNSCheck.Dnssec
-			dnsModel.Timeout = state.DNSCheck.Timeout
+			// Normal read: if the user never configured a field (null),
+			// preserve that null to avoid diffs from server defaults.
+			// If the user did configure it, use the API value so drift is detected.
+			if state.DNSCheck.Port.IsNull() || state.DNSCheck.Port.IsUnknown() {
+				dnsModel.Port = state.DNSCheck.Port
+			} else {
+				dnsModel.Port = types.Int64Value(dns.Port)
+			}
+			if state.DNSCheck.Resolver.IsNull() || state.DNSCheck.Resolver.IsUnknown() {
+				dnsModel.Resolver = state.DNSCheck.Resolver
+			} else {
+				dnsModel.Resolver = types.StringValue(dns.Resolver)
+			}
+			if state.DNSCheck.Dnssec.IsNull() || state.DNSCheck.Dnssec.IsUnknown() {
+				dnsModel.Dnssec = state.DNSCheck.Dnssec
+			} else {
+				dnsModel.Dnssec = types.BoolValue(dns.Dnssec)
+			}
+			if state.DNSCheck.Timeout.IsNull() || state.DNSCheck.Timeout.IsUnknown() {
+				dnsModel.Timeout = state.DNSCheck.Timeout
+			} else {
+				dnsModel.Timeout = types.StringValue(dns.Timeout)
+			}
 		}
 
 		state.DNSCheck = dnsModel
