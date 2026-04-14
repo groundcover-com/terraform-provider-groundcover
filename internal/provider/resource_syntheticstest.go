@@ -1321,15 +1321,23 @@ func fromSDKResponse(ctx context.Context, sdkResp *models.SyntheticTestCreateReq
 			// Import: no prior state — reflect whatever the API returned
 			if dns.Port != 0 {
 				dnsModel.Port = types.Int64Value(dns.Port)
+			} else {
+				dnsModel.Port = types.Int64Null()
 			}
 			if dns.Resolver != "" {
 				dnsModel.Resolver = types.StringValue(dns.Resolver)
+			} else {
+				dnsModel.Resolver = types.StringNull()
 			}
 			if dns.Dnssec {
 				dnsModel.Dnssec = types.BoolValue(dns.Dnssec)
+			} else {
+				dnsModel.Dnssec = types.BoolNull()
 			}
 			if dns.Timeout != "" {
 				dnsModel.Timeout = types.StringValue(dns.Timeout)
+			} else {
+				dnsModel.Timeout = types.StringNull()
 			}
 		} else {
 			// Normal read: if the user never configured a field (null),
