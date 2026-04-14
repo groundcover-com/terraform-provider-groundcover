@@ -1313,7 +1313,8 @@ func fromSDKResponse(ctx context.Context, sdkResp *models.SyntheticTestCreateReq
 	if cc.Request != nil && cc.Request.DNS != nil {
 		dns := cc.Request.DNS
 		dnsModel := &syntheticDNSCheckModel{
-			Domain: types.StringValue(dns.Domain),
+			Domain:     types.StringValue(dns.Domain),
+			RecordType: types.StringValue(string(dns.RecordType)),
 		}
 
 		if state.DNSCheck == nil {
@@ -1323,9 +1324,6 @@ func fromSDKResponse(ctx context.Context, sdkResp *models.SyntheticTestCreateReq
 			}
 			if dns.Resolver != "" {
 				dnsModel.Resolver = types.StringValue(dns.Resolver)
-			}
-			if string(dns.RecordType) != "" {
-				dnsModel.RecordType = types.StringValue(string(dns.RecordType))
 			}
 			if dns.Dnssec {
 				dnsModel.Dnssec = types.BoolValue(dns.Dnssec)
@@ -1338,7 +1336,6 @@ func fromSDKResponse(ctx context.Context, sdkResp *models.SyntheticTestCreateReq
 			// diffs caused by server-side defaults the user never configured.
 			dnsModel.Port = state.DNSCheck.Port
 			dnsModel.Resolver = state.DNSCheck.Resolver
-			dnsModel.RecordType = state.DNSCheck.RecordType
 			dnsModel.Dnssec = state.DNSCheck.Dnssec
 			dnsModel.Timeout = state.DNSCheck.Timeout
 		}
