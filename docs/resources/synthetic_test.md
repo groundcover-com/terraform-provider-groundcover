@@ -3,12 +3,12 @@
 page_title: "groundcover_synthetic_test Resource - groundcover"
 subcategory: ""
 description: |-
-  Manages a groundcover Synthetic Test. Synthetic tests allow you to proactively monitor your services by running periodic HTTP, SSL/TLS, or TCP checks against specified endpoints.
+  Manages a groundcover Synthetic Test. Synthetic tests allow you to proactively monitor your services by running periodic HTTP, SSL/TLS, TCP, or DNS checks against specified endpoints.
 ---
 
 # groundcover_synthetic_test (Resource)
 
-Manages a groundcover Synthetic Test. Synthetic tests allow you to proactively monitor your services by running periodic HTTP, SSL/TLS, or TCP checks against specified endpoints.
+Manages a groundcover Synthetic Test. Synthetic tests allow you to proactively monitor your services by running periodic HTTP, SSL/TLS, TCP, or DNS checks against specified endpoints.
 
 ## Example Usage
 
@@ -325,8 +325,50 @@ output "ssl_check_id" {
   value = groundcover_synthetic_test.ssl_check.id
 }
 
+# Example: Basic DNS resolution check
+resource "groundcover_synthetic_test" "dns_check" {
+  name     = "DNS Resolution Check"
+  interval = "1m"
+
+  dns_check {
+    domain      = "example.com"
+    record_type = "A"
+  }
+
+  assertion {
+    source   = "dns"
+    operator = "exists"
+    target   = "true"
+  }
+}
+
+# Example: DNS check with custom resolver and DNSSEC
+resource "groundcover_synthetic_test" "dns_full_check" {
+  name     = "DNS Full Check"
+  interval = "5m"
+
+  dns_check {
+    domain      = "example.com"
+    record_type = "A"
+    port        = 53
+    resolver    = "8.8.8.8"
+    dnssec      = true
+    timeout     = "10s"
+  }
+
+  assertion {
+    source   = "dns"
+    operator = "exists"
+    target   = "true"
+  }
+}
+
 output "tcp_check_id" {
   value = groundcover_synthetic_test.tcp_check.id
+}
+
+output "dns_check_id" {
+  value = groundcover_synthetic_test.dns_check.id
 }
 ```
 
@@ -341,6 +383,7 @@ output "tcp_check_id" {
 ### Optional
 
 - `assertion` (Block List) Assertions to validate the check result. (see [below for nested schema](#nestedblock--assertion))
+- `dns_check` (Block, Optional) DNS check configuration. Tests DNS resolution and optionally validates DNSSEC. (see [below for nested schema](#nestedblock--dns_check))
 - `enabled` (Boolean) Whether the synthetic test is enabled. Default: `true`.
 - `http_check` (Block, Optional) HTTP check configuration. Defines the endpoint to monitor. (see [below for nested schema](#nestedblock--http_check))
 - `labels` (Map of String) Extra labels to attach to the synthetic test metrics.
@@ -360,13 +403,26 @@ output "tcp_check_id" {
 Required:
 
 - `operator` (String) Comparison operator: `eq`, `ne`, `gt`, `lt`, `contains`, `exists`, `notExists`, `startsWith`, `endsWith`, `regex`, `oneOf`.
-- `source` (String) What to assert on: `statusCode`, `responseTime`, `responseHeader`, `jsonBody`, `responseBody`, `ssl`, `tcp`.
+- `source` (String) What to assert on: `statusCode`, `responseTime`, `responseHeader`, `jsonBody`, `responseBody`, `ssl`, `tcp`, `dns`.
 
 Optional:
 
 - `property` (String) Property path for header, JSON body, or SSL assertions (e.g. `Content-Type`, `data.id`, `certificateValid`, `certificateExpiresIn`, `tlsVersion`, `chainValid`).
 - `severity` (String) Assertion severity: `critical` (default) or `degraded`.
 - `target` (String) Expected value to compare against (as string, e.g. `"200"` for status code).
+
+
+<a id="nestedblock--dns_check"></a>
+### Nested Schema for `dns_check`
+
+Optional:
+
+- `dnssec` (Boolean) Whether to validate DNSSEC.
+- `domain` (String) (Required) The domain name to resolve.
+- `port` (Number) The DNS server port (1-65535). Defaults to 53.
+- `record_type` (String) (Required) DNS record type to query. Supported values: `A`, `AAAA`, `CNAME`, `MX`, `NS`, `TXT`, `SOA`, `SRV`, `PTR`.
+- `resolver` (String) Custom DNS resolver address (e.g. `8.8.8.8`).
+- `timeout` (String) Timeout for the DNS check (e.g. `5s`, `10s`).
 
 
 <a id="nestedblock--http_check"></a>

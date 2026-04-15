@@ -310,6 +310,48 @@ output "ssl_check_id" {
   value = groundcover_synthetic_test.ssl_check.id
 }
 
+# Example: Basic DNS resolution check
+resource "groundcover_synthetic_test" "dns_check" {
+  name     = "DNS Resolution Check"
+  interval = "1m"
+
+  dns_check {
+    domain      = "example.com"
+    record_type = "A"
+  }
+
+  assertion {
+    source   = "dns"
+    operator = "exists"
+    target   = "true"
+  }
+}
+
+# Example: DNS check with custom resolver and DNSSEC
+resource "groundcover_synthetic_test" "dns_full_check" {
+  name     = "DNS Full Check"
+  interval = "5m"
+
+  dns_check {
+    domain      = "example.com"
+    record_type = "A"
+    port        = 53
+    resolver    = "8.8.8.8"
+    dnssec      = true
+    timeout     = "10s"
+  }
+
+  assertion {
+    source   = "dns"
+    operator = "exists"
+    target   = "true"
+  }
+}
+
 output "tcp_check_id" {
   value = groundcover_synthetic_test.tcp_check.id
+}
+
+output "dns_check_id" {
+  value = groundcover_synthetic_test.dns_check.id
 }

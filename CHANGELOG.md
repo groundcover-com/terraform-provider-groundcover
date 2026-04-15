@@ -1,5 +1,7 @@
 ## 1.12.0
 
+* Added DNS check support to `groundcover_synthetic_test` resource — supports `domain`, `record_type`, `port`, `resolver`, `dnssec`, and `timeout` configuration for DNS resolution monitoring
+* Added DNS assertion source (`dns`) for DNS check assertions
 * Added TCP check support to `groundcover_synthetic_test` resource — supports `host`, `port`, `send`, `expect_response`, and `receive_max_bytes` configuration for TCP connectivity monitoring
 * Added TCP assertion source (`tcp`) for TCP check assertions
 * Fixed `follow_redirects` and `allow_insecure` state handling in `groundcover_synthetic_test` HTTP checks — the SDK changed these fields from `bool` to `*bool`, and the provider now uses an import/normal-read pattern to avoid perpetual diffs from server-side defaults
