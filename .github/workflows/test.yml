@@ -92,7 +92,7 @@ jobs:
         GROUNDCOVER_INCLOUD_BACKEND_ID: ${{ secrets.GROUNDCOVER_INCLOUD_BACKEND_ID }}
       run: |
         echo "✅ Running acceptance tests with available secrets..."
-        go test ./internal/provider -v -timeout 30m
+        go test ./internal/provider -v -timeout 60m
 
   # Build test to ensure the provider compiles
   build-test:

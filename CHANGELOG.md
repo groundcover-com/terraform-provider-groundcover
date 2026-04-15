@@ -3,6 +3,8 @@
 * Added TCP check support to `groundcover_synthetic_test` resource — supports `host`, `port`, `send`, `expect_response`, and `receive_max_bytes` configuration for TCP connectivity monitoring
 * Added TCP assertion source (`tcp`) for TCP check assertions
 * Updated groundcover SDK from v1.235.0 to v1.237.0
+* Fixed perpetual plan diffs on `groundcover_monitor` when the API returns boolean label values as quoted strings (e.g., `pagerduty: "true"` instead of `pagerduty: true`) — `deepEqual` now treats bool/string equivalents as semantically identical
+* Fixed perpetual plan diffs on `groundcover_monitor` when using human-readable durations (e.g., `instantRollup: 10 minutes`) — time normalization now converts human-readable formats to Go duration format before comparison
 
 ## 1.11.0
 
