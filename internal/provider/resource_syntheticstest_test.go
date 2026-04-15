@@ -1440,6 +1440,68 @@ resource "groundcover_synthetic_test" "test" {
 `, name)
 }
 
+func TestAccSyntheticTestResource_sslPropertyAssertions(t *testing.T) {
+	name := acctest.RandomWithPrefix("test-synth-ssl-prop")
+
+	resource.Test(t, resource.TestCase{
+		PreCheck:                 func() { testAccPreCheck(t) },
+		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
+		Steps: []resource.TestStep{
+			{
+				Config: testAccSyntheticTestResourceConfig_sslPropertyAssertions(name),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					resource.TestCheckResourceAttr("groundcover_synthetic_test.test", "name", name),
+					resource.TestCheckResourceAttr("groundcover_synthetic_test.test", "assertion.#", "2"),
+					resource.TestCheckResourceAttr("groundcover_synthetic_test.test", "assertion.0.source", "ssl"),
+					resource.TestCheckResourceAttr("groundcover_synthetic_test.test", "assertion.0.property", "certificateValid"),
+					resource.TestCheckResourceAttr("groundcover_synthetic_test.test", "assertion.0.operator", "eq"),
+					resource.TestCheckResourceAttr("groundcover_synthetic_test.test", "assertion.0.target", "true"),
+					resource.TestCheckResourceAttr("groundcover_synthetic_test.test", "assertion.1.source", "ssl"),
+					resource.TestCheckResourceAttr("groundcover_synthetic_test.test", "assertion.1.property", "certificateExpiresIn"),
+					resource.TestCheckResourceAttr("groundcover_synthetic_test.test", "assertion.1.operator", "gt"),
+					resource.TestCheckResourceAttr("groundcover_synthetic_test.test", "assertion.1.target", "30"),
+					resource.TestCheckResourceAttrSet("groundcover_synthetic_test.test", "id"),
+				),
+			},
+			{
+				ResourceName:            "groundcover_synthetic_test.test",
+				ImportState:             true,
+				ImportStateVerify:       true,
+				ImportStateVerifyIgnore: []string{"ssl_check.sni"},
+			},
+		},
+	})
+}
+
+func testAccSyntheticTestResourceConfig_sslPropertyAssertions(name string) string {
+	return fmt.Sprintf(`
+resource "groundcover_synthetic_test" "test" {
+  name     = %[1]q
+  enabled  = true
+  interval = "1m"
+
+  ssl_check {
+    host = "google.com"
+    port = 443
+  }
+
+  assertion {
+    source   = "ssl"
+    property = "certificateValid"
+    operator = "eq"
+    target   = "true"
+  }
+
+  assertion {
+    source   = "ssl"
+    property = "certificateExpiresIn"
+    operator = "gt"
+    target   = "30"
+  }
+}
+`, name)
+}
+
 func testAccSyntheticTestResourceConfig_tcpUpdated(name string) string {
 	return fmt.Sprintf(`
 resource "groundcover_synthetic_test" "test" {

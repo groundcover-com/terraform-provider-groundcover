@@ -1,5 +1,6 @@
 ## 1.12.0
 
+* Improved `property` field documentation for `groundcover_synthetic_test` assertions — added per-source usage details and HCL examples for SSL properties (`certificateValid`, `certificateExpiresIn`, `chainValid`)
 * Added DNS check support to `groundcover_synthetic_test` resource — supports `domain`, `record_type`, `port`, `resolver`, `dnssec`, and `timeout` configuration for DNS resolution monitoring
 * Added DNS assertion source (`dns`) for DNS check assertions
 * Added TCP check support to `groundcover_synthetic_test` resource — supports `host`, `port`, `send`, `expect_response`, and `receive_max_bytes` configuration for TCP connectivity monitoring

@@ -395,7 +395,7 @@ func (r *syntheticTestResource) Schema(_ context.Context, _ resource.SchemaReque
 							Optional:    true,
 						},
 						"property": schema.StringAttribute{
-							Description: "Property path for header, JSON body, or SSL assertions (e.g. `Content-Type`, `data.id`, `certificateValid`, `certificateExpiresIn`, `tlsVersion`, `chainValid`).",
+							Description: "Specifies which property to evaluate within the assertion source. Usage varies by source — see documentation for per-source details.",
 							Optional:    true,
 						},
 						"severity": schema.StringAttribute{

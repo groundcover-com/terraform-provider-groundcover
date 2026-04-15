@@ -209,7 +209,7 @@ resource "groundcover_synthetic_test" "connected_apps_check" {
   }
 }
 
-# Example: SSL certificate check
+# Example: SSL certificate check with property assertions
 resource "groundcover_synthetic_test" "ssl_check" {
   name     = "SSL Certificate Check"
   interval = "5m"
@@ -219,11 +219,20 @@ resource "groundcover_synthetic_test" "ssl_check" {
     port = 443
   }
 
+  # Check that the certificate is valid
   assertion {
     source   = "ssl"
-    operator = "exists"
-    target   = "true"
     property = "certificateValid"
+    operator = "eq"
+    target   = "true"
+  }
+
+  # Check that the certificate expires in more than 30 days
+  assertion {
+    source   = "ssl"
+    property = "certificateExpiresIn"
+    operator = "gt"
+    target   = "30"
   }
 }
 
@@ -243,16 +252,16 @@ resource "groundcover_synthetic_test" "ssl_tls_check" {
 
   assertion {
     source   = "ssl"
-    operator = "exists"
-    target   = "true"
     property = "certificateValid"
+    operator = "eq"
+    target   = "true"
   }
 
   assertion {
     source   = "ssl"
-    operator = "exists"
-    target   = "true"
     property = "chainValid"
+    operator = "eq"
+    target   = "true"
   }
 }
 
