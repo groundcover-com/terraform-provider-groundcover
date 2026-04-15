@@ -1040,6 +1040,102 @@ func TestAccSyntheticTestResource_notificationMethodApplyLoop(t *testing.T) {
 	})
 }
 
+// --- FollowRedirects / AllowInsecure tests ---
+
+func TestAccSyntheticTestResource_followRedirectsAndAllowInsecure(t *testing.T) {
+	name := acctest.RandomWithPrefix("test-synth-bools")
+
+	resource.Test(t, resource.TestCase{
+		PreCheck:                 func() { testAccPreCheck(t) },
+		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
+		Steps: []resource.TestStep{
+			// Create with both booleans set to true
+			{
+				Config: testAccSyntheticTestResourceConfig_withBooleans(name, true, true),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					resource.TestCheckResourceAttr("groundcover_synthetic_test.test", "name", name),
+					resource.TestCheckResourceAttr("groundcover_synthetic_test.test", "http_check.follow_redirects", "true"),
+					resource.TestCheckResourceAttr("groundcover_synthetic_test.test", "http_check.allow_insecure", "true"),
+					resource.TestCheckResourceAttrSet("groundcover_synthetic_test.test", "id"),
+				),
+			},
+			// ImportState testing
+			{
+				ResourceName:      "groundcover_synthetic_test.test",
+				ImportState:       true,
+				ImportStateVerify: true,
+			},
+			// Update to false
+			{
+				Config: testAccSyntheticTestResourceConfig_withBooleans(name, false, false),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					resource.TestCheckResourceAttr("groundcover_synthetic_test.test", "http_check.follow_redirects", "false"),
+					resource.TestCheckResourceAttr("groundcover_synthetic_test.test", "http_check.allow_insecure", "false"),
+				),
+			},
+		},
+	})
+}
+
+func TestAccSyntheticTestResource_followRedirectsApplyLoop(t *testing.T) {
+	name := acctest.RandomWithPrefix("test-synth-bool-loop")
+
+	resource.Test(t, resource.TestCase{
+		PreCheck:                 func() { testAccPreCheck(t) },
+		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
+		Steps: []resource.TestStep{
+			{
+				Config: testAccSyntheticTestResourceConfig_withBooleans(name, true, false),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					resource.TestCheckResourceAttr("groundcover_synthetic_test.test", "name", name),
+					resource.TestCheckResourceAttr("groundcover_synthetic_test.test", "http_check.follow_redirects", "true"),
+					resource.TestCheckResourceAttr("groundcover_synthetic_test.test", "http_check.allow_insecure", "false"),
+				),
+			},
+			// Re-apply same config — should detect no changes
+			{
+				Config: testAccSyntheticTestResourceConfig_withBooleans(name, true, false),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					resource.TestCheckResourceAttr("groundcover_synthetic_test.test", "http_check.follow_redirects", "true"),
+					resource.TestCheckResourceAttr("groundcover_synthetic_test.test", "http_check.allow_insecure", "false"),
+				),
+			},
+			// One more time
+			{
+				Config: testAccSyntheticTestResourceConfig_withBooleans(name, true, false),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					resource.TestCheckResourceAttr("groundcover_synthetic_test.test", "http_check.follow_redirects", "true"),
+					resource.TestCheckResourceAttr("groundcover_synthetic_test.test", "http_check.allow_insecure", "false"),
+				),
+			},
+		},
+	})
+}
+
+func testAccSyntheticTestResourceConfig_withBooleans(name string, followRedirects, allowInsecure bool) string {
+	return fmt.Sprintf(`
+resource "groundcover_synthetic_test" "test" {
+  name     = %[1]q
+  enabled  = true
+  interval = "1m"
+
+  http_check {
+    url              = "https://httpbin.org/status/200"
+    method           = "GET"
+    timeout          = "10s"
+    follow_redirects = %[2]t
+    allow_insecure   = %[3]t
+  }
+
+  assertion {
+    source   = "statusCode"
+    operator = "eq"
+    target   = "200"
+  }
+}
+`, name, followRedirects, allowInsecure)
+}
+
 func testAccSyntheticTestResourceConfig_conflicting(name string) string {
 	return fmt.Sprintf(`
 resource "groundcover_synthetic_test" "test" {

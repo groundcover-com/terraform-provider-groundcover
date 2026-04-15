@@ -57,6 +57,26 @@ resource "groundcover_synthetic_test" "http_health_check" {
   }
 }
 
+# Example: HTTP check with follow_redirects and allow_insecure
+resource "groundcover_synthetic_test" "http_insecure_check" {
+  name     = "HTTP Insecure Redirect Check"
+  interval = "5m"
+
+  http_check {
+    url              = "https://httpbin.org/redirect/1"
+    method           = "GET"
+    timeout          = "10s"
+    follow_redirects = true
+    allow_insecure   = true
+  }
+
+  assertion {
+    source   = "statusCode"
+    operator = "eq"
+    target   = "200"
+  }
+}
+
 # Example: HTTP POST with body and headers
 resource "groundcover_synthetic_test" "http_post_check" {
   name     = "HTTP POST API Check"
