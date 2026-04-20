@@ -1,3 +1,7 @@
+## 1.13.0
+
+* Added `groundcover_metricspipeline` resource for configuring metrics relabeling rules (keep/drop metrics by regex, add labels, raw VictoriaMetrics relabel rules)
+
 ## 1.12.0
 
 * Improved `property` field documentation for `groundcover_synthetic_test` assertions — added per-source usage details and HCL examples for SSL properties (`certificateValid`, `certificateExpiresIn`, `chainValid`)
