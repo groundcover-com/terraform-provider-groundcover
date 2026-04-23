@@ -1,3 +1,7 @@
+## 1.12.1
+
+* Fixed DNS assertion source — fixed from `dns` to `dnsAnswer` to match the backend API
+
 ## 1.12.0
 
 * Improved `property` field documentation for `groundcover_synthetic_test` assertions — added per-source usage details and HCL examples for SSL properties (`certificateValid`, `certificateExpiresIn`, `chainValid`)
