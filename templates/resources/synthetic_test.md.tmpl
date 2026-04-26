@@ -16,9 +16,9 @@ description: |-
 
 ## Assertion Source Reference
 
-Each assertion `source` determines what aspect of the check result to evaluate. The table below summarizes which sources are available for each check type, followed by detailed usage for each source.
+Each assertion `source` determines what aspect of the check result to evaluate. The sections below describe which sources are available for each check type, along with detailed usage for each source.
 
-~> **Note:** Starting from version BE version 1.11.800, SSL and TCP properties (`certificateValid`, `certificateExpiresIn`, etc.) should be used directly as `source` values. The previous syntax using `source = "ssl"` or `source = "tcp"` with a separate `property` field is still supported and remains fully backwards compatible.
+~> **Note:** Starting from BE version 1.11.800, SSL and TCP properties (`certificateValid`, `certificateExpiresIn`, etc.) should be used directly as `source` values. The previous syntax using `source = "ssl"` or `source = "tcp"` with a separate `property` field is still supported and remains fully backwards compatible.
 
 ### `statusCode`
 
