@@ -3,12 +3,12 @@
 page_title: "groundcover_synthetic_test Resource - groundcover"
 subcategory: ""
 description: |-
-  Manages a groundcover Synthetic Test. Synthetic tests allow you to proactively monitor your services by running periodic HTTP or SSL/TLS checks against specified endpoints.
+  Manages a groundcover Synthetic Test. Synthetic tests allow you to proactively monitor your services by running periodic HTTP, SSL/TLS, TCP, or DNS checks against specified endpoints.
 ---
 
 # groundcover_synthetic_test (Resource)
 
-Manages a groundcover Synthetic Test. Synthetic tests allow you to proactively monitor your services by running periodic HTTP or SSL/TLS checks against specified endpoints.
+Manages a groundcover Synthetic Test. Synthetic tests allow you to proactively monitor your services by running periodic HTTP, SSL/TLS, TCP, or DNS checks against specified endpoints.
 
 ## Example Usage
 
@@ -54,6 +54,26 @@ resource "groundcover_synthetic_test" "http_health_check" {
   retry {
     count    = 2
     interval = "1s"
+  }
+}
+
+# Example: HTTP check with follow_redirects and allow_insecure
+resource "groundcover_synthetic_test" "http_insecure_check" {
+  name     = "HTTP Insecure Redirect Check"
+  interval = "5m"
+
+  http_check {
+    url              = "https://httpbin.org/redirect/1"
+    method           = "GET"
+    timeout          = "10s"
+    follow_redirects = true
+    allow_insecure   = true
+  }
+
+  assertion {
+    source   = "statusCode"
+    operator = "eq"
+    target   = "200"
   }
 }
 
@@ -204,7 +224,7 @@ resource "groundcover_synthetic_test" "connected_apps_check" {
   }
 }
 
-# Example: SSL certificate check
+# Example: SSL certificate check with property assertions
 resource "groundcover_synthetic_test" "ssl_check" {
   name     = "SSL Certificate Check"
   interval = "5m"
@@ -214,11 +234,20 @@ resource "groundcover_synthetic_test" "ssl_check" {
     port = 443
   }
 
+  # Check that the certificate is valid
   assertion {
     source   = "ssl"
-    operator = "exists"
-    target   = "true"
     property = "certificateValid"
+    operator = "eq"
+    target   = "true"
+  }
+
+  # Check that the certificate expires in more than 30 days
+  assertion {
+    source   = "ssl"
+    property = "certificateExpiresIn"
+    operator = "gt"
+    target   = "30"
   }
 }
 
@@ -238,16 +267,54 @@ resource "groundcover_synthetic_test" "ssl_tls_check" {
 
   assertion {
     source   = "ssl"
-    operator = "exists"
-    target   = "true"
     property = "certificateValid"
+    operator = "eq"
+    target   = "true"
   }
 
   assertion {
     source   = "ssl"
+    property = "chainValid"
+    operator = "eq"
+    target   = "true"
+  }
+}
+
+# Example: Basic TCP port check
+resource "groundcover_synthetic_test" "tcp_check" {
+  name     = "TCP Port Check"
+  interval = "1m"
+
+  tcp_check {
+    host = "example.com"
+    port = 5432
+  }
+
+  assertion {
+    source   = "tcp"
     operator = "exists"
     target   = "true"
-    property = "chainValid"
+  }
+}
+
+# Example: TCP check with send/receive
+resource "groundcover_synthetic_test" "tcp_send_check" {
+  name     = "TCP Send/Receive Check"
+  interval = "5m"
+
+  tcp_check {
+    host              = "example.com"
+    port              = 6379
+    send              = "PING"
+    expect_response   = true
+    receive_max_bytes = 1024
+    timeout           = "10s"
+  }
+
+  assertion {
+    source   = "tcp"
+    operator = "exists"
+    target   = "true"
   }
 }
 
@@ -266,6 +333,130 @@ output "monitored_check_id" {
 output "ssl_check_id" {
   value = groundcover_synthetic_test.ssl_check.id
 }
+
+# Example: Basic DNS resolution check
+resource "groundcover_synthetic_test" "dns_check" {
+  name     = "DNS Resolution Check"
+  interval = "1m"
+
+  dns_check {
+    domain      = "example.com"
+    record_type = "A"
+  }
+
+  assertion {
+    source   = "dnsAnswer"
+    operator = "exists"
+    target   = "true"
+  }
+}
+
+# Example: DNS check with custom resolver and DNSSEC
+resource "groundcover_synthetic_test" "dns_full_check" {
+  name     = "DNS Full Check"
+  interval = "5m"
+
+  dns_check {
+    domain      = "example.com"
+    record_type = "A"
+    port        = 53
+    resolver    = "8.8.8.8"
+    dnssec      = true
+    timeout     = "10s"
+  }
+
+  assertion {
+    source   = "dnsAnswer"
+    operator = "exists"
+    target   = "true"
+  }
+}
+
+output "tcp_check_id" {
+  value = groundcover_synthetic_test.tcp_check.id
+}
+
+output "dns_check_id" {
+  value = groundcover_synthetic_test.dns_check.id
+}
+```
+
+## Assertion Property Reference
+
+The `property` field in an assertion specifies which property to evaluate within the assertion source. Its usage varies by source:
+
+### `responseHeader`
+
+Set `property` to the header name (case-insensitive).
+
+Supported operators: `exists`, `notExists`, `eq`, `ne`, `contains`.
+
+```terraform
+assertion {
+  source   = "responseHeader"
+  property = "Content-Type"
+  operator = "contains"
+  target   = "application/json"
+}
+```
+
+### `jsonBody`
+
+Set `property` to a dot-notation path into the JSON response body (e.g. `user.name`, `data.items`).
+
+Supported operators: `exists`, `notExists`, `eq`, `ne`, `contains`.
+
+```terraform
+assertion {
+  source   = "jsonBody"
+  property = "user.name"
+  operator = "eq"
+  target   = "admin"
+}
+```
+
+### `responseBody`
+
+Asserts against the entire raw response body as plain text. The `property` field is not used for this source and should be omitted.
+
+Supported operators: `eq`, `ne`, `contains`, `exists`, `notExists`.
+
+```terraform
+assertion {
+  source   = "responseBody"
+  operator = "contains"
+  target   = "success"
+}
+```
+
+### `ssl`
+
+Set `property` to one of the following:
+
+| Property | Description | Operators | Target example |
+|---|---|---|---|
+| `certificateValid` | Whether the certificate is valid | `eq` | `true` / `false` |
+| `certificateExpiresIn` | Days until certificate expiry | `gt`, `lt` | `30` |
+| `tlsVersion` | Negotiated TLS version | `eq`, `gt`, `lt` | `1.2` |
+| `chainValid` | Whether the certificate chain is valid | `eq` | `true` / `false` |
+| `cipherSuite` | Negotiated cipher suite | `eq`, `contains` | `AES256` |
+
+### `tcp`
+
+The `property` field is optional for TCP assertions. When omitted, operators act as connection checks by default.
+
+| Property | Description | Operators |
+|---|---|---|
+| `connection` | Connection check (explicit) | `exists`, `notExists`, `eq`, `ne` |
+| `responseContains` | Match response body content | `contains` |
+
+```terraform
+# Typical usage — property omitted, defaults to connection check
+assertion {
+  source   = "tcp"
+  operator = "exists"
+  target   = "true"
+}
 ```
 
 <!-- schema generated by tfplugindocs -->
@@ -279,12 +470,14 @@ output "ssl_check_id" {
 ### Optional
 
 - `assertion` (Block List) Assertions to validate the check result. (see [below for nested schema](#nestedblock--assertion))
+- `dns_check` (Block, Optional) DNS check configuration. Tests DNS resolution and optionally validates DNSSEC. (see [below for nested schema](#nestedblock--dns_check))
 - `enabled` (Boolean) Whether the synthetic test is enabled. Default: `true`.
 - `http_check` (Block, Optional) HTTP check configuration. Defines the endpoint to monitor. (see [below for nested schema](#nestedblock--http_check))
 - `labels` (Map of String) Extra labels to attach to the synthetic test metrics.
 - `monitor` (Block, Optional) Monitor configuration for the synthetic test. Controls the monitor that is automatically created for this test, including alerting behavior and notification routing. (see [below for nested schema](#nestedblock--monitor))
 - `retry` (Block, Optional) Retry policy for failed checks. (see [below for nested schema](#nestedblock--retry))
 - `ssl_check` (Block, Optional) SSL/TLS check configuration. Validates SSL certificates and TLS connections. (see [below for nested schema](#nestedblock--ssl_check))
+- `tcp_check` (Block, Optional) TCP check configuration. Tests TCP connectivity and optionally sends/receives data. (see [below for nested schema](#nestedblock--tcp_check))
 
 ### Read-Only
 
@@ -297,13 +490,26 @@ output "ssl_check_id" {
 Required:
 
 - `operator` (String) Comparison operator: `eq`, `ne`, `gt`, `lt`, `contains`, `exists`, `notExists`, `startsWith`, `endsWith`, `regex`, `oneOf`.
-- `source` (String) What to assert on: `statusCode`, `responseTime`, `responseHeader`, `jsonBody`, `responseBody`, `ssl`.
+- `source` (String) What to assert on: `statusCode`, `responseTime`, `responseHeader`, `jsonBody`, `responseBody`, `ssl`, `tcp`, `dnsAnswer`.
 
 Optional:
 
-- `property` (String) Property path for header, JSON body, or SSL assertions (e.g. `Content-Type`, `data.id`, `certificateValid`, `certificateExpiresIn`, `tlsVersion`, `chainValid`).
+- `property` (String) Specifies which property to evaluate within the assertion source. Usage varies by source — see documentation for per-source details.
 - `severity` (String) Assertion severity: `critical` (default) or `degraded`.
 - `target` (String) Expected value to compare against (as string, e.g. `"200"` for status code).
+
+
+<a id="nestedblock--dns_check"></a>
+### Nested Schema for `dns_check`
+
+Optional:
+
+- `dnssec` (Boolean) Whether to validate DNSSEC.
+- `domain` (String) (Required) The domain name to resolve.
+- `port` (Number) The DNS server port (1-65535). Defaults to 53.
+- `record_type` (String) (Required) DNS record type to query. Supported values: `A`, `AAAA`, `CNAME`, `MX`, `NS`, `TXT`, `SOA`, `SRV`, `PTR`.
+- `resolver` (String) Custom DNS resolver address (e.g. `8.8.8.8`).
+- `timeout` (String) Timeout for the DNS check (e.g. `5s`, `10s`).
 
 
 <a id="nestedblock--http_check"></a>
@@ -385,12 +591,25 @@ Optional:
 
 Optional:
 
-- `host` (String) The hostname to connect to for the SSL check.
+- `host` (String) (Required) The hostname to connect to for the SSL check.
 - `min_version` (String) Minimum TLS version to accept (e.g. `1.2`, `1.3`).
-- `port` (Number) The port to connect to (1-65535).
+- `port` (Number) (Required) The port to connect to (1-65535).
 - `sni` (String) Server Name Indication (SNI) value for the TLS handshake. Defaults to the host value.
 - `timeout` (String) Timeout for the SSL check (e.g. `5s`, `10s`).
 - `verify` (Boolean) Whether to verify the SSL certificate.
+
+
+<a id="nestedblock--tcp_check"></a>
+### Nested Schema for `tcp_check`
+
+Optional:
+
+- `expect_response` (Boolean) Whether to expect a response from the TCP endpoint.
+- `host` (String) (Required) The hostname to connect to for the TCP check.
+- `port` (Number) (Required) The port to connect to (1-65535).
+- `receive_max_bytes` (Number) Maximum number of bytes to receive in the response.
+- `send` (String) Data to send over the TCP connection.
+- `timeout` (String) Timeout for the TCP check (e.g. `5s`, `10s`).
 
 ## Import
 

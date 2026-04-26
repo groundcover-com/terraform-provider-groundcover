@@ -1,3 +1,23 @@
+## 1.12.1
+
+* Fixed DNS assertion source — fixed from `dns` to `dnsAnswer` to match the backend API
+
+## 1.12.0
+
+* Improved `property` field documentation for `groundcover_synthetic_test` assertions — added per-source usage details and HCL examples for SSL properties (`certificateValid`, `certificateExpiresIn`, `chainValid`)
+* Added DNS check support to `groundcover_synthetic_test` resource — supports `domain`, `record_type`, `port`, `resolver`, `dnssec`, and `timeout` configuration for DNS resolution monitoring
+* Added DNS assertion source (`dns`) for DNS check assertions
+* Added TCP check support to `groundcover_synthetic_test` resource — supports `host`, `port`, `send`, `expect_response`, and `receive_max_bytes` configuration for TCP connectivity monitoring
+* Added TCP assertion source (`tcp`) for TCP check assertions
+* Fixed `follow_redirects` and `allow_insecure` state handling in `groundcover_synthetic_test` HTTP checks — the SDK changed these fields from `bool` to `*bool`, and the provider now uses an import/normal-read pattern to avoid perpetual diffs from server-side defaults
+* Updated groundcover SDK from v1.235.0 to v1.244.0
+* Fixed perpetual plan diffs on `groundcover_monitor` when the API returns boolean label values as quoted strings (e.g., `pagerduty: "true"` instead of `pagerduty: true`) — `deepEqual` now treats bool/string equivalents as semantically identical
+* Fixed perpetual plan diffs on `groundcover_monitor` when using human-readable durations (e.g., `instantRollup: 10 minutes`) — time normalization now converts human-readable formats to Go duration format before comparison
+
+## 1.11.0
+
+* Removed `groundcover_recurring_silence` resource — backend API is being reworked
+
 ## 1.10.0
 
 * Added notification routing support to `groundcover_synthetic_test` monitor block — supports `notification_method`, `connected_apps`, `status_filters`, and `disable_renotification` for controlling how synthetic monitor alerts are delivered

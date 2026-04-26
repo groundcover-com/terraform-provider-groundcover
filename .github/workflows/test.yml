@@ -115,7 +115,7 @@ jobs:
           LOG_FILE=$(mktemp)
 
           set +e
-          go test ./internal/provider -v -failfast -parallel=4 -timeout 30m ${RUN_FILTER:+-run "$RUN_FILTER"} 2>&1 | tee "$LOG_FILE"
+          go test ./internal/provider -v -failfast -parallel=4 -timeout 60m ${RUN_FILTER:+-run "$RUN_FILTER"} 2>&1 | tee "$LOG_FILE"
           EXIT_CODE=${PIPESTATUS[0]}
           set -e
 

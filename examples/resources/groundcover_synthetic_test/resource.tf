@@ -42,6 +42,26 @@ resource "groundcover_synthetic_test" "http_health_check" {
   }
 }
 
+# Example: HTTP check with follow_redirects and allow_insecure
+resource "groundcover_synthetic_test" "http_insecure_check" {
+  name     = "HTTP Insecure Redirect Check"
+  interval = "5m"
+
+  http_check {
+    url              = "https://httpbin.org/redirect/1"
+    method           = "GET"
+    timeout          = "10s"
+    follow_redirects = true
+    allow_insecure   = true
+  }
+
+  assertion {
+    source   = "statusCode"
+    operator = "eq"
+    target   = "200"
+  }
+}
+
 # Example: HTTP POST with body and headers
 resource "groundcover_synthetic_test" "http_post_check" {
   name     = "HTTP POST API Check"
@@ -189,7 +209,7 @@ resource "groundcover_synthetic_test" "connected_apps_check" {
   }
 }
 
-# Example: SSL certificate check
+# Example: SSL certificate check with property assertions
 resource "groundcover_synthetic_test" "ssl_check" {
   name     = "SSL Certificate Check"
   interval = "5m"
@@ -199,11 +219,20 @@ resource "groundcover_synthetic_test" "ssl_check" {
     port = 443
   }
 
+  # Check that the certificate is valid
   assertion {
     source   = "ssl"
-    operator = "exists"
-    target   = "true"
     property = "certificateValid"
+    operator = "eq"
+    target   = "true"
+  }
+
+  # Check that the certificate expires in more than 30 days
+  assertion {
+    source   = "ssl"
+    property = "certificateExpiresIn"
+    operator = "gt"
+    target   = "30"
   }
 }
 
@@ -223,16 +252,54 @@ resource "groundcover_synthetic_test" "ssl_tls_check" {
 
   assertion {
     source   = "ssl"
-    operator = "exists"
-    target   = "true"
     property = "certificateValid"
+    operator = "eq"
+    target   = "true"
   }
 
   assertion {
     source   = "ssl"
+    property = "chainValid"
+    operator = "eq"
+    target   = "true"
+  }
+}
+
+# Example: Basic TCP port check
+resource "groundcover_synthetic_test" "tcp_check" {
+  name     = "TCP Port Check"
+  interval = "1m"
+
+  tcp_check {
+    host = "example.com"
+    port = 5432
+  }
+
+  assertion {
+    source   = "tcp"
     operator = "exists"
     target   = "true"
-    property = "chainValid"
+  }
+}
+
+# Example: TCP check with send/receive
+resource "groundcover_synthetic_test" "tcp_send_check" {
+  name     = "TCP Send/Receive Check"
+  interval = "5m"
+
+  tcp_check {
+    host              = "example.com"
+    port              = 6379
+    send              = "PING"
+    expect_response   = true
+    receive_max_bytes = 1024
+    timeout           = "10s"
+  }
+
+  assertion {
+    source   = "tcp"
+    operator = "exists"
+    target   = "true"
   }
 }
 
@@ -250,4 +317,50 @@ output "monitored_check_id" {
 
 output "ssl_check_id" {
   value = groundcover_synthetic_test.ssl_check.id
+}
+
+# Example: Basic DNS resolution check
+resource "groundcover_synthetic_test" "dns_check" {
+  name     = "DNS Resolution Check"
+  interval = "1m"
+
+  dns_check {
+    domain      = "example.com"
+    record_type = "A"
+  }
+
+  assertion {
+    source   = "dnsAnswer"
+    operator = "exists"
+    target   = "true"
+  }
+}
+
+# Example: DNS check with custom resolver and DNSSEC
+resource "groundcover_synthetic_test" "dns_full_check" {
+  name     = "DNS Full Check"
+  interval = "5m"
+
+  dns_check {
+    domain      = "example.com"
+    record_type = "A"
+    port        = 53
+    resolver    = "8.8.8.8"
+    dnssec      = true
+    timeout     = "10s"
+  }
+
+  assertion {
+    source   = "dnsAnswer"
+    operator = "exists"
+    target   = "true"
+  }
+}
+
+output "tcp_check_id" {
+  value = groundcover_synthetic_test.tcp_check.id
+}
+
+output "dns_check_id" {
+  value = groundcover_synthetic_test.dns_check.id
 }

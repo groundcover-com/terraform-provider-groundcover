@@ -49,6 +49,8 @@ type syntheticTestResourceModel struct {
 
 	HTTPCheck *syntheticHTTPCheckModel  `tfsdk:"http_check"`
 	SSLCheck  *syntheticSSLCheckModel   `tfsdk:"ssl_check"`
+	TCPCheck  *syntheticTCPCheckModel   `tfsdk:"tcp_check"`
+	DNSCheck  *syntheticDNSCheckModel   `tfsdk:"dns_check"`
 	Assertion []syntheticAssertionModel `tfsdk:"assertion"`
 	Retry     *syntheticRetryModel      `tfsdk:"retry"`
 	Labels    types.Map                 `tfsdk:"labels"`
@@ -85,6 +87,24 @@ type syntheticSSLCheckModel struct {
 	Verify     types.Bool   `tfsdk:"verify"`
 	MinVersion types.String `tfsdk:"min_version"`
 	Sni        types.String `tfsdk:"sni"`
+	Timeout    types.String `tfsdk:"timeout"`
+}
+
+type syntheticTCPCheckModel struct {
+	Host            types.String `tfsdk:"host"`
+	Port            types.Int64  `tfsdk:"port"`
+	Send            types.String `tfsdk:"send"`
+	ExpectResponse  types.Bool   `tfsdk:"expect_response"`
+	ReceiveMaxBytes types.Int64  `tfsdk:"receive_max_bytes"`
+	Timeout         types.String `tfsdk:"timeout"`
+}
+
+type syntheticDNSCheckModel struct {
+	Domain     types.String `tfsdk:"domain"`
+	Port       types.Int64  `tfsdk:"port"`
+	Resolver   types.String `tfsdk:"resolver"`
+	RecordType types.String `tfsdk:"record_type"`
+	Dnssec     types.Bool   `tfsdk:"dnssec"`
 	Timeout    types.String `tfsdk:"timeout"`
 }
 
@@ -131,7 +151,7 @@ func (r *syntheticTestResource) Metadata(_ context.Context, req resource.Metadat
 
 func (r *syntheticTestResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *resource.SchemaResponse) {
 	resp.Schema = schema.Schema{
-		Description: "Manages a groundcover Synthetic Test. Synthetic tests allow you to proactively monitor your services by running periodic HTTP or SSL/TLS checks against specified endpoints.",
+		Description: "Manages a groundcover Synthetic Test. Synthetic tests allow you to proactively monitor your services by running periodic HTTP, SSL/TLS, TCP, or DNS checks against specified endpoints.",
 		Attributes: map[string]schema.Attribute{
 			"id": schema.StringAttribute{
 				Description: "The unique identifier (UUID) of the synthetic test.",
@@ -254,11 +274,11 @@ func (r *syntheticTestResource) Schema(_ context.Context, _ resource.SchemaReque
 				Description: "SSL/TLS check configuration. Validates SSL certificates and TLS connections.",
 				Attributes: map[string]schema.Attribute{
 					"host": schema.StringAttribute{
-						Description: "The hostname to connect to for the SSL check.",
+						Description: "(Required) The hostname to connect to for the SSL check.",
 						Optional:    true,
 					},
 					"port": schema.Int64Attribute{
-						Description: "The port to connect to (1-65535).",
+						Description: "(Required) The port to connect to (1-65535).",
 						Optional:    true,
 						Validators: []validator.Int64{
 							int64validator.Between(1, 65535),
@@ -282,15 +302,85 @@ func (r *syntheticTestResource) Schema(_ context.Context, _ resource.SchemaReque
 					},
 				},
 			},
+			"tcp_check": schema.SingleNestedBlock{
+				Description: "TCP check configuration. Tests TCP connectivity and optionally sends/receives data.",
+				Attributes: map[string]schema.Attribute{
+					"host": schema.StringAttribute{
+						Description: "(Required) The hostname to connect to for the TCP check.",
+						Optional:    true,
+					},
+					"port": schema.Int64Attribute{
+						Description: "(Required) The port to connect to (1-65535).",
+						Optional:    true,
+						Validators: []validator.Int64{
+							int64validator.Between(1, 65535),
+						},
+					},
+					"send": schema.StringAttribute{
+						Description: "Data to send over the TCP connection.",
+						Optional:    true,
+					},
+					"expect_response": schema.BoolAttribute{
+						Description: "Whether to expect a response from the TCP endpoint.",
+						Optional:    true,
+					},
+					"receive_max_bytes": schema.Int64Attribute{
+						Description: "Maximum number of bytes to receive in the response.",
+						Optional:    true,
+						Validators: []validator.Int64{
+							int64validator.AtLeast(0),
+						},
+					},
+					"timeout": schema.StringAttribute{
+						Description: "Timeout for the TCP check (e.g. `5s`, `10s`).",
+						Optional:    true,
+					},
+				},
+			},
+			"dns_check": schema.SingleNestedBlock{
+				Description: "DNS check configuration. Tests DNS resolution and optionally validates DNSSEC.",
+				Attributes: map[string]schema.Attribute{
+					"domain": schema.StringAttribute{
+						Description: "(Required) The domain name to resolve.",
+						Optional:    true,
+					},
+					"port": schema.Int64Attribute{
+						Description: "The DNS server port (1-65535). Defaults to 53.",
+						Optional:    true,
+						Validators: []validator.Int64{
+							int64validator.Between(1, 65535),
+						},
+					},
+					"resolver": schema.StringAttribute{
+						Description: "Custom DNS resolver address (e.g. `8.8.8.8`).",
+						Optional:    true,
+					},
+					"record_type": schema.StringAttribute{
+						Description: "(Required) DNS record type to query. Supported values: `A`, `AAAA`, `CNAME`, `MX`, `NS`, `TXT`, `SOA`, `SRV`, `PTR`.",
+						Optional:    true,
+						Validators: []validator.String{
+							stringvalidator.OneOf("A", "AAAA", "CNAME", "MX", "NS", "TXT", "SOA", "SRV", "PTR"),
+						},
+					},
+					"dnssec": schema.BoolAttribute{
+						Description: "Whether to validate DNSSEC.",
+						Optional:    true,
+					},
+					"timeout": schema.StringAttribute{
+						Description: "Timeout for the DNS check (e.g. `5s`, `10s`).",
+						Optional:    true,
+					},
+				},
+			},
 			"assertion": schema.ListNestedBlock{
 				Description: "Assertions to validate the check result.",
 				NestedObject: schema.NestedBlockObject{
 					Attributes: map[string]schema.Attribute{
 						"source": schema.StringAttribute{
-							Description: "What to assert on: `statusCode`, `responseTime`, `responseHeader`, `jsonBody`, `responseBody`, `ssl`.",
+							Description: "What to assert on: `statusCode`, `responseTime`, `responseHeader`, `jsonBody`, `responseBody`, `ssl`, `tcp`, `dnsAnswer`.",
 							Required:    true,
 							Validators: []validator.String{
-								stringvalidator.OneOf("statusCode", "responseTime", "responseHeader", "jsonBody", "responseBody", "ssl"),
+								stringvalidator.OneOf("statusCode", "responseTime", "responseHeader", "jsonBody", "responseBody", "ssl", "tcp", "dnsAnswer"),
 							},
 						},
 						"operator": schema.StringAttribute{
@@ -305,7 +395,7 @@ func (r *syntheticTestResource) Schema(_ context.Context, _ resource.SchemaReque
 							Optional:    true,
 						},
 						"property": schema.StringAttribute{
-							Description: "Property path for header, JSON body, or SSL assertions (e.g. `Content-Type`, `data.id`, `certificateValid`, `certificateExpiresIn`, `tlsVersion`, `chainValid`).",
+							Description: "Specifies which property to evaluate within the assertion source. Usage varies by source — see documentation for per-source details.",
 							Optional:    true,
 						},
 						"severity": schema.StringAttribute{
@@ -449,19 +539,35 @@ func (r *syntheticTestResource) ValidateConfig(ctx context.Context, req resource
 
 	hasHTTP := config.HTTPCheck != nil
 	hasSSL := config.SSLCheck != nil
+	hasTCP := config.TCPCheck != nil
+	hasDNS := config.DNSCheck != nil
 
-	if hasHTTP && hasSSL {
+	checkCount := 0
+	if hasHTTP {
+		checkCount++
+	}
+	if hasSSL {
+		checkCount++
+	}
+	if hasTCP {
+		checkCount++
+	}
+	if hasDNS {
+		checkCount++
+	}
+
+	if checkCount > 1 {
 		resp.Diagnostics.AddError(
 			"Conflicting check configuration",
-			"Only one of http_check or ssl_check may be specified.",
+			"Only one of http_check, ssl_check, tcp_check, or dns_check may be specified.",
 		)
 		return
 	}
 
-	if !hasHTTP && !hasSSL {
+	if checkCount == 0 {
 		resp.Diagnostics.AddError(
 			"Missing check configuration",
-			"Exactly one of http_check or ssl_check must be specified.",
+			"Exactly one of http_check, ssl_check, tcp_check, or dns_check must be specified.",
 		)
 	}
 
@@ -503,6 +609,46 @@ func (r *syntheticTestResource) ValidateConfig(ctx context.Context, req resource
 				"Missing required attribute",
 				"The port attribute is required when ssl_check is configured.",
 			)
+		}
+	}
+
+	if hasTCP {
+		if !config.TCPCheck.Host.IsUnknown() {
+			if config.TCPCheck.Host.IsNull() || config.TCPCheck.Host.ValueString() == "" {
+				resp.Diagnostics.AddAttributeError(
+					path.Root("tcp_check").AtName("host"),
+					"Missing required attribute",
+					"The host attribute is required and must not be empty when tcp_check is configured.",
+				)
+			}
+		}
+		if !config.TCPCheck.Port.IsUnknown() && config.TCPCheck.Port.IsNull() {
+			resp.Diagnostics.AddAttributeError(
+				path.Root("tcp_check").AtName("port"),
+				"Missing required attribute",
+				"The port attribute is required when tcp_check is configured.",
+			)
+		}
+	}
+
+	if hasDNS {
+		if !config.DNSCheck.Domain.IsUnknown() {
+			if config.DNSCheck.Domain.IsNull() || config.DNSCheck.Domain.ValueString() == "" {
+				resp.Diagnostics.AddAttributeError(
+					path.Root("dns_check").AtName("domain"),
+					"Missing required attribute",
+					"The domain attribute is required and must not be empty when dns_check is configured.",
+				)
+			}
+		}
+		if !config.DNSCheck.RecordType.IsUnknown() {
+			if config.DNSCheck.RecordType.IsNull() || config.DNSCheck.RecordType.ValueString() == "" {
+				resp.Diagnostics.AddAttributeError(
+					path.Root("dns_check").AtName("record_type"),
+					"Missing required attribute",
+					"The record_type attribute is required and must not be empty when dns_check is configured.",
+				)
+			}
 		}
 	}
 
@@ -697,10 +843,10 @@ func (r *syntheticTestResource) ImportState(ctx context.Context, req resource.Im
 
 // validateCheckPresent ensures at least one check type is configured.
 func validateCheckPresent(plan *syntheticTestResourceModel, diags *diag.Diagnostics) bool {
-	if plan.HTTPCheck == nil && plan.SSLCheck == nil {
+	if plan.HTTPCheck == nil && plan.SSLCheck == nil && plan.TCPCheck == nil && plan.DNSCheck == nil {
 		diags.AddError(
 			"Missing check configuration",
-			"Either an http_check or ssl_check block is required to define the synthetic test check configuration.",
+			"Either an http_check, ssl_check, tcp_check, or dns_check block is required to define the synthetic test check configuration.",
 		)
 		return false
 	}
@@ -752,11 +898,13 @@ func toSDKRequest(plan *syntheticTestResourceModel) *models.SyntheticTestCreateR
 		}
 
 		if !plan.HTTPCheck.FollowRedirects.IsNull() {
-			httpReq.FollowRedirects = plan.HTTPCheck.FollowRedirects.ValueBool()
+			v := plan.HTTPCheck.FollowRedirects.ValueBool()
+			httpReq.FollowRedirects = &v
 		}
 
 		if !plan.HTTPCheck.AllowInsecure.IsNull() {
-			httpReq.AllowInsecure = plan.HTTPCheck.AllowInsecure.ValueBool()
+			v := plan.HTTPCheck.AllowInsecure.ValueBool()
+			httpReq.AllowInsecure = &v
 		}
 
 		if !plan.HTTPCheck.Headers.IsNull() && !plan.HTTPCheck.Headers.IsUnknown() {
@@ -824,6 +972,65 @@ func toSDKRequest(plan *syntheticTestResourceModel) *models.SyntheticTestCreateR
 		}
 
 		checkConfig.Request = &models.Request{Ssl: sslReq}
+	}
+
+	// TCP Check
+	if plan.TCPCheck != nil {
+		checkConfig.Kind = "tcp"
+		tcpReq := &models.TCPRequest{
+			Kind: "tcp",
+			Host: plan.TCPCheck.Host.ValueString(),
+			Port: plan.TCPCheck.Port.ValueInt64(),
+		}
+
+		if !plan.TCPCheck.Send.IsNull() {
+			tcpReq.Send = plan.TCPCheck.Send.ValueString()
+		}
+
+		if !plan.TCPCheck.ExpectResponse.IsNull() {
+			tcpReq.ExpectResponse = plan.TCPCheck.ExpectResponse.ValueBool()
+		}
+
+		if !plan.TCPCheck.ReceiveMaxBytes.IsNull() {
+			tcpReq.ReceiveMaxBytes = plan.TCPCheck.ReceiveMaxBytes.ValueInt64()
+		}
+
+		if !plan.TCPCheck.Timeout.IsNull() {
+			tcpReq.Timeout = plan.TCPCheck.Timeout.ValueString()
+		}
+
+		checkConfig.Request = &models.Request{TCP: tcpReq}
+	}
+
+	// DNS Check
+	if plan.DNSCheck != nil {
+		checkConfig.Kind = "dns"
+		dnsReq := &models.DNSRequest{
+			Kind:   "dns",
+			Domain: plan.DNSCheck.Domain.ValueString(),
+		}
+
+		if !plan.DNSCheck.Port.IsNull() {
+			dnsReq.Port = plan.DNSCheck.Port.ValueInt64()
+		}
+
+		if !plan.DNSCheck.Resolver.IsNull() {
+			dnsReq.Resolver = plan.DNSCheck.Resolver.ValueString()
+		}
+
+		if !plan.DNSCheck.RecordType.IsNull() {
+			dnsReq.RecordType = models.DNSRequestRecordType(plan.DNSCheck.RecordType.ValueString())
+		}
+
+		if !plan.DNSCheck.Dnssec.IsNull() {
+			dnsReq.Dnssec = plan.DNSCheck.Dnssec.ValueBool()
+		}
+
+		if !plan.DNSCheck.Timeout.IsNull() {
+			dnsReq.Timeout = plan.DNSCheck.Timeout.ValueString()
+		}
+
+		checkConfig.Request = &models.Request{DNS: dnsReq}
 	}
 
 	// Assertions
@@ -987,12 +1194,26 @@ func fromSDKResponse(ctx context.Context, sdkResp *models.SyntheticTestCreateReq
 			httpModel.Headers = types.MapNull(types.StringType)
 		}
 
-		// Set bool fields: preserve explicit user values, set from API if true or if user had set them
-		if http.FollowRedirects || (state.HTTPCheck != nil && !state.HTTPCheck.FollowRedirects.IsNull()) {
-			httpModel.FollowRedirects = types.BoolValue(http.FollowRedirects)
-		}
-		if http.AllowInsecure || (state.HTTPCheck != nil && !state.HTTPCheck.AllowInsecure.IsNull()) {
-			httpModel.AllowInsecure = types.BoolValue(http.AllowInsecure)
+		if state.HTTPCheck == nil {
+			// Import: no prior state — set from API when explicitly present
+			if http.FollowRedirects != nil {
+				httpModel.FollowRedirects = types.BoolValue(*http.FollowRedirects)
+			}
+			if http.AllowInsecure != nil {
+				httpModel.AllowInsecure = types.BoolValue(*http.AllowInsecure)
+			}
+		} else {
+			// Normal read: use API value when present (drift detection), fall back to state
+			if http.FollowRedirects != nil {
+				httpModel.FollowRedirects = types.BoolValue(*http.FollowRedirects)
+			} else {
+				httpModel.FollowRedirects = state.HTTPCheck.FollowRedirects
+			}
+			if http.AllowInsecure != nil {
+				httpModel.AllowInsecure = types.BoolValue(*http.AllowInsecure)
+			} else {
+				httpModel.AllowInsecure = state.HTTPCheck.AllowInsecure
+			}
 		}
 
 		if http.Body != nil && (http.Body.Content != "" || string(http.Body.Type) != "") {
@@ -1020,6 +1241,8 @@ func fromSDKResponse(ctx context.Context, sdkResp *models.SyntheticTestCreateReq
 
 		state.HTTPCheck = httpModel
 		state.SSLCheck = nil
+		state.TCPCheck = nil
+		state.DNSCheck = nil
 	}
 
 	// SSL Check
@@ -1030,12 +1253,11 @@ func fromSDKResponse(ctx context.Context, sdkResp *models.SyntheticTestCreateReq
 			Port: types.Int64Value(ssl.Port),
 		}
 
-		if ssl.Verify || (state.SSLCheck != nil && !state.SSLCheck.Verify.IsNull()) {
-			sslModel.Verify = types.BoolValue(ssl.Verify)
-		}
-
 		if state.SSLCheck == nil {
 			// Import: no prior state — reflect whatever the API returned
+			if ssl.Verify {
+				sslModel.Verify = types.BoolValue(ssl.Verify)
+			}
 			if ssl.MinVersion != "" {
 				sslModel.MinVersion = types.StringValue(ssl.MinVersion)
 			}
@@ -1048,6 +1270,7 @@ func fromSDKResponse(ctx context.Context, sdkResp *models.SyntheticTestCreateReq
 		} else {
 			// Normal read: preserve user's config values to avoid perpetual
 			// diffs caused by server-side defaults the user never configured.
+			sslModel.Verify = state.SSLCheck.Verify
 			sslModel.MinVersion = state.SSLCheck.MinVersion
 			sslModel.Sni = state.SSLCheck.Sni
 			sslModel.Timeout = state.SSLCheck.Timeout
@@ -1055,6 +1278,107 @@ func fromSDKResponse(ctx context.Context, sdkResp *models.SyntheticTestCreateReq
 
 		state.SSLCheck = sslModel
 		state.HTTPCheck = nil
+		state.TCPCheck = nil
+		state.DNSCheck = nil
+	}
+
+	// TCP Check
+	if cc.Request != nil && cc.Request.TCP != nil {
+		tcp := cc.Request.TCP
+		tcpModel := &syntheticTCPCheckModel{
+			Host: types.StringValue(tcp.Host),
+			Port: types.Int64Value(tcp.Port),
+		}
+
+		if state.TCPCheck == nil {
+			// Import: no prior state — reflect whatever the API returned
+			if tcp.ExpectResponse {
+				tcpModel.ExpectResponse = types.BoolValue(tcp.ExpectResponse)
+			}
+			if tcp.Send != "" {
+				tcpModel.Send = types.StringValue(tcp.Send)
+			}
+			if tcp.ReceiveMaxBytes != 0 {
+				tcpModel.ReceiveMaxBytes = types.Int64Value(tcp.ReceiveMaxBytes)
+			}
+			if tcp.Timeout != "" {
+				tcpModel.Timeout = types.StringValue(tcp.Timeout)
+			}
+		} else {
+			// Normal read: preserve user's config values to avoid perpetual
+			// diffs caused by server-side defaults the user never configured.
+			tcpModel.ExpectResponse = state.TCPCheck.ExpectResponse
+			tcpModel.Send = state.TCPCheck.Send
+			tcpModel.ReceiveMaxBytes = state.TCPCheck.ReceiveMaxBytes
+			tcpModel.Timeout = state.TCPCheck.Timeout
+		}
+
+		state.TCPCheck = tcpModel
+		state.HTTPCheck = nil
+		state.SSLCheck = nil
+		state.DNSCheck = nil
+	}
+
+	// DNS Check
+	if cc.Request != nil && cc.Request.DNS != nil {
+		dns := cc.Request.DNS
+		dnsModel := &syntheticDNSCheckModel{
+			Domain:     types.StringValue(dns.Domain),
+			RecordType: types.StringValue(string(dns.RecordType)),
+		}
+
+		if state.DNSCheck == nil {
+			// Import: no prior state — reflect whatever the API returned
+			if dns.Port != 0 {
+				dnsModel.Port = types.Int64Value(dns.Port)
+			} else {
+				dnsModel.Port = types.Int64Null()
+			}
+			if dns.Resolver != "" {
+				dnsModel.Resolver = types.StringValue(dns.Resolver)
+			} else {
+				dnsModel.Resolver = types.StringNull()
+			}
+			if dns.Dnssec {
+				dnsModel.Dnssec = types.BoolValue(dns.Dnssec)
+			} else {
+				dnsModel.Dnssec = types.BoolNull()
+			}
+			if dns.Timeout != "" {
+				dnsModel.Timeout = types.StringValue(dns.Timeout)
+			} else {
+				dnsModel.Timeout = types.StringNull()
+			}
+		} else {
+			// Normal read: if the user never configured a field (null),
+			// preserve that null to avoid diffs from server defaults.
+			// If the user did configure it, use the API value so drift is detected.
+			if state.DNSCheck.Port.IsNull() || state.DNSCheck.Port.IsUnknown() {
+				dnsModel.Port = state.DNSCheck.Port
+			} else {
+				dnsModel.Port = types.Int64Value(dns.Port)
+			}
+			if state.DNSCheck.Resolver.IsNull() || state.DNSCheck.Resolver.IsUnknown() {
+				dnsModel.Resolver = state.DNSCheck.Resolver
+			} else {
+				dnsModel.Resolver = types.StringValue(dns.Resolver)
+			}
+			if state.DNSCheck.Dnssec.IsNull() || state.DNSCheck.Dnssec.IsUnknown() {
+				dnsModel.Dnssec = state.DNSCheck.Dnssec
+			} else {
+				dnsModel.Dnssec = types.BoolValue(dns.Dnssec)
+			}
+			if state.DNSCheck.Timeout.IsNull() || state.DNSCheck.Timeout.IsUnknown() {
+				dnsModel.Timeout = state.DNSCheck.Timeout
+			} else {
+				dnsModel.Timeout = types.StringValue(dns.Timeout)
+			}
+		}
+
+		state.DNSCheck = dnsModel
+		state.HTTPCheck = nil
+		state.SSLCheck = nil
+		state.TCPCheck = nil
 	}
 
 	// Assertions
