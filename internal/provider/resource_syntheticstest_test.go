@@ -1502,6 +1502,199 @@ resource "groundcover_synthetic_test" "test" {
 `, name)
 }
 
+func TestAccSyntheticTestResource_sslNewStyleAssertions(t *testing.T) {
+	name := acctest.RandomWithPrefix("test-synth-ssl-newsrc")
+
+	resource.Test(t, resource.TestCase{
+		PreCheck:                 func() { testAccPreCheck(t) },
+		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
+		Steps: []resource.TestStep{
+			{
+				Config: testAccSyntheticTestResourceConfig_sslNewStyleAssertions(name),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					resource.TestCheckResourceAttr("groundcover_synthetic_test.test", "name", name),
+					resource.TestCheckResourceAttr("groundcover_synthetic_test.test", "assertion.#", "2"),
+					resource.TestCheckResourceAttr("groundcover_synthetic_test.test", "assertion.0.source", "certificateValid"),
+					resource.TestCheckResourceAttr("groundcover_synthetic_test.test", "assertion.0.operator", "eq"),
+					resource.TestCheckResourceAttr("groundcover_synthetic_test.test", "assertion.0.target", "true"),
+					resource.TestCheckResourceAttr("groundcover_synthetic_test.test", "assertion.1.source", "certificateExpiresIn"),
+					resource.TestCheckResourceAttr("groundcover_synthetic_test.test", "assertion.1.operator", "gt"),
+					resource.TestCheckResourceAttr("groundcover_synthetic_test.test", "assertion.1.target", "30"),
+					resource.TestCheckResourceAttrSet("groundcover_synthetic_test.test", "id"),
+				),
+			},
+			{
+				ResourceName:            "groundcover_synthetic_test.test",
+				ImportState:             true,
+				ImportStateVerify:       true,
+				ImportStateVerifyIgnore: []string{"ssl_check.sni"},
+			},
+		},
+	})
+}
+
+func TestAccSyntheticTestResource_sslNewStyleApplyLoop(t *testing.T) {
+	name := acctest.RandomWithPrefix("test-synth-ssl-newsrc-loop")
+
+	resource.Test(t, resource.TestCase{
+		PreCheck:                 func() { testAccPreCheck(t) },
+		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
+		Steps: []resource.TestStep{
+			{
+				Config: testAccSyntheticTestResourceConfig_sslNewStyleAssertions(name),
+			},
+			{
+				Config:   testAccSyntheticTestResourceConfig_sslNewStyleAssertions(name),
+				PlanOnly: true,
+			},
+		},
+	})
+}
+
+func testAccSyntheticTestResourceConfig_sslNewStyleAssertions(name string) string {
+	return fmt.Sprintf(`
+resource "groundcover_synthetic_test" "test" {
+  name     = %[1]q
+  enabled  = true
+  interval = "1m"
+
+  ssl_check {
+    host = "google.com"
+    port = 443
+  }
+
+  assertion {
+    source   = "certificateValid"
+    operator = "eq"
+    target   = "true"
+  }
+
+  assertion {
+    source   = "certificateExpiresIn"
+    operator = "gt"
+    target   = "30"
+  }
+}
+`, name)
+}
+
+func TestAccSyntheticTestResource_tcpNewStyleConnection(t *testing.T) {
+	name := acctest.RandomWithPrefix("test-synth-tcp-newsrc")
+
+	resource.Test(t, resource.TestCase{
+		PreCheck:                 func() { testAccPreCheck(t) },
+		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
+		Steps: []resource.TestStep{
+			{
+				Config: testAccSyntheticTestResourceConfig_tcpNewStyleConnection(name),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					resource.TestCheckResourceAttr("groundcover_synthetic_test.test", "name", name),
+					resource.TestCheckResourceAttr("groundcover_synthetic_test.test", "tcp_check.host", "google.com"),
+					resource.TestCheckResourceAttr("groundcover_synthetic_test.test", "tcp_check.port", "443"),
+					resource.TestCheckResourceAttr("groundcover_synthetic_test.test", "assertion.#", "1"),
+					resource.TestCheckResourceAttr("groundcover_synthetic_test.test", "assertion.0.source", "tcpConnection"),
+					resource.TestCheckResourceAttr("groundcover_synthetic_test.test", "assertion.0.operator", "exists"),
+					resource.TestCheckResourceAttr("groundcover_synthetic_test.test", "assertion.0.target", "true"),
+					resource.TestCheckResourceAttrSet("groundcover_synthetic_test.test", "id"),
+				),
+			},
+			{
+				ResourceName:      "groundcover_synthetic_test.test",
+				ImportState:       true,
+				ImportStateVerify: true,
+			},
+		},
+	})
+}
+
+func TestAccSyntheticTestResource_tcpNewStyleApplyLoop(t *testing.T) {
+	name := acctest.RandomWithPrefix("test-synth-tcp-newsrc-loop")
+
+	resource.Test(t, resource.TestCase{
+		PreCheck:                 func() { testAccPreCheck(t) },
+		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
+		Steps: []resource.TestStep{
+			{
+				Config: testAccSyntheticTestResourceConfig_tcpNewStyleConnection(name),
+			},
+			{
+				Config:   testAccSyntheticTestResourceConfig_tcpNewStyleConnection(name),
+				PlanOnly: true,
+			},
+		},
+	})
+}
+
+func testAccSyntheticTestResourceConfig_tcpNewStyleConnection(name string) string {
+	return fmt.Sprintf(`
+resource "groundcover_synthetic_test" "test" {
+  name     = %[1]q
+  enabled  = true
+  interval = "1m"
+
+  tcp_check {
+    host = "google.com"
+    port = 443
+  }
+
+  assertion {
+    source   = "tcpConnection"
+    operator = "exists"
+    target   = "true"
+  }
+}
+`, name)
+}
+
+func TestAccSyntheticTestResource_tcpNewStyleResponseContains(t *testing.T) {
+	name := acctest.RandomWithPrefix("test-synth-tcp-respcontains")
+
+	resource.Test(t, resource.TestCase{
+		PreCheck:                 func() { testAccPreCheck(t) },
+		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
+		Steps: []resource.TestStep{
+			{
+				Config: testAccSyntheticTestResourceConfig_tcpNewStyleResponseContains(name),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					resource.TestCheckResourceAttr("groundcover_synthetic_test.test", "name", name),
+					resource.TestCheckResourceAttr("groundcover_synthetic_test.test", "assertion.#", "1"),
+					resource.TestCheckResourceAttr("groundcover_synthetic_test.test", "assertion.0.source", "responseContains"),
+					resource.TestCheckResourceAttr("groundcover_synthetic_test.test", "assertion.0.operator", "contains"),
+					resource.TestCheckResourceAttr("groundcover_synthetic_test.test", "assertion.0.target", "PONG"),
+					resource.TestCheckResourceAttrSet("groundcover_synthetic_test.test", "id"),
+				),
+			},
+			{
+				Config:   testAccSyntheticTestResourceConfig_tcpNewStyleResponseContains(name),
+				PlanOnly: true,
+			},
+		},
+	})
+}
+
+func testAccSyntheticTestResourceConfig_tcpNewStyleResponseContains(name string) string {
+	return fmt.Sprintf(`
+resource "groundcover_synthetic_test" "test" {
+  name     = %[1]q
+  enabled  = true
+  interval = "1m"
+
+  tcp_check {
+    host            = "google.com"
+    port            = 443
+    send            = "PING"
+    expect_response = true
+  }
+
+  assertion {
+    source   = "responseContains"
+    operator = "contains"
+    target   = "PONG"
+  }
+}
+`, name)
+}
+
 func testAccSyntheticTestResourceConfig_tcpUpdated(name string) string {
 	return fmt.Sprintf(`
 resource "groundcover_synthetic_test" "test" {
