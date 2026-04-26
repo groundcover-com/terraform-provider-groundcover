@@ -685,7 +685,7 @@ func (r *syntheticTestResource) ValidateConfig(ctx context.Context, req resource
 			continue
 		}
 		src := assertion.Source.ValueString()
-		hasProp := !assertion.Property.IsNull() && !assertion.Property.IsUnknown() && assertion.Property.ValueString() != ""
+		hasProp := !assertion.Property.IsNull() && !assertion.Property.IsUnknown()
 
 		if _, ok := propertyAsSources[src]; ok && hasProp {
 			resp.Diagnostics.AddAttributeError(
