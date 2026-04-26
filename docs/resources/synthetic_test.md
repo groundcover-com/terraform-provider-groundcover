@@ -624,7 +624,7 @@ assertion {
 Required:
 
 - `operator` (String) Comparison operator: `eq`, `ne`, `gt`, `lt`, `contains`, `exists`, `notExists`, `startsWith`, `endsWith`, `regex`, `oneOf`.
-- `source` (String) What to assert on. HTTP: `statusCode`, `responseTime`, `responseHeader`, `jsonBody`, `responseBody`. SSL/TLS: `certificateValid`, `certificateExpiresIn`, `tlsVersion`, `chainValid`, `cipherSuite`. TCP: `tcpConnection`, `responseContains`. DNS: `dnsAnswer`.
+- `source` (String) What to assert on. All check types: `responseTime`. HTTP: `statusCode`, `responseHeader`, `jsonBody`, `responseBody`. SSL/TLS: `certificateValid`, `certificateExpiresIn`, `tlsVersion`, `chainValid`, `cipherSuite`. TCP: `tcpConnection`, `responseContains`. DNS: `dnsAnswer`.
 
 Optional:
 

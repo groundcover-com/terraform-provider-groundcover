@@ -403,7 +403,7 @@ func (r *syntheticTestResource) Schema(_ context.Context, _ resource.SchemaReque
 				NestedObject: schema.NestedBlockObject{
 					Attributes: map[string]schema.Attribute{
 						"source": schema.StringAttribute{
-							Description: "What to assert on. HTTP: `statusCode`, `responseTime`, `responseHeader`, `jsonBody`, `responseBody`. " +
+							Description: "What to assert on. All check types: `responseTime`. HTTP: `statusCode`, `responseHeader`, `jsonBody`, `responseBody`. " +
 								"SSL/TLS: `certificateValid`, `certificateExpiresIn`, `tlsVersion`, `chainValid`, `cipherSuite`. " +
 								"TCP: `tcpConnection`, `responseContains`. DNS: `dnsAnswer`.",
 							Required: true,
