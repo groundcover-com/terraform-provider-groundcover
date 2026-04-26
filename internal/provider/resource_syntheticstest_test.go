@@ -1541,7 +1541,7 @@ func TestAccSyntheticTestResource_dnsBasic(t *testing.T) {
 					resource.TestCheckResourceAttr("groundcover_synthetic_test.test", "dns_check.domain", "google.com"),
 					resource.TestCheckResourceAttr("groundcover_synthetic_test.test", "dns_check.record_type", "A"),
 					resource.TestCheckResourceAttr("groundcover_synthetic_test.test", "assertion.#", "1"),
-					resource.TestCheckResourceAttr("groundcover_synthetic_test.test", "assertion.0.source", "dns"),
+					resource.TestCheckResourceAttr("groundcover_synthetic_test.test", "assertion.0.source", "dnsAnswer"),
 					resource.TestCheckResourceAttr("groundcover_synthetic_test.test", "assertion.0.operator", "exists"),
 					resource.TestCheckResourceAttr("groundcover_synthetic_test.test", "assertion.0.target", "true"),
 					resource.TestCheckResourceAttrSet("groundcover_synthetic_test.test", "id"),
@@ -1695,7 +1695,7 @@ resource "groundcover_synthetic_test" "test" {
   }
 
   assertion {
-    source   = "dns"
+    source   = "dnsAnswer"
     operator = "exists"
     target   = "true"
   }
@@ -1719,7 +1719,7 @@ resource "groundcover_synthetic_test" "test" {
   }
 
   assertion {
-    source   = "dns"
+    source   = "dnsAnswer"
     operator = "exists"
     target   = "true"
   }
@@ -1740,7 +1740,7 @@ resource "groundcover_synthetic_test" "test" {
   }
 
   assertion {
-    source   = "dns"
+    source   = "dnsAnswer"
     operator = "exists"
     target   = "true"
   }
@@ -1762,7 +1762,7 @@ resource "groundcover_synthetic_test" "test" {
   }
 
   assertion {
-    source   = "dns"
+    source   = "dnsAnswer"
     operator = "exists"
     target   = "true"
   }

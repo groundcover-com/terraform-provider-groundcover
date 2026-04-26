@@ -345,7 +345,7 @@ resource "groundcover_synthetic_test" "dns_check" {
   }
 
   assertion {
-    source   = "dns"
+    source   = "dnsAnswer"
     operator = "exists"
     target   = "true"
   }
@@ -366,7 +366,7 @@ resource "groundcover_synthetic_test" "dns_full_check" {
   }
 
   assertion {
-    source   = "dns"
+    source   = "dnsAnswer"
     operator = "exists"
     target   = "true"
   }
@@ -490,7 +490,7 @@ assertion {
 Required:
 
 - `operator` (String) Comparison operator: `eq`, `ne`, `gt`, `lt`, `contains`, `exists`, `notExists`, `startsWith`, `endsWith`, `regex`, `oneOf`.
-- `source` (String) What to assert on: `statusCode`, `responseTime`, `responseHeader`, `jsonBody`, `responseBody`, `ssl`, `tcp`, `dns`.
+- `source` (String) What to assert on: `statusCode`, `responseTime`, `responseHeader`, `jsonBody`, `responseBody`, `ssl`, `tcp`, `dnsAnswer`.
 
 Optional:
 

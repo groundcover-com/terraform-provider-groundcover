@@ -330,7 +330,7 @@ resource "groundcover_synthetic_test" "dns_check" {
   }
 
   assertion {
-    source   = "dns"
+    source   = "dnsAnswer"
     operator = "exists"
     target   = "true"
   }
@@ -351,7 +351,7 @@ resource "groundcover_synthetic_test" "dns_full_check" {
   }
 
   assertion {
-    source   = "dns"
+    source   = "dnsAnswer"
     operator = "exists"
     target   = "true"
   }
