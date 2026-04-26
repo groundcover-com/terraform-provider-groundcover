@@ -10,8 +10,6 @@ import (
 	"time"
 
 	"github.com/groundcover-com/groundcover-sdk-go/pkg/models"
-	"github.com/hashicorp/terraform-plugin-framework/providerserver"
-	"github.com/hashicorp/terraform-plugin-go/tfprotov6"
 	"github.com/hashicorp/terraform-plugin-testing/helper/acctest"
 	"github.com/hashicorp/terraform-plugin-testing/helper/resource"
 	"github.com/hashicorp/terraform-plugin-testing/terraform"
@@ -25,7 +23,7 @@ func TestAccIngestionKeyResource(t *testing.T) {
 		PreCheck: func() {
 			testAccPreCheckIngestionKey(t)
 		},
-		ProtoV6ProviderFactories: testAccProtoV6ProviderFactoriesWithInCloudBackend(t),
+		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
 		Steps: []resource.TestStep{
 			// Create and Read testing
 			{
@@ -66,7 +64,7 @@ func TestAccIngestionKeyResource_typeRum(t *testing.T) {
 		PreCheck: func() {
 			testAccPreCheckIngestionKey(t)
 		},
-		ProtoV6ProviderFactories: testAccProtoV6ProviderFactoriesWithInCloudBackend(t),
+		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
 		Steps: []resource.TestStep{
 			{
 				Config: testAccIngestionKeyResourceConfigWithType(name, "rum"),
@@ -88,7 +86,7 @@ func TestAccIngestionKeyResource_typeThirdParty(t *testing.T) {
 		PreCheck: func() {
 			testAccPreCheckIngestionKey(t)
 		},
-		ProtoV6ProviderFactories: testAccProtoV6ProviderFactoriesWithInCloudBackend(t),
+		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
 		Steps: []resource.TestStep{
 			{
 				Config: testAccIngestionKeyResourceConfigWithType(name, "thirdParty"),
@@ -110,7 +108,7 @@ func TestAccIngestionKeyResource_disappears(t *testing.T) {
 		PreCheck: func() {
 			testAccPreCheckIngestionKey(t)
 		},
-		ProtoV6ProviderFactories: testAccProtoV6ProviderFactoriesWithInCloudBackend(t),
+		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
 		Steps: []resource.TestStep{
 			{
 				Config: testAccIngestionKeyResourceConfig(name),
@@ -128,13 +126,21 @@ func testAccIngestionKeyResourceConfig(name string) string {
 	return testAccIngestionKeyResourceConfigWithType(name, "sensor")
 }
 
+// testAccIngestionKeyResourceConfigWithType emits an HCL config that pins the
+// provider's backend_id to GROUNDCOVER_INCLOUD_BACKEND_ID. This avoids mutating
+// the process-global GROUNDCOVER_BACKEND_ID env var, which would corrupt other
+// tests running in parallel.
 func testAccIngestionKeyResourceConfigWithType(name, keyType string) string {
 	return fmt.Sprintf(`
-resource "groundcover_ingestionkey" "test" {
-  name = %[1]q
-  type = %[2]q
+provider "groundcover" {
+  backend_id = %[1]q
 }
-`, name, keyType)
+
+resource "groundcover_ingestionkey" "test" {
+  name = %[2]q
+  type = %[3]q
+}
+`, os.Getenv("GROUNDCOVER_INCLOUD_BACKEND_ID"), name, keyType)
 }
 
 func testAccCheckIngestionKeyResourceExists(n string) resource.TestCheckFunc {
@@ -166,9 +172,11 @@ func testAccCheckIngestionKeyResourceDisappears(n string) resource.TestCheckFunc
 		// Create a provider client to delete the resource
 		ctx := context.Background()
 
-		// Get environment variables for client configuration
+		// Get environment variables for client configuration. Use the in-cloud
+		// backend ID directly — the regular GROUNDCOVER_BACKEND_ID points at
+		// the dev backend, which doesn't host ingestion keys.
 		apiKey := os.Getenv("GROUNDCOVER_API_KEY")
-		orgName := os.Getenv("GROUNDCOVER_BACKEND_ID") // Use current backend ID (which should be set to in-cloud backend during test)
+		orgName := os.Getenv("GROUNDCOVER_INCLOUD_BACKEND_ID")
 		apiURL := os.Getenv("GROUNDCOVER_API_URL")
 		if apiURL == "" {
 			apiURL = "https://api.groundcover.io"
@@ -209,46 +217,4 @@ func testAccPreCheckIngestionKey(t *testing.T) {
 	if v := os.Getenv("GROUNDCOVER_INCLOUD_BACKEND_ID"); v == "" {
 		t.Skip("Ingestion key tests require GROUNDCOVER_INCLOUD_BACKEND_ID env var for in-cloud backend - skipping")
 	}
-}
-
-// testAccProtoV6ProviderFactoriesWithInCloudBackend creates provider factories that use the in-cloud backend
-func testAccProtoV6ProviderFactoriesWithInCloudBackend(t *testing.T) map[string]func() (tfprotov6.ProviderServer, error) {
-	// Skip if not running acceptance tests
-	if os.Getenv("TF_ACC") == "" {
-		return testAccProtoV6ProviderFactories
-	}
-
-	// Temporarily override GROUNDCOVER_BACKEND_ID with the in-cloud backend ID
-	inCloudBackendId := os.Getenv("GROUNDCOVER_INCLOUD_BACKEND_ID")
-	if inCloudBackendId == "" {
-		t.Fatal("GROUNDCOVER_INCLOUD_BACKEND_ID must be set for ingestion key tests")
-	}
-
-	// Store original value to restore later
-	originalBackendID := os.Getenv("GROUNDCOVER_BACKEND_ID")
-
-	// Set the in-cloud backend ID and set up cleanup ONCE for the entire test
-	if err := os.Setenv("GROUNDCOVER_BACKEND_ID", inCloudBackendId); err != nil {
-		t.Fatalf("Failed to set GROUNDCOVER_BACKEND_ID: %v", err)
-	}
-	t.Cleanup(func() {
-		if originalBackendID != "" {
-			if err := os.Setenv("GROUNDCOVER_BACKEND_ID", originalBackendID); err != nil {
-				t.Errorf("Failed to restore GROUNDCOVER_BACKEND_ID: %v", err)
-			}
-		} else {
-			if err := os.Unsetenv("GROUNDCOVER_BACKEND_ID"); err != nil {
-				t.Errorf("Failed to unset GROUNDCOVER_BACKEND_ID: %v", err)
-			}
-		}
-	})
-
-	// Create provider factory
-	factories := map[string]func() (tfprotov6.ProviderServer, error){
-		"groundcover": func() (tfprotov6.ProviderServer, error) {
-			return providerserver.NewProtocol6WithError(New("test")())()
-		},
-	}
-
-	return factories
 }
