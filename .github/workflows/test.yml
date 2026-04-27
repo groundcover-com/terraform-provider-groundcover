@@ -153,8 +153,11 @@ jobs:
 
           if grep -qE "$TRANSIENT_PATTERNS" "$LOG_FILE"; then
             if [ $attempt -lt $MAX_RETRIES ]; then
-              # Extract failed test names for targeted retry
-              FAILED_TESTS=$(grep -E "^--- FAIL:" "$LOG_FILE" | sed 's/--- FAIL: \([^ ]*\).*/\1/' | paste -sd'|' -)
+              # Extract failed test names for targeted retry. Anchor each name
+              # with ^...$ so the regex doesn't accidentally match siblings —
+              # e.g. retrying "TestAccFoo" without anchors would also rerun
+              # "TestAccFoo_disappears", "TestAccFoo_withCluster", etc.
+              FAILED_TESTS=$(grep -E "^--- FAIL:" "$LOG_FILE" | sed 's/--- FAIL: \([^ ]*\).*/^\1$/' | paste -sd'|' -)
               if [ -n "$FAILED_TESTS" ]; then
                 RUN_FILTER="$FAILED_TESTS"
                 echo "⚠️ Transient error detected. Retrying only failed tests: $FAILED_TESTS"

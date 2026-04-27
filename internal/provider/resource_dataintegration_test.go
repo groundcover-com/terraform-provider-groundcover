@@ -15,13 +15,19 @@ import (
 )
 
 func TestAccDataIntegrationResource(t *testing.T) {
+	// Use random names so parallel test runs don't collide on the dev backend
+	// (the integration's `name` field acts as a uniqueness key — fixed names
+	// produce HTTP 409 conflicts when tests run concurrently).
+	name := acctest.RandomWithPrefix("test-cloudwatch")
+	updatedName := acctest.RandomWithPrefix("test-cloudwatch-updated")
+
 	resource.ParallelTest(t, resource.TestCase{
 		PreCheck:                 func() { testAccPreCheck(t) },
 		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
 		Steps: []resource.TestStep{
 			// Create and Read testing
 			{
-				Config: testAccDataIntegrationResourceConfig(),
+				Config: testAccDataIntegrationResourceConfig(name),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttr("groundcover_dataintegration.test", "type", "cloudwatch"),
 					resource.TestCheckResourceAttr("groundcover_dataintegration.test", "is_paused", "false"),
@@ -43,7 +49,7 @@ func TestAccDataIntegrationResource(t *testing.T) {
 			},
 			// Update and Read testing
 			{
-				Config: testAccDataIntegrationResourceConfigUpdated(),
+				Config: testAccDataIntegrationResourceConfigUpdated(updatedName),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttr("groundcover_dataintegration.test", "type", "cloudwatch"),
 					resource.TestCheckResourceAttr("groundcover_dataintegration.test", "is_paused", "true"),
@@ -60,6 +66,7 @@ func TestAccDataIntegrationResource(t *testing.T) {
 }
 
 func TestAccDataIntegrationResource_withCluster(t *testing.T) {
+	name := acctest.RandomWithPrefix("test-cloudwatch-cluster")
 	cluster := acctest.RandomWithPrefix("test-cluster")
 
 	resource.ParallelTest(t, resource.TestCase{
@@ -68,7 +75,7 @@ func TestAccDataIntegrationResource_withCluster(t *testing.T) {
 		Steps: []resource.TestStep{
 			// Create and Read testing with cluster
 			{
-				Config: testAccDataIntegrationResourceConfigWithCluster(cluster),
+				Config: testAccDataIntegrationResourceConfigWithCluster(name, cluster),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttr("groundcover_dataintegration.test", "type", "cloudwatch"),
 					resource.TestCheckResourceAttr("groundcover_dataintegration.test", "cluster", cluster),
@@ -82,12 +89,14 @@ func TestAccDataIntegrationResource_withCluster(t *testing.T) {
 }
 
 func TestAccDataIntegrationResource_disappears(t *testing.T) {
+	name := acctest.RandomWithPrefix("test-cloudwatch-disappear")
+
 	resource.ParallelTest(t, resource.TestCase{
 		PreCheck:                 func() { testAccPreCheck(t) },
 		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
 		Steps: []resource.TestStep{
 			{
-				Config: testAccDataIntegrationResourceConfig(),
+				Config: testAccDataIntegrationResourceConfig(name),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					testAccCheckDataIntegrationResourceExists("groundcover_dataintegration.test"),
 					testAccCheckDataIntegrationResourceDisappears("groundcover_dataintegration.test"),
@@ -98,13 +107,13 @@ func TestAccDataIntegrationResource_disappears(t *testing.T) {
 	})
 }
 
-func testAccDataIntegrationResourceConfig() string {
-	return `
+func testAccDataIntegrationResourceConfig(name string) string {
+	return fmt.Sprintf(`
 resource "groundcover_dataintegration" "test" {
   type = "cloudwatch"
   config = jsonencode({
 	version = 1
-	name = "test-cloudwatch2"
+	name = %[1]q
 	exporters = ["prometheus"]
 	scrapeInterval = "5m"
     stsRegion = "us-east-1"
@@ -135,16 +144,16 @@ resource "groundcover_dataintegration" "test" {
   })
   is_paused = false
 }
-`
+`, name)
 }
 
-func testAccDataIntegrationResourceConfigUpdated() string {
-	return `
+func testAccDataIntegrationResourceConfigUpdated(name string) string {
+	return fmt.Sprintf(`
 resource "groundcover_dataintegration" "test" {
   type = "cloudwatch"
   config = jsonencode({
 	version = 1
-	name = "test-cloudwatch-updated"
+	name = %[1]q
 	exporters = ["prometheus"]
 	scrapeInterval = "5m"
     stsRegion = "us-east-1"
@@ -175,17 +184,17 @@ resource "groundcover_dataintegration" "test" {
   })
   is_paused = true
 }
-`
+`, name)
 }
 
-func testAccDataIntegrationResourceConfigWithCluster(cluster string) string {
+func testAccDataIntegrationResourceConfigWithCluster(name, cluster string) string {
 	return fmt.Sprintf(`
 resource "groundcover_dataintegration" "test" {
   type     = "cloudwatch"
-  cluster  = %[1]q
+  cluster  = %[2]q
   config = jsonencode({
 	version = 1
-	name = "test-cloudwatch-with-cluster"
+	name = %[1]q
 	exporters = ["prometheus"]
 	scrapeInterval = "5m"
     stsRegion = "us-east-1"
@@ -216,7 +225,7 @@ resource "groundcover_dataintegration" "test" {
   })
   is_paused = false
 }
-`, cluster)
+`, name, cluster)
 }
 
 func testAccCheckDataIntegrationResourceExists(n string) resource.TestCheckFunc {
