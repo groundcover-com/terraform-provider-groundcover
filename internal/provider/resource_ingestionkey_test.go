@@ -201,11 +201,38 @@ func testAccCheckIngestionKeyResourceDisappears(n string) resource.TestCheckFunc
 			return fmt.Errorf("Failed to delete ingestion key: %v", err)
 		}
 
-		// Wait for API consistency - ingestion key deletions take time to propagate
-		// This matches the pattern you found in the SDK testing
-		time.Sleep(10 * time.Second)
+		// Poll the in-cloud backend until the ingestion key is no longer
+		// returned by List. The in-cloud backend has eventually-consistent
+		// read-after-delete (the gap was historically ~10s; now it's longer
+		// and variable). A fixed sleep was flaky — poll-with-timeout returns
+		// as soon as the delete is visible, with a bounded ceiling.
+		const (
+			pollInterval = 2 * time.Second
+			pollTimeout  = 30 * time.Second
+		)
+		deadline := time.Now().Add(pollTimeout)
+		for {
+			keys, err := client.ListIngestionKeys(ctx, &models.ListIngestionKeysRequest{Name: ingestionKeyName})
+			if err != nil {
+				return fmt.Errorf("Failed to list ingestion keys while waiting for delete propagation: %v", err)
+			}
 
-		return nil
+			stillThere := false
+			for _, k := range keys {
+				if k != nil && k.Name == ingestionKeyName {
+					stillThere = true
+					break
+				}
+			}
+			if !stillThere {
+				return nil
+			}
+
+			if time.Now().After(deadline) {
+				return fmt.Errorf("ingestion key %q still visible %s after delete; in-cloud backend consistency exceeded budget", ingestionKeyName, pollTimeout)
+			}
+			time.Sleep(pollInterval)
+		}
 	}
 }
 
