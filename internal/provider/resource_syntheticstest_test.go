@@ -905,6 +905,38 @@ resource "groundcover_synthetic_test" "test" {
 	})
 }
 
+func TestAccSyntheticTestResource_assertionPropertyAsSourceWithProperty(t *testing.T) {
+	name := acctest.RandomWithPrefix("test-synth-prop-conflict")
+
+	resource.Test(t, resource.TestCase{
+		PreCheck:                 func() { testAccPreCheck(t) },
+		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
+		Steps: []resource.TestStep{
+			{
+				Config: fmt.Sprintf(`
+resource "groundcover_synthetic_test" "test" {
+  name     = %[1]q
+  interval = "1m"
+
+  ssl_check {
+    host = "google.com"
+    port = 443
+  }
+
+  assertion {
+    source   = "certificateValid"
+    property = "certificateValid"
+    operator = "eq"
+    target   = "true"
+  }
+}
+`, name),
+				ExpectError: regexp.MustCompile(`property field must not be set`),
+			},
+		},
+	})
+}
+
 func TestAccSyntheticTestResource_notificationMethodConnectedApps(t *testing.T) {
 	name := acctest.RandomWithPrefix("test-synth-ca")
 
@@ -1497,6 +1529,56 @@ resource "groundcover_synthetic_test" "test" {
     property = "certificateExpiresIn"
     operator = "gt"
     target   = "30"
+  }
+}
+`, name)
+}
+
+func TestAccSyntheticTestResource_tcpPropertyAssertions(t *testing.T) {
+	name := acctest.RandomWithPrefix("test-synth-tcp-prop")
+
+	resource.Test(t, resource.TestCase{
+		PreCheck:                 func() { testAccPreCheck(t) },
+		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
+		Steps: []resource.TestStep{
+			{
+				Config: testAccSyntheticTestResourceConfig_tcpPropertyAssertions(name),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					resource.TestCheckResourceAttr("groundcover_synthetic_test.test", "name", name),
+					resource.TestCheckResourceAttr("groundcover_synthetic_test.test", "assertion.#", "1"),
+					resource.TestCheckResourceAttr("groundcover_synthetic_test.test", "assertion.0.source", "tcp"),
+					resource.TestCheckResourceAttr("groundcover_synthetic_test.test", "assertion.0.property", "tcpConnection"),
+					resource.TestCheckResourceAttr("groundcover_synthetic_test.test", "assertion.0.operator", "exists"),
+					resource.TestCheckResourceAttr("groundcover_synthetic_test.test", "assertion.0.target", "true"),
+					resource.TestCheckResourceAttrSet("groundcover_synthetic_test.test", "id"),
+				),
+			},
+			{
+				ResourceName:      "groundcover_synthetic_test.test",
+				ImportState:       true,
+				ImportStateVerify: true,
+			},
+		},
+	})
+}
+
+func testAccSyntheticTestResourceConfig_tcpPropertyAssertions(name string) string {
+	return fmt.Sprintf(`
+resource "groundcover_synthetic_test" "test" {
+  name     = %[1]q
+  enabled  = true
+  interval = "1m"
+
+  tcp_check {
+    host = "google.com"
+    port = 443
+  }
+
+  assertion {
+    source   = "tcp"
+    property = "tcpConnection"
+    operator = "exists"
+    target   = "true"
   }
 }
 `, name)
