@@ -25,14 +25,70 @@ jobs:
         with:
           go-version-file: 'go.mod'
           cache: true
+      - name: Set up Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_wrapper: false
+
+      - name: Get Terraform path
+        id: terraform-path
+        run: echo "path=$(which terraform)" >> $GITHUB_OUTPUT
+
       - name: Run tests before release
         env:
           TF_ACC: 1
+          TF_ACC_TERRAFORM_PATH: ${{ steps.terraform-path.outputs.path }}
           GROUNDCOVER_API_KEY: ${{ secrets.GROUNDCOVER_API_KEY }}
           GROUNDCOVER_API_URL: ${{ secrets.GROUNDCOVER_API_URL }}
           GROUNDCOVER_BACKEND_ID: ${{ secrets.GROUNDCOVER_BACKEND_ID }}
           GROUNDCOVER_INCLOUD_BACKEND_ID: ${{ secrets.GROUNDCOVER_INCLOUD_BACKEND_ID }}
-        run: go test ./internal/provider -v -timeout 60m
+        # Mirror the PR test workflow: parallel + bounded retry on transient
+        # infrastructure errors. We don't shard here — release runs once on
+        # tag push, so a single ~13 min job is acceptable. We also skip
+        # `-failfast` so a flake doesn't truncate visibility for other tests.
+        run: |
+          echo "✅ Running release acceptance tests..."
+          MAX_RETRIES=2
+          TRANSIENT_PATTERNS="503|502|504|Service Unavailable|Bad Gateway|Gateway Timeout|connection refused|connection reset|EOF"
+          RUN_FILTER=""
+
+          for attempt in $(seq 0 $MAX_RETRIES); do
+            echo "=== Test attempt $((attempt + 1)) of $((MAX_RETRIES + 1)) ==="
+            LOG_FILE=$(mktemp)
+
+            set +e
+            go test ./internal/provider -v -parallel=6 -timeout 60m ${RUN_FILTER:+-run "$RUN_FILTER"} 2>&1 | tee "$LOG_FILE"
+            EXIT_CODE=${PIPESTATUS[0]}
+            set -e
+
+            if [ $EXIT_CODE -eq 0 ]; then
+              echo "✅ Tests passed on attempt $((attempt + 1))"
+              rm -f "$LOG_FILE"
+              exit 0
+            fi
+
+            if grep -qE "$TRANSIENT_PATTERNS" "$LOG_FILE"; then
+              if [ $attempt -lt $MAX_RETRIES ]; then
+                FAILED_TESTS=$(grep -E "^--- FAIL:" "$LOG_FILE" | sed 's/--- FAIL: \([^ ]*\).*/\1/' | paste -sd'|' -)
+                if [ -n "$FAILED_TESTS" ]; then
+                  RUN_FILTER="$FAILED_TESTS"
+                  echo "⚠️ Transient error detected. Retrying only failed tests: $FAILED_TESTS"
+                else
+                  echo "⚠️ Transient error detected. Retrying all tests..."
+                  RUN_FILTER=""
+                fi
+                SLEEP_TIME=$(( (attempt + 1) * 30 ))
+                echo "Waiting ${SLEEP_TIME}s before retry..."
+                sleep $SLEEP_TIME
+                rm -f "$LOG_FILE"
+                continue
+              fi
+            fi
+
+            rm -f "$LOG_FILE"
+            echo "❌ Non-transient failure or max retries reached."
+            exit $EXIT_CODE
+          done
       - name: Import GPG key
         uses: crazy-max/ghaction-import-gpg@e89d40939c28e39f97cf32126055eeae86ba74ec # v6.3.0
         id: import_gpg

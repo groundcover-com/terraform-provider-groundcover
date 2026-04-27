@@ -127,7 +127,12 @@ jobs:
       run: |
         echo "✅ Running acceptance tests for shard '${{ matrix.shard.name }}' (regex: $SHARD_RUN)..."
         MAX_RETRIES=2
-        TRANSIENT_PATTERNS="503|502|504|Service Unavailable|Bad Gateway|Gateway Timeout|connection refused|connection reset|EOF|resource not found"
+        # Only match true transient infrastructure errors. "resource not found"
+        # was previously included to absorb dev-API router restarts, but it also
+        # matches the provider's own ErrNotFound text — so a real Read-after-Create
+        # bug would be silently retried instead of surfaced. Keep retries to HTTP
+        # 5xx, connection drops, and EOFs.
+        TRANSIENT_PATTERNS="503|502|504|Service Unavailable|Bad Gateway|Gateway Timeout|connection refused|connection reset|EOF"
         # First attempt runs the full shard regex; retry attempts narrow to failed tests.
         RUN_FILTER="$SHARD_RUN"
 
