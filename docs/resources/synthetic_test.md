@@ -236,16 +236,14 @@ resource "groundcover_synthetic_test" "ssl_check" {
 
   # Check that the certificate is valid
   assertion {
-    source   = "ssl"
-    property = "certificateValid"
+    source   = "certificateValid"
     operator = "eq"
     target   = "true"
   }
 
   # Check that the certificate expires in more than 30 days
   assertion {
-    source   = "ssl"
-    property = "certificateExpiresIn"
+    source   = "certificateExpiresIn"
     operator = "gt"
     target   = "30"
   }
@@ -266,15 +264,13 @@ resource "groundcover_synthetic_test" "ssl_tls_check" {
   }
 
   assertion {
-    source   = "ssl"
-    property = "certificateValid"
+    source   = "certificateValid"
     operator = "eq"
     target   = "true"
   }
 
   assertion {
-    source   = "ssl"
-    property = "chainValid"
+    source   = "chainValid"
     operator = "eq"
     target   = "true"
   }
@@ -291,7 +287,7 @@ resource "groundcover_synthetic_test" "tcp_check" {
   }
 
   assertion {
-    source   = "tcp"
+    source   = "tcpConnection"
     operator = "exists"
     target   = "true"
   }
@@ -312,7 +308,7 @@ resource "groundcover_synthetic_test" "tcp_send_check" {
   }
 
   assertion {
-    source   = "tcp"
+    source   = "tcpConnection"
     operator = "exists"
     target   = "true"
   }
@@ -381,11 +377,47 @@ output "dns_check_id" {
 }
 ```
 
-## Assertion Property Reference
+## Assertion Source Reference
 
-The `property` field in an assertion specifies which property to evaluate within the assertion source. Its usage varies by source:
+Each assertion `source` determines what aspect of the check result to evaluate. The sections below describe which sources are available for each check type, along with detailed usage for each source.
+
+~> **Note:** Starting from BE version 1.11.800, SSL and TCP properties (`certificateValid`, `certificateExpiresIn`, etc.) should be used directly as `source` values. The previous syntax using `source = "ssl"` or `source = "tcp"` with a separate `property` field is still supported and remains fully backwards compatible.
+
+### `statusCode`
+
+Applies to: `http_check`
+
+Asserts on the HTTP response status code. The `property` field is not used for this source and should be omitted.
+
+Supported operators: `eq`, `ne`, `gt`, `lt`.
+
+```terraform
+assertion {
+  source   = "statusCode"
+  operator = "eq"
+  target   = "200"
+}
+```
+
+### `responseTime`
+
+Applies to: `http_check`, `ssl_check`, `tcp_check`, `dns_check`
+
+Asserts on the total response time in milliseconds. The `property` field is not used for this source and should be omitted.
+
+Supported operators: `gt`, `lt`.
+
+```terraform
+assertion {
+  source   = "responseTime"
+  operator = "lt"
+  target   = "5000"
+}
+```
 
 ### `responseHeader`
+
+Applies to: `http_check`
 
 Set `property` to the header name (case-insensitive).
 
@@ -402,6 +434,8 @@ assertion {
 
 ### `jsonBody`
 
+Applies to: `http_check`
+
 Set `property` to a dot-notation path into the JSON response body (e.g. `user.name`, `data.items`).
 
 Supported operators: `exists`, `notExists`, `eq`, `ne`, `contains`.
@@ -417,6 +451,8 @@ assertion {
 
 ### `responseBody`
 
+Applies to: `http_check`
+
 Asserts against the entire raw response body as plain text. The `property` field is not used for this source and should be omitted.
 
 Supported operators: `eq`, `ne`, `contains`, `exists`, `notExists`.
@@ -429,31 +465,129 @@ assertion {
 }
 ```
 
-### `ssl`
+### `certificateValid`
 
-Set `property` to one of the following:
+Applies to: `ssl_check`
 
-| Property | Description | Operators | Target example |
-|---|---|---|---|
-| `certificateValid` | Whether the certificate is valid | `eq` | `true` / `false` |
-| `certificateExpiresIn` | Days until certificate expiry | `gt`, `lt` | `30` |
-| `tlsVersion` | Negotiated TLS version | `eq`, `gt`, `lt` | `1.2` |
-| `chainValid` | Whether the certificate chain is valid | `eq` | `true` / `false` |
-| `cipherSuite` | Negotiated cipher suite | `eq`, `contains` | `AES256` |
+Asserts whether the SSL certificate is valid. The `property` field is not used for this source and should be omitted.
 
-### `tcp`
-
-The `property` field is optional for TCP assertions. When omitted, operators act as connection checks by default.
-
-| Property | Description | Operators |
-|---|---|---|
-| `connection` | Connection check (explicit) | `exists`, `notExists`, `eq`, `ne` |
-| `responseContains` | Match response body content | `contains` |
+Supported operators: `eq`.
 
 ```terraform
-# Typical usage — property omitted, defaults to connection check
 assertion {
-  source   = "tcp"
+  source   = "certificateValid"
+  operator = "eq"
+  target   = "true"
+}
+```
+
+### `certificateExpiresIn`
+
+Applies to: `ssl_check`
+
+Asserts on the number of days until the SSL certificate expires. The `property` field is not used for this source and should be omitted.
+
+Supported operators: `gt`, `lt`.
+
+```terraform
+assertion {
+  source   = "certificateExpiresIn"
+  operator = "gt"
+  target   = "30"
+}
+```
+
+### `tlsVersion`
+
+Applies to: `ssl_check`
+
+Asserts on the negotiated TLS version. The `property` field is not used for this source and should be omitted.
+
+Supported operators: `eq`, `gt`, `lt`.
+
+```terraform
+assertion {
+  source   = "tlsVersion"
+  operator = "eq"
+  target   = "1.2"
+}
+```
+
+### `chainValid`
+
+Applies to: `ssl_check`
+
+Asserts whether the SSL certificate chain is valid. The `property` field is not used for this source and should be omitted.
+
+Supported operators: `eq`.
+
+```terraform
+assertion {
+  source   = "chainValid"
+  operator = "eq"
+  target   = "true"
+}
+```
+
+### `cipherSuite`
+
+Applies to: `ssl_check`
+
+Asserts on the negotiated cipher suite. The `property` field is not used for this source and should be omitted.
+
+Supported operators: `eq`, `contains`.
+
+```terraform
+assertion {
+  source   = "cipherSuite"
+  operator = "eq"
+  target   = "AES256"
+}
+```
+
+### `tcpConnection`
+
+Applies to: `tcp_check`
+
+Asserts on whether a TCP connection was established. The `property` field is not used for this source and should be omitted.
+
+Supported operators: `exists`, `notExists`, `eq`, `ne`.
+
+```terraform
+assertion {
+  source   = "tcpConnection"
+  operator = "exists"
+  target   = "true"
+}
+```
+
+### `responseContains`
+
+Applies to: `tcp_check`
+
+Asserts on the TCP response body content. The `property` field is not used for this source and should be omitted.
+
+Supported operators: `contains`.
+
+```terraform
+assertion {
+  source   = "responseContains"
+  operator = "contains"
+  target   = "PONG"
+}
+```
+
+### `dnsAnswer`
+
+Applies to: `dns_check`
+
+Asserts on the DNS answer record. The `property` field is not used for this source and should be omitted.
+
+Supported operators: `exists`, `notExists`, `eq`, `ne`, `contains`.
+
+```terraform
+assertion {
+  source   = "dnsAnswer"
   operator = "exists"
   target   = "true"
 }
@@ -490,7 +624,7 @@ assertion {
 Required:
 
 - `operator` (String) Comparison operator: `eq`, `ne`, `gt`, `lt`, `contains`, `exists`, `notExists`, `startsWith`, `endsWith`, `regex`, `oneOf`.
-- `source` (String) What to assert on: `statusCode`, `responseTime`, `responseHeader`, `jsonBody`, `responseBody`, `ssl`, `tcp`, `dnsAnswer`.
+- `source` (String) What to assert on. All check types: `responseTime`. HTTP: `statusCode`, `responseHeader`, `jsonBody`, `responseBody`. SSL/TLS: `certificateValid`, `certificateExpiresIn`, `tlsVersion`, `chainValid`, `cipherSuite`. TCP: `tcpConnection`, `responseContains`. DNS: `dnsAnswer`.
 
 Optional:
 

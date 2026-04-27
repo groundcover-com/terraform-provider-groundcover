@@ -221,16 +221,14 @@ resource "groundcover_synthetic_test" "ssl_check" {
 
   # Check that the certificate is valid
   assertion {
-    source   = "ssl"
-    property = "certificateValid"
+    source   = "certificateValid"
     operator = "eq"
     target   = "true"
   }
 
   # Check that the certificate expires in more than 30 days
   assertion {
-    source   = "ssl"
-    property = "certificateExpiresIn"
+    source   = "certificateExpiresIn"
     operator = "gt"
     target   = "30"
   }
@@ -251,15 +249,13 @@ resource "groundcover_synthetic_test" "ssl_tls_check" {
   }
 
   assertion {
-    source   = "ssl"
-    property = "certificateValid"
+    source   = "certificateValid"
     operator = "eq"
     target   = "true"
   }
 
   assertion {
-    source   = "ssl"
-    property = "chainValid"
+    source   = "chainValid"
     operator = "eq"
     target   = "true"
   }
@@ -276,7 +272,7 @@ resource "groundcover_synthetic_test" "tcp_check" {
   }
 
   assertion {
-    source   = "tcp"
+    source   = "tcpConnection"
     operator = "exists"
     target   = "true"
   }
@@ -297,7 +293,7 @@ resource "groundcover_synthetic_test" "tcp_send_check" {
   }
 
   assertion {
-    source   = "tcp"
+    source   = "tcpConnection"
     operator = "exists"
     target   = "true"
   }
