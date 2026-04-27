@@ -46,19 +46,38 @@ jobs:
         fi
     
 
-  # Run acceptance tests (with API calls)
+  # Run acceptance tests (with API calls), sharded across parallel runners.
+  # Each shard runs a subset of TestAcc* tests on its own ubuntu-latest runner,
+  # so wall-clock time is bounded by the slowest shard rather than the sum.
   acceptance-tests:
+    name: acceptance-tests (${{ matrix.shard.name }})
     runs-on: ubuntu-latest
     needs: unit-tests
     environment: testing
+    strategy:
+      fail-fast: false
+      matrix:
+        shard:
+          # Synthetic tests: large suite (~30+ tests), mostly parallel-safe.
+          - name: synthetic
+            run: '^TestAccSynthetic'
+          # Connected app tests: 20+ tests kept sequential due to dev backend
+          # contention. This is the dominant shard wall-clock-wise.
+          - name: connected-app
+            run: '^TestAccConnectedApp'
+          # Everything else: notification routes, monitor, policy, dashboard,
+          # api keys, ingestion keys, secrets, silence, service accounts,
+          # data integration, logs/traces/metrics-aggregation pipelines.
+          - name: rest
+            run: '^TestAcc(ApiKey|Dashboard|DataIntegration|IngestionKey|LogsPipeline|MetricsAggregation|Monitor|NotificationRoute|Policy|Secret|ServiceAccount|Silence|Traces)'
     steps:
     - uses: actions/checkout@v4
-    
+
     - name: Set up Go
       uses: actions/setup-go@v5
       with:
         go-version-file: 'go.mod'
-    
+
     - name: Cache Go modules
       uses: actions/cache@v3
       with:
@@ -66,7 +85,7 @@ jobs:
         key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
         restore-keys: |
           ${{ runner.os }}-go-
-    
+
     - name: Download dependencies
       run: go mod download
 
@@ -87,14 +106,14 @@ jobs:
         else
           echo "secrets-available=false" >> $GITHUB_OUTPUT
         fi
-    
+
     - name: Skip acceptance tests (secrets not available)
       if: steps.check-secrets.outputs.secrets-available == 'false'
       run: |
         echo "⚠️  Skipping acceptance tests - repository secrets not available"
         echo "This is expected for PRs from forks and doesn't indicate a failure"
         echo "Acceptance tests will run when the PR is merged"
-    
+
     - name: Run acceptance tests
       if: steps.check-secrets.outputs.secrets-available == 'true'
       env:
@@ -104,18 +123,20 @@ jobs:
         GROUNDCOVER_API_URL: ${{ secrets.GROUNDCOVER_API_URL }}
         GROUNDCOVER_BACKEND_ID: ${{ secrets.GROUNDCOVER_BACKEND_ID }}
         GROUNDCOVER_INCLOUD_BACKEND_ID: ${{ secrets.GROUNDCOVER_INCLOUD_BACKEND_ID }}
+        SHARD_RUN: ${{ matrix.shard.run }}
       run: |
-        echo "✅ Running acceptance tests with available secrets..."
+        echo "✅ Running acceptance tests for shard '${{ matrix.shard.name }}' (regex: $SHARD_RUN)..."
         MAX_RETRIES=2
         TRANSIENT_PATTERNS="503|502|504|Service Unavailable|Bad Gateway|Gateway Timeout|connection refused|connection reset|EOF|resource not found"
-        RUN_FILTER=""
+        # First attempt runs the full shard regex; retry attempts narrow to failed tests.
+        RUN_FILTER="$SHARD_RUN"
 
         for attempt in $(seq 0 $MAX_RETRIES); do
           echo "=== Test attempt $((attempt + 1)) of $((MAX_RETRIES + 1)) ==="
           LOG_FILE=$(mktemp)
 
           set +e
-          go test ./internal/provider -v -failfast -parallel=4 -timeout 60m ${RUN_FILTER:+-run "$RUN_FILTER"} 2>&1 | tee "$LOG_FILE"
+          go test ./internal/provider -v -failfast -parallel=6 -timeout 60m -run "$RUN_FILTER" 2>&1 | tee "$LOG_FILE"
           EXIT_CODE=${PIPESTATUS[0]}
           set -e
 
@@ -133,7 +154,8 @@ jobs:
                 RUN_FILTER="$FAILED_TESTS"
                 echo "⚠️ Transient error detected. Retrying only failed tests: $FAILED_TESTS"
               else
-                echo "⚠️ Transient error detected. Retrying all tests..."
+                echo "⚠️ Transient error detected. Retrying full shard..."
+                RUN_FILTER="$SHARD_RUN"
               fi
               SLEEP_TIME=$(( (attempt + 1) * 30 ))
               echo "Waiting ${SLEEP_TIME}s before retry..."

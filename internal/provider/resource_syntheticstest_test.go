@@ -162,7 +162,7 @@ func TestAccSyntheticTestResource_disappears(t *testing.T) {
 func TestAccSyntheticTestResource_tcpDisappears(t *testing.T) {
 	name := acctest.RandomWithPrefix("test-synth-tcp-disappear")
 
-	resource.Test(t, resource.TestCase{
+	resource.ParallelTest(t, resource.TestCase{
 		PreCheck:                 func() { testAccPreCheck(t) },
 		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
 		Steps: []resource.TestStep{
@@ -457,7 +457,7 @@ func testAccCheckSyntheticTestResourceExists(n string) resource.TestCheckFunc {
 func TestAccSyntheticTestResource_sslBasic(t *testing.T) {
 	name := acctest.RandomWithPrefix("test-synth-ssl")
 
-	resource.Test(t, resource.TestCase{
+	resource.ParallelTest(t, resource.TestCase{
 		PreCheck:                 func() { testAccPreCheck(t) },
 		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
 		Steps: []resource.TestStep{
@@ -490,7 +490,7 @@ func TestAccSyntheticTestResource_sslBasic(t *testing.T) {
 func TestAccSyntheticTestResource_sslFull(t *testing.T) {
 	name := acctest.RandomWithPrefix("test-synth-ssl-full")
 
-	resource.Test(t, resource.TestCase{
+	resource.ParallelTest(t, resource.TestCase{
 		PreCheck:                 func() { testAccPreCheck(t) },
 		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
 		Steps: []resource.TestStep{
@@ -521,7 +521,7 @@ func TestAccSyntheticTestResource_sslUpdate(t *testing.T) {
 	name := acctest.RandomWithPrefix("test-synth-ssl")
 	updatedName := name + "-updated"
 
-	resource.Test(t, resource.TestCase{
+	resource.ParallelTest(t, resource.TestCase{
 		PreCheck:                 func() { testAccPreCheck(t) },
 		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
 		Steps: []resource.TestStep{
@@ -550,7 +550,7 @@ func TestAccSyntheticTestResource_sslUpdate(t *testing.T) {
 func TestAccSyntheticTestResource_sslTimeoutUpdate(t *testing.T) {
 	name := acctest.RandomWithPrefix("test-synth-ssl-timeout")
 
-	resource.Test(t, resource.TestCase{
+	resource.ParallelTest(t, resource.TestCase{
 		PreCheck:                 func() { testAccPreCheck(t) },
 		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
 		Steps: []resource.TestStep{
@@ -580,7 +580,7 @@ func TestAccSyntheticTestResource_sslTimeoutUpdate(t *testing.T) {
 func TestAccSyntheticTestResource_sslApplyLoop(t *testing.T) {
 	name := acctest.RandomWithPrefix("test-synth-ssl-loop")
 
-	resource.Test(t, resource.TestCase{
+	resource.ParallelTest(t, resource.TestCase{
 		PreCheck:                 func() { testAccPreCheck(t) },
 		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
 		Steps: []resource.TestStep{
@@ -616,7 +616,7 @@ func TestAccSyntheticTestResource_sslApplyLoop(t *testing.T) {
 func TestAccSyntheticTestResource_conflictingChecks(t *testing.T) {
 	name := acctest.RandomWithPrefix("test-synth-conflict")
 
-	resource.Test(t, resource.TestCase{
+	resource.ParallelTest(t, resource.TestCase{
 		PreCheck:                 func() { testAccPreCheck(t) },
 		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
 		Steps: []resource.TestStep{
@@ -755,7 +755,7 @@ resource "groundcover_synthetic_test" "test" {
 func TestAccSyntheticTestResource_notificationMethod(t *testing.T) {
 	name := acctest.RandomWithPrefix("test-synth-notif")
 
-	resource.Test(t, resource.TestCase{
+	resource.ParallelTest(t, resource.TestCase{
 		PreCheck:                 func() { testAccPreCheck(t) },
 		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
 		Steps: []resource.TestStep{
@@ -809,7 +809,7 @@ resource "groundcover_synthetic_test" "test" {
 func TestAccSyntheticTestResource_notificationValidation_connectedAppsWithoutApps(t *testing.T) {
 	name := acctest.RandomWithPrefix("test-synth-val")
 
-	resource.Test(t, resource.TestCase{
+	resource.ParallelTest(t, resource.TestCase{
 		PreCheck:                 func() { testAccPreCheck(t) },
 		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
 		Steps: []resource.TestStep{
@@ -841,7 +841,7 @@ resource "groundcover_synthetic_test" "test" {
 func TestAccSyntheticTestResource_notificationValidation_appsWithoutMethod(t *testing.T) {
 	name := acctest.RandomWithPrefix("test-synth-val")
 
-	resource.Test(t, resource.TestCase{
+	resource.ParallelTest(t, resource.TestCase{
 		PreCheck:                 func() { testAccPreCheck(t) },
 		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
 		Steps: []resource.TestStep{
@@ -874,7 +874,7 @@ resource "groundcover_synthetic_test" "test" {
 func TestAccSyntheticTestResource_notificationValidation_invalidStatusFilter(t *testing.T) {
 	name := acctest.RandomWithPrefix("test-synth-val")
 
-	resource.Test(t, resource.TestCase{
+	resource.ParallelTest(t, resource.TestCase{
 		PreCheck:                 func() { testAccPreCheck(t) },
 		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
 		Steps: []resource.TestStep{
@@ -908,7 +908,7 @@ resource "groundcover_synthetic_test" "test" {
 func TestAccSyntheticTestResource_notificationMethodConnectedApps(t *testing.T) {
 	name := acctest.RandomWithPrefix("test-synth-ca")
 
-	resource.Test(t, resource.TestCase{
+	resource.ParallelTest(t, resource.TestCase{
 		PreCheck:                 func() { testAccPreCheck(t) },
 		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
 		Steps: []resource.TestStep{
@@ -1010,7 +1010,7 @@ resource "groundcover_synthetic_test" "test" {
 func TestAccSyntheticTestResource_notificationMethodApplyLoop(t *testing.T) {
 	name := acctest.RandomWithPrefix("test-synth-notif-loop")
 
-	resource.Test(t, resource.TestCase{
+	resource.ParallelTest(t, resource.TestCase{
 		PreCheck:                 func() { testAccPreCheck(t) },
 		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
 		Steps: []resource.TestStep{
@@ -1045,7 +1045,7 @@ func TestAccSyntheticTestResource_notificationMethodApplyLoop(t *testing.T) {
 func TestAccSyntheticTestResource_followRedirectsAndAllowInsecure(t *testing.T) {
 	name := acctest.RandomWithPrefix("test-synth-bools")
 
-	resource.Test(t, resource.TestCase{
+	resource.ParallelTest(t, resource.TestCase{
 		PreCheck:                 func() { testAccPreCheck(t) },
 		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
 		Steps: []resource.TestStep{
@@ -1080,7 +1080,7 @@ func TestAccSyntheticTestResource_followRedirectsAndAllowInsecure(t *testing.T) 
 func TestAccSyntheticTestResource_followRedirectsApplyLoop(t *testing.T) {
 	name := acctest.RandomWithPrefix("test-synth-bool-loop")
 
-	resource.Test(t, resource.TestCase{
+	resource.ParallelTest(t, resource.TestCase{
 		PreCheck:                 func() { testAccPreCheck(t) },
 		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
 		Steps: []resource.TestStep{
@@ -1166,7 +1166,7 @@ resource "groundcover_synthetic_test" "test" {
 func TestAccSyntheticTestResource_tcpBasic(t *testing.T) {
 	name := acctest.RandomWithPrefix("test-synth-tcp")
 
-	resource.Test(t, resource.TestCase{
+	resource.ParallelTest(t, resource.TestCase{
 		PreCheck:                 func() { testAccPreCheck(t) },
 		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
 		Steps: []resource.TestStep{
@@ -1198,7 +1198,7 @@ func TestAccSyntheticTestResource_tcpBasic(t *testing.T) {
 func TestAccSyntheticTestResource_tcpFull(t *testing.T) {
 	name := acctest.RandomWithPrefix("test-synth-tcp-full")
 
-	resource.Test(t, resource.TestCase{
+	resource.ParallelTest(t, resource.TestCase{
 		PreCheck:                 func() { testAccPreCheck(t) },
 		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
 		Steps: []resource.TestStep{
@@ -1228,7 +1228,7 @@ func TestAccSyntheticTestResource_tcpUpdate(t *testing.T) {
 	name := acctest.RandomWithPrefix("test-synth-tcp")
 	updatedName := name + "-updated"
 
-	resource.Test(t, resource.TestCase{
+	resource.ParallelTest(t, resource.TestCase{
 		PreCheck:                 func() { testAccPreCheck(t) },
 		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
 		Steps: []resource.TestStep{
@@ -1257,7 +1257,7 @@ func TestAccSyntheticTestResource_tcpUpdate(t *testing.T) {
 func TestAccSyntheticTestResource_tcpApplyLoop(t *testing.T) {
 	name := acctest.RandomWithPrefix("test-synth-tcp-loop")
 
-	resource.Test(t, resource.TestCase{
+	resource.ParallelTest(t, resource.TestCase{
 		PreCheck:                 func() { testAccPreCheck(t) },
 		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
 		Steps: []resource.TestStep{
@@ -1293,7 +1293,7 @@ func TestAccSyntheticTestResource_tcpApplyLoop(t *testing.T) {
 func TestAccSyntheticTestResource_tcpTimeoutUpdate(t *testing.T) {
 	name := acctest.RandomWithPrefix("test-synth-tcp-timeout")
 
-	resource.Test(t, resource.TestCase{
+	resource.ParallelTest(t, resource.TestCase{
 		PreCheck:                 func() { testAccPreCheck(t) },
 		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
 		Steps: []resource.TestStep{
@@ -1323,7 +1323,7 @@ func TestAccSyntheticTestResource_tcpTimeoutUpdate(t *testing.T) {
 func TestAccSyntheticTestResource_tcpSendUpdate(t *testing.T) {
 	name := acctest.RandomWithPrefix("test-synth-tcp-send")
 
-	resource.Test(t, resource.TestCase{
+	resource.ParallelTest(t, resource.TestCase{
 		PreCheck:                 func() { testAccPreCheck(t) },
 		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
 		Steps: []resource.TestStep{
@@ -1443,7 +1443,7 @@ resource "groundcover_synthetic_test" "test" {
 func TestAccSyntheticTestResource_sslPropertyAssertions(t *testing.T) {
 	name := acctest.RandomWithPrefix("test-synth-ssl-prop")
 
-	resource.Test(t, resource.TestCase{
+	resource.ParallelTest(t, resource.TestCase{
 		PreCheck:                 func() { testAccPreCheck(t) },
 		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
 		Steps: []resource.TestStep{
@@ -1528,7 +1528,7 @@ resource "groundcover_synthetic_test" "test" {
 func TestAccSyntheticTestResource_dnsBasic(t *testing.T) {
 	name := acctest.RandomWithPrefix("test-synth-dns")
 
-	resource.Test(t, resource.TestCase{
+	resource.ParallelTest(t, resource.TestCase{
 		PreCheck:                 func() { testAccPreCheck(t) },
 		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
 		Steps: []resource.TestStep{
@@ -1560,7 +1560,7 @@ func TestAccSyntheticTestResource_dnsBasic(t *testing.T) {
 func TestAccSyntheticTestResource_dnsFull(t *testing.T) {
 	name := acctest.RandomWithPrefix("test-synth-dns-full")
 
-	resource.Test(t, resource.TestCase{
+	resource.ParallelTest(t, resource.TestCase{
 		PreCheck:                 func() { testAccPreCheck(t) },
 		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
 		Steps: []resource.TestStep{
@@ -1591,7 +1591,7 @@ func TestAccSyntheticTestResource_dnsUpdate(t *testing.T) {
 	name := acctest.RandomWithPrefix("test-synth-dns")
 	updatedName := name + "-updated"
 
-	resource.Test(t, resource.TestCase{
+	resource.ParallelTest(t, resource.TestCase{
 		PreCheck:                 func() { testAccPreCheck(t) },
 		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
 		Steps: []resource.TestStep{
@@ -1619,7 +1619,7 @@ func TestAccSyntheticTestResource_dnsUpdate(t *testing.T) {
 func TestAccSyntheticTestResource_dnsApplyLoop(t *testing.T) {
 	name := acctest.RandomWithPrefix("test-synth-dns-loop")
 
-	resource.Test(t, resource.TestCase{
+	resource.ParallelTest(t, resource.TestCase{
 		PreCheck:                 func() { testAccPreCheck(t) },
 		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
 		Steps: []resource.TestStep{
@@ -1655,7 +1655,7 @@ func TestAccSyntheticTestResource_dnsApplyLoop(t *testing.T) {
 func TestAccSyntheticTestResource_dnsTimeoutUpdate(t *testing.T) {
 	name := acctest.RandomWithPrefix("test-synth-dns-timeout")
 
-	resource.Test(t, resource.TestCase{
+	resource.ParallelTest(t, resource.TestCase{
 		PreCheck:                 func() { testAccPreCheck(t) },
 		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
 		Steps: []resource.TestStep{
