@@ -908,7 +908,15 @@ resource "groundcover_synthetic_test" "test" {
 func TestAccSyntheticTestResource_notificationMethodConnectedApps(t *testing.T) {
 	name := acctest.RandomWithPrefix("test-synth-ca")
 
-	resource.ParallelTest(t, resource.TestCase{
+	// Kept sequential (resource.Test, not resource.ParallelTest) because the
+	// synthetic API in `connectedApps` mode auto-creates an internal
+	// notification_route that references the connected_app. Cleanup of that
+	// internal route on synthetic destroy is eventually consistent on the dev
+	// backend — under parallel load, the connected_app delete races ahead of
+	// the route purge and fails with 409 "referenced by notification routes".
+	// Running this one test sequentially gives the backend the breathing room
+	// to settle, with negligible wall-time impact (single ~30s test).
+	resource.Test(t, resource.TestCase{
 		PreCheck:                 func() { testAccPreCheck(t) },
 		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
 		Steps: []resource.TestStep{
