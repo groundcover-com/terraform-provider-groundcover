@@ -305,6 +305,7 @@ func NewSdkClientWrapper(ctx context.Context, baseURLStr, apiKey, backendID stri
 	}
 
 	retryableStatuses := []int{
+		http.StatusInternalServerError, // 500: backend occasionally fails internal sub-calls (e.g. synthetic-test → monitor create); short-lived and safe to retry with backoff.
 		http.StatusServiceUnavailable,
 		http.StatusTooManyRequests,
 		http.StatusGatewayTimeout,
