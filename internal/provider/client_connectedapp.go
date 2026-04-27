@@ -6,11 +6,28 @@ package provider
 import (
 	"context"
 	"errors"
+	"strings"
+	"time"
 
 	"github.com/groundcover-com/groundcover-sdk-go/pkg/client/connected_apps"
 	"github.com/groundcover-com/groundcover-sdk-go/pkg/models"
 
 	"github.com/hashicorp/terraform-plugin-log/tflog"
+)
+
+// deleteConnectedAppRefRetryAttempts and deleteConnectedAppRefRetryDelay control the retry
+// behavior for the "connected app is still referenced by notification routes" case.
+// The synthetic API auto-creates internal notification_routes when a synthetic_test runs
+// in `connectedApps` mode; cleanup of those routes on synthetic destroy is eventually
+// consistent. Without retry, a Terraform that destroys synthetic + connected_app together
+// can hit a window where the route purge hasn't completed yet → 409.
+//
+// Total budget: ~30s (6 attempts × 5s) — enough for the backend to settle in practice,
+// while bounded so genuine "still in use" cases (user has manually-created routes
+// pointing at the connected_app) surface as errors in reasonable time.
+const (
+	deleteConnectedAppRefRetryAttempts = 6
+	deleteConnectedAppRefRetryDelay    = 5 * time.Second
 )
 
 func (c *SdkClientWrapper) CreateConnectedApp(ctx context.Context, req *models.CreateConnectedAppRequest) (*models.CreateConnectedAppResponse, error) {
@@ -93,16 +110,45 @@ func (c *SdkClientWrapper) DeleteConnectedApp(ctx context.Context, id string) er
 		WithTimeout(defaultTimeout).
 		WithID(id)
 
-	_, err := c.sdkClient.ConnectedApps.DeleteConnectedApp(params, nil)
-	if err != nil {
+	// Retry on the specific "referenced by notification routes" 409. This race
+	// happens when a synthetic_test using the connected_app in `connectedApps`
+	// mode is destroyed alongside the connected_app: the synthetic backend's
+	// async cleanup of its internal notification_route hasn't completed yet.
+	// We retry with a fixed delay to give the backend time to settle. Other
+	// 409s (e.g. user has real routes referencing the app) still surface
+	// after the retry budget is exhausted.
+	var lastErr error
+	for attempt := 0; attempt < deleteConnectedAppRefRetryAttempts; attempt++ {
+		_, err := c.sdkClient.ConnectedApps.DeleteConnectedApp(params, nil)
+		if err == nil {
+			tflog.Debug(ctx, "SDK Call Successful: Delete Connected App", logFields)
+			return nil
+		}
+
 		mappedErr := handleApiError(ctx, err, "DeleteConnectedApp", id)
 		if errors.Is(mappedErr, ErrNotFound) {
 			tflog.Warn(ctx, "SDK Call Result: Connected App Not Found during Delete (Idempotent Success)", logFields)
 			return nil
 		}
-		return mappedErr
+
+		lastErr = mappedErr
+
+		// Only retry on the specific eventually-consistent reference case.
+		// Match on the friendly message produced by handleApiError for this 409.
+		if !strings.Contains(strings.ToLower(mappedErr.Error()), "referenced by one or more notification routes") {
+			return mappedErr
+		}
+
+		if attempt < deleteConnectedAppRefRetryAttempts-1 {
+			tflog.Warn(ctx, "Connected app still referenced by notification routes; retrying delete after backoff",
+				map[string]any{"id": id, "attempt": attempt + 1, "max_attempts": deleteConnectedAppRefRetryAttempts})
+			select {
+			case <-time.After(deleteConnectedAppRefRetryDelay):
+			case <-ctx.Done():
+				return ctx.Err()
+			}
+		}
 	}
 
-	tflog.Debug(ctx, "SDK Call Successful: Delete Connected App", logFields)
-	return nil
+	return lastErr
 }
