@@ -116,6 +116,32 @@ type syntheticAssertionModel struct {
 	Severity types.String `tfsdk:"severity"`
 }
 
+var propertyAsSources = map[string]struct{}{
+	// SSL
+	"certificateValid":     {},
+	"certificateExpiresIn": {},
+	"tlsVersion":           {},
+	"chainValid":           {},
+	"cipherSuite":          {},
+	// TCP
+	"tcpConnection":    {},
+	"responseContains": {},
+}
+
+var baseSources = []string{
+	"statusCode", "responseTime", "responseHeader", "jsonBody", "responseBody",
+	"ssl", "tcp", "dnsAnswer",
+}
+
+func allValidSources() []string {
+	s := make([]string, len(baseSources), len(baseSources)+len(propertyAsSources))
+	copy(s, baseSources)
+	for k := range propertyAsSources {
+		s = append(s, k)
+	}
+	return s
+}
+
 type syntheticRetryModel struct {
 	Count    types.Int64  `tfsdk:"count"`
 	Interval types.String `tfsdk:"interval"`
@@ -377,10 +403,12 @@ func (r *syntheticTestResource) Schema(_ context.Context, _ resource.SchemaReque
 				NestedObject: schema.NestedBlockObject{
 					Attributes: map[string]schema.Attribute{
 						"source": schema.StringAttribute{
-							Description: "What to assert on: `statusCode`, `responseTime`, `responseHeader`, `jsonBody`, `responseBody`, `ssl`, `tcp`, `dnsAnswer`.",
-							Required:    true,
+							Description: "What to assert on. All check types: `responseTime`. HTTP: `statusCode`, `responseHeader`, `jsonBody`, `responseBody`. " +
+								"SSL/TLS: `certificateValid`, `certificateExpiresIn`, `tlsVersion`, `chainValid`, `cipherSuite`. " +
+								"TCP: `tcpConnection`, `responseContains`. DNS: `dnsAnswer`.",
+							Required: true,
 							Validators: []validator.String{
-								stringvalidator.OneOf("statusCode", "responseTime", "responseHeader", "jsonBody", "responseBody", "ssl", "tcp", "dnsAnswer"),
+								stringvalidator.OneOf(allValidSources()...),
 							},
 						},
 						"operator": schema.StringAttribute{
@@ -649,6 +677,22 @@ func (r *syntheticTestResource) ValidateConfig(ctx context.Context, req resource
 					"The record_type attribute is required and must not be empty when dns_check is configured.",
 				)
 			}
+		}
+	}
+
+	for i, assertion := range config.Assertion {
+		if assertion.Source.IsUnknown() || assertion.Source.IsNull() {
+			continue
+		}
+		src := assertion.Source.ValueString()
+		hasProp := !assertion.Property.IsNull() && !assertion.Property.IsUnknown()
+
+		if _, ok := propertyAsSources[src]; ok && hasProp {
+			resp.Diagnostics.AddAttributeError(
+				path.Root("assertion").AtListIndex(i).AtName("property"),
+				"Invalid attribute combination",
+				fmt.Sprintf("When source is %q, the property field must not be set — the source already specifies the property.", src),
+			)
 		}
 	}
 

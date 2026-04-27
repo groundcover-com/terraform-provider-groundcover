@@ -1,3 +1,9 @@
+## 1.12.2
+
+* Updated `groundcover_synthetic_test` assertion `source` field — SSL/TLS properties (`certificateValid`, `certificateExpiresIn`, `tlsVersion`, `chainValid`, `cipherSuite`) and TCP properties (`tcpConnection`, `responseContains`) can now be used directly as `source` values instead of requiring `source = "ssl"/"tcp"` with a separate `property` field
+* Added config validation that rejects `property` when using a property-as-source value (e.g., `source = "certificateValid"` with `property` set)
+* Updated docs and examples to use the new direct-source syntax; the old `source + property` syntax remains fully backwards compatible
+
 ## 1.12.1
 
 * Fixed DNS assertion source — fixed from `dns` to `dnsAnswer` to match the backend API
