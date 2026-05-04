@@ -183,9 +183,9 @@ type ApiClient interface {
 	DeleteMetricsAggregation(ctx context.Context) error
 
 	// Metrics Pipeline
-	CreateMetricsPipeline(ctx context.Context, req *models.CreateOrUpdateMetricsPipelineConfigRequest) (*models.MetricsPipelineConfig, error)
-	GetMetricsPipeline(ctx context.Context) (*models.MetricsPipelineConfig, error)
-	UpdateMetricsPipeline(ctx context.Context, req *models.CreateOrUpdateMetricsPipelineConfigRequest) (*models.MetricsPipelineConfig, error)
+	CreateMetricsPipeline(ctx context.Context, req *models.CreateOrUpdateMetricsPipelineConfigRequest) (*models.MetricsPipelineConfigInfo, error)
+	GetMetricsPipeline(ctx context.Context) (*models.MetricsPipelineConfigInfo, error)
+	UpdateMetricsPipeline(ctx context.Context, req *models.CreateOrUpdateMetricsPipelineConfigRequest) (*models.MetricsPipelineConfigInfo, error)
 	DeleteMetricsPipeline(ctx context.Context) error
 
 	// Ingestion Keys

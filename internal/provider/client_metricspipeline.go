@@ -12,7 +12,7 @@ const (
 	metricsPipelineResourceId = "metrics-pipeline"
 )
 
-func (c *SdkClientWrapper) CreateMetricsPipeline(ctx context.Context, req *models.CreateOrUpdateMetricsPipelineConfigRequest) (*models.MetricsPipelineConfig, error) {
+func (c *SdkClientWrapper) CreateMetricsPipeline(ctx context.Context, req *models.CreateOrUpdateMetricsPipelineConfigRequest) (*models.MetricsPipelineConfigInfo, error) {
 	logFields := map[string]any{"req": "create_metrics_pipeline"}
 	tflog.Debug(ctx, "Executing SDK Call: Create Metrics Pipeline", logFields)
 
@@ -26,7 +26,7 @@ func (c *SdkClientWrapper) CreateMetricsPipeline(ctx context.Context, req *model
 	return createResp.Payload, nil
 }
 
-func (c *SdkClientWrapper) GetMetricsPipeline(ctx context.Context) (*models.MetricsPipelineConfig, error) {
+func (c *SdkClientWrapper) GetMetricsPipeline(ctx context.Context) (*models.MetricsPipelineConfigInfo, error) {
 	logFields := map[string]any{"req": "get_metrics_pipeline"}
 	tflog.Debug(ctx, "Executing SDK Call: Get Metrics Pipeline", logFields)
 
@@ -36,7 +36,7 @@ func (c *SdkClientWrapper) GetMetricsPipeline(ctx context.Context) (*models.Metr
 		return nil, handleApiError(ctx, err, "GetMetricsPipeline", metricsPipelineResourceId)
 	}
 
-	var response *models.MetricsPipelineConfig
+	var response *models.MetricsPipelineConfigInfo
 	if emptyGetResp == nil {
 		response = getResp.Payload
 	}
@@ -45,7 +45,7 @@ func (c *SdkClientWrapper) GetMetricsPipeline(ctx context.Context) (*models.Metr
 	return response, nil
 }
 
-func (c *SdkClientWrapper) UpdateMetricsPipeline(ctx context.Context, req *models.CreateOrUpdateMetricsPipelineConfigRequest) (*models.MetricsPipelineConfig, error) {
+func (c *SdkClientWrapper) UpdateMetricsPipeline(ctx context.Context, req *models.CreateOrUpdateMetricsPipelineConfigRequest) (*models.MetricsPipelineConfigInfo, error) {
 	logFields := map[string]any{"req": "update_metrics_pipeline"}
 	tflog.Debug(ctx, "Executing SDK Call: Update Metrics Pipeline", logFields)
 

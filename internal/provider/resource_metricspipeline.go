@@ -228,7 +228,7 @@ func (r *metricsPipelineResource) ModifyPlan(ctx context.Context, req resource.M
 	)
 }
 
-func (r *metricsPipelineResource) checkAndImportExisting(ctx context.Context, state *tfsdk.State, diags *diag.Diagnostics) (*models.MetricsPipelineConfig, error) {
+func (r *metricsPipelineResource) checkAndImportExisting(ctx context.Context, state *tfsdk.State, diags *diag.Diagnostics) (*models.MetricsPipelineConfigInfo, error) {
 	existingConfig, err := r.client.GetMetricsPipeline(ctx)
 	if err != nil && err != ErrNotFound {
 		return nil, err
@@ -276,7 +276,7 @@ func planToMetricsPipelineRequest(ctx context.Context, plan *metricsPipelineReso
 	return req
 }
 
-func metricsPipelineConfigToState(ctx context.Context, config *models.MetricsPipelineConfig, state *metricsPipelineResourceModel, diags *diag.Diagnostics) {
+func metricsPipelineConfigToState(ctx context.Context, config *models.MetricsPipelineConfigInfo, state *metricsPipelineResourceModel, diags *diag.Diagnostics) {
 	if config == nil {
 		state.Rules = nil
 		state.UpdatedAt = types.StringValue("")
