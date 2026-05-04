@@ -22,6 +22,8 @@ Basic usage examples can be found in the `examples/` directory:
     *   Shows how to configure traces processing pipelines.
 *   **Metrics Aggregation Resource:** [`examples/resources/groundcover_metricsaggregation/resource.tf`](./examples/resources/groundcover_metricsaggregation/resource.tf)
     *   Demonstrates how to configure metrics aggregation rules for reducing cardinality.
+*   **Metrics Pipeline Resource:** [`examples/resources/groundcover_metricspipeline/resource.tf`](./examples/resources/groundcover_metricspipeline/resource.tf)
+    *   Demonstrates how to configure metrics relabeling rules (keep/drop metrics, add labels, raw VM relabel rules).
 *   **Dashboard Resource:** [`examples/resources/groundcover_dashboard/resource.tf`](./examples/resources/groundcover_dashboard/resource.tf)
     *   Demonstrates how to create and manage dashboards with customizable widgets and layouts.
 *   **Data Integration Resource:** [`examples/resources/groundcover_dataintegration/resource.tf`](./examples/resources/groundcover_dataintegration/resource.tf)
@@ -52,6 +54,7 @@ For most resources, the import ID is the resource's UUID. Some exceptions:
 *   **Data Integration:** Import using composite key: `terraform import groundcover_dataintegration.example <type>:<id>`
 *   **Logs Pipeline:** Singleton resource — use any value: `terraform import groundcover_logspipeline.example any`
 *   **Traces Pipeline:** Singleton resource — use any value: `terraform import groundcover_tracespipeline.example any`
+*   **Metrics Pipeline:** Singleton resource — use any value: `terraform import groundcover_metricspipeline.example any`
 See each resource's documentation in `docs/resources/` for the exact import syntax.
 
 ## Local Development and Testing
@@ -246,6 +249,7 @@ TF_ACC=1 go test ./internal/provider -v -run TestAccMonitorResource
 TF_ACC=1 go test ./internal/provider -v -run TestAccApiKeyResource
 TF_ACC=1 go test ./internal/provider -v -run TestAccLogsPipelineResource
 TF_ACC=1 go test ./internal/provider -v -run TestAccMetricsAggregationResource
+TF_ACC=1 go test ./internal/provider -v -run TestAccMetricsPipelineResource
 TF_ACC=1 go test ./internal/provider -v -run TestAccIngestionKeyResource
 TF_ACC=1 go test ./internal/provider -v -run TestAccDashboardResource
 TF_ACC=1 go test ./internal/provider -v -run TestAccDataIntegrationResource

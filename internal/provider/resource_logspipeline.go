@@ -140,9 +140,11 @@ func (r *logsPipelineResource) Read(ctx context.Context, req resource.ReadReques
 
 	value := ""
 	createdAt := ""
+	uuid := ""
 	if configEntry != nil {
 		value = configEntry.Value
 		createdAt = configEntry.CreatedTimestamp.String()
+		uuid = configEntry.UUID
 	}
 
 	// Update state
@@ -155,7 +157,7 @@ func (r *logsPipelineResource) Read(ctx context.Context, req resource.ReadReques
 	if resp.Diagnostics.HasError() {
 		return
 	}
-	tflog.Debug(ctx, fmt.Sprintf("Successfully read LogsPipeline resource with UUID %s", configEntry.UUID))
+	tflog.Debug(ctx, fmt.Sprintf("Successfully read LogsPipeline resource with UUID %s", uuid))
 }
 
 // Update updates the resource and sets the updated Terraform state.

@@ -1,6 +1,6 @@
 module github.com/groundcover-com/terraform-provider-groundcover
 
-go 1.25.8
+go 1.25.9
 
 require (
 	github.com/go-openapi/runtime v0.28.0
@@ -11,7 +11,7 @@ require (
 
 require (
 	github.com/goccy/go-yaml v1.17.1
-	github.com/groundcover-com/groundcover-sdk-go v1.244.0
+	github.com/groundcover-com/groundcover-sdk-go v1.254.0
 	github.com/hashicorp/terraform-plugin-framework-validators v0.19.0
 	github.com/hashicorp/terraform-plugin-go v0.29.0
 	github.com/hashicorp/terraform-plugin-testing v1.14.1

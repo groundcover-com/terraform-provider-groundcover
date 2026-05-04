@@ -1,3 +1,8 @@
+## 1.13.0
+
+* Added `groundcover_metricspipeline` resource for configuring metrics relabeling rules (keep/drop metrics by regex, add labels, raw VictoriaMetrics relabel rules)
+* Updated groundcover SDK from v1.244.0 to v1.254.0
+
 ## 1.12.2
 
 * Updated `groundcover_synthetic_test` assertion `source` field — SSL/TLS properties (`certificateValid`, `certificateExpiresIn`, `tlsVersion`, `chainValid`, `cipherSuite`) and TCP properties (`tcpConnection`, `responseContains`) can now be used directly as `source` values instead of requiring `source = "ssl"/"tcp"` with a separate `property` field
