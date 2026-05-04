@@ -48,7 +48,6 @@ Optional:
 - `drop_regex` (List of String) List of regex patterns. Metrics whose __name__ matches any pattern are dropped.
 - `keep_regex` (List of String) List of regex patterns. Only metrics whose __name__ matches at least one pattern are kept. All others are dropped.
 - `raw` (String) Raw VictoriaMetrics relabeling rules in YAML format for advanced use cases.
-- `remove_label` (List of String) List of label names to remove from every metric.
 
 ## Import
 
