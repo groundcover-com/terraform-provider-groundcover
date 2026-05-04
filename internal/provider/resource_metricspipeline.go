@@ -69,7 +69,7 @@ func (r *metricsPipelineResource) Schema(_ context.Context, _ resource.SchemaReq
 						Optional:    true,
 					},
 					"remove_label": schema.ListAttribute{
-						Description: "List of label names to remove from every metric.",
+						Description: "List of label names to remove from every metric. Be careful with this setting as it can cause metrics amalgamation.",
 						ElementType: types.StringType,
 						Optional:    true,
 					},
