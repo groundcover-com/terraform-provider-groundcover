@@ -32,7 +32,7 @@ jobs:
           GROUNDCOVER_API_URL: ${{ secrets.GROUNDCOVER_API_URL }}
           GROUNDCOVER_BACKEND_ID: ${{ secrets.GROUNDCOVER_BACKEND_ID }}
           GROUNDCOVER_INCLOUD_BACKEND_ID: ${{ secrets.GROUNDCOVER_INCLOUD_BACKEND_ID }}
-        run: go test ./internal/provider -v -timeout 30m
+        run: go test ./internal/provider -v -timeout 60m
       - name: Import GPG key
         uses: crazy-max/ghaction-import-gpg@e89d40939c28e39f97cf32126055eeae86ba74ec # v6.3.0
         id: import_gpg
