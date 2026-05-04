@@ -1,6 +1,7 @@
 ## 1.13.0
 
 * Added `groundcover_metricspipeline` resource for configuring metrics relabeling rules (keep/drop metrics by regex, add labels, raw VictoriaMetrics relabel rules)
+* Updated groundcover SDK from v1.244.0 to v1.254.0
 
 ## 1.12.2
 
