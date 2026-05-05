@@ -43,10 +43,41 @@ jobs:
     
 
   # Run acceptance tests (with API calls)
-  acceptance-tests:
+  acceptance-test-group:
+    name: acceptance-tests / ${{ matrix.name }}
     runs-on: ubuntu-latest
     needs: unit-tests
     environment: testing
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: connected-app
+            run_regex: '^TestAccConnectedApp.*$'
+          - name: dashboard
+            run_regex: '^(TestAccDashboardResource.*|TestAccCustomerApplyLoop_Dashboard.*)$'
+          - name: data-integration
+            run_regex: '^TestAccDataIntegrationResource.*$'
+          - name: logs-pipeline
+            run_regex: '^TestAccLogsPipelineResource.*$'
+          - name: metrics-aggregation
+            run_regex: '^TestAccMetricsAggregationResource.*$'
+          - name: metrics-pipeline
+            run_regex: '^TestAccMetricsPipelineResource.*$'
+          - name: monitor
+            run_regex: '^(TestAccMonitorResource.*|TestAccCustomerApplyLoop_Monitor.*)$'
+          - name: notification-route
+            run_regex: '^TestAccNotificationRoute.*$'
+          - name: rbac
+            run_regex: '^TestAcc(ApiKeyResource|IngestionKeyResource|PolicyResource|ServiceAccountResource).*$'
+          - name: secret
+            run_regex: '^TestAccSecretResource.*$'
+          - name: silence
+            run_regex: '^TestAccSilenceResource.*$'
+          - name: synthetic-test
+            run_regex: '^TestAccSyntheticTestResource.*$'
+          - name: traces-pipeline
+            run_regex: '^TestAccTracesPipelineResource.*$'
     steps:
     - uses: actions/checkout@v4
     
@@ -81,6 +112,21 @@ jobs:
         echo "⚠️  Skipping acceptance tests - repository secrets not available"
         echo "This is expected for PRs from forks and doesn't indicate a failure"
         echo "Acceptance tests will run when the PR is merged"
+
+    - name: Resolve acceptance test group
+      id: acceptance-tests
+      if: steps.check-secrets.outputs.secrets-available == 'true'
+      env:
+        GROUP_REGEX: ${{ matrix.run_regex }}
+      run: |
+        set -euo pipefail
+        tests="$(go test ./internal/provider -list "$GROUP_REGEX" | awk '/^TestAcc/ { tests = tests ? tests "|" $0 : $0 } END { print tests }')"
+        if [ -z "$tests" ]; then
+          echo "No acceptance tests matched group '${{ matrix.name }}'"
+          exit 1
+        fi
+
+        echo "regex=^($tests)$" >> "$GITHUB_OUTPUT"
     
     - name: Run acceptance tests
       if: steps.check-secrets.outputs.secrets-available == 'true'
@@ -91,8 +137,22 @@ jobs:
         GROUNDCOVER_BACKEND_ID: ${{ secrets.GROUNDCOVER_BACKEND_ID }}
         GROUNDCOVER_INCLOUD_BACKEND_ID: ${{ secrets.GROUNDCOVER_INCLOUD_BACKEND_ID }}
       run: |
-        echo "✅ Running acceptance tests with available secrets..."
-        go test ./internal/provider -v -timeout 60m
+        echo "✅ Running acceptance test group '${{ matrix.name }}' with available secrets..."
+        go test ./internal/provider -v -timeout 60m -parallel 1 -run '${{ steps.acceptance-tests.outputs.regex }}'
+
+  acceptance-tests:
+    runs-on: ubuntu-latest
+    needs: acceptance-test-group
+    if: always()
+    steps:
+    - name: Check grouped acceptance tests
+      run: |
+        if [ "${{ needs.acceptance-test-group.result }}" != "success" ]; then
+          echo "One or more grouped acceptance test jobs failed or were cancelled."
+          exit 1
+        fi
+
+        echo "All grouped acceptance test jobs passed."
 
   # Build test to ensure the provider compiles
   build-test:
