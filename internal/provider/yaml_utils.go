@@ -371,7 +371,8 @@ type DefaultValueRule struct {
 
 // Fields that the server doesn't persist/return and should be ignored during comparison
 var ignoredFields = map[string]bool{
-	"link": true, // Server doesn't return the link field
+	"link":          true, // Server doesn't return the link field
+	"isProvisioned": true, // Terraform always manages this field internally
 }
 
 // Fields that should be ignored if they are empty (nil, empty string, empty map, empty slice)

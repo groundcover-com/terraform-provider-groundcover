@@ -693,6 +693,14 @@ display:
 			expect: true,
 		},
 		{
+			name: "isProvisioned field should be ignored",
+			yaml1: `title: Test Monitor
+isProvisioned: false`,
+			yaml2: `title: Test Monitor
+isProvisioned: true`,
+			expect: true,
+		},
+		{
 			name: "empty description should be ignored",
 			yaml1: `title: Test Monitor
 display:

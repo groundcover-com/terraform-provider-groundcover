@@ -77,6 +77,38 @@ func (r *monitorResource) Configure(ctx context.Context, req resource.ConfigureR
 	tflog.Info(ctx, "monitor resource configured successfully")
 }
 
+// buildCreateMonitorRequest converts user YAML into an SDK create request and applies provider-owned defaults.
+func buildCreateMonitorRequest(ctx context.Context, monitorYaml string) (*models.CreateMonitorRequest, string, error) {
+	normalizedApiYaml, err := NormalizeMonitorYaml(ctx, monitorYaml)
+	if err != nil {
+		return nil, "", fmt.Errorf("unable to normalize monitor YAML during Create: %w", err)
+	}
+
+	var createReq models.CreateMonitorRequest
+	if err := yaml.Unmarshal([]byte(normalizedApiYaml), &createReq); err != nil {
+		return nil, normalizedApiYaml, fmt.Errorf("unable to unmarshal monitor config into SDK request model: %w. YAML omitted for privacy", err)
+	}
+	createReq.IsProvisioned = true
+
+	return &createReq, normalizedApiYaml, nil
+}
+
+// buildUpdateMonitorRequest converts user YAML into an SDK update request and applies provider-owned defaults.
+func buildUpdateMonitorRequest(ctx context.Context, monitorYaml string) (*models.UpdateMonitorRequest, string, error) {
+	normalizedApiYaml, err := NormalizeMonitorYaml(ctx, monitorYaml)
+	if err != nil {
+		return nil, "", fmt.Errorf("unable to normalize monitor YAML during Update: %w", err)
+	}
+
+	var updateReq models.UpdateMonitorRequest
+	if err := yaml.Unmarshal([]byte(normalizedApiYaml), &updateReq); err != nil {
+		return nil, normalizedApiYaml, fmt.Errorf("unable to unmarshal monitor config into SDK update request model: %w. YAML omitted for privacy", err)
+	}
+	updateReq.IsProvisioned = true
+
+	return &updateReq, normalizedApiYaml, nil
+}
+
 func (r *monitorResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
 	var data monitorResourceModel
 
@@ -97,9 +129,9 @@ func (r *monitorResource) Create(ctx context.Context, req resource.CreateRequest
 		"has_trailing_nl": strings.HasSuffix(userInputMonitorYaml, "\n"),
 	})
 
-	normalizedApiYaml, err := NormalizeMonitorYaml(ctx, userInputMonitorYaml)
+	createReq, normalizedApiYaml, err := buildCreateMonitorRequest(ctx, userInputMonitorYaml)
 	if err != nil {
-		resp.Diagnostics.AddError("YAML Normalization Error", fmt.Sprintf("Unable to normalize monitor YAML during Create: %s", err))
+		resp.Diagnostics.AddError("YAML Request Error", fmt.Sprintf("Unable to build monitor create request: %s", err))
 		return
 	}
 
@@ -123,17 +155,8 @@ func (r *monitorResource) Create(ctx context.Context, req resource.CreateRequest
 		})
 	}
 
-	monitorYamlBytesForApi := []byte(normalizedApiYaml)
-
-	var createReq models.CreateMonitorRequest
-	err = yaml.Unmarshal(monitorYamlBytesForApi, &createReq)
-	if err != nil {
-		resp.Diagnostics.AddError("YAML Unmarshal Error", fmt.Sprintf("Unable to unmarshal monitor config into SDK request model: %s. YAML: %s", err.Error(), normalizedApiYaml))
-		return
-	}
-
 	tflog.Debug(ctx, "Creating monitor via SDK with unmarshalled request", map[string]any{"title_from_plan": createReq.Title})
-	apiResp, err := r.client.CreateMonitor(ctx, &createReq)
+	apiResp, err := r.client.CreateMonitor(ctx, createReq)
 	if err != nil {
 		resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Unable to create monitor, got error: %s", err.Error()))
 		return
@@ -326,23 +349,14 @@ func (r *monitorResource) Update(ctx context.Context, req resource.UpdateRequest
 	tflog.Debug(ctx, "Updating monitor resource from YAML", map[string]interface{}{"id": monitorId})
 
 	userInputMonitorYaml := plan.MonitorYaml.ValueString()
-	normalizedApiYaml, err := NormalizeMonitorYaml(ctx, userInputMonitorYaml)
+	updateReq, _, err := buildUpdateMonitorRequest(ctx, userInputMonitorYaml)
 	if err != nil {
-		resp.Diagnostics.AddError("YAML Normalization Error", fmt.Sprintf("Unable to normalize monitor YAML during Update for monitor %s: %s", monitorId, err))
-		return
-	}
-
-	monitorYamlBytesForApi := []byte(normalizedApiYaml)
-
-	var updateReq models.UpdateMonitorRequest
-	err = yaml.Unmarshal(monitorYamlBytesForApi, &updateReq)
-	if err != nil {
-		resp.Diagnostics.AddError("YAML Unmarshal Error", fmt.Sprintf("Unable to unmarshal monitor config into SDK update request model: %s. YAML: %s", err.Error(), normalizedApiYaml))
+		resp.Diagnostics.AddError("YAML Request Error", fmt.Sprintf("Unable to build monitor update request for monitor %s: %s", monitorId, err))
 		return
 	}
 
 	tflog.Debug(ctx, "Updating monitor via SDK with unmarshalled request", map[string]any{"id": monitorId, "title_from_yaml": derefString(updateReq.Title)})
-	err = r.client.UpdateMonitor(ctx, monitorId, &updateReq)
+	err = r.client.UpdateMonitor(ctx, monitorId, updateReq)
 	if err != nil {
 		resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Unable to update monitor %s, got error: %s", monitorId, err.Error()))
 		return
