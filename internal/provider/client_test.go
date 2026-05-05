@@ -5,11 +5,28 @@ package provider
 import (
 	"context"
 	"errors"
+	"io"
+	"net/http"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
+
+type roundTripperFunc func(*http.Request) (*http.Response, error)
+
+func (f roundTripperFunc) RoundTrip(req *http.Request) (*http.Response, error) {
+	return f(req)
+}
+
+func testHTTPResponse(statusCode int) *http.Response {
+	return &http.Response{
+		StatusCode: statusCode,
+		Body:       io.NopCloser(strings.NewReader("")),
+		Header:     make(http.Header),
+	}
+}
 
 func TestHandleApiError(t *testing.T) {
 	ctx := context.Background()
@@ -121,6 +138,72 @@ func TestProviderErrorTypes(t *testing.T) {
 			assert.NotEmpty(t, tt.err.Error())
 		})
 	}
+}
+
+func TestRateLimitRetryTransportRetriesSafeMethodInternalServerError(t *testing.T) {
+	attempts := 0
+	transport := &rateLimitRetryTransport{
+		transport: roundTripperFunc(func(req *http.Request) (*http.Response, error) {
+			attempts++
+			if attempts == 1 {
+				return testHTTPResponse(http.StatusInternalServerError), nil
+			}
+			return testHTTPResponse(http.StatusOK), nil
+		}),
+		maxRetries: 1,
+	}
+
+	req, err := http.NewRequest(http.MethodDelete, "https://example.com/resource", nil)
+	require.NoError(t, err)
+
+	resp, err := transport.RoundTrip(req)
+	require.NoError(t, err)
+	require.NotNil(t, resp)
+	assert.Equal(t, http.StatusOK, resp.StatusCode)
+	assert.Equal(t, 2, attempts)
+}
+
+func TestRateLimitRetryTransportDoesNotRetryPostInternalServerError(t *testing.T) {
+	attempts := 0
+	transport := &rateLimitRetryTransport{
+		transport: roundTripperFunc(func(req *http.Request) (*http.Response, error) {
+			attempts++
+			return testHTTPResponse(http.StatusInternalServerError), nil
+		}),
+		maxRetries: 1,
+	}
+
+	req, err := http.NewRequest(http.MethodPost, "https://example.com/resource", nil)
+	require.NoError(t, err)
+
+	resp, err := transport.RoundTrip(req)
+	require.NoError(t, err)
+	require.NotNil(t, resp)
+	assert.Equal(t, http.StatusInternalServerError, resp.StatusCode)
+	assert.Equal(t, 1, attempts)
+}
+
+func TestRateLimitRetryTransportRetriesRateLimitForPost(t *testing.T) {
+	attempts := 0
+	transport := &rateLimitRetryTransport{
+		transport: roundTripperFunc(func(req *http.Request) (*http.Response, error) {
+			attempts++
+			if attempts == 1 {
+				return testHTTPResponse(http.StatusTooManyRequests), nil
+			}
+			return testHTTPResponse(http.StatusOK), nil
+		}),
+		maxRetries: 1,
+	}
+
+	req, err := http.NewRequest(http.MethodPost, "https://example.com/resource", nil)
+	require.NoError(t, err)
+
+	resp, err := transport.RoundTrip(req)
+	require.NoError(t, err)
+	require.NotNil(t, resp)
+	assert.Equal(t, http.StatusOK, resp.StatusCode)
+	assert.Equal(t, 2, attempts)
 }
 
 func TestContextValidation(t *testing.T) {

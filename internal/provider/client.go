@@ -64,14 +64,26 @@ const (
 	yamlContentType   = "application/x-yaml" // Added for consistency
 )
 
-// rateLimitRetryTransport wraps an http.RoundTripper to handle 429 rate limit errors
-// with exponential backoff and retry at the HTTP transport level.
-// This ensures retries happen before go-openapi processes the response.
+// rateLimitRetryTransport wraps an http.RoundTripper to handle retryable responses
+// with exponential backoff at the HTTP transport level. This ensures retries happen
+// before go-openapi processes the response.
 type rateLimitRetryTransport struct {
 	transport  http.RoundTripper
 	maxRetries int
 	minWait    time.Duration
 	maxWait    time.Duration
+}
+
+func shouldRetryHTTPResponse(method string, statusCode int) bool {
+	if statusCode == http.StatusTooManyRequests {
+		return true
+	}
+
+	if statusCode == http.StatusInternalServerError {
+		return method == http.MethodGet || method == http.MethodDelete
+	}
+
+	return false
 }
 
 func (t *rateLimitRetryTransport) RoundTrip(req *http.Request) (*http.Response, error) {
@@ -102,22 +114,18 @@ func (t *rateLimitRetryTransport) RoundTrip(req *http.Request) (*http.Response, 
 			return nil, err
 		}
 
-		// If not a 429, return immediately
-		if resp.StatusCode != http.StatusTooManyRequests {
+		// If the response is not retryable, return immediately.
+		if !shouldRetryHTTPResponse(req.Method, resp.StatusCode) {
+			return resp, nil
+		}
+
+		// Don't retry after the last attempt
+		if attempt == t.maxRetries {
 			return resp, nil
 		}
 
 		// Close the response body before retry (best-effort; we're discarding this response)
 		_ = resp.Body.Close()
-
-		// Don't retry after the last attempt
-		if attempt == t.maxRetries {
-			// Re-execute to get a fresh response to return
-			if bodyBytes != nil {
-				req.Body = io.NopCloser(bytes.NewReader(bodyBytes))
-			}
-			return t.transport.RoundTrip(req)
-		}
 
 		// Calculate exponential backoff with jitter
 		backoff := t.minWait * time.Duration(1<<uint(attempt))
