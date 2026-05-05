@@ -14,8 +14,142 @@ permissions:
   contents: write
 
 jobs:
+  unit-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - uses: actions/setup-go@0aaccfd150d50ccaeb58ebd88d36e91967a5f35b # v5.4.0
+        with:
+          go-version-file: 'go.mod'
+          cache: true
+      - name: Run unit tests
+        run: go test ./internal/provider -v -short
+
+  acceptance-test-coverage:
+    runs-on: ubuntu-latest
+    needs: unit-tests
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - uses: actions/setup-go@0aaccfd150d50ccaeb58ebd88d36e91967a5f35b # v5.4.0
+        with:
+          go-version-file: 'go.mod'
+          cache: true
+      - name: Check acceptance test group coverage
+        run: |
+          set -euo pipefail
+          all_tests="$(mktemp)"
+          covered_tests="$(mktemp)"
+          regexes="$(mktemp)"
+
+          go test ./internal/provider -list '^TestAcc' | awk '/^TestAcc/ { print }' | sort -u > "$all_tests"
+          sed -n '/^  acceptance-test-group:/,/^  acceptance-tests:/p' .github/workflows/release.yml \
+            | awk -F"'" '/^[[:space:]]*run_regex: / { print $2 }' > "$regexes"
+
+          if [ ! -s "$regexes" ]; then
+            echo "No acceptance test groups were found in the release workflow."
+            exit 1
+          fi
+
+          while IFS= read -r regex; do
+            go test ./internal/provider -list "$regex" | awk '/^TestAcc/ { print }'
+          done < "$regexes" | sort -u > "$covered_tests"
+
+          uncovered="$(comm -23 "$all_tests" "$covered_tests")"
+          if [ -n "$uncovered" ]; then
+            echo "The release acceptance-test matrix does not cover every TestAcc test:"
+            printf '%s\n' "$uncovered"
+            exit 1
+          fi
+
+          echo "All acceptance tests are covered by release matrix groups."
+
+  acceptance-test-group:
+    name: acceptance-tests / ${{ matrix.name }}
+    runs-on: ubuntu-latest
+    needs: [unit-tests, acceptance-test-coverage]
+    environment: testing
+    strategy:
+      fail-fast: false
+      max-parallel: 4
+      matrix:
+        include:
+          - name: connected-app
+            run_regex: '^TestAccConnectedApp.*$'
+          - name: dashboard
+            run_regex: '^(TestAccDashboardResource.*|TestAccCustomerApplyLoop_Dashboard.*)$'
+          - name: data-integration
+            run_regex: '^TestAccDataIntegrationResource.*$'
+          - name: logs-pipeline
+            run_regex: '^TestAccLogsPipelineResource.*$'
+          - name: metrics-aggregation
+            run_regex: '^TestAccMetricsAggregationResource.*$'
+          - name: metrics-pipeline
+            run_regex: '^TestAccMetricsPipelineResource.*$'
+          - name: monitor
+            run_regex: '^(TestAccMonitorResource.*|TestAccCustomerApplyLoop_Monitor.*)$'
+          - name: notification-route
+            run_regex: '^TestAccNotificationRoute.*$'
+          - name: rbac
+            run_regex: '^TestAcc(ApiKeyResource|IngestionKeyResource|PolicyResource|ServiceAccountResource).*$'
+          - name: secret
+            run_regex: '^TestAccSecretResource.*$'
+          - name: silence
+            run_regex: '^TestAccSilenceResource.*$'
+          - name: synthetic-test
+            run_regex: '^(TestAccSyntheticTestResource_(basic|update|disappears|withMonitor|applyLoop|sslApplyLoop|notificationMethodApplyLoop|followRedirectsApplyLoop|tcpApplyLoop|sslNewStyleApplyLoop|tcpNewStyleApplyLoop|dnsApplyLoop))$'
+          - name: traces-pipeline
+            run_regex: '^TestAccTracesPipelineResource.*$'
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - uses: actions/setup-go@0aaccfd150d50ccaeb58ebd88d36e91967a5f35b # v5.4.0
+        with:
+          go-version-file: 'go.mod'
+          cache: true
+      - name: Set up Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_wrapper: false
+      - name: Resolve acceptance test group
+        id: acceptance-tests
+        env:
+          GROUP_REGEX: ${{ matrix.run_regex }}
+        run: |
+          set -euo pipefail
+          tests="$(go test ./internal/provider -list "$GROUP_REGEX" | awk '/^TestAcc/ { tests = tests ? tests "|" $0 : $0 } END { print tests }')"
+          if [ -z "$tests" ]; then
+            echo "No acceptance tests matched group '${{ matrix.name }}'"
+            exit 1
+          fi
+
+          echo "regex=^($tests)$" >> "$GITHUB_OUTPUT"
+      - name: Run acceptance tests
+        env:
+          TF_ACC: 1
+          GROUNDCOVER_API_KEY: ${{ secrets.GROUNDCOVER_API_KEY }}
+          GROUNDCOVER_API_URL: ${{ secrets.GROUNDCOVER_API_URL }}
+          GROUNDCOVER_BACKEND_ID: ${{ secrets.GROUNDCOVER_BACKEND_ID }}
+          GROUNDCOVER_INCLOUD_BACKEND_ID: ${{ secrets.GROUNDCOVER_INCLOUD_BACKEND_ID }}
+        run: |
+          echo "Running acceptance test group '${{ matrix.name }}' with available secrets..."
+          go test ./internal/provider -v -timeout 60m -parallel 1 -run '${{ steps.acceptance-tests.outputs.regex }}'
+
+  acceptance-tests:
+    runs-on: ubuntu-latest
+    needs: acceptance-test-group
+    if: always()
+    steps:
+      - name: Check grouped acceptance tests
+        run: |
+          if [ "${{ needs.acceptance-test-group.result }}" != "success" ]; then
+            echo "One or more grouped acceptance test jobs failed or were cancelled."
+            exit 1
+          fi
+
+          echo "All grouped acceptance test jobs passed."
+
   goreleaser:
     runs-on: ubuntu-latest
+    needs: acceptance-tests
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
@@ -25,14 +159,6 @@ jobs:
         with:
           go-version-file: 'go.mod'
           cache: true
-      - name: Run tests before release
-        env:
-          TF_ACC: 1
-          GROUNDCOVER_API_KEY: ${{ secrets.GROUNDCOVER_API_KEY }}
-          GROUNDCOVER_API_URL: ${{ secrets.GROUNDCOVER_API_URL }}
-          GROUNDCOVER_BACKEND_ID: ${{ secrets.GROUNDCOVER_BACKEND_ID }}
-          GROUNDCOVER_INCLOUD_BACKEND_ID: ${{ secrets.GROUNDCOVER_INCLOUD_BACKEND_ID }}
-        run: go test ./internal/provider -v -timeout 60m
       - name: Import GPG key
         uses: crazy-max/ghaction-import-gpg@e89d40939c28e39f97cf32126055eeae86ba74ec # v6.3.0
         id: import_gpg
