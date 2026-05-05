@@ -14,6 +14,45 @@ import (
 	"github.com/hashicorp/terraform-plugin-testing/terraform"
 )
 
+func TestMonitorResourceRequestsForceIsProvisioned(t *testing.T) {
+	monitorYaml := `title: Test Monitor
+isProvisioned: false
+display:
+  header: Test Monitor
+severity: critical
+model:
+  queries:
+    - name: test_query
+      dataType: metrics
+      pipeline:
+        metric: up
+  thresholds:
+    - name: threshold_1
+      inputName: test_query
+      operator: gt
+      values:
+        - 1
+measurementType: state`
+
+	ctx := context.Background()
+
+	createReq, _, err := buildCreateMonitorRequest(ctx, monitorYaml)
+	if err != nil {
+		t.Fatalf("buildCreateMonitorRequest() error = %v", err)
+	}
+	if !createReq.IsProvisioned {
+		t.Fatalf("buildCreateMonitorRequest().IsProvisioned = false, want true")
+	}
+
+	updateReq, _, err := buildUpdateMonitorRequest(ctx, monitorYaml)
+	if err != nil {
+		t.Fatalf("buildUpdateMonitorRequest() error = %v", err)
+	}
+	if !updateReq.IsProvisioned {
+		t.Fatalf("buildUpdateMonitorRequest().IsProvisioned = false, want true")
+	}
+}
+
 func TestAccMonitorResource(t *testing.T) {
 	name := acctest.RandomWithPrefix("test-monitor")
 	updatedName := acctest.RandomWithPrefix("test-monitor-updated")
