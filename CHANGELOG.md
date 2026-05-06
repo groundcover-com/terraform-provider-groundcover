@@ -1,6 +1,6 @@
 ## 1.13.1
 
-* Documentation fix for Monitor example
+* Documentation fix for `Monitor` resource examples
 
 ## 1.13.0
 
