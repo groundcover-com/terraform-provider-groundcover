@@ -1,3 +1,7 @@
+## 1.13.1
+
+* Documentation fix for Monitor example
+
 ## 1.13.0
 
 * Added `groundcover_metricspipeline` resource for configuring metrics relabeling rules (keep/drop metrics by regex, add labels, raw VictoriaMetrics relabel rules)
