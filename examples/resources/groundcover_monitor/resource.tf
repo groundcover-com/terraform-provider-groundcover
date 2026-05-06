@@ -30,6 +30,8 @@ variable "groundcover_backend_id" {
 }
 
 # Example Monitor: K8s Pod Crash Looping using monitor_yaml
+# Monitor YAML structure docs:
+# https://docs.groundcover.com/use-groundcover/monitors/monitor-yaml-structure
 resource "groundcover_monitor" "k8s_pod_crash_looping" {
   monitor_yaml = <<-YAML
 title: K8s Pod Crash Looping
