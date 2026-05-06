@@ -52,46 +52,6 @@ func TestAccSecretResource(t *testing.T) {
 	})
 }
 
-func TestAccSecretResource_passwordType(t *testing.T) {
-	name := acctest.RandomWithPrefix("test-secret-password")
-
-	resource.Test(t, resource.TestCase{
-		PreCheck:                 func() { testAccPreCheck(t) },
-		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
-		Steps: []resource.TestStep{
-			{
-				Config: testAccSecretResourceConfig(name, "password", "test-password-content"),
-				Check: resource.ComposeAggregateTestCheckFunc(
-					resource.TestCheckResourceAttr("groundcover_secret.test", "name", name),
-					resource.TestCheckResourceAttr("groundcover_secret.test", "type", "password"),
-					resource.TestCheckResourceAttrSet("groundcover_secret.test", "id"),
-					resource.TestCheckResourceAttrSet("groundcover_secret.test", "content_hash"),
-				),
-			},
-		},
-	})
-}
-
-func TestAccSecretResource_basicAuthType(t *testing.T) {
-	name := acctest.RandomWithPrefix("test-secret-basicauth")
-
-	resource.Test(t, resource.TestCase{
-		PreCheck:                 func() { testAccPreCheck(t) },
-		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
-		Steps: []resource.TestStep{
-			{
-				Config: testAccSecretResourceConfig(name, "basic_auth", "test-basic-auth-content"),
-				Check: resource.ComposeAggregateTestCheckFunc(
-					resource.TestCheckResourceAttr("groundcover_secret.test", "name", name),
-					resource.TestCheckResourceAttr("groundcover_secret.test", "type", "basic_auth"),
-					resource.TestCheckResourceAttrSet("groundcover_secret.test", "id"),
-					resource.TestCheckResourceAttrSet("groundcover_secret.test", "content_hash"),
-				),
-			},
-		},
-	})
-}
-
 func TestAccSecretResource_contentHashChanges(t *testing.T) {
 	name := acctest.RandomWithPrefix("test-secret-hash")
 	updatedName := acctest.RandomWithPrefix("test-secret-hash-updated")

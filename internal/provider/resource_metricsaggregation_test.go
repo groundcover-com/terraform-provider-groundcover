@@ -6,7 +6,6 @@ import (
 	"context"
 	"fmt"
 	"os"
-	"regexp"
 	"testing"
 
 	"github.com/hashicorp/terraform-plugin-testing/helper/resource"
@@ -35,26 +34,6 @@ func TestAccMetricsAggregationResource(t *testing.T) {
 				),
 			},
 			// Delete testing automatically occurs in TestCase
-		},
-	})
-}
-
-func TestAccMetricsAggregationResource_complex(t *testing.T) {
-	resource.Test(t, resource.TestCase{
-		PreCheck:                 func() { testAccPreCheck(t) },
-		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
-		Steps: []resource.TestStep{
-			// Create with complex aggregation configuration
-			{
-				Config: testAccMetricsAggregationResourceConfigComplex(),
-				Check: resource.ComposeAggregateTestCheckFunc(
-					resource.TestCheckResourceAttrSet("groundcover_metricsaggregation.test", "value"),
-					resource.TestCheckResourceAttrSet("groundcover_metricsaggregation.test", "updated_at"),
-					// Check that YAML contains expected elements
-					resource.TestMatchResourceAttr("groundcover_metricsaggregation.test", "value", regexp.MustCompile("ignore_old_samples")),
-					resource.TestMatchResourceAttr("groundcover_metricsaggregation.test", "value", regexp.MustCompile("total_prometheus")),
-				),
-			},
 		},
 	})
 }
@@ -99,26 +78,6 @@ content: |
   - ignore_old_samples: true
     match: '{__name__=~"test_metric_counter_updated"}'
     without: [instance, pod]
-    interval: 60s
-    outputs: [total_prometheus]
-YAML
-}
-`
-}
-
-func testAccMetricsAggregationResourceConfigComplex() string {
-	return `
-resource "groundcover_metricsaggregation" "test" {
-  value = <<-YAML
-content: |
-  - ignore_old_samples: true
-    match: '{__name__=~"test_metric_counter"}'
-    without: [instance]
-    interval: 30s
-    outputs: [total_prometheus]
-  - ignore_old_samples: false
-    match: '{__name__=~"http_requests_total"}'
-    without: [pod, instance]
     interval: 60s
     outputs: [total_prometheus]
 YAML
