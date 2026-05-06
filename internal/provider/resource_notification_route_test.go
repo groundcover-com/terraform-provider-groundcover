@@ -10,6 +10,72 @@ import (
 	"github.com/hashicorp/terraform-plugin-testing/helper/resource"
 )
 
+func TestAccNotificationRoute_basic(t *testing.T) {
+	name := acctest.RandomWithPrefix("test-route")
+
+	resource.Test(t, resource.TestCase{
+		PreCheck:                 func() { testAccPreCheck(t) },
+		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
+		Steps: []resource.TestStep{
+			{
+				Config: testAccNotificationRouteConfig_basic(name),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					resource.TestCheckResourceAttr("groundcover_notification_route.test", "name", name),
+					resource.TestCheckResourceAttr("groundcover_notification_route.test", "query", "env:test"),
+					resource.TestCheckResourceAttr("groundcover_notification_route.test", "routes.#", "1"),
+					resource.TestCheckResourceAttr("groundcover_notification_route.test", "routes.0.status.#", "1"),
+					resource.TestCheckResourceAttr("groundcover_notification_route.test", "routes.0.status.0", "Alerting"),
+					resource.TestCheckResourceAttr("groundcover_notification_route.test", "routes.0.connected_apps.#", "1"),
+					resource.TestCheckResourceAttr("groundcover_notification_route.test", "routes.0.connected_apps.0.type", "slack-webhook"),
+					resource.TestCheckResourceAttrSet("groundcover_notification_route.test", "routes.0.connected_apps.0.id"),
+					resource.TestCheckResourceAttr("groundcover_notification_route.test", "notification_settings.renotification_interval", "4h"),
+					resource.TestCheckResourceAttrSet("groundcover_notification_route.test", "id"),
+					resource.TestCheckResourceAttrSet("groundcover_notification_route.test", "created_by"),
+					resource.TestCheckResourceAttrSet("groundcover_notification_route.test", "created_at"),
+				),
+			},
+			{
+				ResourceName:      "groundcover_notification_route.test",
+				ImportState:       true,
+				ImportStateVerify: true,
+			},
+		},
+	})
+}
+
+func TestAccNotificationRoute_update(t *testing.T) {
+	name := acctest.RandomWithPrefix("test-route-update")
+
+	resource.Test(t, resource.TestCase{
+		PreCheck:                 func() { testAccPreCheck(t) },
+		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
+		Steps: []resource.TestStep{
+			{
+				Config: testAccNotificationRouteConfig_update_step1(name),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					resource.TestCheckResourceAttr("groundcover_notification_route.test", "name", name),
+					resource.TestCheckResourceAttr("groundcover_notification_route.test", "query", "env:test"),
+					resource.TestCheckResourceAttr("groundcover_notification_route.test", "routes.#", "1"),
+					resource.TestCheckResourceAttr("groundcover_notification_route.test", "routes.0.status.#", "1"),
+					resource.TestCheckResourceAttr("groundcover_notification_route.test", "routes.0.status.0", "Alerting"),
+					resource.TestCheckResourceAttrSet("groundcover_notification_route.test", "id"),
+				),
+			},
+			{
+				Config: testAccNotificationRouteConfig_update_step2(name),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					resource.TestCheckResourceAttr("groundcover_notification_route.test", "name", name),
+					resource.TestCheckResourceAttr("groundcover_notification_route.test", "query", "env:production"),
+					resource.TestCheckResourceAttr("groundcover_notification_route.test", "routes.#", "1"),
+					resource.TestCheckResourceAttr("groundcover_notification_route.test", "routes.0.status.#", "2"),
+					resource.TestCheckResourceAttr("groundcover_notification_route.test", "routes.0.status.0", "Alerting"),
+					resource.TestCheckResourceAttr("groundcover_notification_route.test", "routes.0.status.1", "Resolved"),
+				),
+			},
+		},
+	})
+}
+
 func TestAccNotificationRoute_durationNormalization(t *testing.T) {
 	name := acctest.RandomWithPrefix("test-route-duration")
 
@@ -105,6 +171,64 @@ resource "groundcover_notification_route" "test" {
 
   notification_settings = {
     renotification_interval = "4h"
+  }
+}
+`, name)
+}
+
+func testAccNotificationRouteConfig_update_step1(name string) string {
+	return fmt.Sprintf(`
+resource "groundcover_connected_app" "test" {
+  name = "%[1]s-slack"
+  type = "slack-webhook"
+  data = {
+    url = "https://hooks.slack.com/services/TEST/WEBHOOK/URL"
+  }
+}
+
+resource "groundcover_notification_route" "test" {
+  name  = %[1]q
+  query = "env:test"
+
+  routes = [{
+    status = ["Alerting"]
+    connected_apps = [{
+      type = "slack-webhook"
+      id   = groundcover_connected_app.test.id
+    }]
+  }]
+
+  notification_settings = {
+    renotification_interval = "1h"
+  }
+}
+`, name)
+}
+
+func testAccNotificationRouteConfig_update_step2(name string) string {
+	return fmt.Sprintf(`
+resource "groundcover_connected_app" "test" {
+  name = "%[1]s-slack"
+  type = "slack-webhook"
+  data = {
+    url = "https://hooks.slack.com/services/TEST/WEBHOOK/URL"
+  }
+}
+
+resource "groundcover_notification_route" "test" {
+  name  = %[1]q
+  query = "env:production"
+
+  routes = [{
+    status = ["Alerting", "Resolved"]
+    connected_apps = [{
+      type = "slack-webhook"
+      id   = groundcover_connected_app.test.id
+    }]
+  }]
+
+  notification_settings = {
+    renotification_interval = "1h"
   }
 }
 `, name)
