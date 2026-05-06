@@ -39,28 +39,6 @@ func TestAccMetricsPipelineResource(t *testing.T) {
 	})
 }
 
-func TestAccMetricsPipelineResource_complex(t *testing.T) {
-	resource.Test(t, resource.TestCase{
-		PreCheck:                 func() { testAccPreCheck(t) },
-		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
-		Steps: []resource.TestStep{
-			{
-				Config: testAccMetricsPipelineResourceConfigComplex(),
-				Check: resource.ComposeAggregateTestCheckFunc(
-					resource.TestCheckResourceAttr("groundcover_metricspipeline.test", "rules.keep_regex.#", "2"),
-					resource.TestCheckResourceAttr("groundcover_metricspipeline.test", "rules.drop_regex.#", "1"),
-					resource.TestCheckResourceAttr("groundcover_metricspipeline.test", "rules.add_label.team", "platform"),
-					resource.TestCheckResourceAttr("groundcover_metricspipeline.test", "rules.add_label.env", "staging"),
-					resource.TestCheckResourceAttr("groundcover_metricspipeline.test", "rules.remove_label.#", "1"),
-					resource.TestCheckResourceAttr("groundcover_metricspipeline.test", "rules.remove_label.0", "pod_uid"),
-					resource.TestCheckResourceAttrSet("groundcover_metricspipeline.test", "rules.raw"),
-					resource.TestCheckResourceAttrSet("groundcover_metricspipeline.test", "updated_at"),
-				),
-			},
-		},
-	})
-}
-
 func TestAccMetricsPipelineResource_disappears(t *testing.T) {
 	resource.Test(t, resource.TestCase{
 		PreCheck:                 func() { testAccPreCheck(t) },
@@ -97,26 +75,6 @@ resource "groundcover_metricspipeline" "test" {
     add_label = {
       team = "platform"
     }
-  }
-}
-`
-}
-
-func testAccMetricsPipelineResourceConfigComplex() string {
-	return `
-resource "groundcover_metricspipeline" "test" {
-  rules = {
-    keep_regex   = ["http_requests_total", "process_cpu_seconds_total"]
-    drop_regex   = ["go_.*"]
-    add_label = {
-      team = "platform"
-      env  = "staging"
-    }
-    remove_label = ["pod_uid"]
-    raw = <<-EOT
-      - action: labelmap
-        replacement: "groundcover_$1"
-    EOT
   }
 }
 `

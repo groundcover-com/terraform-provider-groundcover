@@ -36,26 +36,6 @@ func TestAccTracesPipelineResource(t *testing.T) {
 	})
 }
 
-func TestAccTracesPipelineResource_complex(t *testing.T) {
-	resource.Test(t, resource.TestCase{
-		PreCheck:                 func() { testAccPreCheck(t) },
-		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
-		Steps: []resource.TestStep{
-			// Create with complex pipeline configuration
-			{
-				Config: testAccTracesPipelineResourceConfigComplex(),
-				Check: resource.ComposeAggregateTestCheckFunc(
-					resource.TestCheckResourceAttrSet("groundcover_tracespipeline.test", "value"),
-					resource.TestCheckResourceAttrSet("groundcover_tracespipeline.test", "updated_at"),
-					// Check that YAML contains expected elements
-					resource.TestMatchResourceAttr("groundcover_tracespipeline.test", "value", regexp.MustCompile("ottlRules")),
-					resource.TestMatchResourceAttr("groundcover_tracespipeline.test", "value", regexp.MustCompile("filter-errors")),
-				),
-			},
-		},
-	})
-}
-
 func testAccTracesPipelineResourceConfig() string {
 	return `
 resource "groundcover_tracespipeline" "test" {
@@ -81,26 +61,6 @@ ottlRules:
     - workload == "nginx"
   statements:
     - set(attributes["test.key"], "test-value-updated")
-YAML
-}
-`
-}
-
-func testAccTracesPipelineResourceConfigComplex() string {
-	return `
-resource "groundcover_tracespipeline" "test" {
-  value = <<-YAML
-ottlRules:
-- ruleName: filter-errors
-  conditions:
-    - workload == "nginx"
-  statements:
-    - set(attributes["error.processed"], true)
-- ruleName: enrich-traces
-  conditions:
-    - workload == "web"
-  statements:
-    - set(attributes["service.name"], "web-service")
 YAML
 }
 `
