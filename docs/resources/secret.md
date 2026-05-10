@@ -5,6 +5,7 @@ subcategory: ""
 description: |-
   Manages a groundcover Secret.
   Secrets allow you to securely store sensitive values (like API keys, passwords, or credentials) and receive a reference ID that can be used in other resources (such as data integrations) as a placeholder instead of the actual secret value.
+  Permissions: Managing secrets (create, update, delete) requires a service account with the admin role. Service accounts with read or write roles cannot manage secrets and will receive a permission error from the API.
   Note: The secret content is write-only and is NOT persisted in Terraform state. It is only sent to the API during create and update operations and cannot be retrieved afterward.
 ---
 
@@ -13,6 +14,8 @@ description: |-
 Manages a groundcover Secret.
 
 Secrets allow you to securely store sensitive values (like API keys, passwords, or credentials) and receive a reference ID that can be used in other resources (such as data integrations) as a placeholder instead of the actual secret value.
+
+**Permissions:** Managing secrets (create, update, delete) requires a service account with the **admin** role. Service accounts with read or write roles cannot manage secrets and will receive a permission error from the API.
 
 **Note:** The secret content is write-only and is NOT persisted in Terraform state. It is only sent to the API during create and update operations and cannot be retrieved afterward.
 
