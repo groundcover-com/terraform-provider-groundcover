@@ -36,8 +36,9 @@ var (
 
 	// Match bare day durations like "1d" or "7d". Day is not a Go duration unit,
 	// so we convert it to hours before time.ParseDuration sees it.
-	// The trailing \b prevents matching the "d" inside composite tokens like "1d12h".
-	dayDurationRegex = regexp.MustCompile(`(\d+)d\b`)
+	// Word boundaries on both sides prevent matching digits inside identifiers
+	// (e.g. "field1d") or composite duration tokens (e.g. "1d12h").
+	dayDurationRegex = regexp.MustCompile(`\b(\d+)d\b`)
 )
 
 // NormalizeMonitorYaml sorts keys in a YAML string alphabetically using AST manipulation.

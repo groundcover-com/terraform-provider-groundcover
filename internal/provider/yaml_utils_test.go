@@ -390,6 +390,11 @@ func TestNormalizeTimeString(t *testing.T) {
 			input:    "pendingFor: 1d",
 			expected: "pendingFor: 24h",
 		},
+		{
+			name:     "digits inside identifier should not be mutated",
+			input:    "name: field1d",
+			expected: "name: field1d",
+		},
 	}
 
 	for _, tt := range tests {
