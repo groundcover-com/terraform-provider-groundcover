@@ -50,10 +50,10 @@ func NormalizeMonitorYaml(ctx context.Context, yamlString string) (string, error
 		return "", nil
 	}
 
-	// Convert duration tokens not supported by time.ParseDuration before any
-	// downstream parsing/unmarshaling. Day units in particular ("1d", "2 days")
-	// are accepted by the UI but rejected by Go's time.Duration.
-	yamlString = normalizeHumanDurations(yamlString)
+	// Convert bare day tokens like "1d" to hours before downstream parsing,
+	// since Go's time.ParseDuration does not accept the "d" unit. Scoped to
+	// "Nd" specifically (not human-readable forms like "1 day") to minimize
+	// the chance of mutating arbitrary free-text fields.
 	yamlString = normalizeDayDurations(yamlString)
 
 	// Parse with AST approach to preserve comments and handle complex structures
