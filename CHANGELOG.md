@@ -1,3 +1,7 @@
+## 1.13.2
+
+* Documented that managing `groundcover_secret` resources (create, update, delete) requires a service account with the **admin** role — clarifies the permission requirement that previously surfaced only as an API error
+
 ## 1.13.1
 
 * Documentation fix for `Monitor` resource examples
