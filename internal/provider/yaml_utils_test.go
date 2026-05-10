@@ -375,6 +375,21 @@ func TestNormalizeTimeString(t *testing.T) {
 			input:    "interval: 5m0s and pendingFor: 30m0s",
 			expected: "interval: 5m and pendingFor: 30m",
 		},
+		{
+			name:     "1d should normalize to 24h",
+			input:    "1d",
+			expected: "24h",
+		},
+		{
+			name:     "7d should normalize to 168h",
+			input:    "7d",
+			expected: "168h",
+		},
+		{
+			name:     "pendingFor with 1d",
+			input:    "pendingFor: 1d",
+			expected: "pendingFor: 24h",
+		},
 	}
 
 	for _, tt := range tests {
@@ -1358,6 +1373,8 @@ func TestNormalizeHumanDurations(t *testing.T) {
 		{"2 hours", "2h"},
 		{"30 seconds", "30s"},
 		{"1 second", "1s"},
+		{"1 day", "24h"},
+		{"2 days", "48h"},
 		{"no duration here", "no duration here"},
 		{"10m", "10m"},
 		{"1h30m", "1h30m"},

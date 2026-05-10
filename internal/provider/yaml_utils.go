@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"regexp"
 	"sort"
+	"strconv"
 	"strings"
 	"time"
 
@@ -29,17 +30,30 @@ var (
 	componentRegex = regexp.MustCompile(`(\d+)([hms])`)
 	zeroRegex      = regexp.MustCompile(`^0[hms]$`)
 
-	// Match human-readable duration patterns like "10 minutes", "1 hour", "30 seconds"
+	// Match human-readable duration patterns like "10 minutes", "1 hour", "30 seconds", "1 day"
 	// These are converted to Go duration format during normalization
-	humanDurationRegex = regexp.MustCompile(`(\d+)\s+(hours?|minutes?|seconds?)`)
+	humanDurationRegex = regexp.MustCompile(`(\d+)\s+(days?|hours?|minutes?|seconds?)`)
+
+	// Match bare day durations like "1d" or "7d". Day is not a Go duration unit,
+	// so we convert it to hours before time.ParseDuration sees it.
+	// The trailing \b prevents matching the "d" inside composite tokens like "1d12h".
+	dayDurationRegex = regexp.MustCompile(`(\d+)d\b`)
 )
 
 // NormalizeMonitorYaml sorts keys in a YAML string alphabetically using AST manipulation.
 // This approach preserves comments and handles complex YAML structures consistently.
+// It also rewrites duration tokens that Go's time.Duration cannot parse natively
+// (e.g. "1d" -> "24h", "1 day" -> "24h") so downstream SDK unmarshaling succeeds.
 func NormalizeMonitorYaml(ctx context.Context, yamlString string) (string, error) {
 	if yamlString == "" {
 		return "", nil
 	}
+
+	// Convert duration tokens not supported by time.ParseDuration before any
+	// downstream parsing/unmarshaling. Day units in particular ("1d", "2 days")
+	// are accepted by the UI but rejected by Go's time.Duration.
+	yamlString = normalizeHumanDurations(yamlString)
+	yamlString = normalizeDayDurations(yamlString)
 
 	// Parse with AST approach to preserve comments and handle complex structures
 	file, err := parser.ParseBytes([]byte(yamlString), parser.ParseComments)
@@ -320,10 +334,13 @@ func filterAstNodeByKeys(ctx context.Context, node ast.Node, allowedKeys map[str
 }
 
 // NormalizeTimeStringsInYaml normalizes time duration strings in YAML to a consistent format
-// e.g., "30m0s" -> "30m", "1h0m0s" -> "1h", "10 minutes" -> "10m"
+// e.g., "30m0s" -> "30m", "1h0m0s" -> "1h", "10 minutes" -> "10m", "1d" -> "24h"
 func NormalizeTimeStringsInYaml(yamlString string) string {
 	// First convert human-readable durations to Go format
 	yamlString = normalizeHumanDurations(yamlString)
+	// Convert bare day durations (e.g. "1d") to hours, since Go's time.ParseDuration
+	// does not understand the "d" unit.
+	yamlString = normalizeDayDurations(yamlString)
 	result := timeRegex.ReplaceAllStringFunc(yamlString, func(match string) string {
 		// Try to parse as duration to validate it's a valid duration
 		if _, err := time.ParseDuration(match); err == nil {
@@ -711,6 +728,12 @@ func normalizeHumanDurations(s string) string {
 		num := parts[1]
 		unit := parts[2]
 		switch {
+		case strings.HasPrefix(unit, "day"):
+			n, err := strconv.Atoi(num)
+			if err != nil {
+				return match
+			}
+			return strconv.Itoa(n*24) + "h"
 		case strings.HasPrefix(unit, "hour"):
 			return num + "h"
 		case strings.HasPrefix(unit, "minute"):
@@ -723,10 +746,30 @@ func normalizeHumanDurations(s string) string {
 	})
 }
 
+// normalizeDayDurations converts bare day durations like "1d" or "7d" to hours,
+// since Go's time.ParseDuration does not understand the "d" unit.
+// Composite tokens like "1d12h" are not handled here; they require manual
+// conversion by the user.
+func normalizeDayDurations(s string) string {
+	return dayDurationRegex.ReplaceAllStringFunc(s, func(match string) string {
+		parts := dayDurationRegex.FindStringSubmatch(match)
+		if len(parts) != 2 {
+			return match
+		}
+		days, err := strconv.Atoi(parts[1])
+		if err != nil {
+			return match
+		}
+		return strconv.Itoa(days*24) + "h"
+	})
+}
+
 // normalizeTimeString normalizes a single time string
 func normalizeTimeString(s string) string {
 	// First convert human-readable durations to Go format
 	s = normalizeHumanDurations(s)
+	// Convert bare day durations (e.g. "1d") to hours.
+	s = normalizeDayDurations(s)
 	return timeRegex.ReplaceAllStringFunc(s, func(match string) string {
 		// Try to parse as duration to validate it's a valid duration
 		if duration, err := time.ParseDuration(match); err == nil {
