@@ -401,19 +401,9 @@ func TestNormalizeTimeString(t *testing.T) {
 			expected: "28h",
 		},
 		{
-			name:     "2d12h30m should normalize to 60h30m",
-			input:    "2d12h30m",
-			expected: "60h30m",
-		},
-		{
-			name:     "1d30m should normalize to 24h30m",
-			input:    "1d30m",
-			expected: "24h30m",
-		},
-		{
-			name:     "1d30s should normalize to 24h30s",
-			input:    "1d30s",
-			expected: "24h30s",
+			name:     "2d12h should normalize to 60h",
+			input:    "2d12h",
+			expected: "60h",
 		},
 		{
 			name:     "pendingFor with 1d4h",

@@ -34,16 +34,14 @@ var (
 	// These are converted to Go duration format during normalization
 	humanDurationRegex = regexp.MustCompile(`(\d+)\s+(days?|hours?|minutes?|seconds?)`)
 
-	// Match day durations like "1d", "7d", "1d4h", "2d12h30m", "1d30s". Day is not
-	// a Go duration unit, so we convert it (and merge into any trailing hours) before
-	// time.ParseDuration sees it. The left word boundary prevents matching digits
-	// inside identifiers (e.g. "field1d"); the right boundary ensures the trailing
-	// unit is a complete token (e.g. "1dhours" or "1d12hours" do not match).
-	dayDurationRegex = regexp.MustCompile(`\b(\d+)d((?:\d+h)?(?:\d+m)?(?:\d+s)?)\b`)
-
-	// Extracts a leading hours component from a day-duration suffix so we can
-	// fold the days-converted-to-hours into it (e.g. "1d4h" -> "28h").
-	daySuffixHoursRegex = regexp.MustCompile(`^(\d+)h`)
+	// Match day durations like "1d", "7d", or "1d4h". Day is not a Go duration
+	// unit, so we convert it (and merge into any trailing hours) before
+	// time.ParseDuration sees it. Forms with minutes or seconds (e.g. "1d30m")
+	// are intentionally not supported and are left for time.ParseDuration to
+	// reject downstream. The left word boundary prevents matching digits inside
+	// identifiers (e.g. "field1d"); the right boundary ensures the trailing
+	// unit is a complete token.
+	dayDurationRegex = regexp.MustCompile(`\b(\d+)d(?:(\d+)h)?\b`)
 )
 
 // NormalizeMonitorYaml sorts keys in a YAML string alphabetically using AST manipulation.
@@ -752,10 +750,10 @@ func normalizeHumanDurations(s string) string {
 	})
 }
 
-// normalizeDayDurations converts day durations like "1d", "7d", "1d4h", or
-// "2d12h30m" into Go duration format by converting days to hours and merging
-// with any trailing hours component. Go's time.ParseDuration does not
-// understand the "d" unit, so this rewriting must happen before parsing.
+// normalizeDayDurations converts day durations like "1d", "7d", or "1d4h"
+// into hours, since Go's time.ParseDuration does not understand the "d" unit.
+// Composite forms with minutes/seconds (e.g. "1d30m") are not supported and
+// will fail downstream parsing — users should write "24h30m" instead.
 func normalizeDayDurations(s string) string {
 	return dayDurationRegex.ReplaceAllStringFunc(s, func(match string) string {
 		parts := dayDurationRegex.FindStringSubmatch(match)
@@ -767,16 +765,14 @@ func normalizeDayDurations(s string) string {
 			return match
 		}
 		totalHours := days * 24
-		suffix := parts[2]
-		if hMatch := daySuffixHoursRegex.FindStringSubmatch(suffix); hMatch != nil {
-			h, err := strconv.Atoi(hMatch[1])
+		if parts[2] != "" {
+			h, err := strconv.Atoi(parts[2])
 			if err != nil {
 				return match
 			}
 			totalHours += h
-			suffix = suffix[len(hMatch[0]):]
 		}
-		return strconv.Itoa(totalHours) + "h" + suffix
+		return strconv.Itoa(totalHours) + "h"
 	})
 }
 
