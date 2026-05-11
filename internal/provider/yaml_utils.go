@@ -34,11 +34,16 @@ var (
 	// These are converted to Go duration format during normalization
 	humanDurationRegex = regexp.MustCompile(`(\d+)\s+(days?|hours?|minutes?|seconds?)`)
 
-	// Match bare day durations like "1d" or "7d". Day is not a Go duration unit,
-	// so we convert it to hours before time.ParseDuration sees it.
-	// Word boundaries on both sides prevent matching digits inside identifiers
-	// (e.g. "field1d") or composite duration tokens (e.g. "1d12h").
-	dayDurationRegex = regexp.MustCompile(`\b(\d+)d\b`)
+	// Match day durations like "1d", "7d", "1d4h", "2d12h30m", "1d30s". Day is not
+	// a Go duration unit, so we convert it (and merge into any trailing hours) before
+	// time.ParseDuration sees it. The left word boundary prevents matching digits
+	// inside identifiers (e.g. "field1d"); the right boundary ensures the trailing
+	// unit is a complete token (e.g. "1dhours" or "1d12hours" do not match).
+	dayDurationRegex = regexp.MustCompile(`\b(\d+)d((?:\d+h)?(?:\d+m)?(?:\d+s)?)\b`)
+
+	// Extracts a leading hours component from a day-duration suffix so we can
+	// fold the days-converted-to-hours into it (e.g. "1d4h" -> "28h").
+	daySuffixHoursRegex = regexp.MustCompile(`^(\d+)h`)
 )
 
 // NormalizeMonitorYaml sorts keys in a YAML string alphabetically using AST manipulation.
@@ -50,10 +55,10 @@ func NormalizeMonitorYaml(ctx context.Context, yamlString string) (string, error
 		return "", nil
 	}
 
-	// Convert bare day tokens like "1d" to hours before downstream parsing,
-	// since Go's time.ParseDuration does not accept the "d" unit. Scoped to
-	// "Nd" specifically (not human-readable forms like "1 day") to minimize
-	// the chance of mutating arbitrary free-text fields.
+	// Convert day tokens like "1d" or composite forms like "1d4h" into Go
+	// duration format before downstream parsing, since time.ParseDuration does
+	// not accept the "d" unit. Human-readable forms ("1 day") are handled
+	// separately by normalizeHumanDurations to avoid mutating free-text fields.
 	yamlString = normalizeDayDurations(yamlString)
 
 	// Parse with AST approach to preserve comments and handle complex structures
@@ -747,21 +752,31 @@ func normalizeHumanDurations(s string) string {
 	})
 }
 
-// normalizeDayDurations converts bare day durations like "1d" or "7d" to hours,
-// since Go's time.ParseDuration does not understand the "d" unit.
-// Composite tokens like "1d12h" are not handled here; they require manual
-// conversion by the user.
+// normalizeDayDurations converts day durations like "1d", "7d", "1d4h", or
+// "2d12h30m" into Go duration format by converting days to hours and merging
+// with any trailing hours component. Go's time.ParseDuration does not
+// understand the "d" unit, so this rewriting must happen before parsing.
 func normalizeDayDurations(s string) string {
 	return dayDurationRegex.ReplaceAllStringFunc(s, func(match string) string {
 		parts := dayDurationRegex.FindStringSubmatch(match)
-		if len(parts) != 2 {
+		if len(parts) != 3 {
 			return match
 		}
 		days, err := strconv.Atoi(parts[1])
 		if err != nil {
 			return match
 		}
-		return strconv.Itoa(days*24) + "h"
+		totalHours := days * 24
+		suffix := parts[2]
+		if hMatch := daySuffixHoursRegex.FindStringSubmatch(suffix); hMatch != nil {
+			h, err := strconv.Atoi(hMatch[1])
+			if err != nil {
+				return match
+			}
+			totalHours += h
+			suffix = suffix[len(hMatch[0]):]
+		}
+		return strconv.Itoa(totalHours) + "h" + suffix
 	})
 }
 

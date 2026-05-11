@@ -395,6 +395,41 @@ func TestNormalizeTimeString(t *testing.T) {
 			input:    "name: field1d",
 			expected: "name: field1d",
 		},
+		{
+			name:     "1d4h should normalize to 28h",
+			input:    "1d4h",
+			expected: "28h",
+		},
+		{
+			name:     "2d12h30m should normalize to 60h30m",
+			input:    "2d12h30m",
+			expected: "60h30m",
+		},
+		{
+			name:     "1d30m should normalize to 24h30m",
+			input:    "1d30m",
+			expected: "24h30m",
+		},
+		{
+			name:     "1d30s should normalize to 24h30s",
+			input:    "1d30s",
+			expected: "24h30s",
+		},
+		{
+			name:     "pendingFor with 1d4h",
+			input:    "pendingFor: 1d4h",
+			expected: "pendingFor: 28h",
+		},
+		{
+			name:     "composite inside identifier should not be mutated",
+			input:    "name: field1d4h",
+			expected: "name: field1d4h",
+		},
+		{
+			name:     "1d followed by hours word should not match composite",
+			input:    "duration: 1dhours",
+			expected: "duration: 1dhours",
+		},
 	}
 
 	for _, tt := range tests {
