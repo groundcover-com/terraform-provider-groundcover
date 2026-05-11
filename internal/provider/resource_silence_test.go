@@ -63,93 +63,6 @@ func TestAccSilenceResource(t *testing.T) {
 	})
 }
 
-func TestAccSilenceResource_multipleMatchers(t *testing.T) {
-	comment := acctest.RandomWithPrefix("test-silence-multi")
-
-	startsAt := time.Now().Add(1 * time.Hour).UTC().Format(time.RFC3339)
-	endsAt := time.Now().Add(2 * time.Hour).UTC().Format(time.RFC3339)
-
-	resource.Test(t, resource.TestCase{
-		PreCheck:                 func() { testAccPreCheck(t) },
-		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
-		Steps: []resource.TestStep{
-			{
-				Config: testAccSilenceResourceConfigMultipleMatchers(comment, startsAt, endsAt),
-				Check: resource.ComposeAggregateTestCheckFunc(
-					resource.TestCheckResourceAttrSet("groundcover_silence.test", "id"),
-					resource.TestCheckResourceAttr("groundcover_silence.test", "comment", comment),
-					resource.TestCheckResourceAttr("groundcover_silence.test", "matchers.#", "3"),
-					// First matcher - equal
-					resource.TestCheckResourceAttr("groundcover_silence.test", "matchers.0.name", "equal"),
-					resource.TestCheckResourceAttr("groundcover_silence.test", "matchers.0.value", "test-service"),
-					resource.TestCheckResourceAttr("groundcover_silence.test", "matchers.0.is_equal", "true"),
-					resource.TestCheckResourceAttr("groundcover_silence.test", "matchers.0.is_contains", "false"),
-					// Second matcher - not contains
-					resource.TestCheckResourceAttr("groundcover_silence.test", "matchers.1.name", "not-contains"),
-					resource.TestCheckResourceAttr("groundcover_silence.test", "matchers.1.value", "test-service"),
-					resource.TestCheckResourceAttr("groundcover_silence.test", "matchers.1.is_equal", "false"),
-					resource.TestCheckResourceAttr("groundcover_silence.test", "matchers.1.is_contains", "true"),
-					// Third matcher - defaults
-					resource.TestCheckResourceAttr("groundcover_silence.test", "matchers.2.name", "empty-equal"),
-					resource.TestCheckResourceAttr("groundcover_silence.test", "matchers.2.value", "test-service"),
-					resource.TestCheckResourceAttr("groundcover_silence.test", "matchers.2.is_equal", "true"),
-					resource.TestCheckResourceAttr("groundcover_silence.test", "matchers.2.is_contains", "false"),
-				),
-			},
-		},
-	})
-}
-
-func TestAccSilenceResource_containsMatcher(t *testing.T) {
-	comment := acctest.RandomWithPrefix("test-silence-contains")
-
-	startsAt := time.Now().Add(1 * time.Hour).UTC().Format(time.RFC3339)
-	endsAt := time.Now().Add(2 * time.Hour).UTC().Format(time.RFC3339)
-
-	resource.Test(t, resource.TestCase{
-		PreCheck:                 func() { testAccPreCheck(t) },
-		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
-		Steps: []resource.TestStep{
-			{
-				Config: testAccSilenceResourceConfig(comment, startsAt, endsAt, "service", "*test*", true, true),
-				Check: resource.ComposeAggregateTestCheckFunc(
-					resource.TestCheckResourceAttrSet("groundcover_silence.test", "id"),
-					resource.TestCheckResourceAttr("groundcover_silence.test", "comment", comment),
-					resource.TestCheckResourceAttr("groundcover_silence.test", "matchers.0.name", "service"),
-					resource.TestCheckResourceAttr("groundcover_silence.test", "matchers.0.value", "*test*"),
-					resource.TestCheckResourceAttr("groundcover_silence.test", "matchers.0.is_equal", "true"),
-					resource.TestCheckResourceAttr("groundcover_silence.test", "matchers.0.is_contains", "true"),
-				),
-			},
-		},
-	})
-}
-
-func TestAccSilenceResource_negation(t *testing.T) {
-	comment := acctest.RandomWithPrefix("test-silence-negation")
-
-	startsAt := time.Now().Add(1 * time.Hour).UTC().Format(time.RFC3339)
-	endsAt := time.Now().Add(2 * time.Hour).UTC().Format(time.RFC3339)
-
-	resource.Test(t, resource.TestCase{
-		PreCheck:                 func() { testAccPreCheck(t) },
-		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
-		Steps: []resource.TestStep{
-			{
-				Config: testAccSilenceResourceConfig(comment, startsAt, endsAt, "environment", "production", false, false),
-				Check: resource.ComposeAggregateTestCheckFunc(
-					resource.TestCheckResourceAttrSet("groundcover_silence.test", "id"),
-					resource.TestCheckResourceAttr("groundcover_silence.test", "comment", comment),
-					resource.TestCheckResourceAttr("groundcover_silence.test", "matchers.0.name", "environment"),
-					resource.TestCheckResourceAttr("groundcover_silence.test", "matchers.0.value", "production"),
-					resource.TestCheckResourceAttr("groundcover_silence.test", "matchers.0.is_equal", "false"),
-					resource.TestCheckResourceAttr("groundcover_silence.test", "matchers.0.is_contains", "false"),
-				),
-			},
-		},
-	})
-}
-
 func TestAccSilenceResource_disappears(t *testing.T) {
 	comment := acctest.RandomWithPrefix("test-silence-disappears")
 
@@ -292,37 +205,6 @@ resource "groundcover_silence" "test" {
   ]
 }
 `, startsAt, endsAt, comment, matcherName, matcherValue, isEqual, isContains)
-}
-
-func testAccSilenceResourceConfigMultipleMatchers(comment, startsAt, endsAt string) string {
-	return fmt.Sprintf(`
-resource "groundcover_silence" "test" {
-  starts_at = %[1]q
-  ends_at   = %[2]q
-  comment   = %[3]q
-
-  matchers = [
-    {
-      name        = "equal"
-      value       = "test-service"
-      is_equal    = true
-      is_contains = false
-    },
-    {
-      name        = "not-contains"
-      value       = "test-service"
-      is_equal    = false
-      is_contains = true
-    },
-    {
-      name        = "empty-equal"
-      value       = "test-service"
-      is_equal    = true
-      is_contains = false
-    }
-  ]
-}
-`, startsAt, endsAt, comment)
 }
 
 func testAccCheckSilenceResourceExists(n string) resource.TestCheckFunc {

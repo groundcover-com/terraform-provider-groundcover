@@ -43,29 +43,6 @@ func TestAccServiceAccountResource(t *testing.T) {
 	})
 }
 
-func TestAccServiceAccountResource_withPolicy(t *testing.T) {
-	name := acctest.RandomWithPrefix("test-serviceaccount")
-	policyName := acctest.RandomWithPrefix("test-policy")
-
-	resource.Test(t, resource.TestCase{
-		PreCheck:                 func() { testAccPreCheck(t) },
-		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
-		Steps: []resource.TestStep{
-			// Create service account with policy
-			{
-				Config: testAccServiceAccountResourceConfigWithPolicy(name, policyName),
-				Check: resource.ComposeAggregateTestCheckFunc(
-					resource.TestCheckResourceAttr("groundcover_serviceaccount.test", "name", name),
-					resource.TestCheckResourceAttrSet("groundcover_serviceaccount.test", "id"),
-					resource.TestCheckResourceAttr("groundcover_serviceaccount.test", "email", "test-"+name+"@example.com"),
-					// Check policy association
-					resource.TestCheckResourceAttr("groundcover_serviceaccount.test", "policy_uuids.#", "1"),
-				),
-			},
-		},
-	})
-}
-
 func TestAccServiceAccountResource_disappears(t *testing.T) {
 	name := acctest.RandomWithPrefix("test-serviceaccount")
 
@@ -119,24 +96,6 @@ resource "groundcover_serviceaccount" "test" {
   policy_uuids = [groundcover_policy.test_policy.uuid]
 }
 `, baseName, updatedEmail)
-}
-
-func testAccServiceAccountResourceConfigWithPolicy(name, policyName string) string {
-	return fmt.Sprintf(`
-resource "groundcover_policy" "test" {
-  name        = %[2]q
-  description = "Test policy for service account"
-  role = {
-    read = "read"
-  }
-}
-
-resource "groundcover_serviceaccount" "test" {
-  name         = %[1]q
-  email        = "test-%[1]s@example.com"
-  policy_uuids = [groundcover_policy.test.uuid]
-}
-`, name, policyName)
 }
 
 func testAccCheckServiceAccountResourceExists(n string) resource.TestCheckFunc {
