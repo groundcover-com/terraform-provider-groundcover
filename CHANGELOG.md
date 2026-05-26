@@ -1,3 +1,7 @@
+## 1.13.3
+
+* Fixed wrong parsing of time duration in monitors (1d and complex formats like 1h30m)
+
 ## 1.13.2
 
 * Documented that managing `groundcover_secret` resources (create, update, delete) requires a service account with the **admin** role — clarifies the permission requirement that previously surfaced only as an API error
