@@ -1,3 +1,9 @@
+## 1.13.4
+
+* Documented that `groundcover_policy` import takes the policy **UUID** (not the name) — the import example and generated docs now show a UUID placeholder and point at the UI/network tab for finding it
+* Documented the allowed keys in the `groundcover_policy` `role` map (`read`, `write`, `admin`) in the schema description so they appear in the generated docs; the value is unused on the backend
+* Added schema validation for the `groundcover_policy` `role` map — the provider now rejects invalid keys (`read`, `write`, and `admin` are the only accepted values) at plan time with a clear error, rather than propagating an opaque 400 from the backend
+
 ## 1.13.3
 
 * Fixed wrong parsing of time duration in monitors (1d and complex formats like 1h30m)

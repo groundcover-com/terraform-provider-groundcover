@@ -20,6 +20,11 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/types/basetypes"
 	"github.com/hashicorp/terraform-plugin-log/tflog"
 
+	// Validator imports
+	"github.com/hashicorp/terraform-plugin-framework-validators/mapvalidator"
+	"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
+	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
+
 	// SDK Imports
 	"github.com/groundcover-com/groundcover-sdk-go/pkg/models"
 )
@@ -180,9 +185,12 @@ func (r *policyResource) Schema(ctx context.Context, req resource.SchemaRequest,
 				Required:            true,
 			},
 			"role": schema.MapAttribute{
-				MarkdownDescription: "Role definitions associated with the policy. Maps role identifiers to specific permissions or access levels.",
+				MarkdownDescription: "Role definitions associated with the policy. The map **key** is the access level granted to the policy and must be one of `read`, `write`, or `admin`. The map **value** is unused on the backend — pass any non-empty string (e.g. the role key itself). Example: `role = { admin = \"admin\" }`.",
 				ElementType:         types.StringType,
 				Required:            true,
+				Validators: []validator.Map{
+					mapvalidator.KeysAre(stringvalidator.OneOf("read", "write", "admin")),
+				},
 			},
 			"description": schema.StringAttribute{
 				MarkdownDescription: "A description for the policy.",
