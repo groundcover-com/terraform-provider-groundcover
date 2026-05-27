@@ -97,7 +97,7 @@ output "policy_revision_number" {
 ### Required
 
 - `name` (String) The name of the policy.
-- `role` (Map of String) Role definitions associated with the policy. Maps role identifiers to specific permissions or access levels.
+- `role` (Map of String) Role definitions associated with the policy. The map **key** is the access level granted to the policy and must be one of `read`, `write`, or `admin`. The map **value** is unused on the backend — pass any non-empty string (e.g. the role key itself). Example: `role = { admin = "admin" }`.
 
 ### Optional
 
@@ -334,5 +334,8 @@ Required:
 Import is supported using the following syntax:
 
 ```shell
-terraform import groundcover_policy.example "<id>"
+# Policies are imported by their UUID, not their name.
+# Find the UUID under Settings → Policies (visible in the network tab of the policy list request),
+# or copy it from `groundcover_policy.<name>.uuid` after creating one with Terraform.
+terraform import groundcover_policy.example "00000000-0000-0000-0000-000000000000"
 ```
