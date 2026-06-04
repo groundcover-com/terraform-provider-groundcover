@@ -14,7 +14,11 @@ func (c *SdkClientWrapper) CreateMonitor(ctx context.Context, monitorReq *models
 	if monitorReq != nil && monitorReq.Title != nil {
 		identifier = *monitorReq.Title
 	}
-	logFields := map[string]any{"title": identifier, "is_provisioned": monitorReq != nil && monitorReq.IsProvisioned}
+	isProvisioned := false
+	if monitorReq != nil && monitorReq.IsProvisioned != nil {
+		isProvisioned = *monitorReq.IsProvisioned
+	}
+	logFields := map[string]any{"title": identifier, "is_provisioned": isProvisioned}
 	tflog.Debug(ctx, "Executing SDK Call: Create Monitor", logFields)
 
 	params := monitors.NewCreateMonitorParams().
@@ -81,7 +85,7 @@ func (c *SdkClientWrapper) UpdateMonitor(ctx context.Context, id string, monitor
 	if monitorReq != nil && monitorReq.Title != nil {
 		identifier = *monitorReq.Title
 	}
-	logFields := map[string]any{"id": id, "title": identifier, "is_provisioned": monitorReq != nil && monitorReq.IsProvisioned}
+	logFields := map[string]any{"id": id, "title": identifier}
 	tflog.Debug(ctx, "Executing SDK Call: Update Monitor", logFields)
 
 	params := monitors.NewUpdateMonitorParams().

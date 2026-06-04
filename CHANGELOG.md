@@ -1,3 +1,8 @@
+## 1.14.0
+
+* Added `groundcover_monitor_v2`, a typed monitor resource that replaces the raw YAML blob with Terraform schema fields and supports GCQL, MetricsQL, raw SQL, custom resolve thresholds, and connected-app delivery params
+* Updated `github.com/groundcover-com/groundcover-sdk-go` to `v1.287.0` so monitor resources use the current generated monitor model; `isProvisioned` is now sent on monitor create requests per the current SDK shape
+
 ## 1.13.4
 
 * Documented that `groundcover_policy` import takes the policy **UUID** (not the name) — the import example and generated docs now show a UUID placeholder and point at the UI/network tab for finding it

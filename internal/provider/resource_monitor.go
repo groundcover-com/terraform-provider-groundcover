@@ -88,7 +88,8 @@ func buildCreateMonitorRequest(ctx context.Context, monitorYaml string) (*models
 	if err := yaml.Unmarshal([]byte(normalizedApiYaml), &createReq); err != nil {
 		return nil, normalizedApiYaml, fmt.Errorf("unable to unmarshal monitor config into SDK request model: %w. YAML omitted for privacy", err)
 	}
-	createReq.IsProvisioned = true
+	isProvisioned := true
+	createReq.IsProvisioned = &isProvisioned
 
 	return &createReq, normalizedApiYaml, nil
 }
@@ -104,7 +105,6 @@ func buildUpdateMonitorRequest(ctx context.Context, monitorYaml string) (*models
 	if err := yaml.Unmarshal([]byte(normalizedApiYaml), &updateReq); err != nil {
 		return nil, normalizedApiYaml, fmt.Errorf("unable to unmarshal monitor config into SDK update request model: %w. YAML omitted for privacy", err)
 	}
-	updateReq.IsProvisioned = true
 
 	return &updateReq, normalizedApiYaml, nil
 }
