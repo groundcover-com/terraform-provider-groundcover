@@ -66,7 +66,7 @@ func TestMonitorV2BuildCreateRequestGCQL(t *testing.T) {
 		Type:          types.StringValue(monitorV2QueryTypeGCQL),
 		Expression:    types.StringValue(`level:error | stats count() count_all_result`),
 		DataType:      types.StringValue("logs"),
-		InstantRollup: types.StringValue("5m"),
+		InstantRollup: types.StringValue("5 minutes"),
 	})
 
 	req, diags := buildMonitorV2CreateRequest(ctx, &plan)
@@ -208,6 +208,33 @@ func TestMonitorV2BuildCreateRequestRejectsUnsupportedCustomResolveParentOperato
 	if !buildDiags.HasError() {
 		t.Fatalf("buildMonitorV2CreateRequest() diagnostics = none, want unsupported custom resolve parent operator error")
 	}
+	requireDiagnosticSummary(t, buildDiags, "Unsupported threshold operator for custom resolve threshold")
+}
+
+func TestMonitorV2ValidateNotificationSettings(t *testing.T) {
+	connectedApps, diags := types.ListValueFrom(context.Background(), types.StringType, []string{"slack-app-id"})
+	if diags.HasError() {
+		t.Fatalf("types.ListValueFrom() connected apps diagnostics: %v", diags)
+	}
+	statusFilters, diags := types.ListValueFrom(context.Background(), types.StringType, []string{"Alerting"})
+	if diags.HasError() {
+		t.Fatalf("types.ListValueFrom() status filters diagnostics: %v", diags)
+	}
+
+	var missingAppsDiags diag.Diagnostics
+	monitorV2ValidateNotificationSettings(&monitorV2NotificationSettingsModel{
+		Method:        types.StringValue("connectedApps"),
+		ConnectedApps: types.ListNull(types.StringType),
+	}, &missingAppsDiags)
+	requireDiagnosticSummary(t, missingAppsDiags, "Missing connected apps")
+
+	var invalidCombinationDiags diag.Diagnostics
+	monitorV2ValidateNotificationSettings(&monitorV2NotificationSettingsModel{
+		Method:        types.StringValue("notificationRoutes"),
+		ConnectedApps: connectedApps,
+		StatusFilters: statusFilters,
+	}, &invalidCombinationDiags)
+	requireDiagnosticSummary(t, invalidCombinationDiags, "Invalid notification settings combination")
 }
 
 func TestMonitorV2BuildCreateRequestConnectedAppParams(t *testing.T) {
@@ -327,6 +354,95 @@ func TestMonitorV2MapSDKToModelNormalizesDurations(t *testing.T) {
 	}
 }
 
+func TestMonitorV2MapSDKToModelPreservesEquivalentConfiguredDurations(t *testing.T) {
+	ctx := context.Background()
+	title := "duration monitor"
+	thresholdName := "threshold_1"
+	thresholdInput := monitorV2DefaultQueryName
+	thresholdOperator := "gt"
+	pendingFor := models.Duration(1 * time.Minute)
+	remote := &models.UpdateMonitorRequest{
+		Title:           &title,
+		Severity:        "critical",
+		MeasurementType: "state",
+		EvaluationInterval: &models.EvaluationInterval{
+			Interval:   strfmt.Duration(1 * time.Minute),
+			PendingFor: &pendingFor,
+		},
+		Model: &models.Model{
+			Queries: []*models.BaseQuery{
+				{
+					Name:           monitorV2DefaultQueryName,
+					Expression:     "up",
+					DatasourceType: monitorV2DatasourcePrometheus,
+					QueryType:      monitorV2QueryTypeInstant,
+					Rollup: &models.Rollup{
+						Function: "last",
+						Time:     models.Duration(5 * time.Minute),
+					},
+					RelativeTimerange: &models.RelativeTimerange{
+						From: strfmt.Duration(-5 * time.Minute),
+						To:   strfmt.Duration(0),
+					},
+				},
+			},
+			Thresholds: []*models.Threshold{
+				{
+					Name:      &thresholdName,
+					InputName: &thresholdInput,
+					Operator:  &thresholdOperator,
+					Values:    []float64{1},
+				},
+			},
+		},
+	}
+
+	state := monitorV2ResourceModel{
+		EvaluationInterval: &monitorV2EvaluationIntervalModel{
+			Interval:   types.StringValue("60 seconds"),
+			PendingFor: types.StringValue("1 minute"),
+		},
+		Query: &monitorV2QueryModel{
+			Rollup: &monitorV2RollupModel{
+				Time: types.StringValue("5 minutes"),
+			},
+			RelativeTimerange: &monitorV2RelativeRangeModel{
+				From: types.StringValue("-5 minutes"),
+				To:   types.StringValue("0m"),
+			},
+		},
+	}
+	var diags diag.Diagnostics
+	mapMonitorV2SDKToModel(ctx, "monitor-id", remote, &state, &diags)
+	if diags.HasError() {
+		t.Fatalf("mapMonitorV2SDKToModel() diagnostics: %v", diags)
+	}
+	if state.EvaluationInterval.Interval.ValueString() != "60 seconds" {
+		t.Fatalf("state.EvaluationInterval.Interval = %q, want 60 seconds", state.EvaluationInterval.Interval.ValueString())
+	}
+	if state.EvaluationInterval.PendingFor.ValueString() != "1 minute" {
+		t.Fatalf("state.EvaluationInterval.PendingFor = %q, want 1 minute", state.EvaluationInterval.PendingFor.ValueString())
+	}
+	if state.Query.Rollup.Time.ValueString() != "5 minutes" {
+		t.Fatalf("state.Query.Rollup.Time = %q, want 5 minutes", state.Query.Rollup.Time.ValueString())
+	}
+	if state.Query.RelativeTimerange.From.ValueString() != "-5 minutes" {
+		t.Fatalf("state.Query.RelativeTimerange.From = %q, want -5 minutes", state.Query.RelativeTimerange.From.ValueString())
+	}
+	if state.Query.RelativeTimerange.To.ValueString() != "0m" {
+		t.Fatalf("state.Query.RelativeTimerange.To = %q, want 0m", state.Query.RelativeTimerange.To.ValueString())
+	}
+}
+
+func TestMonitorV2DurationNormalizationPreservesZero(t *testing.T) {
+	if got := monitorV2DurationToType(0).ValueString(); got != "0m" {
+		t.Fatalf("monitorV2DurationToType(0) = %q, want 0m", got)
+	}
+	if got := monitorV2DurationStringToType("5 minutes").ValueString(); got != "5m" {
+		t.Fatalf("monitorV2DurationStringToType(5 minutes) = %q, want 5m", got)
+	}
+}
+
 func TestMonitorV2MapSDKToModelClassifiesMetricsQLByRollup(t *testing.T) {
 	query := monitorV2QueryFromSDK(&models.BaseQuery{
 		Expression:     "sum(metric)",
@@ -356,6 +472,18 @@ func TestMonitorResourceDisappearsDefaultAPIURLMatchesProviderDefault(t *testing
 	if got, want := testAccMonitorAPIURL(), "https://api.groundcover.com"; got != want {
 		t.Fatalf("testAccMonitorAPIURL() = %q, want %q", got, want)
 	}
+}
+
+func requireDiagnosticSummary(t *testing.T, diagnostics diag.Diagnostics, summary string) {
+	t.Helper()
+
+	for _, diagnostic := range diagnostics {
+		if strings.Contains(diagnostic.Summary(), summary) {
+			return
+		}
+	}
+
+	t.Fatalf("diagnostics did not include summary %q: %v", summary, diagnostics)
 }
 
 func testMonitorV2BasePlan(t *testing.T, query *monitorV2QueryModel) monitorV2ResourceModel {
@@ -435,6 +563,7 @@ func TestAccMonitorV2Resource(t *testing.T) {
 					resource.TestCheckResourceAttr("groundcover_monitor_v2.test", "title", name),
 					resource.TestCheckResourceAttr("groundcover_monitor_v2.test", "query.type", monitorV2QueryTypeGCQL),
 					resource.TestCheckResourceAttr("groundcover_monitor_v2.test", "query.data_type", "logs"),
+					resource.TestCheckResourceAttr("groundcover_monitor_v2.test", "query.instant_rollup", "5m"),
 					resource.TestCheckResourceAttr("groundcover_monitor_v2.test", "threshold.#", "1"),
 				),
 			},
@@ -452,6 +581,22 @@ func TestAccMonitorV2Resource(t *testing.T) {
 			},
 			{
 				Config:             testAccMonitorV2ResourceConfig(updatedName),
+				PlanOnly:           true,
+				ExpectNonEmptyPlan: false,
+			},
+			{
+				Config: testAccMonitorV2ResourceHumanDurationConfig(updatedName),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					resource.TestCheckResourceAttr("groundcover_monitor_v2.test", "query.type", monitorV2QueryTypeMetricsQL),
+					resource.TestCheckResourceAttr("groundcover_monitor_v2.test", "query.relative_timerange.from", "-5 minutes"),
+					resource.TestCheckResourceAttr("groundcover_monitor_v2.test", "query.relative_timerange.to", "0m"),
+					resource.TestCheckResourceAttr("groundcover_monitor_v2.test", "query.rollup.time", "5 minutes"),
+					resource.TestCheckResourceAttr("groundcover_monitor_v2.test", "evaluation_interval.interval", "60 seconds"),
+					resource.TestCheckResourceAttr("groundcover_monitor_v2.test", "evaluation_interval.pending_for", "1 minute"),
+				),
+			},
+			{
+				Config:             testAccMonitorV2ResourceHumanDurationConfig(updatedName),
 				PlanOnly:           true,
 				ExpectNonEmptyPlan: false,
 			},
@@ -483,7 +628,8 @@ func TestAccMonitorV2Resource_allSupportedQueryTypes(t *testing.T) {
 		t.Skip("Set TF_ACC_MONITOR_V2_ALL_QUERY_TYPES=1 to run the Monitor V2 all-supported-query-types acceptance test")
 	}
 
-	suffix := acctest.RandString(8)
+	// This intentionally broad live check is opt-in only. It verifies the backend accepts every supported Monitor V2 query family.
+	suffix := fmt.Sprintf("%d-%s", time.Now().UnixNano(), acctest.RandString(8))
 
 	resource.Test(t, resource.TestCase{
 		PreCheck:                 func() { testAccPreCheck(t) },
@@ -549,6 +695,51 @@ resource "groundcover_monitor_v2" "test" {
   evaluation_interval {
     interval    = "1m"
     pending_for = "1m"
+  }
+
+  execution_error_state = "OK"
+  no_data_state         = "OK"
+}
+`, name)
+}
+
+func testAccMonitorV2ResourceHumanDurationConfig(name string) string {
+	return fmt.Sprintf(`
+resource "groundcover_monitor_v2" "test" {
+  title            = %[1]q
+  severity         = "critical"
+  measurement_type = "state"
+
+  display {
+    header      = %[1]q
+    description = "Test monitor created by acceptance tests"
+  }
+
+  query {
+    type       = "metricsql"
+    expression = "sum(groundcover_kube_pod_container_status_running{})"
+
+    relative_timerange {
+      from = "-5 minutes"
+      to   = "0m"
+    }
+
+    rollup {
+      function = "last"
+      time     = "5 minutes"
+    }
+  }
+
+  threshold {
+    name       = "threshold_1"
+    input_name = "threshold_input_query"
+    operator   = "gt"
+    values     = [1]
+  }
+
+  evaluation_interval {
+    interval    = "60 seconds"
+    pending_for = "1 minute"
   }
 
   execution_error_state = "OK"
@@ -680,9 +871,14 @@ resource "groundcover_monitor_v2" "metricsql" {
     type       = "metricsql"
     expression = "sum(groundcover_kube_pod_container_status_running{})"
 
+    relative_timerange {
+      from = "-5m"
+      to   = "0m"
+    }
+
     rollup {
       function = "last"
-      time     = "5m"
+      time     = "5 minutes"
     }
   }
 

@@ -9,6 +9,7 @@ import (
 
 	"github.com/go-openapi/strfmt"
 	"github.com/groundcover-com/groundcover-sdk-go/pkg/models"
+	"github.com/hashicorp/terraform-plugin-framework-validators/listvalidator"
 	"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
 	"github.com/hashicorp/terraform-plugin-framework/attr"
 	"github.com/hashicorp/terraform-plugin-framework/diag"
@@ -277,6 +278,7 @@ func (r *monitorV2Resource) Schema(_ context.Context, _ resource.SchemaRequest, 
 					"instant_rollup": schema.StringAttribute{
 						MarkdownDescription: "GCQL rollup window used to add the monitor evaluation time bucket, for example `5m` or `5 minutes`.",
 						Optional:            true,
+						Computed:            true,
 					},
 				},
 				Blocks: map[string]schema.Block{
@@ -293,6 +295,7 @@ func (r *monitorV2Resource) Schema(_ context.Context, _ resource.SchemaRequest, 
 							"time": schema.StringAttribute{
 								MarkdownDescription: "Rollup time window, for example `5m` or `1 hour`.",
 								Optional:            true,
+								Computed:            true,
 							},
 						},
 					},
@@ -365,10 +368,12 @@ func (r *monitorV2Resource) Schema(_ context.Context, _ resource.SchemaRequest, 
 					"interval": schema.StringAttribute{
 						MarkdownDescription: "How often the monitor evaluates, for example `1m`.",
 						Optional:            true,
+						Computed:            true,
 					},
 					"pending_for": schema.StringAttribute{
 						MarkdownDescription: "How long the condition must remain true before alerting, for example `5m`.",
 						Optional:            true,
+						Computed:            true,
 					},
 				},
 			},
@@ -434,6 +439,9 @@ func (r *monitorV2Resource) Schema(_ context.Context, _ resource.SchemaRequest, 
 						MarkdownDescription: "Issue statuses that should notify.",
 						Optional:            true,
 						ElementType:         types.StringType,
+						Validators: []validator.List{
+							listvalidator.ValueStringsAre(stringvalidator.OneOf("Alerting", "Resolved")),
+						},
 					},
 					"disable_renotification": schema.BoolAttribute{
 						MarkdownDescription: "Whether renotification is disabled.",
@@ -478,10 +486,12 @@ func relativeTimerangeBlock() schema.SingleNestedBlock {
 			"from": schema.StringAttribute{
 				MarkdownDescription: "Start of the relative range, for example `-5m`.",
 				Optional:            true,
+				Computed:            true,
 			},
 			"to": schema.StringAttribute{
 				MarkdownDescription: "End of the relative range, for example `0m`.",
 				Optional:            true,
+				Computed:            true,
 			},
 		},
 	}
@@ -586,20 +596,70 @@ func (r *monitorV2Resource) ValidateConfig(ctx context.Context, req resource.Val
 				"`custom_resolve_threshold` is supported only when threshold.operator is one of `gt`, `lt`, `within_range`, or `outside_range`.",
 			)
 		}
-		if monitorV2String(threshold.CustomResolveThreshold.Operator) == "" {
+		if !threshold.CustomResolveThreshold.Operator.IsUnknown() && monitorV2String(threshold.CustomResolveThreshold.Operator) == "" {
 			resp.Diagnostics.AddAttributeError(
 				path.Root("threshold").AtListIndex(i).AtName("custom_resolve_threshold").AtName("operator"),
 				"Missing custom resolve threshold operator",
 				"`custom_resolve_threshold.operator` is required when custom_resolve_threshold is configured.",
 			)
 		}
-		if len(monitorV2Float64List(ctx, threshold.CustomResolveThreshold.Values, &resp.Diagnostics)) == 0 {
+		if !threshold.CustomResolveThreshold.Values.IsUnknown() && len(monitorV2Float64List(ctx, threshold.CustomResolveThreshold.Values, &resp.Diagnostics)) == 0 {
 			resp.Diagnostics.AddAttributeError(
 				path.Root("threshold").AtListIndex(i).AtName("custom_resolve_threshold").AtName("values"),
 				"Missing custom resolve threshold values",
 				"`custom_resolve_threshold.values` is required when custom_resolve_threshold is configured.",
 			)
 		}
+	}
+
+	monitorV2ValidateNotificationSettings(config.NotificationSettings, &resp.Diagnostics)
+}
+
+func monitorV2ValidateNotificationSettings(settings *monitorV2NotificationSettingsModel, diags *diag.Diagnostics) {
+	if settings == nil {
+		return
+	}
+
+	methodUnknown := settings.Method.IsUnknown()
+	methodSet := !settings.Method.IsNull() && !methodUnknown
+	isConnectedApps := methodSet && settings.Method.ValueString() == "connectedApps"
+
+	hasAppsSet := !settings.ConnectedApps.IsNull() && !settings.ConnectedApps.IsUnknown()
+	hasAppsNonEmpty := hasAppsSet && len(settings.ConnectedApps.Elements()) > 0
+	hasParamsSet := !settings.ConnectedAppParams.IsNull() && !settings.ConnectedAppParams.IsUnknown()
+	hasFiltersSet := !settings.StatusFilters.IsNull() && !settings.StatusFilters.IsUnknown()
+
+	if methodUnknown {
+		return
+	}
+
+	if isConnectedApps && !settings.ConnectedApps.IsUnknown() && !hasAppsNonEmpty {
+		diags.AddAttributeError(
+			path.Root("notification_settings").AtName("connected_apps"),
+			"Missing connected apps",
+			"`notification_settings.connected_apps` must be set and non-empty when notification_settings.method is `connectedApps`.",
+		)
+	}
+	if !isConnectedApps && hasAppsSet {
+		diags.AddAttributeError(
+			path.Root("notification_settings").AtName("connected_apps"),
+			"Invalid notification settings combination",
+			"`notification_settings.connected_apps` can only be set when notification_settings.method is `connectedApps`.",
+		)
+	}
+	if !isConnectedApps && hasParamsSet {
+		diags.AddAttributeError(
+			path.Root("notification_settings").AtName("connected_app_params"),
+			"Invalid notification settings combination",
+			"`notification_settings.connected_app_params` can only be set when notification_settings.method is `connectedApps`.",
+		)
+	}
+	if !isConnectedApps && hasFiltersSet {
+		diags.AddAttributeError(
+			path.Root("notification_settings").AtName("status_filters"),
+			"Invalid notification settings combination",
+			"`notification_settings.status_filters` can only be set when notification_settings.method is `connectedApps`.",
+		)
 	}
 }
 
@@ -616,7 +676,7 @@ func (r *monitorV2Resource) Create(ctx context.Context, req resource.CreateReque
 		return
 	}
 
-	apiResp, err := r.client.CreateMonitor(ctx, createReq)
+	apiResp, err := r.client.CreateMonitorV2(ctx, createReq)
 	if err != nil {
 		resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Unable to create monitor, got error: %s", err.Error()))
 		return
@@ -672,7 +732,7 @@ func (r *monitorV2Resource) Update(ctx context.Context, req resource.UpdateReque
 	}
 
 	id := state.ID.ValueString()
-	if err := r.client.UpdateMonitor(ctx, id, updateReq); err != nil {
+	if err := r.client.UpdateMonitorV2(ctx, id, updateReq); err != nil {
 		resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Unable to update monitor %s, got error: %s", id, err.Error()))
 		return
 	}
@@ -694,7 +754,7 @@ func (r *monitorV2Resource) Delete(ctx context.Context, req resource.DeleteReque
 	}
 
 	id := state.ID.ValueString()
-	if err := r.client.DeleteMonitor(ctx, id); err != nil && !errors.Is(err, ErrNotFound) {
+	if err := r.client.DeleteMonitorV2(ctx, id); err != nil && !errors.Is(err, ErrNotFound) {
 		resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Unable to delete monitor %s, got error: %s", id, err))
 		return
 	}
@@ -705,7 +765,7 @@ func (r *monitorV2Resource) ImportState(ctx context.Context, req resource.Import
 }
 
 func (r *monitorV2Resource) readMonitorV2IntoState(ctx context.Context, id string, state *monitorV2ResourceModel, diags *diag.Diagnostics) error {
-	remoteYaml, err := r.client.GetMonitor(ctx, id)
+	remoteYaml, err := r.client.GetMonitorV2(ctx, id)
 	if err != nil {
 		return err
 	}
@@ -811,7 +871,9 @@ func monitorV2QueryToSDK(query *monitorV2QueryModel, diags *diag.Diagnostics) *m
 	switch monitorV2String(query.Type) {
 	case monitorV2QueryTypeGCQL:
 		req.DataType = monitorV2String(query.DataType)
-		req.InstantRollup = monitorV2String(query.InstantRollup)
+		if parsed, ok := monitorV2ParseDuration(query.InstantRollup, path.Root("query").AtName("instant_rollup"), diags); ok {
+			req.InstantRollup = monitorV2DurationToString(parsed)
+		}
 	case monitorV2QueryTypeMetricsQL:
 		req.DatasourceType = monitorV2String(query.DatasourceType)
 		if req.DatasourceType == "" {
@@ -949,6 +1011,11 @@ func monitorV2RelativeRangeToSDK(relativeRange *monitorV2RelativeRangeModel, dia
 }
 
 func mapMonitorV2SDKToModel(ctx context.Context, id string, remote *models.UpdateMonitorRequest, state *monitorV2ResourceModel, diags *diag.Diagnostics) {
+	previousQuery := state.Query
+	previousEvaluationInterval := state.EvaluationInterval
+	previousReducers := state.Reducers
+	previousThresholds := state.Thresholds
+
 	state.ID = types.StringValue(id)
 	state.Title = monitorV2StringPtrToType(remote.Title)
 	state.Severity = monitorV2NullableString(remote.Severity)
@@ -963,7 +1030,7 @@ func mapMonitorV2SDKToModel(ctx context.Context, id string, remote *models.Updat
 	state.Annotations = monitorV2MapType(ctx, monitorV2FilterAnnotations(remote.Annotations), diags)
 	state.Routing = monitorV2StringListType(ctx, remote.Routing, diags)
 	state.Display = monitorV2DisplayFromSDK(ctx, remote.Display, diags)
-	state.EvaluationInterval = monitorV2EvaluationIntervalFromSDK(remote.EvaluationInterval)
+	state.EvaluationInterval = monitorV2PreserveEvaluationIntervalDurations(previousEvaluationInterval, monitorV2EvaluationIntervalFromSDK(remote.EvaluationInterval))
 	state.NotificationSettings = monitorV2NotificationSettingsFromSDK(ctx, remote.NotificationSettings, diags)
 
 	if remote.Model == nil {
@@ -973,10 +1040,79 @@ func mapMonitorV2SDKToModel(ctx context.Context, id string, remote *models.Updat
 		return
 	}
 	if len(remote.Model.Queries) > 0 && remote.Model.Queries[0] != nil {
-		state.Query = monitorV2QueryFromSDK(remote.Model.Queries[0])
+		state.Query = monitorV2PreserveQueryDurations(previousQuery, monitorV2QueryFromSDK(remote.Model.Queries[0]))
 	}
-	state.Reducers = monitorV2ReducersFromSDK(remote.Model.Reducers)
-	state.Thresholds = monitorV2ThresholdsFromSDK(ctx, remote.Model.Thresholds, diags)
+	state.Reducers = monitorV2PreserveReducerDurations(previousReducers, monitorV2ReducersFromSDK(remote.Model.Reducers))
+	state.Thresholds = monitorV2PreserveThresholdDurations(previousThresholds, monitorV2ThresholdsFromSDK(ctx, remote.Model.Thresholds, diags))
+}
+
+func monitorV2PreserveQueryDurations(previous, updated *monitorV2QueryModel) *monitorV2QueryModel {
+	if previous == nil || updated == nil {
+		return updated
+	}
+
+	updated.InstantRollup = monitorV2PreserveDurationString(previous.InstantRollup, updated.InstantRollup)
+	updated.RelativeTimerange = monitorV2PreserveRelativeRangeDurations(previous.RelativeTimerange, updated.RelativeTimerange)
+	if previous.Rollup != nil && updated.Rollup != nil {
+		updated.Rollup.Time = monitorV2PreserveDurationString(previous.Rollup.Time, updated.Rollup.Time)
+	}
+	return updated
+}
+
+func monitorV2PreserveEvaluationIntervalDurations(previous, updated *monitorV2EvaluationIntervalModel) *monitorV2EvaluationIntervalModel {
+	if previous == nil || updated == nil {
+		return updated
+	}
+
+	updated.Interval = monitorV2PreserveDurationString(previous.Interval, updated.Interval)
+	updated.PendingFor = monitorV2PreserveDurationString(previous.PendingFor, updated.PendingFor)
+	return updated
+}
+
+func monitorV2PreserveReducerDurations(previous, updated []monitorV2ReducerModel) []monitorV2ReducerModel {
+	for i := range updated {
+		if i >= len(previous) {
+			break
+		}
+		updated[i].RelativeTimerange = monitorV2PreserveRelativeRangeDurations(previous[i].RelativeTimerange, updated[i].RelativeTimerange)
+	}
+	return updated
+}
+
+func monitorV2PreserveThresholdDurations(previous, updated []monitorV2ThresholdModel) []monitorV2ThresholdModel {
+	for i := range updated {
+		if i >= len(previous) {
+			break
+		}
+		updated[i].RelativeTimerange = monitorV2PreserveRelativeRangeDurations(previous[i].RelativeTimerange, updated[i].RelativeTimerange)
+	}
+	return updated
+}
+
+func monitorV2PreserveRelativeRangeDurations(previous, updated *monitorV2RelativeRangeModel) *monitorV2RelativeRangeModel {
+	if previous == nil || updated == nil {
+		return updated
+	}
+
+	updated.From = monitorV2PreserveDurationString(previous.From, updated.From)
+	updated.To = monitorV2PreserveDurationString(previous.To, updated.To)
+	return updated
+}
+
+func monitorV2PreserveDurationString(previous, updated types.String) types.String {
+	if previous.IsNull() || previous.IsUnknown() || updated.IsNull() || updated.IsUnknown() {
+		return updated
+	}
+	if monitorV2DurationStringsEqual(previous.ValueString(), updated.ValueString()) {
+		return previous
+	}
+	return updated
+}
+
+func monitorV2DurationStringsEqual(left, right string) bool {
+	leftNormalized, leftOK := monitorV2NormalizeDurationString(left)
+	rightNormalized, rightOK := monitorV2NormalizeDurationString(right)
+	return leftOK && rightOK && leftNormalized == rightNormalized
 }
 
 func monitorV2QueryFromSDK(query *models.BaseQuery) *monitorV2QueryModel {
@@ -995,7 +1131,7 @@ func monitorV2QueryFromSDK(query *models.BaseQuery) *monitorV2QueryModel {
 		DatasourceType:    monitorV2NullableString(query.DatasourceType),
 		DatasourceID:      monitorV2NullableString(query.DatasourceID),
 		QueryType:         monitorV2NullableString(query.QueryType),
-		InstantRollup:     monitorV2NullableString(query.InstantRollup),
+		InstantRollup:     monitorV2DurationStringToType(query.InstantRollup),
 		Rollup:            monitorV2RollupFromSDK(query.Rollup),
 		RelativeTimerange: monitorV2RelativeRangeFromSDK(query.RelativeTimerange),
 	}
@@ -1300,7 +1436,7 @@ func monitorV2ParseDuration(value types.String, attrPath path.Path, diags *diag.
 		return 0, false
 	}
 
-	normalized := strings.TrimSpace(normalizeDayDurations(normalizeHumanDurations(raw)))
+	normalized := monitorV2NormalizeDurationForParse(raw)
 	parsed, err := strfmt.ParseDuration(normalized)
 	if err != nil {
 		diags.AddAttributeError(
@@ -1313,11 +1449,40 @@ func monitorV2ParseDuration(value types.String, attrPath path.Path, diags *diag.
 	return parsed, true
 }
 
-func monitorV2DurationToType(value time.Duration) types.String {
-	if value == 0 {
-		return types.StringNull()
+func monitorV2NormalizeDurationForParse(value string) string {
+	return strings.TrimSpace(normalizeDayDurations(normalizeHumanDurations(value)))
+}
+
+func monitorV2NormalizeDurationString(value string) (string, bool) {
+	raw := strings.TrimSpace(value)
+	if raw == "" {
+		return "", false
 	}
-	return types.StringValue(normalizeTimeString(value.String()))
+
+	parsed, err := strfmt.ParseDuration(monitorV2NormalizeDurationForParse(raw))
+	if err != nil {
+		return "", false
+	}
+	return monitorV2DurationToString(parsed), true
+}
+
+func monitorV2DurationStringToType(value string) types.String {
+	normalized, ok := monitorV2NormalizeDurationString(value)
+	if !ok {
+		return monitorV2NullableString(value)
+	}
+	return types.StringValue(normalized)
+}
+
+func monitorV2DurationToString(value time.Duration) string {
+	if value == 0 {
+		return "0m"
+	}
+	return normalizeTimeString(value.String())
+}
+
+func monitorV2DurationToType(value time.Duration) types.String {
+	return types.StringValue(monitorV2DurationToString(value))
 }
 
 func monitorV2FilterAnnotations(annotations map[string]string) map[string]string {
