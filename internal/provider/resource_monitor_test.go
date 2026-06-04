@@ -185,6 +185,31 @@ func TestMonitorV2BuildCreateRequestCustomResolveThreshold(t *testing.T) {
 	}
 }
 
+func TestMonitorV2BuildCreateRequestRejectsUnsupportedCustomResolveParentOperator(t *testing.T) {
+	ctx := context.Background()
+	plan := testMonitorV2BasePlan(t, &monitorV2QueryModel{
+		Type:          types.StringValue(monitorV2QueryTypeGCQL),
+		Expression:    types.StringValue(`level:error | stats count() count_all_result`),
+		DataType:      types.StringValue("logs"),
+		InstantRollup: types.StringValue("5m"),
+	})
+
+	resolveValues, diags := types.ListValueFrom(ctx, types.Float64Type, []float64{0.5})
+	if diags.HasError() {
+		t.Fatalf("types.ListValueFrom() diagnostics: %v", diags)
+	}
+	plan.Thresholds[0].Operator = types.StringValue("eq")
+	plan.Thresholds[0].CustomResolveThreshold = &monitorV2CustomResolveThresholdModel{
+		Operator: types.StringValue("lt"),
+		Values:   resolveValues,
+	}
+
+	_, buildDiags := buildMonitorV2CreateRequest(ctx, &plan)
+	if !buildDiags.HasError() {
+		t.Fatalf("buildMonitorV2CreateRequest() diagnostics = none, want unsupported custom resolve parent operator error")
+	}
+}
+
 func TestMonitorV2BuildCreateRequestConnectedAppParams(t *testing.T) {
 	ctx := context.Background()
 	plan := testMonitorV2BasePlan(t, &monitorV2QueryModel{
@@ -299,6 +324,37 @@ func TestMonitorV2MapSDKToModelNormalizesDurations(t *testing.T) {
 	}
 	if state.Query.Rollup.Time.ValueString() != "5m" {
 		t.Fatalf("state.Query.Rollup.Time = %q, want 5m", state.Query.Rollup.Time.ValueString())
+	}
+}
+
+func TestMonitorV2MapSDKToModelClassifiesMetricsQLByRollup(t *testing.T) {
+	query := monitorV2QueryFromSDK(&models.BaseQuery{
+		Expression:     "sum(metric)",
+		DatasourceType: monitorV2DatasourceClickhouse,
+		Rollup: &models.Rollup{
+			Function: "last",
+			Time:     models.Duration(5 * time.Minute),
+		},
+	})
+	if query.Type.ValueString() != monitorV2QueryTypeMetricsQL {
+		t.Fatalf("query.Type = %q, want %q", query.Type.ValueString(), monitorV2QueryTypeMetricsQL)
+	}
+
+	rawSQLQuery := monitorV2QueryFromSDK(&models.BaseQuery{
+		Expression:     "SELECT 0 AS count_all_result",
+		DatasourceType: monitorV2DatasourceClickhouse,
+		QueryType:      monitorV2QueryTypeInstant,
+	})
+	if rawSQLQuery.Type.ValueString() != monitorV2QueryTypeRawSQL {
+		t.Fatalf("rawSQLQuery.Type = %q, want %q", rawSQLQuery.Type.ValueString(), monitorV2QueryTypeRawSQL)
+	}
+}
+
+func TestMonitorResourceDisappearsDefaultAPIURLMatchesProviderDefault(t *testing.T) {
+	t.Setenv("GROUNDCOVER_API_URL", "")
+
+	if got, want := testAccMonitorAPIURL(), "https://api.groundcover.com"; got != want {
+		t.Fatalf("testAccMonitorAPIURL() = %q, want %q", got, want)
 	}
 }
 
@@ -842,10 +898,7 @@ func testAccCheckMonitorResourceDisappears(n string) resource.TestCheckFunc {
 		// Get environment variables for client configuration
 		apiKey := os.Getenv("GROUNDCOVER_API_KEY")
 		orgName := os.Getenv("GROUNDCOVER_BACKEND_ID")
-		apiURL := os.Getenv("GROUNDCOVER_API_URL")
-		if apiURL == "" {
-			apiURL = "https://api.groundcover.io"
-		}
+		apiURL := testAccMonitorAPIURL()
 
 		// Create the client wrapper
 		client, err := NewSdkClientWrapper(ctx, apiURL, apiKey, orgName)
@@ -860,6 +913,14 @@ func testAccCheckMonitorResourceDisappears(n string) resource.TestCheckFunc {
 
 		return nil
 	}
+}
+
+func testAccMonitorAPIURL() string {
+	apiURL := os.Getenv("GROUNDCOVER_API_URL")
+	if apiURL == "" {
+		return "https://api.groundcover.com"
+	}
+	return apiURL
 }
 
 // testAccMonitorResourceConfigWithTrailingNewline creates a monitor config with trailing newlines

@@ -578,6 +578,14 @@ func (r *monitorV2Resource) ValidateConfig(ctx context.Context, req resource.Val
 		if threshold.CustomResolveThreshold == nil {
 			continue
 		}
+		parentOp := monitorV2String(threshold.Operator)
+		if parentOp != "" && !monitorV2SupportsCustomResolveOperator(parentOp) {
+			resp.Diagnostics.AddAttributeError(
+				path.Root("threshold").AtListIndex(i).AtName("operator"),
+				"Unsupported threshold operator for custom resolve threshold",
+				"`custom_resolve_threshold` is supported only when threshold.operator is one of `gt`, `lt`, `within_range`, or `outside_range`.",
+			)
+		}
 		if monitorV2String(threshold.CustomResolveThreshold.Operator) == "" {
 			resp.Diagnostics.AddAttributeError(
 				path.Root("threshold").AtListIndex(i).AtName("custom_resolve_threshold").AtName("operator"),
@@ -772,8 +780,8 @@ func monitorV2ModelToSDK(ctx context.Context, plan *monitorV2ResourceModel, diag
 	}
 
 	thresholds := make([]*models.Threshold, 0, len(plan.Thresholds))
-	for _, threshold := range plan.Thresholds {
-		thresholds = append(thresholds, monitorV2ThresholdToSDK(ctx, threshold, diags))
+	for i, threshold := range plan.Thresholds {
+		thresholds = append(thresholds, monitorV2ThresholdToSDK(ctx, threshold, i, diags))
 	}
 
 	return &models.Model{
@@ -850,7 +858,16 @@ func monitorV2ReducerToSDK(reducer monitorV2ReducerModel, diags *diag.Diagnostic
 	}
 }
 
-func monitorV2ThresholdToSDK(ctx context.Context, threshold monitorV2ThresholdModel, diags *diag.Diagnostics) *models.Threshold {
+func monitorV2ThresholdToSDK(ctx context.Context, threshold monitorV2ThresholdModel, index int, diags *diag.Diagnostics) *models.Threshold {
+	parentOp := monitorV2String(threshold.Operator)
+	if threshold.CustomResolveThreshold != nil && parentOp != "" && !monitorV2SupportsCustomResolveOperator(parentOp) {
+		diags.AddAttributeError(
+			path.Root("threshold").AtListIndex(index).AtName("operator"),
+			"Unsupported threshold operator for custom resolve threshold",
+			"`custom_resolve_threshold` is supported only when threshold.operator is one of `gt`, `lt`, `within_range`, or `outside_range`.",
+		)
+	}
+
 	return &models.Threshold{
 		InputName:              monitorV2StringPtr(threshold.InputName),
 		Name:                   monitorV2StringPtr(threshold.Name),
@@ -966,7 +983,7 @@ func monitorV2QueryFromSDK(query *models.BaseQuery) *monitorV2QueryModel {
 	queryType := monitorV2QueryTypeRawSQL
 	if query.DataType != "" {
 		queryType = monitorV2QueryTypeGCQL
-	} else if query.DatasourceType == monitorV2DatasourcePrometheus || query.DatasourceType == monitorV2DatasourceMetrics {
+	} else if query.Rollup != nil || query.DatasourceType == monitorV2DatasourcePrometheus || query.DatasourceType == monitorV2DatasourceMetrics {
 		queryType = monitorV2QueryTypeMetricsQL
 	}
 
@@ -1123,6 +1140,15 @@ func monitorV2StringPtrToType(value *string) types.String {
 		return types.StringNull()
 	}
 	return types.StringValue(*value)
+}
+
+func monitorV2SupportsCustomResolveOperator(operator string) bool {
+	switch operator {
+	case "gt", "lt", "within_range", "outside_range":
+		return true
+	default:
+		return false
+	}
 }
 
 func monitorV2NullableString(value string) types.String {
