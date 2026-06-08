@@ -1003,7 +1003,7 @@ func assertionValueOrNull(value string) types.String {
 
 func syntheticAssertionsToList(assertions []*models.Assertion) types.List {
 	if len(assertions) == 0 {
-		return types.ListValueMust(syntheticAssertionObjectType(), []attr.Value{})
+		return types.ListNull(syntheticAssertionObjectType())
 	}
 
 	elements := make([]attr.Value, 0, len(assertions))
@@ -1371,8 +1371,8 @@ func fromSDKResponse(ctx context.Context, sdkResp *models.SyntheticTestCreateReq
 		}
 
 		// Headers - set from API, preserve an explicitly configured empty map,
-		// or clear to null when API returns none.
-		if len(http.Headers) > 0 {
+		// or clear to null when API omits headers.
+		if http.Headers != nil {
 			headersMap, diags := types.MapValueFrom(ctx, types.StringType, http.Headers)
 			if !diags.HasError() {
 				httpModel.Headers = headersMap

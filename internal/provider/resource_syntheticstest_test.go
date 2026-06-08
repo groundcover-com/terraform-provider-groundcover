@@ -16,16 +16,59 @@ import (
 	"github.com/hashicorp/terraform-plugin-testing/terraform"
 )
 
-func TestSyntheticTestFromSDKResponsePreservesExplicitEmptyHTTPHeaders(t *testing.T) {
+func TestSyntheticTestFromSDKResponsePreservesEmptyHTTPHeaders(t *testing.T) {
 	ctx := context.Background()
 	emptyHeaders := types.MapValueMust(types.StringType, map[string]attr.Value{})
-	state := &syntheticTestResourceModel{
-		HTTPCheck: &syntheticHTTPCheckModel{
-			Headers: emptyHeaders,
+
+	tests := []struct {
+		name        string
+		state       *syntheticTestResourceModel
+		sdkHeaders  map[string]string
+		wantMapNull bool
+	}{
+		{
+			name: "preserves configured empty headers when API omits headers",
+			state: &syntheticTestResourceModel{
+				HTTPCheck: &syntheticHTTPCheckModel{
+					Headers: emptyHeaders,
+				},
+			},
+			wantMapNull: false,
+		},
+		{
+			name:        "reflects empty API headers during import",
+			state:       &syntheticTestResourceModel{},
+			sdkHeaders:  map[string]string{},
+			wantMapNull: false,
+		},
+		{
+			name:        "keeps omitted API headers null during import",
+			state:       &syntheticTestResourceModel{},
+			wantMapNull: true,
 		},
 	}
 
-	fromSDKResponse(ctx, &models.SyntheticTestCreateRequest{
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			fromSDKResponse(ctx, syntheticTestResponseWithHeaders(tt.sdkHeaders), tt.state)
+
+			if tt.state.HTTPCheck == nil {
+				t.Fatal("expected http_check to be set")
+			}
+			if got := tt.state.HTTPCheck.Headers.IsNull(); got != tt.wantMapNull {
+				t.Fatalf("expected headers IsNull=%t, got %t", tt.wantMapNull, got)
+			}
+			if !tt.wantMapNull {
+				if got := len(tt.state.HTTPCheck.Headers.Elements()); got != 0 {
+					t.Fatalf("expected empty headers map, got %d elements", got)
+				}
+			}
+		})
+	}
+}
+
+func syntheticTestResponseWithHeaders(headers map[string]string) *models.SyntheticTestCreateRequest {
+	return &models.SyntheticTestCreateRequest{
 		Name:     "empty-headers",
 		Enabled:  true,
 		Interval: "1m",
@@ -37,20 +80,19 @@ func TestSyntheticTestFromSDKResponsePreservesExplicitEmptyHTTPHeaders(t *testin
 					URL:     "https://example.com",
 					Method:  "GET",
 					Timeout: "10s",
-					Headers: map[string]string{},
+					Headers: headers,
 				},
 			},
 		},
-	}, state)
+	}
+}
 
-	if state.HTTPCheck == nil {
-		t.Fatal("expected http_check to be set")
-	}
-	if state.HTTPCheck.Headers.IsNull() {
-		t.Fatal("expected explicit empty headers map to be preserved, got null")
-	}
-	if got := len(state.HTTPCheck.Headers.Elements()); got != 0 {
-		t.Fatalf("expected empty headers map, got %d elements", got)
+func TestSyntheticAssertionsToListUsesNullForAbsentAssertions(t *testing.T) {
+	for _, assertions := range [][]*models.Assertion{nil, {}} {
+		assertionsList := syntheticAssertionsToList(assertions)
+		if !assertionsList.IsNull() {
+			t.Fatal("expected absent assertions to be represented as a null list")
+		}
 	}
 }
 
