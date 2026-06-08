@@ -220,6 +220,66 @@ func TestMonitorV2BuildCreateRequestRejectsUnsupportedCustomResolveParentOperato
 	requireDiagnosticSummary(t, buildDiags, "Unsupported threshold operator for custom resolve threshold")
 }
 
+func TestMonitorV2ValidateUnsupportedQueryFields(t *testing.T) {
+	tests := []struct {
+		name      string
+		queryType string
+		query     *monitorV2QueryModel
+		wantPath  string
+	}{
+		{
+			name:      "gcql rollup",
+			queryType: monitorV2QueryTypeGCQL,
+			query: &monitorV2QueryModel{
+				Rollup: &monitorV2RollupModel{
+					Function: types.StringValue("last"),
+					Time:     types.StringValue("5m"),
+				},
+			},
+			wantPath: "query.rollup",
+		},
+		{
+			name:      "metricsql instant_rollup",
+			queryType: monitorV2QueryTypeMetricsQL,
+			query: &monitorV2QueryModel{
+				InstantRollup: types.StringValue("5m"),
+			},
+			wantPath: "query.instant_rollup",
+		},
+		{
+			name:      "raw_sql data_type",
+			queryType: monitorV2QueryTypeRawSQL,
+			query: &monitorV2QueryModel{
+				DataType: types.StringValue("logs"),
+			},
+			wantPath: "query.data_type",
+		},
+		{
+			name:      "raw_sql datasource_type",
+			queryType: monitorV2QueryTypeRawSQL,
+			query: &monitorV2QueryModel{
+				DatasourceType: types.StringValue(monitorV2DatasourcePrometheus),
+			},
+			wantPath: "query.datasource_type",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			var diags diag.Diagnostics
+			monitorV2ValidateUnsupportedQueryFields(tt.query, tt.queryType, &diags)
+			requireDiagnosticSummary(t, diags, "Unsupported query")
+			diagnosticWithPath, ok := diags[0].(diag.DiagnosticWithPath)
+			if !ok {
+				t.Fatalf("diagnostic does not expose a path: %#v", diags[0])
+			}
+			if got := diagnosticWithPath.Path().String(); got != tt.wantPath {
+				t.Fatalf("diagnostic path = %q, want %q", got, tt.wantPath)
+			}
+		})
+	}
+}
+
 func TestMonitorV2ValidateNotificationSettings(t *testing.T) {
 	connectedApps, diags := types.ListValueFrom(context.Background(), types.StringType, []string{"slack-app-id"})
 	if diags.HasError() {
@@ -440,6 +500,35 @@ func TestMonitorV2MapSDKToModelPreservesEquivalentConfiguredDurations(t *testing
 	}
 	if state.Query.RelativeTimerange.To.ValueString() != "0m" {
 		t.Fatalf("state.Query.RelativeTimerange.To = %q, want 0m", state.Query.RelativeTimerange.To.ValueString())
+	}
+}
+
+func TestMonitorV2MapSDKToModelPreservesEquivalentNotificationDuration(t *testing.T) {
+	ctx := context.Background()
+	title := "duration monitor"
+	remote := &models.UpdateMonitorRequest{
+		Title:           &title,
+		Severity:        "critical",
+		MeasurementType: "state",
+		NotificationSettings: &models.NotificationSettings{
+			Method:                 "connectedApps",
+			RenotificationInterval: models.RenotificationDuration("1h"),
+		},
+	}
+
+	state := monitorV2ResourceModel{
+		NotificationSettings: &monitorV2NotificationSettingsModel{
+			Method:                 types.StringValue("connectedApps"),
+			RenotificationInterval: types.StringValue("60m"),
+		},
+	}
+	var diags diag.Diagnostics
+	mapMonitorV2SDKToModel(ctx, "monitor-id", remote, &state, &diags)
+	if diags.HasError() {
+		t.Fatalf("mapMonitorV2SDKToModel() diagnostics: %v", diags)
+	}
+	if state.NotificationSettings.RenotificationInterval.ValueString() != "60m" {
+		t.Fatalf("state.NotificationSettings.RenotificationInterval = %q, want 60m", state.NotificationSettings.RenotificationInterval.ValueString())
 	}
 }
 

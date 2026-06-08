@@ -540,6 +540,7 @@ func (r *monitorV2Resource) ValidateConfig(ctx context.Context, req resource.Val
 
 	switch queryType {
 	case monitorV2QueryTypeGCQL:
+		monitorV2ValidateUnsupportedQueryFields(config.Query, queryType, &resp.Diagnostics)
 		if monitorV2String(config.Query.DataType) == "" {
 			resp.Diagnostics.AddAttributeError(
 				path.Root("query").AtName("data_type"),
@@ -548,6 +549,7 @@ func (r *monitorV2Resource) ValidateConfig(ctx context.Context, req resource.Val
 			)
 		}
 	case monitorV2QueryTypeMetricsQL:
+		monitorV2ValidateUnsupportedQueryFields(config.Query, queryType, &resp.Diagnostics)
 		if config.Query.Rollup == nil {
 			resp.Diagnostics.AddAttributeError(
 				path.Root("query").AtName("rollup"),
@@ -571,6 +573,7 @@ func (r *monitorV2Resource) ValidateConfig(ctx context.Context, req resource.Val
 			}
 		}
 	case monitorV2QueryTypeRawSQL:
+		monitorV2ValidateUnsupportedQueryFields(config.Query, queryType, &resp.Diagnostics)
 		if config.Query.Rollup != nil {
 			resp.Diagnostics.AddAttributeError(
 				path.Root("query").AtName("rollup"),
@@ -617,6 +620,50 @@ func (r *monitorV2Resource) ValidateConfig(ctx context.Context, req resource.Val
 	}
 
 	monitorV2ValidateNotificationSettings(config.NotificationSettings, &resp.Diagnostics)
+}
+
+func monitorV2ValidateUnsupportedQueryFields(query *monitorV2QueryModel, queryType string, diags *diag.Diagnostics) {
+	if query == nil {
+		return
+	}
+
+	switch queryType {
+	case monitorV2QueryTypeGCQL:
+		monitorV2RejectConfiguredQueryString(query.DatasourceType, "datasource_type", queryType, diags)
+		monitorV2RejectConfiguredQueryString(query.DatasourceID, "datasource_id", queryType, diags)
+		monitorV2RejectConfiguredQueryString(query.QueryType, "query_type", queryType, diags)
+		if query.Rollup != nil {
+			monitorV2RejectQueryBlock("rollup", queryType, diags)
+		}
+	case monitorV2QueryTypeMetricsQL:
+		monitorV2RejectConfiguredQueryString(query.DataType, "data_type", queryType, diags)
+		monitorV2RejectConfiguredQueryString(query.DatasourceID, "datasource_id", queryType, diags)
+		monitorV2RejectConfiguredQueryString(query.InstantRollup, "instant_rollup", queryType, diags)
+	case monitorV2QueryTypeRawSQL:
+		monitorV2RejectConfiguredQueryString(query.DataType, "data_type", queryType, diags)
+		monitorV2RejectConfiguredQueryString(query.DatasourceType, "datasource_type", queryType, diags)
+		monitorV2RejectConfiguredQueryString(query.InstantRollup, "instant_rollup", queryType, diags)
+	}
+}
+
+func monitorV2RejectConfiguredQueryString(value types.String, name, queryType string, diags *diag.Diagnostics) {
+	if value.IsNull() || value.IsUnknown() {
+		return
+	}
+
+	diags.AddAttributeError(
+		path.Root("query").AtName(name),
+		"Unsupported query field",
+		fmt.Sprintf("`query.%s` is not supported when query.type is `%s`.", name, queryType),
+	)
+}
+
+func monitorV2RejectQueryBlock(name, queryType string, diags *diag.Diagnostics) {
+	diags.AddAttributeError(
+		path.Root("query").AtName(name),
+		"Unsupported query block",
+		fmt.Sprintf("`query.%s` is not supported when query.type is `%s`.", name, queryType),
+	)
 }
 
 func monitorV2ValidateAnnotations(annotations types.Map, diags *diag.Diagnostics) {
@@ -1032,6 +1079,7 @@ func monitorV2RelativeRangeToSDK(relativeRange *monitorV2RelativeRangeModel, dia
 func mapMonitorV2SDKToModel(ctx context.Context, id string, remote *models.UpdateMonitorRequest, state *monitorV2ResourceModel, diags *diag.Diagnostics) {
 	previousQuery := state.Query
 	previousEvaluationInterval := state.EvaluationInterval
+	previousNotificationSettings := state.NotificationSettings
 	previousReducers := state.Reducers
 	previousThresholds := state.Thresholds
 
@@ -1050,7 +1098,7 @@ func mapMonitorV2SDKToModel(ctx context.Context, id string, remote *models.Updat
 	state.Routing = monitorV2StringListType(ctx, remote.Routing, diags)
 	state.Display = monitorV2DisplayFromSDK(ctx, remote.Display, diags)
 	state.EvaluationInterval = monitorV2PreserveEvaluationIntervalDurations(previousEvaluationInterval, monitorV2EvaluationIntervalFromSDK(remote.EvaluationInterval))
-	state.NotificationSettings = monitorV2NotificationSettingsFromSDK(ctx, remote.NotificationSettings, diags)
+	state.NotificationSettings = monitorV2PreserveNotificationSettingsDurations(previousNotificationSettings, monitorV2NotificationSettingsFromSDK(ctx, remote.NotificationSettings, diags))
 
 	if remote.Model == nil {
 		state.Query = nil
@@ -1085,6 +1133,15 @@ func monitorV2PreserveEvaluationIntervalDurations(previous, updated *monitorV2Ev
 
 	updated.Interval = monitorV2PreserveDurationString(previous.Interval, updated.Interval)
 	updated.PendingFor = monitorV2PreserveDurationString(previous.PendingFor, updated.PendingFor)
+	return updated
+}
+
+func monitorV2PreserveNotificationSettingsDurations(previous, updated *monitorV2NotificationSettingsModel) *monitorV2NotificationSettingsModel {
+	if previous == nil || updated == nil {
+		return updated
+	}
+
+	updated.RenotificationInterval = monitorV2PreserveDurationString(previous.RenotificationInterval, updated.RenotificationInterval)
 	return updated
 }
 
