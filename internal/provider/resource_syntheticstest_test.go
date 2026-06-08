@@ -8,10 +8,134 @@ import (
 	"os"
 	"testing"
 
+	"github.com/groundcover-com/groundcover-sdk-go/pkg/models"
+	"github.com/hashicorp/terraform-plugin-framework/attr"
+	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/hashicorp/terraform-plugin-testing/helper/acctest"
 	"github.com/hashicorp/terraform-plugin-testing/helper/resource"
 	"github.com/hashicorp/terraform-plugin-testing/terraform"
 )
+
+func TestSyntheticTestFromSDKResponsePreservesEmptyHTTPHeaders(t *testing.T) {
+	ctx := context.Background()
+	emptyHeaders := types.MapValueMust(types.StringType, map[string]attr.Value{})
+
+	tests := []struct {
+		name        string
+		state       *syntheticTestResourceModel
+		sdkHeaders  map[string]string
+		wantMapNull bool
+	}{
+		{
+			name: "preserves configured empty headers when API omits headers",
+			state: &syntheticTestResourceModel{
+				HTTPCheck: &syntheticHTTPCheckModel{
+					Headers: emptyHeaders,
+				},
+			},
+			wantMapNull: false,
+		},
+		{
+			name:        "reflects empty API headers during import",
+			state:       &syntheticTestResourceModel{},
+			sdkHeaders:  map[string]string{},
+			wantMapNull: false,
+		},
+		{
+			name:        "keeps omitted API headers null during import",
+			state:       &syntheticTestResourceModel{},
+			wantMapNull: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			fromSDKResponse(ctx, syntheticTestResponseWithHeaders(tt.sdkHeaders), tt.state)
+
+			if tt.state.HTTPCheck == nil {
+				t.Fatal("expected http_check to be set")
+			}
+			if got := tt.state.HTTPCheck.Headers.IsNull(); got != tt.wantMapNull {
+				t.Fatalf("expected headers IsNull=%t, got %t", tt.wantMapNull, got)
+			}
+			if !tt.wantMapNull {
+				if got := len(tt.state.HTTPCheck.Headers.Elements()); got != 0 {
+					t.Fatalf("expected empty headers map, got %d elements", got)
+				}
+			}
+		})
+	}
+}
+
+func syntheticTestResponseWithHeaders(headers map[string]string) *models.SyntheticTestCreateRequest {
+	return &models.SyntheticTestCreateRequest{
+		Name:     "empty-headers",
+		Enabled:  true,
+		Interval: "1m",
+		Version:  1,
+		CheckConfig: &models.WorkerRequest{
+			Request: &models.Request{
+				HTTP: &models.HTTPRequest{
+					Kind:    "http",
+					URL:     "https://example.com",
+					Method:  "GET",
+					Timeout: "10s",
+					Headers: headers,
+				},
+			},
+		},
+	}
+}
+
+func TestSyntheticAssertionsToListUsesNullForAbsentAssertions(t *testing.T) {
+	for _, assertions := range [][]*models.Assertion{nil, {}} {
+		assertionsList := syntheticAssertionsToList(assertions)
+		if !assertionsList.IsNull() {
+			t.Fatal("expected absent assertions to be represented as a null list")
+		}
+	}
+}
+
+func TestAssertionModelsFromListHandlesUnknownValues(t *testing.T) {
+	ctx := context.Background()
+
+	assertions, diags := assertionModelsFromList(ctx, types.ListUnknown(syntheticAssertionObjectType()), true)
+	if diags.HasError() {
+		t.Fatalf("expected unknown assertion list to be skipped during validation, got diagnostics: %v", diags)
+	}
+	if len(assertions) != 0 {
+		t.Fatalf("expected no assertion models from unknown list, got %d", len(assertions))
+	}
+
+	assertionObj, diags := types.ObjectValue(
+		syntheticAssertionAttrTypes(),
+		map[string]attr.Value{
+			"source":   types.StringUnknown(),
+			"operator": types.StringValue("eq"),
+			"target":   types.StringNull(),
+			"property": types.StringUnknown(),
+			"severity": types.StringNull(),
+		},
+	)
+	if diags.HasError() {
+		t.Fatalf("failed to build assertion object: %v", diags)
+	}
+
+	assertionList := types.ListValueMust(syntheticAssertionObjectType(), []attr.Value{assertionObj})
+	assertions, diags = assertionModelsFromList(ctx, assertionList, true)
+	if diags.HasError() {
+		t.Fatalf("expected unknown assertion attributes to be representable, got diagnostics: %v", diags)
+	}
+	if len(assertions) != 1 {
+		t.Fatalf("expected one assertion model, got %d", len(assertions))
+	}
+	if !assertions[0].Source.IsUnknown() {
+		t.Fatal("expected source to remain unknown")
+	}
+	if !assertions[0].Property.IsUnknown() {
+		t.Fatal("expected property to remain unknown")
+	}
+}
 
 func TestAccSyntheticTestResource_basic(t *testing.T) {
 	name := acctest.RandomWithPrefix("test-synth")

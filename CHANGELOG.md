@@ -1,5 +1,7 @@
 ## 1.14.0
 
+* Fixed `groundcover_synthetic_test` stability issues when Terraform/OpenTofu produces unknown values for `assertion` blocks, including module patterns using `dynamic`, `for_each`, or `optional()` values
+* Fixed perpetual diffs for `groundcover_synthetic_test.http_check.headers` when users explicitly configure an empty map (`headers = {}`)
 * Added `groundcover_monitor_v2`, a typed monitor resource that replaces the raw YAML blob with Terraform schema fields and supports GCQL, MetricsQL, raw SQL, custom resolve thresholds, and connected-app delivery params
 * Updated `github.com/groundcover-com/groundcover-sdk-go` to `v1.287.0` so monitor resources use the current generated monitor model; `isProvisioned` is now sent on monitor create requests per the current SDK shape
 
