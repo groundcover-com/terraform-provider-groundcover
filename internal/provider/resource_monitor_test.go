@@ -505,6 +505,20 @@ func TestMonitorV2FilterAnnotationsRemovesInternalQueryTypeMarker(t *testing.T) 
 	}
 }
 
+func TestMonitorV2ValidateAnnotationsRejectsReservedQueryTypeMarker(t *testing.T) {
+	annotations, mapDiags := types.MapValueFrom(context.Background(), types.StringType, map[string]string{
+		monitorV2QueryTypeAnnotationKey: monitorV2QueryTypeGCQL,
+		"team":                          "platform",
+	})
+	if mapDiags.HasError() {
+		t.Fatalf("types.MapValueFrom() diagnostics: %v", mapDiags)
+	}
+
+	var diags diag.Diagnostics
+	monitorV2ValidateAnnotations(annotations, &diags)
+	requireDiagnosticSummary(t, diags, "Reserved monitor annotation")
+}
+
 func TestMonitorResourceDisappearsDefaultAPIURLMatchesProviderDefault(t *testing.T) {
 	t.Setenv("GROUNDCOVER_API_URL", "")
 

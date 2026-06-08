@@ -218,7 +218,7 @@ func (r *monitorV2Resource) Schema(_ context.Context, _ resource.SchemaRequest, 
 				ElementType:         types.StringType,
 			},
 			"annotations": schema.MapAttribute{
-				MarkdownDescription: "Annotations to attach to the monitor and resulting alerts.",
+				MarkdownDescription: fmt.Sprintf("Annotations to attach to the monitor and resulting alerts. The `%s` key is reserved for provider-managed Monitor V2 state and cannot be configured.", monitorV2QueryTypeAnnotationKey),
 				Optional:            true,
 				Computed:            true,
 				ElementType:         types.StringType,
@@ -522,6 +522,8 @@ func (r *monitorV2Resource) ValidateConfig(ctx context.Context, req resource.Val
 		return
 	}
 
+	monitorV2ValidateAnnotations(config.Annotations, &resp.Diagnostics)
+
 	if config.Query == nil {
 		resp.Diagnostics.AddAttributeError(
 			path.Root("query"),
@@ -615,6 +617,21 @@ func (r *monitorV2Resource) ValidateConfig(ctx context.Context, req resource.Val
 	}
 
 	monitorV2ValidateNotificationSettings(config.NotificationSettings, &resp.Diagnostics)
+}
+
+func monitorV2ValidateAnnotations(annotations types.Map, diags *diag.Diagnostics) {
+	if annotations.IsNull() || annotations.IsUnknown() {
+		return
+	}
+	if _, ok := annotations.Elements()[monitorV2QueryTypeAnnotationKey]; !ok {
+		return
+	}
+
+	diags.AddAttributeError(
+		path.Root("annotations").AtMapKey(monitorV2QueryTypeAnnotationKey),
+		"Reserved monitor annotation",
+		fmt.Sprintf("`annotations.%s` is reserved for provider-managed Monitor V2 state and cannot be configured.", monitorV2QueryTypeAnnotationKey),
+	)
 }
 
 func monitorV2ValidateNotificationSettings(settings *monitorV2NotificationSettingsModel, diags *diag.Diagnostics) {
