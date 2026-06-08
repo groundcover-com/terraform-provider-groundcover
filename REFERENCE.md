@@ -164,4 +164,65 @@ resource "groundcover_monitor" "my_monitor" {
 
 #### Attributes
 
-*   `id` (String): Monitor identifier (UUID). 
+*   `id` (String): Monitor identifier (UUID).
+
+### `groundcover_monitor_v2`
+
+Manages a groundcover Monitor resource with a typed schema instead of raw YAML. Supports GCQL, MetricsQL, and raw SQL query definitions.
+
+#### Example Usage
+
+The full example file includes GCQL examples for logs, traces, events, entities, RUM, and issues, plus MetricsQL and raw SQL examples.
+
+```hcl
+resource "groundcover_monitor_v2" "gcql_logs" {
+  title            = "GCQL Logs Error Count"
+  severity         = "critical"
+  measurement_type = "event"
+  is_paused        = true
+
+  display {
+    header      = "GCQL Logs Error Count"
+    description = "Fires when error logs are observed in the evaluation window."
+  }
+
+  query {
+    type           = "gcql"
+    data_type      = "logs"
+    expression     = "level:error | stats count() count_all_result"
+    instant_rollup = "5m"
+  }
+
+  threshold {
+    name       = "threshold_1"
+    input_name = "threshold_input_query"
+    operator   = "gt"
+    values     = [10]
+  }
+
+  notification_settings {
+    method         = "connectedApps"
+    connected_apps = ["slack-connected-app-id"]
+
+    connected_app_params = {
+      "slack-connected-app-id" = {
+        channels = ["C0123456789"]
+      }
+    }
+  }
+}
+```
+
+#### Arguments
+
+*   `title` (String, Required): Monitor title.
+*   `severity` (String, Required): Monitor severity.
+*   `measurement_type` (String, Required): `state` or `event`.
+*   `query` (Block, Required): Typed query definition. Supports `type = "gcql"`, `type = "metricsql"`, and `type = "raw_sql"`. GCQL supports `data_type` values `logs`, `traces`, `events`, `entities`, `rum`, and `issues`.
+*   `threshold` (Block, Required): One or more threshold definitions. Supports optional `custom_resolve_threshold`.
+*   `notification_settings` (Block, Optional): Notification behavior, including `connected_app_params` for per-app Slack channels.
+*   `display`, `evaluation_interval`, `reducer`, `labels`, `annotations`, and `routing` are optional monitor settings.
+
+#### Attributes
+
+*   `id` (String): Monitor identifier (UUID).
