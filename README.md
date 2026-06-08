@@ -14,6 +14,8 @@ Basic usage examples can be found in the `examples/` directory:
     *   Illustrates API key creation and management for service accounts.
 *   **Monitor Resource:** [`examples/resources/groundcover_monitor/resource.tf`](./examples/resources/groundcover_monitor/resource.tf)
     *   Provides examples of configuring monitoring rules and alerts.
+*   **Monitor V2 Resource:** [`examples/resources/groundcover_monitor_v2/resource.tf`](./examples/resources/groundcover_monitor_v2/resource.tf)
+    *   Provides typed monitor examples for GCQL, MetricsQL, raw SQL, custom resolve thresholds, and connected-app delivery params.
 *   **Ingestion Key Resource:** [`examples/resources/groundcover_ingestionkey/resource.tf`](./examples/resources/groundcover_ingestionkey/resource.tf)
     *   Demonstrates how to create and manage ingestion keys for data ingestion.
 *   **Logs Pipeline Resource:** [`examples/resources/groundcover_logspipeline/resource.tf`](./examples/resources/groundcover_logspipeline/resource.tf)
@@ -246,6 +248,8 @@ TF_ACC=1 go test ./internal/provider -v -cover
 TF_ACC=1 go test ./internal/provider -v -run TestAccPolicyResource
 TF_ACC=1 go test ./internal/provider -v -run TestAccServiceAccountResource
 TF_ACC=1 go test ./internal/provider -v -run TestAccMonitorResource
+TF_ACC=1 go test ./internal/provider -v -run TestAccMonitorV2Resource
+TF_ACC=1 TF_ACC_MONITOR_V2_ALL_QUERY_TYPES=1 go test ./internal/provider -v -run TestAccMonitorV2Resource_allSupportedQueryTypes
 TF_ACC=1 go test ./internal/provider -v -run TestAccApiKeyResource
 TF_ACC=1 go test ./internal/provider -v -run TestAccLogsPipelineResource
 TF_ACC=1 go test ./internal/provider -v -run TestAccMetricsAggregationResource

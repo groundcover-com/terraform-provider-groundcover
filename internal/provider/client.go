@@ -167,6 +167,12 @@ type ApiClient interface {
 	UpdateMonitor(ctx context.Context, id string, req *models.UpdateMonitorRequest) error // Update response has no payload
 	DeleteMonitor(ctx context.Context, id string) error
 
+	// Monitors V2 (typed Terraform schema backed by the monitor API).
+	CreateMonitorV2(ctx context.Context, req *models.CreateMonitorRequest) (*models.CreateMonitorResponse, error)
+	GetMonitorV2(ctx context.Context, id string) ([]byte, error)                            // Returns raw YAML bytes
+	UpdateMonitorV2(ctx context.Context, id string, req *models.UpdateMonitorRequest) error // Update response has no payload
+	DeleteMonitorV2(ctx context.Context, id string) error
+
 	// API Keys
 	CreateApiKey(ctx context.Context, req *models.CreateAPIKeyRequest) (*models.CreateAPIKeyResponse, error)
 	ListApiKeys(ctx context.Context, withRevoked *bool, withExpired *bool) ([]*models.ListAPIKeysResponseItem, error)
