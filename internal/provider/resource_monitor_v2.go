@@ -647,7 +647,7 @@ func monitorV2ValidateUnsupportedQueryFields(query *monitorV2QueryModel, queryTy
 }
 
 func monitorV2RejectConfiguredQueryString(value types.String, name, queryType string, diags *diag.Diagnostics) {
-	if value.IsNull() || value.IsUnknown() {
+	if value.IsNull() || value.IsUnknown() || value.ValueString() == "" {
 		return
 	}
 

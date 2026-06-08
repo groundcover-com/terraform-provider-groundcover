@@ -226,6 +226,7 @@ func TestMonitorV2ValidateUnsupportedQueryFields(t *testing.T) {
 		queryType string
 		query     *monitorV2QueryModel
 		wantPath  string
+		wantError bool
 	}{
 		{
 			name:      "gcql rollup",
@@ -236,7 +237,8 @@ func TestMonitorV2ValidateUnsupportedQueryFields(t *testing.T) {
 					Time:     types.StringValue("5m"),
 				},
 			},
-			wantPath: "query.rollup",
+			wantPath:  "query.rollup",
+			wantError: true,
 		},
 		{
 			name:      "metricsql instant_rollup",
@@ -244,7 +246,15 @@ func TestMonitorV2ValidateUnsupportedQueryFields(t *testing.T) {
 			query: &monitorV2QueryModel{
 				InstantRollup: types.StringValue("5m"),
 			},
-			wantPath: "query.instant_rollup",
+			wantPath:  "query.instant_rollup",
+			wantError: true,
+		},
+		{
+			name:      "metricsql empty instant_rollup",
+			queryType: monitorV2QueryTypeMetricsQL,
+			query: &monitorV2QueryModel{
+				InstantRollup: types.StringValue(""),
+			},
 		},
 		{
 			name:      "raw_sql data_type",
@@ -252,7 +262,8 @@ func TestMonitorV2ValidateUnsupportedQueryFields(t *testing.T) {
 			query: &monitorV2QueryModel{
 				DataType: types.StringValue("logs"),
 			},
-			wantPath: "query.data_type",
+			wantPath:  "query.data_type",
+			wantError: true,
 		},
 		{
 			name:      "raw_sql datasource_type",
@@ -260,7 +271,15 @@ func TestMonitorV2ValidateUnsupportedQueryFields(t *testing.T) {
 			query: &monitorV2QueryModel{
 				DatasourceType: types.StringValue(monitorV2DatasourcePrometheus),
 			},
-			wantPath: "query.datasource_type",
+			wantPath:  "query.datasource_type",
+			wantError: true,
+		},
+		{
+			name:      "gcql empty datasource_id",
+			queryType: monitorV2QueryTypeGCQL,
+			query: &monitorV2QueryModel{
+				DatasourceID: types.StringValue(""),
+			},
 		},
 	}
 
@@ -268,6 +287,12 @@ func TestMonitorV2ValidateUnsupportedQueryFields(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			var diags diag.Diagnostics
 			monitorV2ValidateUnsupportedQueryFields(tt.query, tt.queryType, &diags)
+			if !tt.wantError {
+				if diags.HasError() {
+					t.Fatalf("monitorV2ValidateUnsupportedQueryFields() diagnostics = %v, want none", diags)
+				}
+				return
+			}
 			requireDiagnosticSummary(t, diags, "Unsupported query")
 			diagnosticWithPath, ok := diags[0].(diag.DiagnosticWithPath)
 			if !ok {
