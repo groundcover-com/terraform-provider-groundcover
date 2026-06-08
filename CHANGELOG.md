@@ -1,3 +1,8 @@
+## 1.13.5
+
+* Fixed `groundcover_synthetic_test` stability issues when Terraform/OpenTofu produces unknown values for `assertion` blocks, including module patterns using `dynamic`, `for_each`, or `optional()` values
+* Fixed perpetual diffs for `groundcover_synthetic_test.http_check.headers` when users explicitly configure an empty map (`headers = {}`)
+
 ## 1.13.4
 
 * Documented that `groundcover_policy` import takes the policy **UUID** (not the name) — the import example and generated docs now show a UUID placeholder and point at the UI/network tab for finding it

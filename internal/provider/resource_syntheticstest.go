@@ -8,6 +8,7 @@ import (
 	"github.com/groundcover-com/groundcover-sdk-go/pkg/models"
 	"github.com/hashicorp/terraform-plugin-framework-validators/int64validator"
 	"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
+	"github.com/hashicorp/terraform-plugin-framework/attr"
 	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
@@ -19,6 +20,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
 	"github.com/hashicorp/terraform-plugin-framework/types"
+	"github.com/hashicorp/terraform-plugin-framework/types/basetypes"
 	"github.com/hashicorp/terraform-plugin-log/tflog"
 )
 
@@ -47,14 +49,14 @@ type syntheticTestResourceModel struct {
 	Interval types.String `tfsdk:"interval"`
 	Version  types.Int64  `tfsdk:"version"`
 
-	HTTPCheck *syntheticHTTPCheckModel  `tfsdk:"http_check"`
-	SSLCheck  *syntheticSSLCheckModel   `tfsdk:"ssl_check"`
-	TCPCheck  *syntheticTCPCheckModel   `tfsdk:"tcp_check"`
-	DNSCheck  *syntheticDNSCheckModel   `tfsdk:"dns_check"`
-	Assertion []syntheticAssertionModel `tfsdk:"assertion"`
-	Retry     *syntheticRetryModel      `tfsdk:"retry"`
-	Labels    types.Map                 `tfsdk:"labels"`
-	Monitor   *syntheticMonitorModel    `tfsdk:"monitor"`
+	HTTPCheck *syntheticHTTPCheckModel `tfsdk:"http_check"`
+	SSLCheck  *syntheticSSLCheckModel  `tfsdk:"ssl_check"`
+	TCPCheck  *syntheticTCPCheckModel  `tfsdk:"tcp_check"`
+	DNSCheck  *syntheticDNSCheckModel  `tfsdk:"dns_check"`
+	Assertion types.List               `tfsdk:"assertion"`
+	Retry     *syntheticRetryModel     `tfsdk:"retry"`
+	Labels    types.Map                `tfsdk:"labels"`
+	Monitor   *syntheticMonitorModel   `tfsdk:"monitor"`
 }
 
 type syntheticHTTPCheckModel struct {
@@ -114,6 +116,20 @@ type syntheticAssertionModel struct {
 	Target   types.String `tfsdk:"target"`
 	Property types.String `tfsdk:"property"`
 	Severity types.String `tfsdk:"severity"`
+}
+
+func syntheticAssertionAttrTypes() map[string]attr.Type {
+	return map[string]attr.Type{
+		"source":   types.StringType,
+		"operator": types.StringType,
+		"target":   types.StringType,
+		"property": types.StringType,
+		"severity": types.StringType,
+	}
+}
+
+func syntheticAssertionObjectType() types.ObjectType {
+	return types.ObjectType{AttrTypes: syntheticAssertionAttrTypes()}
 }
 
 var propertyAsSources = map[string]struct{}{
@@ -680,7 +696,13 @@ func (r *syntheticTestResource) ValidateConfig(ctx context.Context, req resource
 		}
 	}
 
-	for i, assertion := range config.Assertion {
+	assertions, assertionDiags := assertionModelsFromList(ctx, config.Assertion, true)
+	resp.Diagnostics.Append(assertionDiags...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+
+	for i, assertion := range assertions {
 		if assertion.Source.IsUnknown() || assertion.Source.IsNull() {
 			continue
 		}
@@ -766,7 +788,11 @@ func (r *syntheticTestResource) Create(ctx context.Context, req resource.CreateR
 		return
 	}
 
-	sdkReq := toSDKRequest(&plan)
+	sdkReq, conversionDiags := toSDKRequest(ctx, &plan)
+	resp.Diagnostics.Append(conversionDiags...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
 
 	createdResp, err := r.client.CreateSyntheticTest(ctx, sdkReq)
 	if err != nil {
@@ -836,7 +862,11 @@ func (r *syntheticTestResource) Update(ctx context.Context, req resource.UpdateR
 		return
 	}
 
-	sdkReq := toSDKRequest(&plan)
+	sdkReq, conversionDiags := toSDKRequest(ctx, &plan)
+	resp.Diagnostics.Append(conversionDiags...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
 
 	err := r.client.UpdateSyntheticTest(ctx, plan.ID.ValueString(), sdkReq)
 	if err != nil {
@@ -897,7 +927,114 @@ func validateCheckPresent(plan *syntheticTestResourceModel, diags *diag.Diagnost
 	return true
 }
 
-func toSDKRequest(plan *syntheticTestResourceModel) *models.SyntheticTestCreateRequest {
+func assertionModelsFromList(ctx context.Context, assertions types.List, allowUnknown bool) ([]syntheticAssertionModel, diag.Diagnostics) {
+	var diags diag.Diagnostics
+
+	if assertions.IsNull() {
+		return nil, diags
+	}
+
+	if assertions.IsUnknown() {
+		if !allowUnknown {
+			diags.AddError(
+				"Unknown assertion configuration",
+				"The assertion blocks contain unknown values and cannot be sent to the groundcover API until Terraform resolves them.",
+			)
+		}
+		return nil, diags
+	}
+
+	assertionModels := make([]syntheticAssertionModel, 0, len(assertions.Elements()))
+	for _, element := range assertions.Elements() {
+		if element.IsNull() || element.IsUnknown() {
+			if !allowUnknown {
+				diags.AddError(
+					"Unknown assertion configuration",
+					"The assertion block contains unknown values and cannot be sent to the groundcover API until Terraform resolves them.",
+				)
+			}
+			continue
+		}
+
+		assertionObj, ok := element.(types.Object)
+		if !ok {
+			diags.AddError(
+				"Unexpected assertion element type",
+				fmt.Sprintf("Expected assertion element to be types.Object, got %T. Please report this issue to the provider developers.", element),
+			)
+			return nil, diags
+		}
+
+		var assertion syntheticAssertionModel
+		diags.Append(assertionObj.As(ctx, &assertion, basetypes.ObjectAsOptions{})...)
+		if diags.HasError() {
+			return nil, diags
+		}
+
+		if !allowUnknown && assertionHasUnknownValues(assertion) {
+			diags.AddError(
+				"Unknown assertion configuration",
+				"The assertion block contains unknown values and cannot be sent to the groundcover API until Terraform resolves them.",
+			)
+			return nil, diags
+		}
+
+		assertionModels = append(assertionModels, assertion)
+	}
+
+	return assertionModels, diags
+}
+
+func assertionHasUnknownValues(assertion syntheticAssertionModel) bool {
+	return assertion.Source.IsUnknown() ||
+		assertion.Operator.IsUnknown() ||
+		assertion.Target.IsUnknown() ||
+		assertion.Property.IsUnknown() ||
+		assertion.Severity.IsUnknown()
+}
+
+func assertionValueOrNull(value string) types.String {
+	if value == "" {
+		return types.StringNull()
+	}
+
+	return types.StringValue(value)
+}
+
+func syntheticAssertionsToList(assertions []*models.Assertion) types.List {
+	if len(assertions) == 0 {
+		return types.ListValueMust(syntheticAssertionObjectType(), []attr.Value{})
+	}
+
+	elements := make([]attr.Value, 0, len(assertions))
+	for _, assertion := range assertions {
+		assertionObj, diags := types.ObjectValue(
+			syntheticAssertionAttrTypes(),
+			map[string]attr.Value{
+				"source":   types.StringValue(string(assertion.Source)),
+				"operator": types.StringValue(string(assertion.Operator)),
+				"target":   assertionValueOrNull(assertion.Target),
+				"property": assertionValueOrNull(assertion.Property),
+				"severity": assertionValueOrNull(string(assertion.Severity)),
+			},
+		)
+		if diags.HasError() {
+			return types.ListNull(syntheticAssertionObjectType())
+		}
+		elements = append(elements, assertionObj)
+	}
+
+	assertionsList, diags := types.ListValue(syntheticAssertionObjectType(), elements)
+	if diags.HasError() {
+		return types.ListNull(syntheticAssertionObjectType())
+	}
+
+	return assertionsList
+}
+
+func toSDKRequest(ctx context.Context, plan *syntheticTestResourceModel) (*models.SyntheticTestCreateRequest, diag.Diagnostics) {
+	var diags diag.Diagnostics
+
 	sdkReq := &models.SyntheticTestCreateRequest{
 		Name:     plan.Name.ValueString(),
 		Enabled:  plan.Enabled.ValueBool(),
@@ -1078,9 +1215,14 @@ func toSDKRequest(plan *syntheticTestResourceModel) *models.SyntheticTestCreateR
 	}
 
 	// Assertions
-	if len(plan.Assertion) > 0 {
-		assertions := make([]*models.Assertion, 0, len(plan.Assertion))
-		for _, a := range plan.Assertion {
+	assertionModels, assertionDiags := assertionModelsFromList(ctx, plan.Assertion, false)
+	diags.Append(assertionDiags...)
+	if diags.HasError() {
+		return nil, diags
+	}
+	if len(assertionModels) > 0 {
+		assertions := make([]*models.Assertion, 0, len(assertionModels))
+		for _, a := range assertionModels {
 			assertion := &models.Assertion{
 				Source:   models.AssertionSource(a.Source.ValueString()),
 				Operator: models.AssertionOperator(a.Operator.ValueString()),
@@ -1187,7 +1329,7 @@ func toSDKRequest(plan *syntheticTestResourceModel) *models.SyntheticTestCreateR
 		sdkReq.Monitor = monitorConfig
 	}
 
-	return sdkReq
+	return sdkReq, diags
 }
 
 // --- Conversion: SDK response → Terraform state ---
@@ -1228,12 +1370,18 @@ func fromSDKResponse(ctx context.Context, sdkResp *models.SyntheticTestCreateReq
 			Timeout: types.StringValue(http.Timeout),
 		}
 
-		// Headers - set from API or clear to null when API returns none
+		// Headers - set from API, preserve an explicitly configured empty map,
+		// or clear to null when API returns none.
 		if len(http.Headers) > 0 {
 			headersMap, diags := types.MapValueFrom(ctx, types.StringType, http.Headers)
 			if !diags.HasError() {
 				httpModel.Headers = headersMap
 			}
+		} else if state.HTTPCheck != nil &&
+			!state.HTTPCheck.Headers.IsNull() &&
+			!state.HTTPCheck.Headers.IsUnknown() &&
+			len(state.HTTPCheck.Headers.Elements()) == 0 {
+			httpModel.Headers = state.HTTPCheck.Headers
 		} else {
 			httpModel.Headers = types.MapNull(types.StringType)
 		}
@@ -1427,26 +1575,9 @@ func fromSDKResponse(ctx context.Context, sdkResp *models.SyntheticTestCreateReq
 
 	// Assertions
 	if cc.ExecutionPolicy != nil && len(cc.ExecutionPolicy.Assertions) > 0 {
-		assertions := make([]syntheticAssertionModel, 0, len(cc.ExecutionPolicy.Assertions))
-		for _, a := range cc.ExecutionPolicy.Assertions {
-			am := syntheticAssertionModel{
-				Source:   types.StringValue(string(a.Source)),
-				Operator: types.StringValue(string(a.Operator)),
-			}
-			if a.Target != "" {
-				am.Target = types.StringValue(a.Target)
-			}
-			if a.Property != "" {
-				am.Property = types.StringValue(a.Property)
-			}
-			if string(a.Severity) != "" {
-				am.Severity = types.StringValue(string(a.Severity))
-			}
-			assertions = append(assertions, am)
-		}
-		state.Assertion = assertions
+		state.Assertion = syntheticAssertionsToList(cc.ExecutionPolicy.Assertions)
 	} else {
-		state.Assertion = nil
+		state.Assertion = syntheticAssertionsToList(nil)
 	}
 
 	// Retries - clear when API returns none to avoid stale state
