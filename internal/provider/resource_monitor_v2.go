@@ -37,6 +37,8 @@ const (
 
 	monitorV2DefaultQueryName = "threshold_input_query"
 
+	monitorV2QueryTypeAnnotationKey = "_gc_monitor_v2_query_type"
+
 	monitorV2DatasourcePrometheus = "prometheus"
 	monitorV2DatasourceMetrics    = "metrics"
 	monitorV2DatasourceClickhouse = "clickhouse"
@@ -786,7 +788,7 @@ func buildMonitorV2CreateRequest(ctx context.Context, plan *monitorV2ResourceMod
 	var diags diag.Diagnostics
 	isProvisioned := true
 	req := &models.CreateMonitorRequest{
-		Annotations:          monitorV2StringMap(ctx, plan.Annotations, &diags),
+		Annotations:          monitorV2AnnotationsToSDK(ctx, plan.Annotations, plan.Query, &diags),
 		AutoResolve:          monitorV2Bool(plan.AutoResolve),
 		Category:             monitorV2String(plan.Category),
 		ExecutionErrorState:  monitorV2String(plan.ExecutionErrorState),
@@ -811,7 +813,7 @@ func buildMonitorV2CreateRequest(ctx context.Context, plan *monitorV2ResourceMod
 func buildMonitorV2UpdateRequest(ctx context.Context, plan *monitorV2ResourceModel) (*models.UpdateMonitorRequest, diag.Diagnostics) {
 	var diags diag.Diagnostics
 	req := &models.UpdateMonitorRequest{
-		Annotations:          monitorV2StringMap(ctx, plan.Annotations, &diags),
+		Annotations:          monitorV2AnnotationsToSDK(ctx, plan.Annotations, plan.Query, &diags),
 		AutoResolve:          monitorV2Bool(plan.AutoResolve),
 		Category:             monitorV2String(plan.Category),
 		ExecutionErrorState:  monitorV2String(plan.ExecutionErrorState),
@@ -1040,7 +1042,7 @@ func mapMonitorV2SDKToModel(ctx context.Context, id string, remote *models.Updat
 		return
 	}
 	if len(remote.Model.Queries) > 0 && remote.Model.Queries[0] != nil {
-		state.Query = monitorV2PreserveQueryDurations(previousQuery, monitorV2QueryFromSDK(remote.Model.Queries[0]))
+		state.Query = monitorV2PreserveQueryDurations(previousQuery, monitorV2QueryFromSDK(remote.Model.Queries[0], remote.Annotations))
 	}
 	state.Reducers = monitorV2PreserveReducerDurations(previousReducers, monitorV2ReducersFromSDK(remote.Model.Reducers))
 	state.Thresholds = monitorV2PreserveThresholdDurations(previousThresholds, monitorV2ThresholdsFromSDK(ctx, remote.Model.Thresholds, diags))
@@ -1115,17 +1117,10 @@ func monitorV2DurationStringsEqual(left, right string) bool {
 	return leftOK && rightOK && leftNormalized == rightNormalized
 }
 
-func monitorV2QueryFromSDK(query *models.BaseQuery) *monitorV2QueryModel {
-	queryType := monitorV2QueryTypeRawSQL
-	if query.DataType != "" {
-		queryType = monitorV2QueryTypeGCQL
-	} else if query.Rollup != nil || query.DatasourceType == monitorV2DatasourcePrometheus || query.DatasourceType == monitorV2DatasourceMetrics {
-		queryType = monitorV2QueryTypeMetricsQL
-	}
-
+func monitorV2QueryFromSDK(query *models.BaseQuery, annotations map[string]string) *monitorV2QueryModel {
 	return &monitorV2QueryModel{
 		Name:              monitorV2NullableString(query.Name),
-		Type:              types.StringValue(queryType),
+		Type:              types.StringValue(monitorV2QueryTypeFromSDK(query, annotations)),
 		Expression:        monitorV2NullableString(query.Expression),
 		DataType:          monitorV2NullableString(query.DataType),
 		DatasourceType:    monitorV2NullableString(query.DatasourceType),
@@ -1134,6 +1129,28 @@ func monitorV2QueryFromSDK(query *models.BaseQuery) *monitorV2QueryModel {
 		InstantRollup:     monitorV2DurationStringToType(query.InstantRollup),
 		Rollup:            monitorV2RollupFromSDK(query.Rollup),
 		RelativeTimerange: monitorV2RelativeRangeFromSDK(query.RelativeTimerange),
+	}
+}
+
+func monitorV2QueryTypeFromSDK(query *models.BaseQuery, annotations map[string]string) string {
+	if queryType := annotations[monitorV2QueryTypeAnnotationKey]; monitorV2IsValidQueryType(queryType) {
+		return queryType
+	}
+	if query.DataType != "" {
+		return monitorV2QueryTypeGCQL
+	}
+	if query.Rollup != nil || query.DatasourceType == monitorV2DatasourcePrometheus || query.DatasourceType == monitorV2DatasourceMetrics {
+		return monitorV2QueryTypeMetricsQL
+	}
+	return monitorV2QueryTypeRawSQL
+}
+
+func monitorV2IsValidQueryType(queryType string) bool {
+	switch queryType {
+	case monitorV2QueryTypeGCQL, monitorV2QueryTypeMetricsQL, monitorV2QueryTypeRawSQL:
+		return true
+	default:
+		return false
 	}
 }
 
@@ -1314,6 +1331,22 @@ func monitorV2StringMap(ctx context.Context, value types.Map, diags *diag.Diagno
 	return result
 }
 
+func monitorV2AnnotationsToSDK(ctx context.Context, annotations types.Map, query *monitorV2QueryModel, diags *diag.Diagnostics) map[string]string {
+	result := monitorV2StringMap(ctx, annotations, diags)
+	queryType := ""
+	if query != nil {
+		queryType = monitorV2String(query.Type)
+	}
+	if !monitorV2IsValidQueryType(queryType) {
+		return result
+	}
+	if result == nil {
+		result = make(map[string]string, 1)
+	}
+	result[monitorV2QueryTypeAnnotationKey] = queryType
+	return result
+}
+
 func monitorV2StringList(ctx context.Context, value types.List, diags *diag.Diagnostics) []string {
 	if value.IsNull() || value.IsUnknown() {
 		return nil
@@ -1491,7 +1524,7 @@ func monitorV2FilterAnnotations(annotations map[string]string) map[string]string
 	}
 	filtered := make(map[string]string, len(annotations))
 	for key, value := range annotations {
-		if key == "_gc_data_type" {
+		if monitorV2IsInternalAnnotation(key) {
 			continue
 		}
 		filtered[key] = value
@@ -1500,4 +1533,13 @@ func monitorV2FilterAnnotations(annotations map[string]string) map[string]string
 		return nil
 	}
 	return filtered
+}
+
+func monitorV2IsInternalAnnotation(key string) bool {
+	switch key {
+	case "_gc_data_type", monitorV2QueryTypeAnnotationKey:
+		return true
+	default:
+		return false
+	}
 }

@@ -92,6 +92,9 @@ func TestMonitorV2BuildCreateRequestGCQL(t *testing.T) {
 	if query.InstantRollup != "5m" {
 		t.Fatalf("query.InstantRollup = %q, want 5m", query.InstantRollup)
 	}
+	if req.Annotations[monitorV2QueryTypeAnnotationKey] != monitorV2QueryTypeGCQL {
+		t.Fatalf("Annotations[%q] = %q, want %q", monitorV2QueryTypeAnnotationKey, req.Annotations[monitorV2QueryTypeAnnotationKey], monitorV2QueryTypeGCQL)
+	}
 }
 
 func TestMonitorV2BuildCreateRequestMetricsQL(t *testing.T) {
@@ -125,6 +128,9 @@ func TestMonitorV2BuildCreateRequestMetricsQL(t *testing.T) {
 	if time.Duration(query.Rollup.Time) != 5*time.Minute {
 		t.Fatalf("query.Rollup.Time = %s, want 5m", time.Duration(query.Rollup.Time))
 	}
+	if req.Annotations[monitorV2QueryTypeAnnotationKey] != monitorV2QueryTypeMetricsQL {
+		t.Fatalf("Annotations[%q] = %q, want %q", monitorV2QueryTypeAnnotationKey, req.Annotations[monitorV2QueryTypeAnnotationKey], monitorV2QueryTypeMetricsQL)
+	}
 }
 
 func TestMonitorV2BuildCreateRequestRawSQL(t *testing.T) {
@@ -148,6 +154,9 @@ func TestMonitorV2BuildCreateRequestRawSQL(t *testing.T) {
 	}
 	if query.Rollup != nil {
 		t.Fatalf("query.Rollup = %#v, want nil", query.Rollup)
+	}
+	if req.Annotations[monitorV2QueryTypeAnnotationKey] != monitorV2QueryTypeRawSQL {
+		t.Fatalf("Annotations[%q] = %q, want %q", monitorV2QueryTypeAnnotationKey, req.Annotations[monitorV2QueryTypeAnnotationKey], monitorV2QueryTypeRawSQL)
 	}
 }
 
@@ -451,7 +460,7 @@ func TestMonitorV2MapSDKToModelClassifiesMetricsQLByRollup(t *testing.T) {
 			Function: "last",
 			Time:     models.Duration(5 * time.Minute),
 		},
-	})
+	}, nil)
 	if query.Type.ValueString() != monitorV2QueryTypeMetricsQL {
 		t.Fatalf("query.Type = %q, want %q", query.Type.ValueString(), monitorV2QueryTypeMetricsQL)
 	}
@@ -460,9 +469,39 @@ func TestMonitorV2MapSDKToModelClassifiesMetricsQLByRollup(t *testing.T) {
 		Expression:     "SELECT 0 AS count_all_result",
 		DatasourceType: monitorV2DatasourceClickhouse,
 		QueryType:      monitorV2QueryTypeInstant,
-	})
+	}, nil)
 	if rawSQLQuery.Type.ValueString() != monitorV2QueryTypeRawSQL {
 		t.Fatalf("rawSQLQuery.Type = %q, want %q", rawSQLQuery.Type.ValueString(), monitorV2QueryTypeRawSQL)
+	}
+}
+
+func TestMonitorV2MapSDKToModelUsesQueryTypeAnnotation(t *testing.T) {
+	query := monitorV2QueryFromSDK(&models.BaseQuery{
+		Expression:     "SELECT 0 AS count_all_result",
+		DatasourceType: monitorV2DatasourcePrometheus,
+		QueryType:      monitorV2QueryTypeInstant,
+	}, map[string]string{
+		monitorV2QueryTypeAnnotationKey: monitorV2QueryTypeRawSQL,
+	})
+	if query.Type.ValueString() != monitorV2QueryTypeRawSQL {
+		t.Fatalf("query.Type = %q, want %q", query.Type.ValueString(), monitorV2QueryTypeRawSQL)
+	}
+}
+
+func TestMonitorV2FilterAnnotationsRemovesInternalQueryTypeMarker(t *testing.T) {
+	filtered := monitorV2FilterAnnotations(map[string]string{
+		monitorV2QueryTypeAnnotationKey: monitorV2QueryTypeMetricsQL,
+		"_gc_data_type":                 "metrics",
+		"team":                          "platform",
+	})
+	if _, ok := filtered[monitorV2QueryTypeAnnotationKey]; ok {
+		t.Fatalf("filtered annotations still include %q", monitorV2QueryTypeAnnotationKey)
+	}
+	if _, ok := filtered["_gc_data_type"]; ok {
+		t.Fatalf("filtered annotations still include _gc_data_type")
+	}
+	if filtered["team"] != "platform" {
+		t.Fatalf("filtered team annotation = %q, want platform", filtered["team"])
 	}
 }
 
