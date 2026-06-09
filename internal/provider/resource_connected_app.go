@@ -77,7 +77,7 @@ func (r *connectedAppResource) Schema(_ context.Context, _ resource.SchemaReques
 				Sensitive:   true,
 			},
 			"data_hash": schema.StringAttribute{
-				Description: "SHA-256 hash of the stored connected app data (including secret fields), computed by groundcover. Because `data` is sensitive and redacted on read, this hash is how Terraform detects that the stored data changed outside of Terraform.",
+				Description: "SHA-256 hash of the stored connected app data (including secret fields), computed by groundcover. Because `data` is sensitive and redacted on read, this hash is how Terraform detects that the stored data changed outside of Terraform. Drift detection is forward-looking: it covers changes made after this hash is first recorded in state (i.e. after upgrading to a provider version that supports `data_hash`, on the next refresh/apply). For resources created by an older provider version, the first refresh adopts the current server hash as the baseline, so any out-of-band change made before the upgrade is absorbed rather than flagged.",
 				Computed:    true,
 			},
 			"created_by": schema.StringAttribute{
@@ -217,8 +217,16 @@ func (r *connectedAppResource) Read(ctx context.Context, req resource.ReadReques
 
 // connectedAppDataDrifted reports whether the connected app's stored data changed outside
 // Terraform, by comparing the data_hash recorded in state against the one returned by the API.
-// It returns false when state has no recorded hash (e.g. fresh import) or the API returns no
-// hash, so those cases fall back to preserving the sensitive `data` value as before.
+//
+// It returns false when state has no recorded hash or the API returns no hash, falling back to
+// preserving the sensitive `data` value as before. A missing state hash happens for a fresh
+// import or for a resource created by a provider version predating `data_hash`: in those cases
+// we deliberately do NOT treat the read as drift. The provider cannot reconstruct the
+// server-side hash locally (it is computed over the full pre-redaction data, including
+// server-side secret merging), so there is no trustworthy baseline to compare against — flagging
+// drift would produce false positives. Instead the first refresh adopts the current server hash
+// as the baseline, and drift detection applies to subsequent changes. See the `data_hash`
+// attribute description for the user-facing contract.
 func connectedAppDataDrifted(stateHash types.String, remoteHash string) bool {
 	if stateHash.IsNull() || stateHash.IsUnknown() {
 		return false

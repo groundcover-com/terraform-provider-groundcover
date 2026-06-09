@@ -117,7 +117,7 @@ output "pagerduty_app_id" {
 
 - `created_at` (String) The date the connected app was created (RFC3339 format).
 - `created_by` (String) The user who created the connected app.
-- `data_hash` (String) SHA-256 hash of the stored connected app data (including secret fields), computed by groundcover. Because `data` is sensitive and redacted on read, this hash is how Terraform detects that the stored data changed outside of Terraform.
+- `data_hash` (String) SHA-256 hash of the stored connected app data (including secret fields), computed by groundcover. Because `data` is sensitive and redacted on read, this hash is how Terraform detects that the stored data changed outside of Terraform. Drift detection is forward-looking: it covers changes made after this hash is first recorded in state (i.e. after upgrading to a provider version that supports `data_hash`, on the next refresh/apply). For resources created by an older provider version, the first refresh adopts the current server hash as the baseline, so any out-of-band change made before the upgrade is absorbed rather than flagged.
 - `id` (String) The unique identifier for the connected app.
 - `updated_at` (String) The date the connected app was last updated (RFC3339 format).
 - `updated_by` (String) The user who last updated the connected app.
