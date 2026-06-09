@@ -117,6 +117,7 @@ output "pagerduty_app_id" {
 
 - `created_at` (String) The date the connected app was created (RFC3339 format).
 - `created_by` (String) The user who created the connected app.
+- `data_hash` (String) SHA-256 hash of the stored connected app data (including secret fields), computed by groundcover. Because `data` is sensitive and redacted on read, this hash is how Terraform detects that the stored data changed outside of Terraform.
 - `id` (String) The unique identifier for the connected app.
 - `updated_at` (String) The date the connected app was last updated (RFC3339 format).
 - `updated_by` (String) The user who last updated the connected app.

@@ -29,6 +29,7 @@ func TestAccConnectedApp_basic(t *testing.T) {
 					resource.TestCheckResourceAttrSet("groundcover_connected_app.test", "id"),
 					resource.TestCheckResourceAttrSet("groundcover_connected_app.test", "created_by"),
 					resource.TestCheckResourceAttrSet("groundcover_connected_app.test", "created_at"),
+					resource.TestCheckResourceAttrSet("groundcover_connected_app.test", "data_hash"),
 				),
 			},
 			{
@@ -55,6 +56,7 @@ func TestAccConnectedApp_update(t *testing.T) {
 					resource.TestCheckResourceAttr("groundcover_connected_app.test", "name", initialName),
 					resource.TestCheckResourceAttr("groundcover_connected_app.test", "type", "slack-webhook"),
 					resource.TestCheckResourceAttrSet("groundcover_connected_app.test", "id"),
+					resource.TestCheckResourceAttrSet("groundcover_connected_app.test", "data_hash"),
 				),
 			},
 			{
@@ -63,6 +65,8 @@ func TestAccConnectedApp_update(t *testing.T) {
 					resource.TestCheckResourceAttr("groundcover_connected_app.test", "name", updatedName),
 					resource.TestCheckResourceAttr("groundcover_connected_app.test", "type", "slack-webhook"),
 					resource.TestCheckResourceAttrSet("groundcover_connected_app.test", "id"),
+					// data is unchanged across the rename, so the hash must stay stable.
+					resource.TestCheckResourceAttrSet("groundcover_connected_app.test", "data_hash"),
 				),
 			},
 		},

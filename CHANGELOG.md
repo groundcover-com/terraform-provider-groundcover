@@ -1,3 +1,9 @@
+## 1.15.0
+
+* Added computed `data_hash` attribute to `groundcover_connected_app` — exposes the SHA-256 hash groundcover computes over the stored (pre-redaction) data, so Terraform can detect changes to the sensitive, redacted `data` without retrieving the secret
+* `groundcover_connected_app` now corrects out-of-band drift: when the API-reported `data_hash` differs from the value recorded in state, the next plan shows a diff and apply restores the configured `data`
+* Updated `github.com/groundcover-com/groundcover-sdk-go` to `v1.291.0` (adds `data_hash` to connected-app responses)
+
 ## 1.14.0
 
 * Fixed `groundcover_synthetic_test` stability issues when Terraform/OpenTofu produces unknown values for `assertion` blocks, including module patterns using `dynamic`, `for_each`, or `optional()` values
