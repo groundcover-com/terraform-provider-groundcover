@@ -1,0 +1,5 @@
+# Generation cache (terraform schema scratch dir, downloaded provider binaries).
+.cache/
+
+# Generated provider schema (produced by `make schema`; large, environment-specific).
+config/schema.json
