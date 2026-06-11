@@ -332,7 +332,7 @@ resource "groundcover_monitor_v2" "raw_sql" {
 
 ### Optional
 
-- `annotations` (Map of String) Annotations to attach to the monitor and resulting alerts. The `_gc_monitor_v2_query_type` key is reserved for provider-managed Monitor V2 state and cannot be configured.
+- `annotations` (Map of String) Annotations to attach to the monitor and resulting alerts. Keys prefixed with `_gc_` are reserved for internal groundcover use and cannot be configured.
 - `auto_resolve` (Boolean) Whether the monitor should auto-resolve.
 - `category` (String) Monitor category.
 - `display` (Block, Optional) Display metadata shown in monitor issues. (see [below for nested schema](#nestedblock--display))

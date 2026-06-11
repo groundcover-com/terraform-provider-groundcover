@@ -92,8 +92,21 @@ func TestMonitorV2BuildCreateRequestGCQL(t *testing.T) {
 	if query.InstantRollup != "5m" {
 		t.Fatalf("query.InstantRollup = %q, want 5m", query.InstantRollup)
 	}
-	if req.Annotations[monitorV2QueryTypeAnnotationKey] != monitorV2QueryTypeGCQL {
-		t.Fatalf("Annotations[%q] = %q, want %q", monitorV2QueryTypeAnnotationKey, req.Annotations[monitorV2QueryTypeAnnotationKey], monitorV2QueryTypeGCQL)
+	requireMonitorV2NoInternalAnnotations(t, req.Annotations)
+	if derived := monitorV2QueryTypeFromSDK(query, nil); derived != monitorV2QueryTypeGCQL {
+		t.Fatalf("monitorV2QueryTypeFromSDK() = %q, want %q", derived, monitorV2QueryTypeGCQL)
+	}
+}
+
+// requireMonitorV2NoInternalAnnotations asserts an outgoing request carries no
+// `_gc_`-prefixed annotations — the backend reserves that prefix and rejects
+// requests containing such keys.
+func requireMonitorV2NoInternalAnnotations(t *testing.T, annotations map[string]string) {
+	t.Helper()
+	for key := range annotations {
+		if monitorV2IsInternalAnnotation(key) {
+			t.Fatalf("outgoing annotations contain reserved key %q", key)
+		}
 	}
 }
 
@@ -128,8 +141,9 @@ func TestMonitorV2BuildCreateRequestMetricsQL(t *testing.T) {
 	if time.Duration(query.Rollup.Time) != 5*time.Minute {
 		t.Fatalf("query.Rollup.Time = %s, want 5m", time.Duration(query.Rollup.Time))
 	}
-	if req.Annotations[monitorV2QueryTypeAnnotationKey] != monitorV2QueryTypeMetricsQL {
-		t.Fatalf("Annotations[%q] = %q, want %q", monitorV2QueryTypeAnnotationKey, req.Annotations[monitorV2QueryTypeAnnotationKey], monitorV2QueryTypeMetricsQL)
+	requireMonitorV2NoInternalAnnotations(t, req.Annotations)
+	if derived := monitorV2QueryTypeFromSDK(query, nil); derived != monitorV2QueryTypeMetricsQL {
+		t.Fatalf("monitorV2QueryTypeFromSDK() = %q, want %q", derived, monitorV2QueryTypeMetricsQL)
 	}
 }
 
@@ -155,8 +169,9 @@ func TestMonitorV2BuildCreateRequestRawSQL(t *testing.T) {
 	if query.Rollup != nil {
 		t.Fatalf("query.Rollup = %#v, want nil", query.Rollup)
 	}
-	if req.Annotations[monitorV2QueryTypeAnnotationKey] != monitorV2QueryTypeRawSQL {
-		t.Fatalf("Annotations[%q] = %q, want %q", monitorV2QueryTypeAnnotationKey, req.Annotations[monitorV2QueryTypeAnnotationKey], monitorV2QueryTypeRawSQL)
+	requireMonitorV2NoInternalAnnotations(t, req.Annotations)
+	if derived := monitorV2QueryTypeFromSDK(query, nil); derived != monitorV2QueryTypeRawSQL {
+		t.Fatalf("monitorV2QueryTypeFromSDK() = %q, want %q", derived, monitorV2QueryTypeRawSQL)
 	}
 }
 
@@ -623,6 +638,66 @@ func TestMonitorV2ValidateAnnotationsRejectsReservedQueryTypeMarker(t *testing.T
 	annotations, mapDiags := types.MapValueFrom(context.Background(), types.StringType, map[string]string{
 		monitorV2QueryTypeAnnotationKey: monitorV2QueryTypeGCQL,
 		"team":                          "platform",
+	})
+	if mapDiags.HasError() {
+		t.Fatalf("types.MapValueFrom() diagnostics: %v", mapDiags)
+	}
+
+	var diags diag.Diagnostics
+	monitorV2ValidateAnnotations(annotations, &diags)
+	requireDiagnosticSummary(t, diags, "Reserved monitor annotation")
+}
+
+// The backend reserves the entire `_gc_` annotation prefix and rejects create
+// requests that contain such keys, so the provider must not inject its
+// query-type marker into outgoing annotations.
+func TestMonitorV2AnnotationsToSDKDoesNotInjectInternalMarker(t *testing.T) {
+	ctx := context.Background()
+
+	annotations, mapDiags := types.MapValueFrom(ctx, types.StringType, map[string]string{
+		"team": "platform",
+	})
+	if mapDiags.HasError() {
+		t.Fatalf("types.MapValueFrom() diagnostics: %v", mapDiags)
+	}
+
+	var diags diag.Diagnostics
+	result := monitorV2AnnotationsToSDK(ctx, annotations, &diags)
+	if diags.HasError() {
+		t.Fatalf("monitorV2AnnotationsToSDK() diagnostics: %v", diags)
+	}
+	for key := range result {
+		if strings.HasPrefix(key, "_gc_") {
+			t.Fatalf("outgoing annotations contain reserved key %q", key)
+		}
+	}
+	if result["team"] != "platform" {
+		t.Fatalf("team annotation = %q, want platform", result["team"])
+	}
+
+	var nilDiags diag.Diagnostics
+	if result := monitorV2AnnotationsToSDK(ctx, types.MapNull(types.StringType), &nilDiags); result != nil {
+		t.Fatalf("expected nil annotations for null map, got %v", result)
+	}
+}
+
+func TestMonitorV2FilterAnnotationsRemovesAnyGcPrefixedKey(t *testing.T) {
+	filtered := monitorV2FilterAnnotations(map[string]string{
+		"_gc_some_future_internal_key": "value",
+		"team":                         "platform",
+	})
+	if _, ok := filtered["_gc_some_future_internal_key"]; ok {
+		t.Fatalf("filtered annotations still include _gc_some_future_internal_key")
+	}
+	if filtered["team"] != "platform" {
+		t.Fatalf("filtered team annotation = %q, want platform", filtered["team"])
+	}
+}
+
+func TestMonitorV2ValidateAnnotationsRejectsAnyGcPrefixedKey(t *testing.T) {
+	annotations, mapDiags := types.MapValueFrom(context.Background(), types.StringType, map[string]string{
+		"_gc_custom": "value",
+		"team":       "platform",
 	})
 	if mapDiags.HasError() {
 		t.Fatalf("types.MapValueFrom() diagnostics: %v", mapDiags)
