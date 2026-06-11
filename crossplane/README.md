@@ -7,9 +7,11 @@ mimics the Terraform provider's drift-fixing so Crossplane does not report perpe
 drift on `connected_app`, `monitor`, and `dashboard`.
 
 > Status: **POC** (BE-2055). The hand-written drift-suppression core and the upjet
-> configuration are complete and unit-tested. Running the generation pipeline itself
-> requires the Terraform CLI and network access (see below) and is intended to be run in
-> a development environment, not CI, for the POC.
+> configuration are complete and unit-tested, and the generation pipeline has been run
+> end-to-end against the in-repo provider — it generates correct CRD API types, deepcopy
+> methods, and controllers for all three resources (`monitor`, `dashboard`,
+> `connected_app`). The generated tree is reproducible via `make generate` and is
+> gitignored while this is a POC (see "What's proven vs. remaining" below).
 
 ## Why custom observe is needed
 
@@ -122,6 +124,35 @@ func SetupWithObserve(mgr ctrl.Manager, o tjcontroller.Options) error {
 
 `connected_app` is identical but uses `observe.NewHashStrategy`, extracting the recorded
 `data_hash` from `Spec`/`Status` and the current remote hash from `Status.AtProvider`.
+
+## What's proven vs. remaining
+
+Proven by running `make schema && make generate` against the in-repo provider:
+
+- The pipeline generates correct CRD API types, deepcopy methods, and controllers for
+  `monitor`, `dashboard`, and `connected_app`.
+- `monitor` exposes `MonitorYaml` in both `Spec.ForProvider` and `Status.AtProvider` —
+  the clean YAML-strategy case the wiring example above targets.
+- `connected_app` exposes `DataHash` in `Status.AtProvider` — exactly what the hash
+  strategy consumes.
+
+Findings worth carrying into productionization:
+
+- **Dynamic types.** upjet's `NewProvider` converts the whole schema to an SDKv2 resource
+  map and panics on cty `DynamicPseudoType`. `connected_app.data` is dynamic, so the
+  generator coerces dynamic attributes to JSON strings before generation
+  (`cmd/generator`). upjet then represents the sensitive `data` as a `DataSecretRef`
+  (secret reference) on the spec; the desired-vs-observed hash baseline for the hash
+  strategy needs design follow-up since `data` is excluded from the diff (`tf:"-"`).
+- **Dashboard body.** The generated `dashboard` type exposes `name/description/team/
+  preset/override` but no single YAML body field, so the YAML strategy needs the actual
+  content field confirmed (or dashboard may need a different suppression approach than
+  monitor).
+- **Remaining to compile a provider binary.** The generated `apis/zz_register.go` imports
+  the upjet-provider-template base packages (`apis/v1alpha1` ProviderConfig, `apis/v1beta1`
+  StoreConfig), plus `cmd/provider` and `internal/clients`. Adding that template base
+  (and the per-resource `SetupWithObserve` files above) turns the generated tree into a
+  runnable provider. That base scaffolding is the next ticket.
 
 ## Tests
 
