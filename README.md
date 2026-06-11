@@ -192,6 +192,16 @@ To use this provider locally before it is published to the Terraform Registry, f
 *   [Go](https://golang.org/doc/install) >= 1.25.7 (to build the provider plugin)
 *   groundcover Account and API Key.
 
+## Crossplane Provider (experimental)
+
+A Crossplane provider is generated from this Terraform provider using
+[upjet](https://github.com/crossplane/upjet), under [`crossplane/`](./crossplane). It adds
+custom observe logic that reuses this provider's drift-suppression
+([`pkg/normalize`](./pkg/normalize)) so Crossplane does not report perpetual drift on
+`connected_app`, `monitor`, and `dashboard`. See [`crossplane/README.md`](./crossplane/README.md)
+for the design and generation runbook. This is a POC (BE-2055) and is not yet part of a
+provider release.
+
 ## Provider Reference
 
 Configure the groundcover provider in your Terraform configuration:

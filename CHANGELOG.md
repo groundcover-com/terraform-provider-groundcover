@@ -1,3 +1,8 @@
+## 1.14.2
+
+* Extracted the monitor/dashboard semantic YAML normalization and the `connected_app` `data_hash` drift rule out of `internal/provider` into a standalone, importable `pkg/normalize` package — internal refactor with no user-facing change to the Terraform provider
+* Added an experimental Crossplane provider generated from this Terraform provider via [upjet](https://github.com/crossplane/upjet) under `crossplane/`, with custom observe logic that reuses `pkg/normalize` to suppress the perpetual drift Crossplane otherwise reports on `connected_app`, `monitor`, and `dashboard` (BE-2055, POC). This lives in a separate Go module and is not part of the Terraform provider release.
+
 ## 1.14.1
 
 * Added computed `data_hash` attribute to `groundcover_connected_app` — exposes the SHA-256 hash groundcover computes over the stored (pre-redaction) data, so Terraform can detect changes to the sensitive, redacted `data` without retrieving the secret
