@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"strings"
 
+	goccyyaml "github.com/goccy/go-yaml"
 	"github.com/groundcover-com/groundcover-sdk-go/pkg/models"
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
@@ -14,7 +15,6 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/hashicorp/terraform-plugin-log/tflog"
-	"gopkg.in/yaml.v3"
 )
 
 var _ resource.Resource = &monitorResource{}
@@ -85,7 +85,7 @@ func buildCreateMonitorRequest(ctx context.Context, monitorYaml string) (*models
 	}
 
 	var createReq models.CreateMonitorRequest
-	if err := yaml.Unmarshal([]byte(normalizedApiYaml), &createReq); err != nil {
+	if err := parseMonitorYAML([]byte(normalizedApiYaml), &createReq); err != nil {
 		return nil, normalizedApiYaml, fmt.Errorf("unable to unmarshal monitor config into SDK request model: %w. YAML omitted for privacy", err)
 	}
 	isProvisioned := true
@@ -102,11 +102,22 @@ func buildUpdateMonitorRequest(ctx context.Context, monitorYaml string) (*models
 	}
 
 	var updateReq models.UpdateMonitorRequest
-	if err := yaml.Unmarshal([]byte(normalizedApiYaml), &updateReq); err != nil {
+	if err := parseMonitorYAML([]byte(normalizedApiYaml), &updateReq); err != nil {
 		return nil, normalizedApiYaml, fmt.Errorf("unable to unmarshal monitor config into SDK update request model: %w. YAML omitted for privacy", err)
 	}
 
 	return &updateReq, normalizedApiYaml, nil
+}
+
+// parseMonitorYAML unmarshals monitor YAML into an SDK model using goccy/go-yaml,
+// which falls back to json tags for field names when yaml tags are absent. The
+// SDK's nested models (e.g. Condition) only carry camelCase json tags — yaml.v3
+// ignores those and silently drops camelCase keys like autoComplete, so the
+// values never reach the API. goccy also honors the models' duration
+// unmarshalers (UnmarshalYAML on models.Duration, UnmarshalText on
+// strfmt.Duration).
+func parseMonitorYAML(monitorYaml []byte, target any) error {
+	return goccyyaml.Unmarshal(monitorYaml, target)
 }
 
 func (r *monitorResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {

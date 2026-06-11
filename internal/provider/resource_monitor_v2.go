@@ -22,7 +22,6 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/hashicorp/terraform-plugin-log/tflog"
-	"gopkg.in/yaml.v3"
 )
 
 var _ resource.Resource = &monitorV2Resource{}
@@ -846,7 +845,7 @@ func (r *monitorV2Resource) readMonitorV2IntoState(ctx context.Context, id strin
 	}
 
 	var remote models.UpdateMonitorRequest
-	if err := yaml.Unmarshal(remoteYaml, &remote); err != nil {
+	if err := parseMonitorYAML(remoteYaml, &remote); err != nil {
 		return fmt.Errorf("unable to unmarshal monitor response into typed model: %w", err)
 	}
 
