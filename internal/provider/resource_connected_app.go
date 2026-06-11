@@ -41,6 +41,7 @@ type connectedAppResourceModel struct {
 	Name      types.String  `tfsdk:"name"`
 	Type      types.String  `tfsdk:"type"`
 	Data      types.Dynamic `tfsdk:"data"`
+	DataHash  types.String  `tfsdk:"data_hash"`
 	CreatedBy types.String  `tfsdk:"created_by"`
 	CreatedAt types.String  `tfsdk:"created_at"`
 	UpdatedBy types.String  `tfsdk:"updated_by"`
@@ -74,6 +75,10 @@ func (r *connectedAppResource) Schema(_ context.Context, _ resource.SchemaReques
 				Description: "Type-specific configuration. Supports nested structures. For slack-webhook: {url = \"https://...\"}. For pagerduty: {routing_key = \"...\", severity_mapping = {critical = \"P1\", ...}}. For rootly: {api_key = \"...\", webhook_url = \"https://...\"}. For opsgenie: {api_key = \"...\", region = \"us\", priority_mapping = {critical = \"P1\", ...}}. For incidentio: {url = \"https://...\", severity_mapping = {critical = \"SEV0\", ...}}. For ms-teams: {url = \"https://...\"}. For webhook: {url = \"https://...\", method = \"POST\" (GET/POST/PUT/DELETE), headers = {key = \"value\"}, auth_type = \"bearer\"|\"basic\", api_key = \"...\" (for bearer), username = \"...\", password = \"...\" (for basic), custom_payload = \"JSON Jinja2 template string (max 64KB)\"}.",
 				Required:    true,
 				Sensitive:   true,
+			},
+			"data_hash": schema.StringAttribute{
+				Description: "SHA-256 hash of the stored connected app data (including secret fields), computed by groundcover. Because `data` is sensitive and redacted on read, this hash is how Terraform detects that the stored data changed outside of Terraform. Drift detection is forward-looking: it covers changes made after this hash is first recorded in state (i.e. after upgrading to a provider version that supports `data_hash`, on the next refresh/apply). For resources created by an older provider version, the first refresh adopts the current server hash as the baseline, so any out-of-band change made before the upgrade is absorbed rather than flagged.",
+				Computed:    true,
 			},
 			"created_by": schema.StringAttribute{
 				Description: "The user who created the connected app.",
@@ -185,7 +190,21 @@ func (r *connectedAppResource) Read(ctx context.Context, req resource.ReadReques
 		return
 	}
 
-	mapConnectedAppResponseToModel(ctx, connectedApp, &state, state.Data)
+	// `data` is sensitive and redacted on read, so we normally preserve the value held in
+	// state to avoid perpetual diffs. data_hash lets us still detect when the stored data
+	// changed outside Terraform: when it differs from the hash recorded in state, we stop
+	// preserving `data` so the next plan surfaces the drift and apply restores the configured value.
+	preserveData := state.Data
+	if connectedAppDataDrifted(state.DataHash, connectedApp.DataHash) {
+		tflog.Info(ctx, "Connected app data changed outside Terraform; surfacing drift via data_hash", map[string]any{
+			"id":          state.Id.ValueString(),
+			"state_hash":  state.DataHash.ValueString(),
+			"remote_hash": connectedApp.DataHash,
+		})
+		preserveData = types.DynamicNull()
+	}
+
+	mapConnectedAppResponseToModel(ctx, connectedApp, &state, preserveData)
 
 	diags = resp.State.Set(ctx, &state)
 	resp.Diagnostics.Append(diags...)
@@ -194,6 +213,29 @@ func (r *connectedAppResource) Read(ctx context.Context, req resource.ReadReques
 	}
 
 	tflog.Debug(ctx, fmt.Sprintf("Successfully read connected app resource: %s", state.Id.ValueString()))
+}
+
+// connectedAppDataDrifted reports whether the connected app's stored data changed outside
+// Terraform, by comparing the data_hash recorded in state against the one returned by the API.
+//
+// It returns false when state has no recorded hash or the API returns no hash, falling back to
+// preserving the sensitive `data` value as before. A missing state hash happens for a fresh
+// import or for a resource created by a provider version predating `data_hash`: in those cases
+// we deliberately do NOT treat the read as drift. The provider cannot reconstruct the
+// server-side hash locally (it is computed over the full pre-redaction data, including
+// server-side secret merging), so there is no trustworthy baseline to compare against — flagging
+// drift would produce false positives. Instead the first refresh adopts the current server hash
+// as the baseline, and drift detection applies to subsequent changes. See the `data_hash`
+// attribute description for the user-facing contract.
+func connectedAppDataDrifted(stateHash types.String, remoteHash string) bool {
+	if stateHash.IsNull() || stateHash.IsUnknown() {
+		return false
+	}
+	recorded := stateHash.ValueString()
+	if recorded == "" || remoteHash == "" {
+		return false
+	}
+	return recorded != remoteHash
 }
 
 // Update updates the resource.
@@ -301,6 +343,14 @@ func mapConnectedAppResponseToModel(ctx context.Context, app *models.ConnectedAp
 		}
 	} else {
 		model.Data = types.DynamicNull()
+	}
+
+	// data_hash is computed server-side over the full stored data (incl. redacted
+	// secrets), so it tracks real changes to the otherwise-opaque data attribute.
+	if app.DataHash != "" {
+		model.DataHash = types.StringValue(app.DataHash)
+	} else {
+		model.DataHash = types.StringNull()
 	}
 
 	model.CreatedBy = types.StringValue(app.CreatedBy)

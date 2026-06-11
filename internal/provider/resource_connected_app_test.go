@@ -8,6 +8,7 @@ import (
 	"os"
 	"testing"
 
+	"github.com/groundcover-com/groundcover-sdk-go/pkg/models"
 	"github.com/hashicorp/terraform-plugin-testing/helper/acctest"
 	"github.com/hashicorp/terraform-plugin-testing/helper/resource"
 	"github.com/hashicorp/terraform-plugin-testing/terraform"
@@ -29,6 +30,7 @@ func TestAccConnectedApp_basic(t *testing.T) {
 					resource.TestCheckResourceAttrSet("groundcover_connected_app.test", "id"),
 					resource.TestCheckResourceAttrSet("groundcover_connected_app.test", "created_by"),
 					resource.TestCheckResourceAttrSet("groundcover_connected_app.test", "created_at"),
+					resource.TestCheckResourceAttrSet("groundcover_connected_app.test", "data_hash"),
 				),
 			},
 			{
@@ -45,6 +47,8 @@ func TestAccConnectedApp_update(t *testing.T) {
 	initialName := acctest.RandomWithPrefix("test-slack-app-initial")
 	updatedName := acctest.RandomWithPrefix("test-slack-app-updated")
 
+	var initialHash string
+
 	resource.Test(t, resource.TestCase{
 		PreCheck:                 func() { testAccPreCheck(t) },
 		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
@@ -55,6 +59,8 @@ func TestAccConnectedApp_update(t *testing.T) {
 					resource.TestCheckResourceAttr("groundcover_connected_app.test", "name", initialName),
 					resource.TestCheckResourceAttr("groundcover_connected_app.test", "type", "slack-webhook"),
 					resource.TestCheckResourceAttrSet("groundcover_connected_app.test", "id"),
+					resource.TestCheckResourceAttrSet("groundcover_connected_app.test", "data_hash"),
+					testAccCaptureConnectedAppAttr("groundcover_connected_app.test", "data_hash", &initialHash),
 				),
 			},
 			{
@@ -63,6 +69,52 @@ func TestAccConnectedApp_update(t *testing.T) {
 					resource.TestCheckResourceAttr("groundcover_connected_app.test", "name", updatedName),
 					resource.TestCheckResourceAttr("groundcover_connected_app.test", "type", "slack-webhook"),
 					resource.TestCheckResourceAttrSet("groundcover_connected_app.test", "id"),
+					// data is unchanged across the rename, so the hash must stay exactly stable
+					// (not merely be set) — a changing hash here would signal spurious drift.
+					testAccCheckConnectedAppAttrEquals("groundcover_connected_app.test", "data_hash", &initialHash),
+				),
+			},
+		},
+	})
+}
+
+// TestAccConnectedApp_outOfBandDrift covers the data_hash repair path: a connected app's
+// secret is changed outside Terraform (directly via the API), and the next apply of the
+// unchanged config must detect the drift (via data_hash) and restore the configured data,
+// returning the hash to its baseline. Under a provider without data_hash drift detection,
+// the redacted-but-preserved `data` would hide the change and this test would fail.
+func TestAccConnectedApp_outOfBandDrift(t *testing.T) {
+	name := acctest.RandomWithPrefix("test-slack-drift")
+
+	var appID, baselineHash string
+	const driftedURL = "https://hooks.slack.com/services/DRIFT/WEBHOOK/CHANGED"
+
+	resource.Test(t, resource.TestCase{
+		PreCheck:                 func() { testAccPreCheck(t) },
+		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
+		Steps: []resource.TestStep{
+			// Step 1: create and record the baseline id + data_hash.
+			{
+				Config: testAccConnectedAppConfig_basic(name),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					testAccCheckConnectedAppResourceExists("groundcover_connected_app.test"),
+					resource.TestCheckResourceAttrSet("groundcover_connected_app.test", "data_hash"),
+					testAccCaptureConnectedAppAttr("groundcover_connected_app.test", "id", &appID),
+					testAccCaptureConnectedAppAttr("groundcover_connected_app.test", "data_hash", &baselineHash),
+				),
+			},
+			// Step 2: mutate the secret out-of-band, then re-apply the unchanged config.
+			// Drift must be detected and the configured data restored, so the hash returns
+			// to its baseline value.
+			{
+				PreConfig: func() {
+					if err := testAccConnectedAppOutOfBandSetSlackURL(appID, name, driftedURL); err != nil {
+						t.Fatalf("out-of-band update failed: %v", err)
+					}
+				},
+				Config: testAccConnectedAppConfig_basic(name),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					testAccCheckConnectedAppAttrEquals("groundcover_connected_app.test", "data_hash", &baselineHash),
 				),
 			},
 		},
@@ -416,6 +468,60 @@ func testAccCheckConnectedAppResourceDisappears(n string) resource.TestCheckFunc
 
 		return nil
 	}
+}
+
+// testAccCaptureConnectedAppAttr stores the value of a resource attribute into dst, for
+// comparison against a later step.
+func testAccCaptureConnectedAppAttr(n, attr string, dst *string) resource.TestCheckFunc {
+	return func(s *terraform.State) error {
+		rs, ok := s.RootModule().Resources[n]
+		if !ok {
+			return fmt.Errorf("Not found: %s", n)
+		}
+		*dst = rs.Primary.Attributes[attr]
+		return nil
+	}
+}
+
+// testAccCheckConnectedAppAttrEquals asserts that a resource attribute equals a value captured
+// earlier (via testAccCaptureConnectedAppAttr).
+func testAccCheckConnectedAppAttrEquals(n, attr string, want *string) resource.TestCheckFunc {
+	return func(s *terraform.State) error {
+		rs, ok := s.RootModule().Resources[n]
+		if !ok {
+			return fmt.Errorf("Not found: %s", n)
+		}
+		got := rs.Primary.Attributes[attr]
+		if got != *want {
+			return fmt.Errorf("%s.%s = %q, want %q", n, attr, got, *want)
+		}
+		return nil
+	}
+}
+
+// testAccConnectedAppOutOfBandSetSlackURL changes a slack-webhook connected app's URL directly
+// via the API, simulating an out-of-band edit that Terraform did not make.
+func testAccConnectedAppOutOfBandSetSlackURL(id, name, url string) error {
+	ctx := context.Background()
+
+	apiKey := os.Getenv("GROUNDCOVER_API_KEY")
+	orgName := os.Getenv("GROUNDCOVER_BACKEND_ID")
+	apiURL := os.Getenv("GROUNDCOVER_API_URL")
+	if apiURL == "" {
+		apiURL = "https://api.groundcover.com"
+	}
+
+	client, err := NewSdkClientWrapper(ctx, apiURL, apiKey, orgName)
+	if err != nil {
+		return fmt.Errorf("failed to create client: %w", err)
+	}
+
+	appType := "slack-webhook"
+	return client.UpdateConnectedApp(ctx, id, &models.UpdateConnectedAppRequest{
+		Name: &name,
+		Type: &appType,
+		Data: map[string]any{"url": url},
+	})
 }
 
 func testAccConnectedAppConfig_rootlyNoWebhookURL(name string) string {
