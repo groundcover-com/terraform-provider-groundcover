@@ -160,7 +160,7 @@ func (r *monitorV2Resource) Metadata(_ context.Context, req resource.MetadataReq
 
 func (r *monitorV2Resource) Schema(_ context.Context, _ resource.SchemaRequest, resp *resource.SchemaResponse) {
 	resp.Schema = schema.Schema{
-		MarkdownDescription: "Manages a groundcover Monitor with a typed Terraform schema. This resource avoids the raw YAML blob used by `groundcover_monitor` and supports GCQL, MetricsQL, and raw SQL query definitions.",
+		MarkdownDescription: "Manages a groundcover Monitor with a typed Terraform schema. This resource avoids the raw YAML blob used by `groundcover_monitor` and supports GCQL, MetricsQL, and raw SQL query definitions.\n\n~> Import is intended for monitors created by this resource. Monitors created elsewhere (UI, API, `groundcover_monitor`) may not map cleanly onto the typed schema — in particular, `query.type` is derived from the query shape and can be misclassified for shapes this resource cannot express (e.g. `sqlPipeline` queries).",
 		Attributes: map[string]schema.Attribute{
 			"id": schema.StringAttribute{
 				MarkdownDescription: "Monitor identifier (UUID).",
