@@ -9,11 +9,23 @@ import (
 	"strings"
 	"time"
 
+	goccyyaml "github.com/goccy/go-yaml"
 	"github.com/goccy/go-yaml/ast"
 	"github.com/goccy/go-yaml/parser"
 	"github.com/hashicorp/terraform-plugin-log/tflog"
 	"gopkg.in/yaml.v3"
 )
+
+// parseMonitorYAML unmarshals monitor YAML into an SDK model using goccy/go-yaml,
+// which falls back to json tags for field names when yaml tags are absent. The
+// SDK's nested models (e.g. Condition) only carry camelCase json tags — yaml.v3
+// ignores those and silently drops camelCase keys like autoComplete, so the
+// values never reach the API. goccy also honors the models' duration
+// unmarshalers (UnmarshalYAML on models.Duration, UnmarshalText on
+// strfmt.Duration).
+func parseMonitorYAML(monitorYaml []byte, target any) error {
+	return goccyyaml.Unmarshal(monitorYaml, target)
+}
 
 // Constants for AST node markers
 const (

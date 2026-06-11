@@ -7,7 +7,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/go-openapi/strfmt"
 	"github.com/groundcover-com/groundcover-sdk-go/pkg/models"
 )
 
@@ -83,6 +82,4 @@ evaluationInterval:
 	if req.EvaluationInterval.PendingFor == nil || time.Duration(*req.EvaluationInterval.PendingFor) != time.Minute {
 		t.Errorf("PendingFor = %v, want 1m", req.EvaluationInterval.PendingFor)
 	}
-
-	var _ strfmt.Duration = req.EvaluationInterval.Interval
 }

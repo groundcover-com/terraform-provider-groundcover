@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"strings"
 
-	goccyyaml "github.com/goccy/go-yaml"
 	"github.com/groundcover-com/groundcover-sdk-go/pkg/models"
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
@@ -107,17 +106,6 @@ func buildUpdateMonitorRequest(ctx context.Context, monitorYaml string) (*models
 	}
 
 	return &updateReq, normalizedApiYaml, nil
-}
-
-// parseMonitorYAML unmarshals monitor YAML into an SDK model using goccy/go-yaml,
-// which falls back to json tags for field names when yaml tags are absent. The
-// SDK's nested models (e.g. Condition) only carry camelCase json tags — yaml.v3
-// ignores those and silently drops camelCase keys like autoComplete, so the
-// values never reach the API. goccy also honors the models' duration
-// unmarshalers (UnmarshalYAML on models.Duration, UnmarshalText on
-// strfmt.Duration).
-func parseMonitorYAML(monitorYaml []byte, target any) error {
-	return goccyyaml.Unmarshal(monitorYaml, target)
 }
 
 func (r *monitorResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
