@@ -9,6 +9,7 @@ import (
 
 	"github.com/go-openapi/strfmt"
 	"github.com/groundcover-com/groundcover-sdk-go/pkg/models"
+	"github.com/groundcover-com/terraform-provider-groundcover/pkg/normalize"
 	"github.com/hashicorp/terraform-plugin-framework-validators/listvalidator"
 	"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
 	"github.com/hashicorp/terraform-plugin-framework/attr"
@@ -1393,7 +1394,7 @@ func monitorV2AnyString(value any) types.String {
 	if str == "" || str == "<nil>" {
 		return types.StringNull()
 	}
-	return types.StringValue(normalizeTimeString(str))
+	return types.StringValue(normalize.NormalizeTimeString(str))
 }
 
 func monitorV2StringMap(ctx context.Context, value types.Map, diags *diag.Diagnostics) map[string]string {
@@ -1557,7 +1558,7 @@ func monitorV2ParseDuration(value types.String, attrPath path.Path, diags *diag.
 }
 
 func monitorV2NormalizeDurationForParse(value string) string {
-	return strings.TrimSpace(normalizeDayDurations(normalizeHumanDurations(value)))
+	return strings.TrimSpace(normalize.NormalizeDayDurations(normalize.NormalizeHumanDurations(value)))
 }
 
 func monitorV2NormalizeDurationString(value string) (string, bool) {
@@ -1585,7 +1586,7 @@ func monitorV2DurationToString(value time.Duration) string {
 	if value == 0 {
 		return "0m"
 	}
-	return normalizeTimeString(value.String())
+	return normalize.NormalizeTimeString(value.String())
 }
 
 func monitorV2DurationToType(value time.Duration) types.String {

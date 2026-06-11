@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/groundcover-com/groundcover-sdk-go/pkg/models"
+	"github.com/groundcover-com/terraform-provider-groundcover/pkg/normalize"
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
@@ -79,7 +80,7 @@ func (r *monitorResource) Configure(ctx context.Context, req resource.ConfigureR
 
 // buildCreateMonitorRequest converts user YAML into an SDK create request and applies provider-owned defaults.
 func buildCreateMonitorRequest(ctx context.Context, monitorYaml string) (*models.CreateMonitorRequest, string, error) {
-	normalizedApiYaml, err := NormalizeMonitorYaml(ctx, monitorYaml)
+	normalizedApiYaml, err := normalize.NormalizeMonitorYaml(ctx, monitorYaml)
 	if err != nil {
 		return nil, "", fmt.Errorf("unable to normalize monitor YAML during Create: %w", err)
 	}
@@ -96,7 +97,7 @@ func buildCreateMonitorRequest(ctx context.Context, monitorYaml string) (*models
 
 // buildUpdateMonitorRequest converts user YAML into an SDK update request and applies provider-owned defaults.
 func buildUpdateMonitorRequest(ctx context.Context, monitorYaml string) (*models.UpdateMonitorRequest, string, error) {
-	normalizedApiYaml, err := NormalizeMonitorYaml(ctx, monitorYaml)
+	normalizedApiYaml, err := normalize.NormalizeMonitorYaml(ctx, monitorYaml)
 	if err != nil {
 		return nil, "", fmt.Errorf("unable to normalize monitor YAML during Update: %w", err)
 	}
@@ -209,7 +210,7 @@ func (r *monitorResource) detectAndHandleDrift(ctx context.Context, data *monito
 
 	// Filter remote YAML to only include keys that exist in the state
 	// This prevents drift detection from triggering on server-added default fields
-	filteredRemoteYaml, err := FilterYamlKeysBasedOnTemplate(ctx, remoteYaml, stateYaml)
+	filteredRemoteYaml, err := normalize.FilterYamlKeysBasedOnTemplate(ctx, remoteYaml, stateYaml)
 	if err != nil {
 		// If the error is due to unparseable state YAML, that's a more serious issue
 		if strings.Contains(err.Error(), "failed to parse template YAML") {
@@ -228,7 +229,7 @@ func (r *monitorResource) detectAndHandleDrift(ctx context.Context, data *monito
 	}
 
 	// Normalize both YAMLs for comparison
-	normalizedStateYaml, err := NormalizeMonitorYaml(ctx, stateYaml)
+	normalizedStateYaml, err := normalize.NormalizeMonitorYaml(ctx, stateYaml)
 	if err != nil {
 		tflog.Warn(ctx, "Failed to normalize state YAML", map[string]interface{}{
 			"id":    monitorId,
@@ -237,7 +238,7 @@ func (r *monitorResource) detectAndHandleDrift(ctx context.Context, data *monito
 		normalizedStateYaml = stateYaml
 	}
 
-	normalizedFilteredRemoteYaml, err := NormalizeMonitorYaml(ctx, filteredRemoteYaml)
+	normalizedFilteredRemoteYaml, err := normalize.NormalizeMonitorYaml(ctx, filteredRemoteYaml)
 	if err != nil {
 		tflog.Warn(ctx, "Failed to normalize filtered remote YAML", map[string]interface{}{
 			"id":    monitorId,
@@ -254,7 +255,7 @@ func (r *monitorResource) detectAndHandleDrift(ctx context.Context, data *monito
 	})
 
 	// Use semantic comparison to detect real drift vs formatting differences
-	areSemanticallySame, err := CompareYamlSemantically(normalizedStateYaml, normalizedFilteredRemoteYaml)
+	areSemanticallySame, err := normalize.CompareYamlSemantically(normalizedStateYaml, normalizedFilteredRemoteYaml)
 	if err != nil {
 		tflog.Warn(ctx, "Failed to perform semantic YAML comparison, falling back to string comparison", map[string]interface{}{
 			"id":    monitorId,
@@ -438,7 +439,7 @@ func (r *monitorResource) ModifyPlan(ctx context.Context, req resource.ModifyPla
 
 	// Filter state YAML to only include keys that exist in the planned YAML
 	// This prevents ModifyPlan from triggering on server-added default fields
-	filteredStateYaml, err := FilterYamlKeysBasedOnTemplate(ctx, stateYamlString, plannedYamlString)
+	filteredStateYaml, err := normalize.FilterYamlKeysBasedOnTemplate(ctx, stateYamlString, plannedYamlString)
 	if err != nil {
 		// If the error is due to unparseable planned YAML, that's concerning
 		if strings.Contains(err.Error(), "failed to parse template YAML") {
@@ -455,7 +456,7 @@ func (r *monitorResource) ModifyPlan(ctx context.Context, req resource.ModifyPla
 	}
 
 	// Normalize both YAMLs for comparison
-	normalizedPlannedYaml, err := NormalizeMonitorYaml(ctx, plannedYamlString)
+	normalizedPlannedYaml, err := normalize.NormalizeMonitorYaml(ctx, plannedYamlString)
 	if err != nil {
 		tflog.Warn(ctx, "ModifyPlan: Failed to normalize planned YAML", map[string]interface{}{
 			"error": err.Error(),
@@ -463,7 +464,7 @@ func (r *monitorResource) ModifyPlan(ctx context.Context, req resource.ModifyPla
 		normalizedPlannedYaml = plannedYamlString
 	}
 
-	normalizedFilteredStateYaml, err := NormalizeMonitorYaml(ctx, filteredStateYaml)
+	normalizedFilteredStateYaml, err := normalize.NormalizeMonitorYaml(ctx, filteredStateYaml)
 	if err != nil {
 		tflog.Warn(ctx, "ModifyPlan: Failed to normalize filtered state YAML", map[string]interface{}{
 			"error": err.Error(),
@@ -472,7 +473,7 @@ func (r *monitorResource) ModifyPlan(ctx context.Context, req resource.ModifyPla
 	}
 
 	// Use semantic comparison to detect real changes vs formatting differences
-	areSemanticallySame, err := CompareYamlSemantically(normalizedPlannedYaml, normalizedFilteredStateYaml)
+	areSemanticallySame, err := normalize.CompareYamlSemantically(normalizedPlannedYaml, normalizedFilteredStateYaml)
 	if err != nil {
 		tflog.Warn(ctx, "ModifyPlan: Failed to perform semantic YAML comparison, allowing update", map[string]interface{}{
 			"error": err.Error(),

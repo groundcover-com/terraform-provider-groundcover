@@ -20,6 +20,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-log/tflog"
 
 	"github.com/groundcover-com/groundcover-sdk-go/pkg/models"
+	"github.com/groundcover-com/terraform-provider-groundcover/pkg/normalize"
 )
 
 var (
@@ -231,11 +232,9 @@ func connectedAppDataDrifted(stateHash types.String, remoteHash string) bool {
 	if stateHash.IsNull() || stateHash.IsUnknown() {
 		return false
 	}
-	recorded := stateHash.ValueString()
-	if recorded == "" || remoteHash == "" {
-		return false
-	}
-	return recorded != remoteHash
+	// Delegate the hash comparison to the shared normalize package so the Terraform
+	// provider and the Crossplane observe decorator apply identical drift semantics.
+	return normalize.HashDrifted(stateHash.ValueString(), remoteHash)
 }
 
 // Update updates the resource.
