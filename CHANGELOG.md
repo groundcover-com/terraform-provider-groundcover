@@ -1,6 +1,6 @@
 ## 1.14.2
 
-* Fixed `groundcover_monitor` create/update being rejected with 400 errors like `field additionalfilter not found in type search.Condition` since the backend started decoding monitor YAML strictly. The request body is now serialized using the SDK models' json tags (camelCase), instead of the default YAML encoder's lowercasing of Go field names, so nested fields such as `additionalFilter`, `autoComplete`, `filterKeys`, and `isNullable` reach the API with the casing it expects
+* Fixed `groundcover_monitor` create/update being rejected with 400 errors like `field additionalfilter not found in type search.Condition` since the backend started decoding monitor YAML strictly. The request body is now serialized with goccy/go-yaml, which uses the SDK models' json tags (camelCase) for field names instead of the default YAML encoder's lowercasing of Go field names, so nested fields such as `additionalFilter`, `autoComplete`, `filterKeys`, and `isNullable` reach the API with the casing it expects; duration fields keep serializing with units (`1m0s`) rather than raw nanoseconds
 
 ## 1.14.1
 

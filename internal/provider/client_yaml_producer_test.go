@@ -11,7 +11,9 @@ import (
 	"net/http/httptest"
 	"strings"
 	"testing"
+	"time"
 
+	"github.com/go-openapi/strfmt"
 	"github.com/groundcover-com/groundcover-sdk-go/pkg/models"
 )
 
@@ -70,6 +72,37 @@ func TestJSONTagYAMLProducer_PreservesNumbers(t *testing.T) {
 	}
 	if !strings.Contains(out, "floatValue: 2.5") {
 		t.Errorf("expected unquoted float scalar 'floatValue: 2.5', got:\n%s", out)
+	}
+}
+
+// Duration fields must serialize as duration strings with units ("1m0s"),
+// not raw nanosecond integers — the backend rejects bare numbers with
+// `time: missing unit in duration "60000000000"`. models.Duration only
+// implements MarshalYAML, and strfmt.Duration only MarshalText, so the
+// producer must honor both interfaces.
+func TestJSONTagYAMLProducer_FormatsDurations(t *testing.T) {
+	producer := newJSONTagYAMLProducer()
+
+	pendingFor := models.Duration(time.Minute)
+	data := &models.EvaluationInterval{
+		Interval:   strfmt.Duration(time.Minute),
+		PendingFor: &pendingFor,
+	}
+
+	var buf bytes.Buffer
+	if err := producer.Produce(&buf, data); err != nil {
+		t.Fatalf("Produce returned error: %v", err)
+	}
+	out := buf.String()
+
+	if !strings.Contains(out, "interval: 1m0s") {
+		t.Errorf("expected 'interval: 1m0s', got:\n%s", out)
+	}
+	if !strings.Contains(out, "pendingFor: 1m0s") {
+		t.Errorf("expected 'pendingFor: 1m0s', got:\n%s", out)
+	}
+	if strings.Contains(out, "60000000000") {
+		t.Errorf("durations must not serialize as raw nanoseconds, got:\n%s", out)
 	}
 }
 

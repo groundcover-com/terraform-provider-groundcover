@@ -6,7 +6,6 @@ package provider
 import (
 	"bytes"
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -377,18 +376,19 @@ func NewSdkClientWrapper(ctx context.Context, baseURLStr, apiKey, backendID stri
 }
 
 // newJSONTagYAMLProducer returns a producer for application/x-yaml request
-// bodies that emits field names from the models' json tags (camelCase) by
-// round-tripping through JSON, instead of yaml.v3's default lowercasing of
-// Go field names. goccy's JSONToYAML preserves numeric scalars.
+// bodies that marshals with goccy/go-yaml instead of go-openapi's default
+// yaml.v3 producer. The SDK's nested models only carry json tags, which
+// yaml.v3 ignores — it lowercases the Go field names (additionalFilter ->
+// additionalfilter) and the backend rejects them under strict decoding.
+// goccy falls back to json tags for field names (keeping camelCase and
+// omitempty) and honors both MarshalYAML (models.Duration) and
+// encoding.TextMarshaler (strfmt.Duration), so durations serialize as
+// "1m0s" rather than raw nanoseconds.
 func newJSONTagYAMLProducer() apiruntime.Producer {
 	return apiruntime.ProducerFunc(func(writer io.Writer, data interface{}) error {
-		jsonBytes, err := json.Marshal(data)
+		yamlBytes, err := goccyyaml.Marshal(data)
 		if err != nil {
-			return fmt.Errorf("marshaling YAML request body to JSON: %w", err)
-		}
-		yamlBytes, err := goccyyaml.JSONToYAML(jsonBytes)
-		if err != nil {
-			return fmt.Errorf("converting YAML request body from JSON: %w", err)
+			return fmt.Errorf("marshaling YAML request body: %w", err)
 		}
 		_, err = writer.Write(yamlBytes)
 		return err
