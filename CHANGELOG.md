@@ -1,3 +1,7 @@
+## 1.14.2
+
+* Fixed `groundcover_monitor` create/update being rejected with 400 errors like `field additionalfilter not found in type search.Condition` since the backend started decoding monitor YAML strictly. The request body is now serialized using the SDK models' json tags (camelCase), instead of the default YAML encoder's lowercasing of Go field names, so nested fields such as `additionalFilter`, `autoComplete`, `filterKeys`, and `isNullable` reach the API with the casing it expects
+
 ## 1.14.1
 
 * Added computed `data_hash` attribute to `groundcover_connected_app` — exposes the SHA-256 hash groundcover computes over the stored (pre-redaction) data, so Terraform can detect changes to the sensitive, redacted `data` without retrieving the secret

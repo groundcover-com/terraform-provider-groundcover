@@ -6,6 +6,7 @@ package provider
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -26,6 +27,7 @@ import (
 	openapi_client "github.com/go-openapi/runtime/client"
 	"github.com/go-openapi/runtime/logger"
 	"github.com/go-openapi/strfmt"
+	goccyyaml "github.com/goccy/go-yaml"
 
 	// Terraform specific imports
 	"github.com/hashicorp/terraform-plugin-log/tflog"
@@ -359,6 +361,12 @@ func NewSdkClientWrapper(ctx context.Context, baseURLStr, apiKey, backendID stri
 	// This will be used if the Content-Type is correctly identified as application/x-yaml (due to our fixer).
 	finalRuntimeTransport.Consumers[yamlContentType] = apiruntime.ByteStreamConsumer()
 
+	// The SDK models only carry json tags (camelCase). The default go-openapi
+	// YAML producer encodes structs with yaml.v3, which lowercases field names
+	// (e.g. additionalFilter -> additionalfilter) and the backend rejects them
+	// under strict decoding. Serialize via the json tags instead.
+	finalRuntimeTransport.Producers[yamlContentType] = newJSONTagYAMLProducer()
+
 	// Configure go-openapi to use tflog for its debug messages
 	finalRuntimeTransport.SetLogger(&tflogAdapter{ctx: ctx})
 	finalRuntimeTransport.SetDebug(userEnabledDebug)
@@ -366,6 +374,25 @@ func NewSdkClientWrapper(ctx context.Context, baseURLStr, apiKey, backendID stri
 	newSdkClient := goclient.New(finalRuntimeTransport, strfmt.Default)
 
 	return &SdkClientWrapper{sdkClient: newSdkClient}, nil
+}
+
+// newJSONTagYAMLProducer returns a producer for application/x-yaml request
+// bodies that emits field names from the models' json tags (camelCase) by
+// round-tripping through JSON, instead of yaml.v3's default lowercasing of
+// Go field names. goccy's JSONToYAML preserves numeric scalars.
+func newJSONTagYAMLProducer() apiruntime.Producer {
+	return apiruntime.ProducerFunc(func(writer io.Writer, data interface{}) error {
+		jsonBytes, err := json.Marshal(data)
+		if err != nil {
+			return fmt.Errorf("marshaling YAML request body to JSON: %w", err)
+		}
+		yamlBytes, err := goccyyaml.JSONToYAML(jsonBytes)
+		if err != nil {
+			return fmt.Errorf("converting YAML request body from JSON: %w", err)
+		}
+		_, err = writer.Write(yamlBytes)
+		return err
+	})
 }
 
 // statusCodeRegex extracts the HTTP status code from SDK error strings.
