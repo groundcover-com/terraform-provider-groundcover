@@ -1,4 +1,4 @@
-## 1.15.0
+## 1.14.1
 
 * Added computed `data_hash` attribute to `groundcover_connected_app` — exposes the SHA-256 hash groundcover computes over the stored (pre-redaction) data, so Terraform can detect changes to the sensitive, redacted `data` without retrieving the secret
 * `groundcover_connected_app` now corrects out-of-band drift: when the API-reported `data_hash` differs from the value recorded in state, the next plan shows a diff and apply restores the configured `data`. Detection is forward-looking — it covers changes made after the baseline hash is first recorded in state (on the first refresh after upgrading to this version); resources created by an older provider adopt the current server hash as their baseline, so pre-upgrade out-of-band changes are not retroactively flagged
