@@ -1,3 +1,7 @@
+## 1.15.0
+
+* Added `apm` as a supported GCQL `data_type` for `groundcover_monitor_v2`
+
 ## 1.14.1
 
 * Fixed `groundcover_monitor_v2` import/update failures caused by sending the reserved `_gc_monitor_v2_query_type` annotation back to the monitors API

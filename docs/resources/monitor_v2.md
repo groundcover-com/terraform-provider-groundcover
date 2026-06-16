@@ -234,6 +234,40 @@ resource "groundcover_monitor_v2" "gcql_issues" {
   no_data_state         = "OK"
 }
 
+resource "groundcover_monitor_v2" "gcql_apm" {
+  title            = "GCQL APM Count"
+  severity         = "warning"
+  measurement_type = "event"
+  is_paused        = true
+
+  display {
+    header      = "GCQL APM Count"
+    description = "Counts APM records returned by GCQL."
+  }
+
+  query {
+    type           = "gcql"
+    data_type      = "apm"
+    expression     = "* | stats count() count_all_result"
+    instant_rollup = "5m"
+  }
+
+  threshold {
+    name       = "threshold_1"
+    input_name = "threshold_input_query"
+    operator   = "gt"
+    values     = [1000]
+  }
+
+  evaluation_interval {
+    interval    = "1m"
+    pending_for = "1m"
+  }
+
+  execution_error_state = "OK"
+  no_data_state         = "OK"
+}
+
 resource "groundcover_monitor_v2" "metricsql" {
   title            = "MetricsQL Running Pods"
   severity         = "warning"
@@ -404,7 +438,7 @@ Required:
 
 Optional:
 
-- `data_type` (String) GCQL data type. Required when `type = "gcql"`. Supported values: `logs`, `traces`, `events`, `entities`, `rum`, `issues`.
+- `data_type` (String) GCQL data type. Required when `type = "gcql"`. Supported values: `logs`, `traces`, `events`, `entities`, `rum`, `issues`, `apm`.
 - `datasource_id` (String) Optional datasource identifier for raw queries.
 - `datasource_type` (String) Metrics datasource type for MetricsQL. Defaults to `prometheus` when `type = "metricsql"`.
 - `instant_rollup` (String) GCQL rollup window used to add the monitor evaluation time bucket, for example `5m` or `5 minutes`.
