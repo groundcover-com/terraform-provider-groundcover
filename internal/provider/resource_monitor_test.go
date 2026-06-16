@@ -95,6 +95,29 @@ func TestMonitorV2BuildCreateRequestGCQL(t *testing.T) {
 	requireNoInternalMonitorV2Annotations(t, req.Annotations)
 }
 
+func TestMonitorV2BuildCreateRequestGCQLAPM(t *testing.T) {
+	ctx := context.Background()
+	plan := testMonitorV2BasePlan(t, &monitorV2QueryModel{
+		Type:          types.StringValue(monitorV2QueryTypeGCQL),
+		Expression:    types.StringValue(`* | stats count() count_all_result`),
+		DataType:      types.StringValue("apm"),
+		InstantRollup: types.StringValue("5 minutes"),
+	})
+
+	req, diags := buildMonitorV2CreateRequest(ctx, &plan)
+	if diags.HasError() {
+		t.Fatalf("buildMonitorV2CreateRequest() diagnostics: %v", diags)
+	}
+	query := req.Model.Queries[0]
+	if query.DataType != "apm" {
+		t.Fatalf("query.DataType = %q, want apm", query.DataType)
+	}
+	if query.InstantRollup != "5m" {
+		t.Fatalf("query.InstantRollup = %q, want 5m", query.InstantRollup)
+	}
+	requireNoInternalMonitorV2Annotations(t, req.Annotations)
+}
+
 func TestMonitorV2BuildCreateRequestMetricsQL(t *testing.T) {
 	ctx := context.Background()
 	plan := testMonitorV2BasePlan(t, &monitorV2QueryModel{
@@ -895,6 +918,9 @@ func TestAccMonitorV2Resource_allSupportedQueryTypes(t *testing.T) {
 					resource.TestCheckResourceAttrSet("groundcover_monitor_v2.issues", "id"),
 					resource.TestCheckResourceAttr("groundcover_monitor_v2.issues", "query.type", monitorV2QueryTypeGCQL),
 					resource.TestCheckResourceAttr("groundcover_monitor_v2.issues", "query.data_type", "issues"),
+					resource.TestCheckResourceAttrSet("groundcover_monitor_v2.apm", "id"),
+					resource.TestCheckResourceAttr("groundcover_monitor_v2.apm", "query.type", monitorV2QueryTypeGCQL),
+					resource.TestCheckResourceAttr("groundcover_monitor_v2.apm", "query.data_type", "apm"),
 					resource.TestCheckResourceAttrSet("groundcover_monitor_v2.metricsql", "id"),
 					resource.TestCheckResourceAttr("groundcover_monitor_v2.metricsql", "query.type", monitorV2QueryTypeMetricsQL),
 					resource.TestCheckResourceAttrSet("groundcover_monitor_v2.raw_sql", "id"),
@@ -1075,6 +1101,12 @@ func testAccMonitorV2AllSupportedQueryTypesConfig(suffix string) string {
 			resourceName:  "issues",
 			dataType:      "issues",
 			query:         "status:Alerting | stats count() count_all_result",
+			instantRollup: true,
+		},
+		{
+			resourceName:  "apm",
+			dataType:      "apm",
+			query:         "* | stats count() count_all_result",
 			instantRollup: true,
 		},
 	}
