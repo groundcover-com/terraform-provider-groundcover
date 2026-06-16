@@ -172,7 +172,7 @@ Manages a groundcover Monitor resource with a typed schema instead of raw YAML. 
 
 #### Example Usage
 
-The full example file includes GCQL examples for logs, traces, events, entities, RUM, and issues, plus MetricsQL and raw SQL examples.
+The full example file includes GCQL examples for logs, traces, events, entities, RUM, issues, and APM, plus MetricsQL and raw SQL examples.
 
 ```hcl
 resource "groundcover_monitor_v2" "gcql_logs" {
