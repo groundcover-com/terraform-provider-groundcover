@@ -34,6 +34,8 @@ Basic usage examples can be found in the `examples/` directory:
     *   Demonstrates how to create and manage alert silences with time windows and matchers.
 *   **Connected App Resource:** [`examples/resources/groundcover_connected_app/resource.tf`](./examples/resources/groundcover_connected_app/resource.tf)
     *   Demonstrates how to create and manage integrations with external services (Slack, PagerDuty, MS Teams).
+*   **Connected App (JSON) Resource:** [`examples/resources/groundcover_connected_app_json/resource.tf`](./examples/resources/groundcover_connected_app_json/resource.tf)
+    *   Same as Connected App, but `data` is a JSON string — for generated configs or tooling that can't model dynamic objects (e.g. Crossplane).
 *   **Notification Route Resource:** [`examples/resources/groundcover_notification_route/resource.tf`](./examples/resources/groundcover_notification_route/resource.tf)
     *   Demonstrates how to create and manage notification routes for routing alerts to connected apps.
 *   **Secret Resource:** [`examples/resources/groundcover_secret/resource.tf`](./examples/resources/groundcover_secret/resource.tf)

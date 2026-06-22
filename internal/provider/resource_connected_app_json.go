@@ -27,7 +27,7 @@ import (
 // terraform-plugin-framework dynamic attributes cannot be represented by code generators
 // (e.g. upjet/Crossplane) — mirroring the datadog_dashboard vs datadog_dashboard_json split.
 // The dynamic resource stays the default for HCL users; this variant is the codegen-friendly
-// path. ponytail: shares the data_hash drift logic and SDK models with the dynamic resource.
+// path. It shares the data_hash drift logic and SDK models with the dynamic resource.
 var (
 	_ resource.Resource                = &connectedAppJsonResource{}
 	_ resource.ResourceWithConfigure   = &connectedAppJsonResource{}
@@ -258,6 +258,12 @@ func jsonStringToMap(data types.String) (map[string]any, diag.Diagnostics) {
 	var m map[string]any
 	if err := json.Unmarshal([]byte(data.ValueString()), &m); err != nil {
 		diags.AddError("Invalid data JSON", fmt.Sprintf("The 'data' attribute must be a JSON object string: %v", err))
+		return nil, diags
+	}
+	// json.Unmarshal turns the literal "null" into a nil map with no error; reject it so we
+	// never send Data: nil to the API. (Scalars like "123"/"\"x\"" already error above.)
+	if m == nil {
+		diags.AddError("Invalid data JSON", "The 'data' attribute must be a JSON object string (e.g. {\"url\":\"...\"}), not null or a scalar.")
 		return nil, diags
 	}
 	return m, diags

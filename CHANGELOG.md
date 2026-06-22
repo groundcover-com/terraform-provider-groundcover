@@ -1,3 +1,7 @@
+## 1.14.2
+
+* Added `groundcover_connected_app_json` — a variant of `groundcover_connected_app` whose `data` is a JSON string (`jsonencode({...})`) instead of a dynamic object. Behaviour, drift detection (`data_hash`), and the underlying API are identical; the JSON-string form is for configs generated/consumed by tooling that can't model dynamic objects (e.g. the Crossplane provider). The existing `groundcover_connected_app` is unchanged.
+
 ## 1.14.1
 
 * Added computed `data_hash` attribute to `groundcover_connected_app` — exposes the SHA-256 hash groundcover computes over the stored (pre-redaction) data, so Terraform can detect changes to the sensitive, redacted `data` without retrieving the secret
