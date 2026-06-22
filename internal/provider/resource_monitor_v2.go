@@ -44,6 +44,8 @@ const (
 	monitorV2DatasourceClickhouse = "clickhouse"
 
 	monitorV2QueryTypeInstant = "instant"
+
+	monitorV2DataTypeAnnotationKey = "_gc_data_type"
 )
 
 func NewMonitorV2Resource() resource.Resource {
@@ -218,7 +220,7 @@ func (r *monitorV2Resource) Schema(_ context.Context, _ resource.SchemaRequest, 
 				ElementType:         types.StringType,
 			},
 			"annotations": schema.MapAttribute{
-				MarkdownDescription: fmt.Sprintf("Annotations to attach to the monitor and resulting alerts. The `%s` key is reserved for provider-managed Monitor V2 state and cannot be configured.", monitorV2QueryTypeAnnotationKey),
+				MarkdownDescription: fmt.Sprintf("Annotations to attach to the monitor and resulting alerts. The `%s` and `%s` keys are reserved for provider-managed Monitor V2 state and cannot be configured.", monitorV2QueryTypeAnnotationKey, monitorV2DataTypeAnnotationKey),
 				Optional:            true,
 				Computed:            true,
 				ElementType:         types.StringType,
@@ -251,10 +253,10 @@ func (r *monitorV2Resource) Schema(_ context.Context, _ resource.SchemaRequest, 
 						Required:            true,
 					},
 					"data_type": schema.StringAttribute{
-						MarkdownDescription: "GCQL data type. Required when `type = \"gcql\"`. Supported values: `logs`, `traces`, `events`, `entities`, `rum`, `issues`.",
+						MarkdownDescription: "GCQL data type. Required when `type = \"gcql\"`. Supported values: `logs`, `traces`, `events`, `entities`, `rum`, `issues`, `apm`.",
 						Optional:            true,
 						Validators: []validator.String{
-							stringvalidator.OneOf("logs", "traces", "events", "entities", "rum", "issues"),
+							stringvalidator.OneOf("logs", "traces", "events", "entities", "rum", "issues", "apm"),
 						},
 					},
 					"datasource_type": schema.StringAttribute{
@@ -670,15 +672,17 @@ func monitorV2ValidateAnnotations(annotations types.Map, diags *diag.Diagnostics
 	if annotations.IsNull() || annotations.IsUnknown() {
 		return
 	}
-	if _, ok := annotations.Elements()[monitorV2QueryTypeAnnotationKey]; !ok {
-		return
-	}
 
-	diags.AddAttributeError(
-		path.Root("annotations").AtMapKey(monitorV2QueryTypeAnnotationKey),
-		"Reserved monitor annotation",
-		fmt.Sprintf("`annotations.%s` is reserved for provider-managed Monitor V2 state and cannot be configured.", monitorV2QueryTypeAnnotationKey),
-	)
+	for key := range annotations.Elements() {
+		if !monitorV2IsInternalAnnotation(key) {
+			continue
+		}
+		diags.AddAttributeError(
+			path.Root("annotations").AtMapKey(key),
+			"Reserved monitor annotation",
+			fmt.Sprintf("`annotations.%s` is reserved for provider-managed Monitor V2 state and cannot be configured.", key),
+		)
+	}
 }
 
 func monitorV2ValidateNotificationSettings(settings *monitorV2NotificationSettingsModel, diags *diag.Diagnostics) {
@@ -852,7 +856,7 @@ func buildMonitorV2CreateRequest(ctx context.Context, plan *monitorV2ResourceMod
 	var diags diag.Diagnostics
 	isProvisioned := true
 	req := &models.CreateMonitorRequest{
-		Annotations:          monitorV2AnnotationsToSDK(ctx, plan.Annotations, plan.Query, &diags),
+		Annotations:          monitorV2AnnotationsToSDK(ctx, plan.Annotations, &diags),
 		AutoResolve:          monitorV2Bool(plan.AutoResolve),
 		Category:             monitorV2String(plan.Category),
 		ExecutionErrorState:  monitorV2String(plan.ExecutionErrorState),
@@ -877,7 +881,7 @@ func buildMonitorV2CreateRequest(ctx context.Context, plan *monitorV2ResourceMod
 func buildMonitorV2UpdateRequest(ctx context.Context, plan *monitorV2ResourceModel) (*models.UpdateMonitorRequest, diag.Diagnostics) {
 	var diags diag.Diagnostics
 	req := &models.UpdateMonitorRequest{
-		Annotations:          monitorV2AnnotationsToSDK(ctx, plan.Annotations, plan.Query, &diags),
+		Annotations:          monitorV2AnnotationsToSDK(ctx, plan.Annotations, &diags),
 		AutoResolve:          monitorV2Bool(plan.AutoResolve),
 		Category:             monitorV2String(plan.Category),
 		ExecutionErrorState:  monitorV2String(plan.ExecutionErrorState),
@@ -1405,20 +1409,8 @@ func monitorV2StringMap(ctx context.Context, value types.Map, diags *diag.Diagno
 	return result
 }
 
-func monitorV2AnnotationsToSDK(ctx context.Context, annotations types.Map, query *monitorV2QueryModel, diags *diag.Diagnostics) map[string]string {
-	result := monitorV2StringMap(ctx, annotations, diags)
-	queryType := ""
-	if query != nil {
-		queryType = monitorV2String(query.Type)
-	}
-	if !monitorV2IsValidQueryType(queryType) {
-		return result
-	}
-	if result == nil {
-		result = make(map[string]string, 1)
-	}
-	result[monitorV2QueryTypeAnnotationKey] = queryType
-	return result
+func monitorV2AnnotationsToSDK(ctx context.Context, annotations types.Map, diags *diag.Diagnostics) map[string]string {
+	return monitorV2FilterAnnotations(monitorV2StringMap(ctx, annotations, diags))
 }
 
 func monitorV2StringList(ctx context.Context, value types.List, diags *diag.Diagnostics) []string {
@@ -1611,7 +1603,7 @@ func monitorV2FilterAnnotations(annotations map[string]string) map[string]string
 
 func monitorV2IsInternalAnnotation(key string) bool {
 	switch key {
-	case "_gc_data_type", monitorV2QueryTypeAnnotationKey:
+	case monitorV2DataTypeAnnotationKey, monitorV2QueryTypeAnnotationKey:
 		return true
 	default:
 		return false

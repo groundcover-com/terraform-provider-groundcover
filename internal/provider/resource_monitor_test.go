@@ -92,9 +92,30 @@ func TestMonitorV2BuildCreateRequestGCQL(t *testing.T) {
 	if query.InstantRollup != "5m" {
 		t.Fatalf("query.InstantRollup = %q, want 5m", query.InstantRollup)
 	}
-	if req.Annotations[monitorV2QueryTypeAnnotationKey] != monitorV2QueryTypeGCQL {
-		t.Fatalf("Annotations[%q] = %q, want %q", monitorV2QueryTypeAnnotationKey, req.Annotations[monitorV2QueryTypeAnnotationKey], monitorV2QueryTypeGCQL)
+	requireNoInternalMonitorV2Annotations(t, req.Annotations)
+}
+
+func TestMonitorV2BuildCreateRequestGCQLAPM(t *testing.T) {
+	ctx := context.Background()
+	plan := testMonitorV2BasePlan(t, &monitorV2QueryModel{
+		Type:          types.StringValue(monitorV2QueryTypeGCQL),
+		Expression:    types.StringValue(`* | stats count() count_all_result`),
+		DataType:      types.StringValue("apm"),
+		InstantRollup: types.StringValue("5 minutes"),
+	})
+
+	req, diags := buildMonitorV2CreateRequest(ctx, &plan)
+	if diags.HasError() {
+		t.Fatalf("buildMonitorV2CreateRequest() diagnostics: %v", diags)
 	}
+	query := req.Model.Queries[0]
+	if query.DataType != "apm" {
+		t.Fatalf("query.DataType = %q, want apm", query.DataType)
+	}
+	if query.InstantRollup != "5m" {
+		t.Fatalf("query.InstantRollup = %q, want 5m", query.InstantRollup)
+	}
+	requireNoInternalMonitorV2Annotations(t, req.Annotations)
 }
 
 func TestMonitorV2BuildCreateRequestMetricsQL(t *testing.T) {
@@ -128,9 +149,7 @@ func TestMonitorV2BuildCreateRequestMetricsQL(t *testing.T) {
 	if time.Duration(query.Rollup.Time) != 5*time.Minute {
 		t.Fatalf("query.Rollup.Time = %s, want 5m", time.Duration(query.Rollup.Time))
 	}
-	if req.Annotations[monitorV2QueryTypeAnnotationKey] != monitorV2QueryTypeMetricsQL {
-		t.Fatalf("Annotations[%q] = %q, want %q", monitorV2QueryTypeAnnotationKey, req.Annotations[monitorV2QueryTypeAnnotationKey], monitorV2QueryTypeMetricsQL)
-	}
+	requireNoInternalMonitorV2Annotations(t, req.Annotations)
 }
 
 func TestMonitorV2BuildCreateRequestRawSQL(t *testing.T) {
@@ -155,8 +174,36 @@ func TestMonitorV2BuildCreateRequestRawSQL(t *testing.T) {
 	if query.Rollup != nil {
 		t.Fatalf("query.Rollup = %#v, want nil", query.Rollup)
 	}
-	if req.Annotations[monitorV2QueryTypeAnnotationKey] != monitorV2QueryTypeRawSQL {
-		t.Fatalf("Annotations[%q] = %q, want %q", monitorV2QueryTypeAnnotationKey, req.Annotations[monitorV2QueryTypeAnnotationKey], monitorV2QueryTypeRawSQL)
+	requireNoInternalMonitorV2Annotations(t, req.Annotations)
+}
+
+func TestMonitorV2BuildUpdateRequestFiltersInternalAnnotations(t *testing.T) {
+	ctx := context.Background()
+	plan := testMonitorV2BasePlan(t, &monitorV2QueryModel{
+		Type:       types.StringValue(monitorV2QueryTypeMetricsQL),
+		Expression: types.StringValue(`sum(up) by (cluster)`),
+		Rollup: &monitorV2RollupModel{
+			Function: types.StringValue("last"),
+			Time:     types.StringValue("5m"),
+		},
+	})
+	annotations, mapDiags := types.MapValueFrom(ctx, types.StringType, map[string]string{
+		monitorV2QueryTypeAnnotationKey: monitorV2QueryTypeMetricsQL,
+		monitorV2DataTypeAnnotationKey:  "metrics",
+		"team":                          "platform",
+	})
+	if mapDiags.HasError() {
+		t.Fatalf("types.MapValueFrom() diagnostics: %v", mapDiags)
+	}
+	plan.Annotations = annotations
+
+	req, diags := buildMonitorV2UpdateRequest(ctx, &plan)
+	if diags.HasError() {
+		t.Fatalf("buildMonitorV2UpdateRequest() diagnostics: %v", diags)
+	}
+	requireNoInternalMonitorV2Annotations(t, req.Annotations)
+	if req.Annotations["team"] != "platform" {
+		t.Fatalf("Annotations[team] = %q, want platform", req.Annotations["team"])
 	}
 }
 
@@ -602,35 +649,49 @@ func TestMonitorV2MapSDKToModelUsesQueryTypeAnnotation(t *testing.T) {
 	}
 }
 
-func TestMonitorV2FilterAnnotationsRemovesInternalQueryTypeMarker(t *testing.T) {
+func TestMonitorV2FilterAnnotationsRemovesInternalMarkers(t *testing.T) {
 	filtered := monitorV2FilterAnnotations(map[string]string{
 		monitorV2QueryTypeAnnotationKey: monitorV2QueryTypeMetricsQL,
-		"_gc_data_type":                 "metrics",
+		monitorV2DataTypeAnnotationKey:  "metrics",
 		"team":                          "platform",
 	})
 	if _, ok := filtered[monitorV2QueryTypeAnnotationKey]; ok {
 		t.Fatalf("filtered annotations still include %q", monitorV2QueryTypeAnnotationKey)
 	}
-	if _, ok := filtered["_gc_data_type"]; ok {
-		t.Fatalf("filtered annotations still include _gc_data_type")
+	if _, ok := filtered[monitorV2DataTypeAnnotationKey]; ok {
+		t.Fatalf("filtered annotations still include %q", monitorV2DataTypeAnnotationKey)
 	}
 	if filtered["team"] != "platform" {
 		t.Fatalf("filtered team annotation = %q, want platform", filtered["team"])
 	}
 }
 
-func TestMonitorV2ValidateAnnotationsRejectsReservedQueryTypeMarker(t *testing.T) {
-	annotations, mapDiags := types.MapValueFrom(context.Background(), types.StringType, map[string]string{
-		monitorV2QueryTypeAnnotationKey: monitorV2QueryTypeGCQL,
-		"team":                          "platform",
-	})
-	if mapDiags.HasError() {
-		t.Fatalf("types.MapValueFrom() diagnostics: %v", mapDiags)
-	}
+func TestMonitorV2ValidateAnnotationsRejectsReservedInternalMarkers(t *testing.T) {
+	for _, key := range []string{monitorV2QueryTypeAnnotationKey, monitorV2DataTypeAnnotationKey} {
+		t.Run(key, func(t *testing.T) {
+			annotations, mapDiags := types.MapValueFrom(context.Background(), types.StringType, map[string]string{
+				key:    monitorV2QueryTypeGCQL,
+				"team": "platform",
+			})
+			if mapDiags.HasError() {
+				t.Fatalf("types.MapValueFrom() diagnostics: %v", mapDiags)
+			}
 
-	var diags diag.Diagnostics
-	monitorV2ValidateAnnotations(annotations, &diags)
-	requireDiagnosticSummary(t, diags, "Reserved monitor annotation")
+			var diags diag.Diagnostics
+			monitorV2ValidateAnnotations(annotations, &diags)
+			requireDiagnosticSummary(t, diags, "Reserved monitor annotation")
+		})
+	}
+}
+
+func requireNoInternalMonitorV2Annotations(t *testing.T, annotations map[string]string) {
+	t.Helper()
+
+	for key := range annotations {
+		if monitorV2IsInternalAnnotation(key) {
+			t.Fatalf("annotations unexpectedly include internal key %q", key)
+		}
+	}
 }
 
 func TestMonitorResourceDisappearsDefaultAPIURLMatchesProviderDefault(t *testing.T) {
@@ -771,6 +832,40 @@ func TestAccMonitorV2Resource(t *testing.T) {
 	})
 }
 
+func TestAccMonitorV2Resource_importThenUpdate(t *testing.T) {
+	name := acctest.RandomWithPrefix("test-monitor-v2-import")
+	updatedName := acctest.RandomWithPrefix("test-monitor-v2-import-updated")
+
+	resource.Test(t, resource.TestCase{
+		PreCheck:                 func() { testAccPreCheck(t) },
+		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
+		Steps: []resource.TestStep{
+			{
+				Config: testAccMonitorV2MetricsQLImportUpdateConfig(name),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					resource.TestCheckResourceAttrSet("groundcover_monitor_v2.test", "id"),
+					resource.TestCheckResourceAttr("groundcover_monitor_v2.test", "title", name),
+					resource.TestCheckResourceAttr("groundcover_monitor_v2.test", "query.type", monitorV2QueryTypeMetricsQL),
+					resource.TestCheckNoResourceAttr("groundcover_monitor_v2.test", "annotations."+monitorV2QueryTypeAnnotationKey),
+				),
+			},
+			{
+				ResourceName:      "groundcover_monitor_v2.test",
+				ImportState:       true,
+				ImportStateVerify: true,
+			},
+			{
+				Config: testAccMonitorV2MetricsQLImportUpdateConfig(updatedName),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					resource.TestCheckResourceAttr("groundcover_monitor_v2.test", "title", updatedName),
+					resource.TestCheckResourceAttr("groundcover_monitor_v2.test", "display.header", updatedName),
+					resource.TestCheckNoResourceAttr("groundcover_monitor_v2.test", "annotations."+monitorV2QueryTypeAnnotationKey),
+				),
+			},
+		},
+	})
+}
+
 func TestAccMonitorV2Resource_disappears(t *testing.T) {
 	name := acctest.RandomWithPrefix("test-monitor-v2")
 
@@ -823,6 +918,9 @@ func TestAccMonitorV2Resource_allSupportedQueryTypes(t *testing.T) {
 					resource.TestCheckResourceAttrSet("groundcover_monitor_v2.issues", "id"),
 					resource.TestCheckResourceAttr("groundcover_monitor_v2.issues", "query.type", monitorV2QueryTypeGCQL),
 					resource.TestCheckResourceAttr("groundcover_monitor_v2.issues", "query.data_type", "issues"),
+					resource.TestCheckResourceAttrSet("groundcover_monitor_v2.apm", "id"),
+					resource.TestCheckResourceAttr("groundcover_monitor_v2.apm", "query.type", monitorV2QueryTypeGCQL),
+					resource.TestCheckResourceAttr("groundcover_monitor_v2.apm", "query.data_type", "apm"),
 					resource.TestCheckResourceAttrSet("groundcover_monitor_v2.metricsql", "id"),
 					resource.TestCheckResourceAttr("groundcover_monitor_v2.metricsql", "query.type", monitorV2QueryTypeMetricsQL),
 					resource.TestCheckResourceAttrSet("groundcover_monitor_v2.raw_sql", "id"),
@@ -866,6 +964,51 @@ resource "groundcover_monitor_v2" "test" {
 
   execution_error_state = "OK"
   no_data_state         = "OK"
+}
+`, name)
+}
+
+func testAccMonitorV2MetricsQLImportUpdateConfig(name string) string {
+	return fmt.Sprintf(`
+resource "groundcover_monitor_v2" "test" {
+  title            = %[1]q
+  severity         = "warning"
+  measurement_type = "state"
+  is_paused        = true
+
+  display {
+    header      = %[1]q
+    description = "Monitor V2 import/update acceptance test"
+  }
+
+  query {
+    type       = "metricsql"
+    expression = "sum(groundcover_kube_pod_container_status_running{})"
+
+    rollup {
+      function = "avg"
+      time     = "5m"
+    }
+  }
+
+  threshold {
+    name       = "threshold_1"
+    input_name = "threshold_input_query"
+    operator   = "gt"
+    values     = [999999]
+  }
+
+  evaluation_interval {
+    interval    = "5m"
+    pending_for = "10m"
+  }
+
+  execution_error_state = "OK"
+  no_data_state         = "OK"
+
+  notification_settings {
+    method = "notificationRoutes"
+  }
 }
 `, name)
 }
@@ -958,6 +1101,12 @@ func testAccMonitorV2AllSupportedQueryTypesConfig(suffix string) string {
 			resourceName:  "issues",
 			dataType:      "issues",
 			query:         "status:Alerting | stats count() count_all_result",
+			instantRollup: true,
+		},
+		{
+			resourceName:  "apm",
+			dataType:      "apm",
+			query:         "* | stats count() count_all_result",
 			instantRollup: true,
 		},
 	}

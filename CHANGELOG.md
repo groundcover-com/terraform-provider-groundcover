@@ -1,9 +1,11 @@
-## 1.14.2
+## 1.15.0
 
+* Added `apm` as a supported GCQL `data_type` for `groundcover_monitor_v2`
 * Added `groundcover_connected_app_json` — a variant of `groundcover_connected_app` whose `data` is a JSON string (`jsonencode({...})`) instead of a dynamic object. Behaviour, drift detection (`data_hash`), and the underlying API are identical; the JSON-string form is for configs generated/consumed by tooling that can't model dynamic objects (e.g. the Crossplane provider). The existing `groundcover_connected_app` is unchanged.
 
 ## 1.14.1
 
+* Fixed `groundcover_monitor_v2` import/update failures caused by sending the reserved `_gc_monitor_v2_query_type` annotation back to the monitors API
 * Added computed `data_hash` attribute to `groundcover_connected_app` — exposes the SHA-256 hash groundcover computes over the stored (pre-redaction) data, so Terraform can detect changes to the sensitive, redacted `data` without retrieving the secret
 * `groundcover_connected_app` now corrects out-of-band drift: when the API-reported `data_hash` differs from the value recorded in state, the next plan shows a diff and apply restores the configured `data`. Detection is forward-looking — it covers changes made after the baseline hash is first recorded in state (on the first refresh after upgrading to this version); resources created by an older provider adopt the current server hash as their baseline, so pre-upgrade out-of-band changes are not retroactively flagged
 * Updated `github.com/groundcover-com/groundcover-sdk-go` to `v1.291.0` (adds `data_hash` to connected-app responses)

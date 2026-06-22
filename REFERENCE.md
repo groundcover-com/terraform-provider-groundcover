@@ -172,7 +172,7 @@ Manages a groundcover Monitor resource with a typed schema instead of raw YAML. 
 
 #### Example Usage
 
-The full example file includes GCQL examples for logs, traces, events, entities, RUM, and issues, plus MetricsQL and raw SQL examples.
+The full example file includes GCQL examples for logs, traces, events, entities, RUM, issues, and APM, plus MetricsQL and raw SQL examples.
 
 ```hcl
 resource "groundcover_monitor_v2" "gcql_logs" {
@@ -218,7 +218,7 @@ resource "groundcover_monitor_v2" "gcql_logs" {
 *   `title` (String, Required): Monitor title.
 *   `severity` (String, Required): Monitor severity.
 *   `measurement_type` (String, Required): `state` or `event`.
-*   `query` (Block, Required): Typed query definition. Supports `type = "gcql"`, `type = "metricsql"`, and `type = "raw_sql"`. GCQL supports `data_type` values `logs`, `traces`, `events`, `entities`, `rum`, and `issues`.
+*   `query` (Block, Required): Typed query definition. Supports `type = "gcql"`, `type = "metricsql"`, and `type = "raw_sql"`. GCQL supports `data_type` values `logs`, `traces`, `events`, `entities`, `rum`, `issues`, and `apm`.
 *   `threshold` (Block, Required): One or more threshold definitions. Supports optional `custom_resolve_threshold`.
 *   `notification_settings` (Block, Optional): Notification behavior, including `connected_app_params` for per-app Slack channels.
 *   `display`, `evaluation_interval`, `reducer`, `labels`, `annotations`, and `routing` are optional monitor settings.
