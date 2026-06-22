@@ -58,6 +58,28 @@ func TestAccConnectedAppJson_applyLoop(t *testing.T) {
 	})
 }
 
+// TestAccConnectedAppJson_disappears verifies the provider detects external deletion and
+// plans to recreate. Reuses the connected_app helpers — both resources delete by ID via
+// the same API.
+func TestAccConnectedAppJson_disappears(t *testing.T) {
+	name := acctest.RandomWithPrefix("test-slack-json-disappears")
+
+	resource.Test(t, resource.TestCase{
+		PreCheck:                 func() { testAccPreCheck(t) },
+		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
+		Steps: []resource.TestStep{
+			{
+				Config: testAccConnectedAppJsonConfig_basic(name),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					testAccCheckConnectedAppResourceExists("groundcover_connected_app_json.test"),
+					testAccCheckConnectedAppResourceDisappears("groundcover_connected_app_json.test"),
+				),
+				ExpectNonEmptyPlan: true,
+			},
+		},
+	})
+}
+
 func testAccConnectedAppJsonConfig_basic(name string) string {
 	return fmt.Sprintf(`
 resource "groundcover_connected_app_json" "test" {
