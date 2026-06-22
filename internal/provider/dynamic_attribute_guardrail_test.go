@@ -7,9 +7,11 @@ import (
 	"context"
 	"testing"
 
+	"github.com/hashicorp/terraform-plugin-framework/attr"
 	fwprovider "github.com/hashicorp/terraform-plugin-framework/provider"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	rschema "github.com/hashicorp/terraform-plugin-framework/resource/schema"
+	"github.com/hashicorp/terraform-plugin-framework/types/basetypes"
 )
 
 // knownDynamicAttrs is the allowlist of resource attributes that are intentionally
@@ -90,7 +92,22 @@ func findDynamicAttrs(t *testing.T, resName, prefix string, attrs map[string]rsc
 			findDynamicAttrs(t, resName, joinPath(prefix, name), a.NestedObject.Attributes)
 		case rschema.MapNestedAttribute:
 			findDynamicAttrs(t, resName, joinPath(prefix, name), a.NestedObject.Attributes)
+		// Collections whose element type is itself dynamic are also uncodegenable.
+		case rschema.ListAttribute:
+			flagDynamicElement(t, key, a.ElementType)
+		case rschema.SetAttribute:
+			flagDynamicElement(t, key, a.ElementType)
+		case rschema.MapAttribute:
+			flagDynamicElement(t, key, a.ElementType)
 		}
+	}
+}
+
+func flagDynamicElement(t *testing.T, key string, et attr.Type) {
+	t.Helper()
+	if _, ok := et.(basetypes.DynamicType); ok && !knownDynamicAttrs[key] {
+		t.Errorf("%q is a collection with a types.Dynamic element type, which upjet cannot generate — it breaks the Crossplane provider (crossplane-provider-groundcover, BE-2207). "+
+			"Use a JSON-string field instead, or add %q to knownDynamicAttrs with justification.", key, key)
 	}
 }
 

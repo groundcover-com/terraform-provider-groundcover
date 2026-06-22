@@ -262,6 +262,7 @@ TF_ACC=1 go test ./internal/provider -v -run TestAccDataIntegrationResource
 TF_ACC=1 go test ./internal/provider -v -run TestAccSyntheticTestResource
 TF_ACC=1 go test ./internal/provider -v -run TestAccTracesPipelineResource
 TF_ACC=1 go test ./internal/provider -v -run TestAccSilenceResource
+TF_ACC=1 go test ./internal/provider -v -run TestAccConnectedAppJson
 
 # Run unit tests only (no API calls required)
 go test ./internal/provider -v
