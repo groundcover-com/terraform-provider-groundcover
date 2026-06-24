@@ -1,4 +1,4 @@
-## 1.15.1
+## 1.16.0
 
 * Added `groundcover_connected_app_json` — a variant of `groundcover_connected_app` whose `data` is a JSON string (`jsonencode({...})`) instead of a dynamic object. Behaviour, drift detection (`data_hash`), and the underlying API are identical; the JSON-string form is for configs generated/consumed by tooling that can't model dynamic objects (e.g. the Crossplane provider). The existing `groundcover_connected_app` is unchanged.
 
