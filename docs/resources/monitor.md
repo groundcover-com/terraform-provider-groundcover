@@ -3,12 +3,12 @@
 page_title: "groundcover_monitor Resource - groundcover"
 subcategory: ""
 description: |-
-  groundcover Monitor resource managed via raw YAML.
+  Deprecated: use groundcover_monitor_v2 monitor_v2.md instead. groundcover Monitor resource managed via raw YAML.
 ---
 
 # groundcover_monitor (Resource)
 
-groundcover Monitor resource managed via raw YAML.
+**Deprecated:** use [`groundcover_monitor_v2`](monitor_v2.md) instead. groundcover Monitor resource managed via raw YAML.
 
 ## Example Usage
 
@@ -44,64 +44,64 @@ variable "groundcover_backend_id" {
   description = "groundcover Backend ID"
 }
 
-# Example Monitor: K8s Pod Crash Looping using monitor_yaml
+# NOTE: groundcover_monitor is deprecated. Use groundcover_monitor_v2 instead,
+# which provides a typed Terraform schema in place of the raw YAML blob.
+
+# Example Monitor: K8s Pod Crashed using monitor_yaml
 # Monitor YAML structure docs:
 # https://docs.groundcover.com/use-groundcover/monitors/monitor-yaml-structure
-resource "groundcover_monitor" "k8s_pod_crash_looping" {
+resource "groundcover_monitor" "k8s_pod_crashed" {
   monitor_yaml = <<-YAML
-title: K8s Pod Crash Looping
+title: K8s Pod Crashed Monitor
 display:
-  header: K8s Pod Crash Looping
-  resourceHeaderLabels:
-  - workload
+  header: K8s Pod Crashed - {{ alert.labels.reason }}
+  description: |-
+    This Monitor fires when a pod has crashed, leading to potential application instability.
+    {% if alert.labels.env %} Environment: {{ alert.labels.env }} {% endif %}
+    Cluster: {{ alert.labels.cluster }}
+    Namespace: {{ alert.labels.namespace }}
+    Workload: {{ alert.labels.workload }}
+    Pod Name: {{ alert.labels.pod_name }}
+    Container: {{ alert.labels.container }}
+    Reason: {{ alert.labels.reason }}
+  resourceHeaderLabels: []
   contextHeaderLabels:
-  - cluster
-  - namespace
-  - workload
-  description: Kubernetes pod is on a CrashLoopBackOff for more than 5 minutes
+    - env
+    - cluster
+    - namespace
+    - workload
+    - podName
+    - container
+    - reason
 severity: S2
-measurementType: event
 model:
   queries:
-  - dataType: metrics
-    name: threshold_input_query
-    pipeline:
-      function:
-        name: avg_over_time
-        pipelines:
-        - function:
-            name: avg_by
-            pipelines:
-            - metric: groundcover_kube_pod_container_status_waiting_reason
-            args:
-            - cluster
-            - namespace
-            - workload
-        args:
-        - 5m
-    conditions:
-    - key: reason
-      origin: root
-      type: string
-      filters:
-      - op: match
-        value: CrashLoopBackOff
+    - name: threshold_input_query
+      dataType: events
+      expression: type:container_crash | stats by (env, cluster, namespace, workload, podName, container, reason) count() crashes_count | rename podName as pod_name
+      instantRollup: 5 minutes
   thresholds:
-  - name: threshold_1
-    inputName: threshold_input_query
-    operator: gt
-    values:
-    - 0
+    - name: threshold_1
+      inputName: threshold_input_query
+      operator: gt
+      values:
+        - 0
+labels: {}
+annotations: {}
 executionErrorState: OK
+noDataState: OK
 evaluationInterval:
-  interval: 1m0s
-  pendingFor: 5m0s
+  interval: 1m
+  pendingFor: 0s
+notificationSettings:
+  method: notificationRoutes
+measurementType: event
   YAML
 }
 
 output "monitor_example_id" {
   description = "The ID of the example Monitor created via YAML."
-  value       = groundcover_monitor.k8s_pod_crash_looping.id
+  value       = groundcover_monitor.k8s_pod_crashed.id
 }
 
 # Note: Accessing specific fields like 'title' directly is not possible
@@ -109,7 +109,7 @@ output "monitor_example_id" {
 # You would need to parse the YAML output if required.
 output "monitor_example_yaml_output" {
   description = "The YAML definition applied to the monitor."
-  value       = groundcover_monitor.k8s_pod_crash_looping.monitor_yaml
+  value       = groundcover_monitor.k8s_pod_crashed.monitor_yaml
 }
 ```
 

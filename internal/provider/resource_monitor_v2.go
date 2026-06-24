@@ -253,10 +253,10 @@ func (r *monitorV2Resource) Schema(_ context.Context, _ resource.SchemaRequest, 
 						Required:            true,
 					},
 					"data_type": schema.StringAttribute{
-						MarkdownDescription: "GCQL data type. Required when `type = \"gcql\"`. Supported values: `logs`, `traces`, `events`, `entities`, `rum`, `issues`, `apm`.",
+						MarkdownDescription: "GCQL data type. Required when `type = \"gcql\"`. Supported values: `logs`, `traces`, `events`, `apm`.",
 						Optional:            true,
 						Validators: []validator.String{
-							stringvalidator.OneOf("logs", "traces", "events", "entities", "rum", "issues", "apm"),
+							stringvalidator.OneOf("logs", "traces", "events", "apm"),
 						},
 					},
 					"datasource_type": schema.StringAttribute{

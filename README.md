@@ -12,8 +12,8 @@ Basic usage examples can be found in the `examples/` directory:
     *   Shows how to create and manage service accounts with associated policies.
 *   **API Key Resource:** [`examples/resources/groundcover_apikey/resource.tf`](./examples/resources/groundcover_apikey/resource.tf)
     *   Illustrates API key creation and management for service accounts.
-*   **Monitor Resource:** [`examples/resources/groundcover_monitor/resource.tf`](./examples/resources/groundcover_monitor/resource.tf)
-    *   Provides examples of configuring monitoring rules and alerts.
+*   **Monitor Resource (deprecated):** [`examples/resources/groundcover_monitor/resource.tf`](./examples/resources/groundcover_monitor/resource.tf)
+    *   Provides examples of configuring monitoring rules and alerts via raw YAML. **Deprecated — use the Monitor V2 resource instead.**
 *   **Monitor V2 Resource:** [`examples/resources/groundcover_monitor_v2/resource.tf`](./examples/resources/groundcover_monitor_v2/resource.tf)
     *   Provides typed monitor examples for GCQL, MetricsQL, raw SQL, custom resolve thresholds, and connected-app delivery params.
 *   **Ingestion Key Resource:** [`examples/resources/groundcover_ingestionkey/resource.tf`](./examples/resources/groundcover_ingestionkey/resource.tf)
