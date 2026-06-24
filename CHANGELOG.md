@@ -1,6 +1,7 @@
 ## 1.16.0
 
 * Added `groundcover_connected_app_json` — a variant of `groundcover_connected_app` whose `data` is a JSON string (`jsonencode({...})`) instead of a dynamic object. Behaviour, drift detection (`data_hash`), and the underlying API are identical; the JSON-string form is for configs generated/consumed by tooling that can't model dynamic objects (e.g. the Crossplane provider). The existing `groundcover_connected_app` is unchanged.
+* Added `pkg/tfprovider`, a public re-export of the plugin-framework provider constructor (`internal/provider.New`), so the groundcover Crossplane provider can hand the live provider to upjet for schema introspection during code generation. No change to provider behaviour.
 
 ## 1.15.0
 
