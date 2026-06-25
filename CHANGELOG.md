@@ -1,3 +1,9 @@
+## 1.16.2
+
+* Deprecated `groundcover_monitor` — the resource now emits a deprecation warning directing users to `groundcover_monitor_v2`, which provides a typed Terraform schema in place of the raw YAML blob. The resource continues to work for backward compatibility
+* Refreshed the `groundcover_monitor` example to a K8s Pod Crashed monitor using GCQL
+* Removed `entities`, `rum`, and `issues` from the supported `groundcover_monitor_v2` GCQL `data_type` values — only `logs`, `traces`, `events`, and `apm` are supported. These values were not actually backed by the monitors API; configs using them are now rejected at plan time with a clear validation error
+
 ## 1.16.1
 
 * Added `pkg/tfprovider`, a public re-export of the plugin-framework provider constructor (`internal/provider.New`), so the groundcover Crossplane provider can hand the live provider to upjet for schema introspection during code generation. No change to provider behaviour.

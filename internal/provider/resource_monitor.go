@@ -41,7 +41,8 @@ func (r *monitorResource) Metadata(ctx context.Context, req resource.MetadataReq
 
 func (r *monitorResource) Schema(ctx context.Context, req resource.SchemaRequest, resp *resource.SchemaResponse) {
 	resp.Schema = schema.Schema{
-		MarkdownDescription: "groundcover Monitor resource managed via raw YAML.",
+		DeprecationMessage:  "The `groundcover_monitor` resource is deprecated. Use `groundcover_monitor_v2` instead, which provides a typed Terraform schema in place of the raw YAML blob.",
+		MarkdownDescription: "**Deprecated:** use `groundcover_monitor_v2` (see monitor_v2.md) instead. groundcover Monitor resource managed via raw YAML.",
 
 		Attributes: map[string]schema.Attribute{
 			"id": schema.StringAttribute{
