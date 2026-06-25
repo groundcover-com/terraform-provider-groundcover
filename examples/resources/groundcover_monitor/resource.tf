@@ -55,7 +55,7 @@ display:
     - cluster
     - namespace
     - workload
-    - podName
+    - pod_name
     - container
     - reason
 severity: S2

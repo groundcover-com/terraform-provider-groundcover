@@ -3,12 +3,12 @@
 page_title: "groundcover_monitor Resource - groundcover"
 subcategory: ""
 description: |-
-  Deprecated: use groundcover_monitor_v2 monitor_v2.md instead. groundcover Monitor resource managed via raw YAML.
+  Deprecated: use groundcover_monitor_v2 (see monitor_v2.md) instead. groundcover Monitor resource managed via raw YAML.
 ---
 
 # groundcover_monitor (Resource)
 
-**Deprecated:** use [`groundcover_monitor_v2`](monitor_v2.md) instead. groundcover Monitor resource managed via raw YAML.
+**Deprecated:** use `groundcover_monitor_v2` (see monitor_v2.md) instead. groundcover Monitor resource managed via raw YAML.
 
 ## Example Usage
 
@@ -70,7 +70,7 @@ display:
     - cluster
     - namespace
     - workload
-    - podName
+    - pod_name
     - container
     - reason
 severity: S2
