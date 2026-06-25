@@ -1,4 +1,4 @@
-## 1.17.0
+## 1.16.2
 
 * Deprecated `groundcover_monitor` — the resource now emits a deprecation warning directing users to `groundcover_monitor_v2`, which provides a typed Terraform schema in place of the raw YAML blob. The resource continues to work for backward compatibility
 * Refreshed the `groundcover_monitor` example to a K8s Pod Crashed monitor using GCQL
