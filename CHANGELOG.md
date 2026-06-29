@@ -1,3 +1,7 @@
+## 1.17.0
+
+* Added `groundcover_monitor_v2_json` — a variant of `groundcover_monitor_v2` whose `notification_settings.connected_app_params` is a JSON string (`jsonencode({...})`) instead of an HCL nested map. Schema, behaviour, and the underlying API are otherwise identical; the JSON-string form is for configs generated/consumed by tooling that can't model nested maps (e.g. the Crossplane provider). The existing `groundcover_monitor_v2` is unchanged
+
 ## 1.16.2
 
 * Deprecated `groundcover_monitor` — the resource now emits a deprecation warning directing users to `groundcover_monitor_v2`, which provides a typed Terraform schema in place of the raw YAML blob. The resource continues to work for backward compatibility

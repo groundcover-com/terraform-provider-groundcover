@@ -523,11 +523,16 @@ func (r *monitorV2Resource) ValidateConfig(ctx context.Context, req resource.Val
 	if resp.Diagnostics.HasError() {
 		return
 	}
+	validateMonitorV2Config(ctx, &config, &resp.Diagnostics)
+}
 
-	monitorV2ValidateAnnotations(config.Annotations, &resp.Diagnostics)
+// validateMonitorV2Config holds the shared monitor_v2 config validation so both the typed
+// resource and its JSON sibling (groundcover_monitor_v2_json) enforce identical rules.
+func validateMonitorV2Config(ctx context.Context, config *monitorV2ResourceModel, diags *diag.Diagnostics) {
+	monitorV2ValidateAnnotations(config.Annotations, diags)
 
 	if config.Query == nil {
-		resp.Diagnostics.AddAttributeError(
+		diags.AddAttributeError(
 			path.Root("query"),
 			"Missing query block",
 			"groundcover_monitor_v2 requires exactly one query block.",
@@ -542,32 +547,32 @@ func (r *monitorV2Resource) ValidateConfig(ctx context.Context, req resource.Val
 
 	switch queryType {
 	case monitorV2QueryTypeGCQL:
-		monitorV2ValidateUnsupportedQueryFields(config.Query, queryType, &resp.Diagnostics)
+		monitorV2ValidateUnsupportedQueryFields(config.Query, queryType, diags)
 		if monitorV2String(config.Query.DataType) == "" {
-			resp.Diagnostics.AddAttributeError(
+			diags.AddAttributeError(
 				path.Root("query").AtName("data_type"),
 				"Missing GCQL data type",
 				"`data_type` is required when query.type is `gcql`.",
 			)
 		}
 	case monitorV2QueryTypeMetricsQL:
-		monitorV2ValidateUnsupportedQueryFields(config.Query, queryType, &resp.Diagnostics)
+		monitorV2ValidateUnsupportedQueryFields(config.Query, queryType, diags)
 		if config.Query.Rollup == nil {
-			resp.Diagnostics.AddAttributeError(
+			diags.AddAttributeError(
 				path.Root("query").AtName("rollup"),
 				"Missing MetricsQL rollup",
 				"`rollup` is required when query.type is `metricsql`.",
 			)
 		} else {
 			if monitorV2String(config.Query.Rollup.Function) == "" {
-				resp.Diagnostics.AddAttributeError(
+				diags.AddAttributeError(
 					path.Root("query").AtName("rollup").AtName("function"),
 					"Missing MetricsQL rollup function",
 					"`rollup.function` is required when query.type is `metricsql`.",
 				)
 			}
 			if monitorV2String(config.Query.Rollup.Time) == "" {
-				resp.Diagnostics.AddAttributeError(
+				diags.AddAttributeError(
 					path.Root("query").AtName("rollup").AtName("time"),
 					"Missing MetricsQL rollup time",
 					"`rollup.time` is required when query.type is `metricsql`.",
@@ -575,9 +580,9 @@ func (r *monitorV2Resource) ValidateConfig(ctx context.Context, req resource.Val
 			}
 		}
 	case monitorV2QueryTypeRawSQL:
-		monitorV2ValidateUnsupportedQueryFields(config.Query, queryType, &resp.Diagnostics)
+		monitorV2ValidateUnsupportedQueryFields(config.Query, queryType, diags)
 		if config.Query.Rollup != nil {
-			resp.Diagnostics.AddAttributeError(
+			diags.AddAttributeError(
 				path.Root("query").AtName("rollup"),
 				"Unsupported raw SQL rollup",
 				"`rollup` is only supported for MetricsQL queries.",
@@ -586,7 +591,7 @@ func (r *monitorV2Resource) ValidateConfig(ctx context.Context, req resource.Val
 	}
 
 	if len(config.Thresholds) == 0 {
-		resp.Diagnostics.AddAttributeError(
+		diags.AddAttributeError(
 			path.Root("threshold"),
 			"Missing threshold block",
 			"groundcover_monitor_v2 requires at least one threshold block.",
@@ -599,21 +604,21 @@ func (r *monitorV2Resource) ValidateConfig(ctx context.Context, req resource.Val
 		}
 		parentOp := monitorV2String(threshold.Operator)
 		if parentOp != "" && !monitorV2SupportsCustomResolveOperator(parentOp) {
-			resp.Diagnostics.AddAttributeError(
+			diags.AddAttributeError(
 				path.Root("threshold").AtListIndex(i).AtName("operator"),
 				"Unsupported threshold operator for custom resolve threshold",
 				"`custom_resolve_threshold` is supported only when threshold.operator is one of `gt`, `lt`, `within_range`, or `outside_range`.",
 			)
 		}
 		if !threshold.CustomResolveThreshold.Operator.IsUnknown() && monitorV2String(threshold.CustomResolveThreshold.Operator) == "" {
-			resp.Diagnostics.AddAttributeError(
+			diags.AddAttributeError(
 				path.Root("threshold").AtListIndex(i).AtName("custom_resolve_threshold").AtName("operator"),
 				"Missing custom resolve threshold operator",
 				"`custom_resolve_threshold.operator` is required when custom_resolve_threshold is configured.",
 			)
 		}
-		if !threshold.CustomResolveThreshold.Values.IsUnknown() && len(monitorV2Float64List(ctx, threshold.CustomResolveThreshold.Values, &resp.Diagnostics)) == 0 {
-			resp.Diagnostics.AddAttributeError(
+		if !threshold.CustomResolveThreshold.Values.IsUnknown() && len(monitorV2Float64List(ctx, threshold.CustomResolveThreshold.Values, diags)) == 0 {
+			diags.AddAttributeError(
 				path.Root("threshold").AtListIndex(i).AtName("custom_resolve_threshold").AtName("values"),
 				"Missing custom resolve threshold values",
 				"`custom_resolve_threshold.values` is required when custom_resolve_threshold is configured.",
@@ -621,7 +626,7 @@ func (r *monitorV2Resource) ValidateConfig(ctx context.Context, req resource.Val
 		}
 	}
 
-	monitorV2ValidateNotificationSettings(config.NotificationSettings, &resp.Diagnostics)
+	monitorV2ValidateNotificationSettings(config.NotificationSettings, diags)
 }
 
 func monitorV2ValidateUnsupportedQueryFields(query *monitorV2QueryModel, queryType string, diags *diag.Diagnostics) {

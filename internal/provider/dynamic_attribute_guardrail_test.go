@@ -34,6 +34,14 @@ var knownDynamicAttrs = map[string]bool{
 	"groundcover_connected_app.data": true,
 }
 
+// knownNestedMapAttrs is the allowlist of schema.MapNestedAttribute attributes (a map whose
+// values are objects). upjet cannot represent these either, so the same rule applies: a new one
+// must be deliberate, and the Crossplane-friendly path is a JSON-string sibling resource.
+var knownNestedMapAttrs = map[string]bool{
+	// The nested-map original; groundcover_monitor_v2_json exposes this as a JSON string (BE-2288).
+	"groundcover_monitor_v2.notification_settings.connected_app_params": true,
+}
+
 // TestNoUnexpectedDynamicAttributes fails when a resource exposes a types.Dynamic attribute
 // that is not on the knownDynamicAttrs allowlist, preventing accidental breakage of the
 // upjet-generated Crossplane provider.
@@ -91,6 +99,11 @@ func findDynamicAttrs(t *testing.T, resName, prefix string, attrs map[string]rsc
 		case rschema.SetNestedAttribute:
 			findDynamicAttrs(t, resName, joinPath(prefix, name), a.NestedObject.Attributes)
 		case rschema.MapNestedAttribute:
+			if !knownNestedMapAttrs[key] {
+				t.Errorf("%q is a schema.MapNestedAttribute (map of objects), which upjet cannot generate — it breaks the Crossplane provider (crossplane-provider-groundcover, BE-2207). "+
+					"Expose this via a JSON-string sibling resource (see groundcover_monitor_v2_json), "+
+					"or, if this resource is intentionally Terraform-only, add %q to knownNestedMapAttrs with justification.", key, key)
+			}
 			findDynamicAttrs(t, resName, joinPath(prefix, name), a.NestedObject.Attributes)
 		// Collections whose element type is itself dynamic are also uncodegenable.
 		case rschema.ListAttribute:
