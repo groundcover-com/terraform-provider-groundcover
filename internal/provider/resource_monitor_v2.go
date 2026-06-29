@@ -617,7 +617,10 @@ func validateMonitorV2Config(ctx context.Context, config *monitorV2ResourceModel
 				"`custom_resolve_threshold.operator` is required when custom_resolve_threshold is configured.",
 			)
 		}
-		if !threshold.CustomResolveThreshold.Values.IsUnknown() && len(monitorV2Float64List(ctx, threshold.CustomResolveThreshold.Values, diags)) == 0 {
+		// Check raw list emptiness rather than coercing: a present-but-malformed list (e.g. a
+		// null/unknown element) would otherwise both record a conversion error and be reported as
+		// "missing". Conversion happens later, at build time.
+		if !threshold.CustomResolveThreshold.Values.IsUnknown() && len(threshold.CustomResolveThreshold.Values.Elements()) == 0 {
 			diags.AddAttributeError(
 				path.Root("threshold").AtListIndex(i).AtName("custom_resolve_threshold").AtName("values"),
 				"Missing custom resolve threshold values",

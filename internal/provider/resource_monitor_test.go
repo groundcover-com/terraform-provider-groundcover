@@ -738,6 +738,52 @@ func testMonitorV2BasePlan(t *testing.T, query *monitorV2QueryModel) monitorV2Re
 	}
 }
 
+// TestMonitorV2ValidateCustomResolveValues checks that a present-but-malformed
+// custom_resolve_threshold.values list is not misreported as "missing", while a genuinely empty
+// list still is.
+func TestMonitorV2ValidateCustomResolveValues(t *testing.T) {
+	ctx := context.Background()
+	query := &monitorV2QueryModel{
+		Type:       types.StringValue(monitorV2QueryTypeGCQL),
+		Expression: types.StringValue("level:error | stats count() c"),
+		DataType:   types.StringValue("logs"),
+	}
+
+	hasMissingValues := func(diags diag.Diagnostics) bool {
+		for _, d := range diags {
+			if d.Summary() == "Missing custom resolve threshold values" {
+				return true
+			}
+		}
+		return false
+	}
+
+	withValues := func(values types.List) *monitorV2ResourceModel {
+		plan := testMonitorV2BasePlan(t, query)
+		plan.Thresholds[0].CustomResolveThreshold = &monitorV2CustomResolveThresholdModel{
+			Operator: types.StringValue("gt"),
+			Values:   values,
+		}
+		return &plan
+	}
+
+	// Present but malformed (one unknown element): conversion fails, but it must not be "missing".
+	malformed := types.ListValueMust(types.Float64Type, []attr.Value{types.Float64Unknown()})
+	var diags diag.Diagnostics
+	validateMonitorV2Config(ctx, withValues(malformed), &diags)
+	if hasMissingValues(diags) {
+		t.Error("malformed (present) values were misreported as missing")
+	}
+
+	// Genuinely empty: must be reported as missing.
+	empty := types.ListValueMust(types.Float64Type, []attr.Value{})
+	diags = nil
+	validateMonitorV2Config(ctx, withValues(empty), &diags)
+	if !hasMissingValues(diags) {
+		t.Error("empty values should be reported as missing")
+	}
+}
+
 func TestAccMonitorResource(t *testing.T) {
 	name := acctest.RandomWithPrefix("test-monitor")
 	updatedName := acctest.RandomWithPrefix("test-monitor-updated")
