@@ -394,7 +394,18 @@ func connectedAppParamsJSONToMap(ctx context.Context, value types.String, diags 
 		)
 		return types.MapNull(objectType)
 	}
+	if parsed == nil {
+		// A scalar payload errors above; literal `null` decodes to a nil map without error. Reject
+		// it rather than silently treating it as unset — omit the attribute for "no params".
+		diags.AddAttributeError(
+			path.Root("notification_settings").AtName("connected_app_params"),
+			"Invalid connected_app_params JSON",
+			"`connected_app_params` must be a JSON object (e.g. {\"app-id\":{\"channels\":[\"C123\"]}}), not null. Omit the attribute to leave it unset.",
+		)
+		return types.MapNull(objectType)
+	}
 	if len(parsed) == 0 {
+		// Explicit empty object `{}`: no per-app params. Kept distinct from null above.
 		return types.MapNull(objectType)
 	}
 

@@ -101,6 +101,16 @@ func TestUnitConnectedAppParamsJSONInvalid(t *testing.T) {
 	}
 }
 
+func TestUnitConnectedAppParamsJSONRejectsNull(t *testing.T) {
+	ctx := context.Background()
+	var diags diag.Diagnostics
+	// A JSON-string literal "null" is not the same as an unset attribute; reject it.
+	connectedAppParamsJSONToMap(ctx, types.StringValue(`null`), &diags)
+	if !diags.HasError() {
+		t.Fatal("expected an error for a literal null payload")
+	}
+}
+
 func TestUnitConnectedAppParamsJSONNullPassthrough(t *testing.T) {
 	ctx := context.Background()
 	var diags diag.Diagnostics
