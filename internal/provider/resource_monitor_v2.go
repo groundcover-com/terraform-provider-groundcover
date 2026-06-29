@@ -535,7 +535,7 @@ func validateMonitorV2Config(ctx context.Context, config *monitorV2ResourceModel
 		diags.AddAttributeError(
 			path.Root("query"),
 			"Missing query block",
-			"groundcover_monitor_v2 requires exactly one query block.",
+			"This resource requires exactly one query block.",
 		)
 		return
 	}
@@ -594,7 +594,7 @@ func validateMonitorV2Config(ctx context.Context, config *monitorV2ResourceModel
 		diags.AddAttributeError(
 			path.Root("threshold"),
 			"Missing threshold block",
-			"groundcover_monitor_v2 requires at least one threshold block.",
+			"This resource requires at least one threshold block.",
 		)
 	}
 

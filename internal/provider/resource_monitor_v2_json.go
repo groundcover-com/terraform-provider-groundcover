@@ -9,6 +9,7 @@ import (
 	"errors"
 	"fmt"
 	"reflect"
+	"strings"
 
 	"github.com/groundcover-com/groundcover-sdk-go/pkg/models"
 	"github.com/hashicorp/terraform-plugin-framework/diag"
@@ -351,7 +352,16 @@ func (m *monitorV2JsonResourceModel) preserveParamsIfUnchanged(prior monitorV2Js
 	}
 	priorStr := prior.NotificationSettings.ConnectedAppParams
 	fresh := m.NotificationSettings.ConnectedAppParams
-	if priorStr.IsNull() || priorStr.IsUnknown() || fresh.IsNull() || fresh.IsUnknown() {
+	if priorStr.IsNull() || priorStr.IsUnknown() {
+		return
+	}
+	// The SDK carries no params for an empty/absent map, so the remote always reads back as null.
+	// Keep an authored-but-empty object (e.g. "{}") so it doesn't flip to null and churn the plan;
+	// a non-empty authored value vs a null remote is real drift and is left to surface.
+	if fresh.IsNull() || fresh.IsUnknown() {
+		if connectedAppParamsEmpty(priorStr.ValueString()) {
+			m.NotificationSettings.ConnectedAppParams = priorStr
+		}
 		return
 	}
 	if connectedAppParamsJSONEqual(priorStr.ValueString(), fresh.ValueString()) {
@@ -367,6 +377,12 @@ func connectedAppParamsJSONEqual(a, b string) bool {
 	return reflect.DeepEqual(pa, pb)
 }
 
+// connectedAppParamsEmpty reports whether s is a JSON object with no entries (e.g. "{}" or "null").
+func connectedAppParamsEmpty(s string) bool {
+	var p map[string]connectedAppParamJSON
+	return json.Unmarshal([]byte(s), &p) == nil && len(p) == 0
+}
+
 // connectedAppParamsJSONToMap parses the JSON-string params into the nested types.Map that the
 // shared monitor_v2 logic consumes. Null/unknown pass through unchanged.
 func connectedAppParamsJSONToMap(ctx context.Context, value types.String, diags *diag.Diagnostics) types.Map {
@@ -378,12 +394,16 @@ func connectedAppParamsJSONToMap(ctx context.Context, value types.String, diags 
 		return types.MapUnknown(objectType)
 	}
 
+	// Decode strictly so a typo in a nested key (e.g. "chanels") is rejected rather than
+	// silently dropped — otherwise the request would lose channels while state still looks valid.
+	dec := json.NewDecoder(strings.NewReader(value.ValueString()))
+	dec.DisallowUnknownFields()
 	var parsed map[string]connectedAppParamJSON
-	if err := json.Unmarshal([]byte(value.ValueString()), &parsed); err != nil {
+	if err := dec.Decode(&parsed); err != nil {
 		diags.AddAttributeError(
 			path.Root("notification_settings").AtName("connected_app_params"),
 			"Invalid connected_app_params JSON",
-			fmt.Sprintf("`connected_app_params` must be a JSON object keyed by connected app ID, e.g. {\"app-id\":{\"channels\":[\"C123\"]}}: %v", err),
+			fmt.Sprintf("`connected_app_params` must be a JSON object keyed by connected app ID with only a `channels` list, e.g. {\"app-id\":{\"channels\":[\"C123\"]}}: %v", err),
 		)
 		return types.MapNull(objectType)
 	}

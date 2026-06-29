@@ -60,3 +60,40 @@ func TestUnitConnectedAppParamsJSONNullPassthrough(t *testing.T) {
 		t.Error("null params string should yield a null map")
 	}
 }
+
+func TestUnitConnectedAppParamsJSONUnknownPassthrough(t *testing.T) {
+	ctx := context.Background()
+	var diags diag.Diagnostics
+	m := connectedAppParamsJSONToMap(ctx, types.StringUnknown(), &diags)
+	if diags.HasError() {
+		t.Fatalf("unexpected errors: %v", diags.Errors())
+	}
+	if !m.IsUnknown() {
+		t.Error("unknown params string should yield an unknown map")
+	}
+}
+
+func TestUnitConnectedAppParamsJSONRejectsUnknownKeys(t *testing.T) {
+	ctx := context.Background()
+	var diags diag.Diagnostics
+	// "chanels" is a typo for "channels"; strict decoding must reject it rather than drop it.
+	connectedAppParamsJSONToMap(ctx, types.StringValue(`{"app-1":{"chanels":["C1"]}}`), &diags)
+	if !diags.HasError() {
+		t.Fatal("expected an error for an unknown nested key")
+	}
+}
+
+func TestUnitConnectedAppParamsEmptyPreserved(t *testing.T) {
+	// An authored empty object must round-trip as itself, not flip to null (perpetual diff).
+	prior := monitorV2JsonResourceModel{NotificationSettings: &monitorV2JsonNotificationSettingsModel{
+		ConnectedAppParams: types.StringValue(`{}`),
+	}}
+	fresh := monitorV2JsonResourceModel{NotificationSettings: &monitorV2JsonNotificationSettingsModel{
+		ConnectedAppParams: types.StringNull(),
+	}}
+	fresh.preserveParamsIfUnchanged(prior)
+	got := fresh.NotificationSettings.ConnectedAppParams
+	if got.IsNull() || got.ValueString() != `{}` {
+		t.Errorf("authored empty params should be preserved, got %v", got)
+	}
+}
