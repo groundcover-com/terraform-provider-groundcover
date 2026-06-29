@@ -265,26 +265,8 @@ func (r *monitorV2JsonResource) readTyped(ctx context.Context, id string, typed 
 // toTyped converts the JSON model into the typed model, parsing the connected_app_params JSON
 // string into the nested map the shared logic expects.
 func (m *monitorV2JsonResourceModel) toTyped(ctx context.Context, diags *diag.Diagnostics) *monitorV2ResourceModel {
-	typed := &monitorV2ResourceModel{
-		ID:                  m.ID,
-		Title:               m.Title,
-		Severity:            m.Severity,
-		MeasurementType:     m.MeasurementType,
-		ExecutionErrorState: m.ExecutionErrorState,
-		NoDataState:         m.NoDataState,
-		IsPaused:            m.IsPaused,
-		AutoResolve:         m.AutoResolve,
-		Category:            m.Category,
-		Team:                m.Team,
-		Labels:              m.Labels,
-		Annotations:         m.Annotations,
-		Routing:             m.Routing,
-		Query:               m.Query,
-		Reducers:            m.Reducers,
-		Thresholds:          m.Thresholds,
-		EvaluationInterval:  m.EvaluationInterval,
-		Display:             m.Display,
-	}
+	typed := &monitorV2ResourceModel{}
+	copyMonitorV2SharedFields(m, typed)
 	if m.NotificationSettings != nil {
 		ns := m.NotificationSettings
 		typed.NotificationSettings = &monitorV2NotificationSettingsModel{
@@ -302,26 +284,8 @@ func (m *monitorV2JsonResourceModel) toTyped(ctx context.Context, diags *diag.Di
 // monitorV2JsonModelFromTyped converts the typed model (post-read) back into the JSON model,
 // serializing the nested params map into a JSON string.
 func monitorV2JsonModelFromTyped(ctx context.Context, typed *monitorV2ResourceModel, diags *diag.Diagnostics) *monitorV2JsonResourceModel {
-	m := &monitorV2JsonResourceModel{
-		ID:                  typed.ID,
-		Title:               typed.Title,
-		Severity:            typed.Severity,
-		MeasurementType:     typed.MeasurementType,
-		ExecutionErrorState: typed.ExecutionErrorState,
-		NoDataState:         typed.NoDataState,
-		IsPaused:            typed.IsPaused,
-		AutoResolve:         typed.AutoResolve,
-		Category:            typed.Category,
-		Team:                typed.Team,
-		Labels:              typed.Labels,
-		Annotations:         typed.Annotations,
-		Routing:             typed.Routing,
-		Query:               typed.Query,
-		Reducers:            typed.Reducers,
-		Thresholds:          typed.Thresholds,
-		EvaluationInterval:  typed.EvaluationInterval,
-		Display:             typed.Display,
-	}
+	m := &monitorV2JsonResourceModel{}
+	copyMonitorV2SharedFields(typed, m)
 	if typed.NotificationSettings != nil {
 		ns := typed.NotificationSettings
 		m.NotificationSettings = &monitorV2JsonNotificationSettingsModel{
@@ -334,6 +298,29 @@ func monitorV2JsonModelFromTyped(ctx context.Context, typed *monitorV2ResourceMo
 		}
 	}
 	return m
+}
+
+// copyMonitorV2SharedFields copies every field shared by name+type between the typed and JSON
+// monitor models. The two models are identical except NotificationSettings (skipped here and
+// handled explicitly by callers). Doing this by reflection means a new field added to both models
+// is carried across automatically and can't be silently dropped by a stale hand-written copy;
+// TestMonitorV2JsonModelParity keeps the two struct definitions in lockstep so this stays total.
+// ponytail: reflection field copy; if a non-shared field ever needs special handling, add it to
+// the skip set alongside NotificationSettings.
+func copyMonitorV2SharedFields(src, dst any) {
+	sv := reflect.ValueOf(src).Elem()
+	dv := reflect.ValueOf(dst).Elem()
+	st := sv.Type()
+	for i := 0; i < st.NumField(); i++ {
+		name := st.Field(i).Name
+		if name == "NotificationSettings" {
+			continue
+		}
+		df := dv.FieldByName(name)
+		if df.IsValid() && df.CanSet() && df.Type() == sv.Field(i).Type() {
+			df.Set(sv.Field(i))
+		}
+	}
 }
 
 // preserveAuthoredParams keeps the params JSON string exactly as the user authored it (required

@@ -5,11 +5,63 @@ package provider
 
 import (
 	"context"
+	"reflect"
 	"testing"
 
 	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 )
+
+// TestMonitorV2JsonModelParity guards the typed-clone against drift: groundcover_monitor_v2_json
+// reuses monitor_v2's schema and build/read logic, but duplicates the model structs. This test
+// fails if monitor_v2 gains/changes a field that the JSON twin doesn't mirror, so a developer
+// editing monitor_v2 is told to update the JSON twin too. Combined with copyMonitorV2SharedFields
+// (which copies shared fields by reflection), keeping the structs in parity is all that's needed.
+func TestMonitorV2JsonModelParity(t *testing.T) {
+	// Top-level models match except notification_settings (string-vs-map params is the whole point).
+	assertTfsdkFieldParity(t,
+		reflect.TypeOf(monitorV2ResourceModel{}),
+		reflect.TypeOf(monitorV2JsonResourceModel{}),
+		map[string]bool{"notification_settings": true},
+	)
+	// Notification settings match except connected_app_params (JSON string vs nested map).
+	assertTfsdkFieldParity(t,
+		reflect.TypeOf(monitorV2NotificationSettingsModel{}),
+		reflect.TypeOf(monitorV2JsonNotificationSettingsModel{}),
+		map[string]bool{"connected_app_params": true},
+	)
+}
+
+func assertTfsdkFieldParity(t *testing.T, typed, jsonModel reflect.Type, except map[string]bool) {
+	t.Helper()
+	ft := tfsdkFields(typed)
+	fj := tfsdkFields(jsonModel)
+	for tag, tt := range ft {
+		tj, ok := fj[tag]
+		if !ok {
+			t.Errorf("%s has tfsdk field %q but %s does not — add it to both models so the JSON twin tracks the typed resource", typed.Name(), tag, jsonModel.Name())
+			continue
+		}
+		if !except[tag] && tt != tj {
+			t.Errorf("tfsdk field %q type mismatch: %s has %s, %s has %s", tag, typed.Name(), tt, jsonModel.Name(), tj)
+		}
+	}
+	for tag := range fj {
+		if _, ok := ft[tag]; !ok {
+			t.Errorf("%s has tfsdk field %q but %s does not", jsonModel.Name(), tag, typed.Name())
+		}
+	}
+}
+
+func tfsdkFields(t reflect.Type) map[string]reflect.Type {
+	out := map[string]reflect.Type{}
+	for i := 0; i < t.NumField(); i++ {
+		if tag, ok := t.Field(i).Tag.Lookup("tfsdk"); ok {
+			out[tag] = t.Field(i).Type
+		}
+	}
+	return out
+}
 
 // TestUnitConnectedAppParamsJSONRoundTrip verifies the only non-trivial logic in the JSON
 // sibling: parsing the connected_app_params JSON string into the nested map and serializing it
