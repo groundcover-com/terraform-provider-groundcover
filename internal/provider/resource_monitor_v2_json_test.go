@@ -42,8 +42,13 @@ func assertTfsdkFieldParity(t *testing.T, typed, jsonModel reflect.Type, except 
 			t.Errorf("%s has tfsdk field %q but %s does not — add it to both models so the JSON twin tracks the typed resource", typed.Name(), tag, jsonModel.Name())
 			continue
 		}
-		if !except[tag] && tt != tj {
-			t.Errorf("tfsdk field %q type mismatch: %s has %s, %s has %s", tag, typed.Name(), tt, jsonModel.Name(), tj)
+		// Go field name must match too: copyMonitorV2SharedFields bridges by FieldByName, so a
+		// renamed field with the same tfsdk tag would be silently dropped at runtime.
+		if tt.name != tj.name {
+			t.Errorf("tfsdk field %q Go-name mismatch: %s has %q, %s has %q — copyMonitorV2SharedFields copies by field name, so these must match", tag, typed.Name(), tt.name, jsonModel.Name(), tj.name)
+		}
+		if !except[tag] && tt.typ != tj.typ {
+			t.Errorf("tfsdk field %q type mismatch: %s has %s, %s has %s", tag, typed.Name(), tt.typ, jsonModel.Name(), tj.typ)
 		}
 	}
 	for tag := range fj {
@@ -53,11 +58,16 @@ func assertTfsdkFieldParity(t *testing.T, typed, jsonModel reflect.Type, except 
 	}
 }
 
-func tfsdkFields(t reflect.Type) map[string]reflect.Type {
-	out := map[string]reflect.Type{}
+type tfsdkField struct {
+	name string
+	typ  reflect.Type
+}
+
+func tfsdkFields(t reflect.Type) map[string]tfsdkField {
+	out := map[string]tfsdkField{}
 	for i := 0; i < t.NumField(); i++ {
 		if tag, ok := t.Field(i).Tag.Lookup("tfsdk"); ok {
-			out[tag] = t.Field(i).Type
+			out[tag] = tfsdkField{name: t.Field(i).Name, typ: t.Field(i).Type}
 		}
 	}
 	return out
