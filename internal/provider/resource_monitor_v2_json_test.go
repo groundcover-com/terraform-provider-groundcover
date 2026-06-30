@@ -5,11 +5,16 @@ package provider
 
 import (
 	"context"
+	"fmt"
 	"reflect"
+	"strings"
 	"testing"
 
+	"github.com/groundcover-com/groundcover-sdk-go/pkg/models"
 	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/types"
+	"github.com/hashicorp/terraform-plugin-testing/helper/acctest"
+	"github.com/hashicorp/terraform-plugin-testing/helper/resource"
 )
 
 // TestMonitorV2JsonModelParity guards the typed-clone against drift: groundcover_monitor_v2_json
@@ -30,6 +35,80 @@ func TestMonitorV2JsonModelParity(t *testing.T) {
 		reflect.TypeOf(monitorV2JsonNotificationSettingsModel{}),
 		map[string]bool{"connected_app_params": true},
 	)
+}
+
+// TestAccMonitorV2JsonResource_basic is a lean live CRUD check matching the connected_app_json
+// precedent. CRUD fully delegates to monitor_v2's tested logic (covered by TestAccMonitorV2Resource);
+// this just proves the JSON sibling registers and round-trips end-to-end. The connected_app_params
+// JSON path is covered by the unit tests above (a real connected app would be needed here to use it).
+func TestAccMonitorV2JsonResource_basic(t *testing.T) {
+	name := acctest.RandomWithPrefix("test-monitor-v2-json")
+	updatedName := acctest.RandomWithPrefix("test-monitor-v2-json-updated")
+
+	resource.Test(t, resource.TestCase{
+		PreCheck:                 func() { testAccPreCheck(t) },
+		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
+		Steps: []resource.TestStep{
+			{
+				Config: testAccMonitorV2JsonResourceConfig(name),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					resource.TestCheckResourceAttrSet("groundcover_monitor_v2_json.test", "id"),
+					resource.TestCheckResourceAttr("groundcover_monitor_v2_json.test", "title", name),
+					resource.TestCheckResourceAttr("groundcover_monitor_v2_json.test", "query.type", monitorV2QueryTypeGCQL),
+					resource.TestCheckResourceAttr("groundcover_monitor_v2_json.test", "query.data_type", "logs"),
+					resource.TestCheckResourceAttr("groundcover_monitor_v2_json.test", "threshold.#", "1"),
+				),
+			},
+			{
+				ResourceName:      "groundcover_monitor_v2_json.test",
+				ImportState:       true,
+				ImportStateVerify: true,
+			},
+			{
+				Config: testAccMonitorV2JsonResourceConfig(updatedName),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					resource.TestCheckResourceAttr("groundcover_monitor_v2_json.test", "title", updatedName),
+				),
+			},
+			{
+				Config:             testAccMonitorV2JsonResourceConfig(updatedName),
+				PlanOnly:           true,
+				ExpectNonEmptyPlan: false,
+			},
+		},
+	})
+}
+
+func testAccMonitorV2JsonResourceConfig(name string) string {
+	return fmt.Sprintf(`
+resource "groundcover_monitor_v2_json" "test" {
+  title            = %[1]q
+  severity         = "critical"
+  measurement_type = "event"
+
+  query {
+    type           = "gcql"
+    data_type      = "logs"
+    expression     = "level:error | stats count() count_all_result"
+    instant_rollup = "5m"
+  }
+
+  threshold {
+    name       = "threshold_1"
+    input_name = "threshold_input_query"
+    operator   = "gt"
+    values     = [1]
+  }
+
+  evaluation_interval {
+    interval    = "1m"
+    pending_for = "1m"
+  }
+
+  execution_error_state = "OK"
+  no_data_state         = "OK"
+}
+`, name)
 }
 
 func assertTfsdkFieldParity(t *testing.T, typed, jsonModel reflect.Type, except map[string]bool) {
@@ -68,6 +147,33 @@ func tfsdkFields(t reflect.Type) map[string]tfsdkField {
 	for i := 0; i < t.NumField(); i++ {
 		if tag, ok := t.Field(i).Tag.Lookup("tfsdk"); ok {
 			out[tag] = tfsdkField{name: t.Field(i).Name, typ: t.Field(i).Type}
+		}
+	}
+	return out
+}
+
+// TestConnectedAppParamJSONTracksSDK guards the hidden drift seam: connectedAppParamJSON is a
+// hand-written mirror of the SDK's ConnectedAppDeliveryOptions, used only to (de)serialize the
+// connected_app_params JSON string. If the SDK gains a delivery-option field, the typed resource
+// carries it but this struct would silently drop it. Fails when the SDK's json-tag set isn't
+// covered here, prompting an update to connectedAppParamJSON and the conversion helpers.
+func TestConnectedAppParamJSONTracksSDK(t *testing.T) {
+	mirror := jsonTags(reflect.TypeOf(connectedAppParamJSON{}))
+	for tag := range jsonTags(reflect.TypeOf(models.ConnectedAppDeliveryOptions{})) {
+		if !mirror[tag] {
+			t.Errorf("models.ConnectedAppDeliveryOptions has json field %q that connectedAppParamJSON does not mirror — add it here and to the conversion helpers", tag)
+		}
+	}
+}
+
+func jsonTags(t reflect.Type) map[string]bool {
+	out := map[string]bool{}
+	for i := 0; i < t.NumField(); i++ {
+		if tag, ok := t.Field(i).Tag.Lookup("json"); ok {
+			name, _, _ := strings.Cut(tag, ",")
+			if name != "" && name != "-" {
+				out[name] = true
+			}
 		}
 	}
 	return out

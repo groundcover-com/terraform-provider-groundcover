@@ -305,7 +305,7 @@ func monitorV2JsonModelFromTyped(ctx context.Context, typed *monitorV2ResourceMo
 // handled explicitly by callers). Doing this by reflection means a new field added to both models
 // is carried across automatically and can't be silently dropped by a stale hand-written copy;
 // TestMonitorV2JsonModelParity keeps the two struct definitions in lockstep so this stays total.
-// ponytail: reflection field copy; if a non-shared field ever needs special handling, add it to
+// NOTE: reflection field copy; if a non-shared field ever needs special handling, add it to
 // the skip set alongside NotificationSettings.
 func copyMonitorV2SharedFields(src, dst any) {
 	sv := reflect.ValueOf(src).Elem()
