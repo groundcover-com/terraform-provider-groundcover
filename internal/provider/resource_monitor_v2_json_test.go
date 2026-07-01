@@ -54,6 +54,7 @@ func TestAccMonitorV2JsonResource_basic(t *testing.T) {
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttrSet("groundcover_monitor_v2_json.test", "id"),
 					resource.TestCheckResourceAttr("groundcover_monitor_v2_json.test", "title", name),
+					resource.TestCheckResourceAttr("groundcover_monitor_v2_json.test", "display.header", name),
 					resource.TestCheckResourceAttr("groundcover_monitor_v2_json.test", "query.type", monitorV2QueryTypeGCQL),
 					resource.TestCheckResourceAttr("groundcover_monitor_v2_json.test", "query.data_type", "logs"),
 					resource.TestCheckResourceAttr("groundcover_monitor_v2_json.test", "threshold.#", "1"),
@@ -85,6 +86,10 @@ resource "groundcover_monitor_v2_json" "test" {
   title            = %[1]q
   severity         = "critical"
   measurement_type = "event"
+
+  display {
+    header = %[1]q
+  }
 
   query {
     type           = "gcql"
