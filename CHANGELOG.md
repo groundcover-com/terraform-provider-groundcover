@@ -1,6 +1,7 @@
 ## 1.17.0
 
 * Added `groundcover_monitor_v2_json` — a variant of `groundcover_monitor_v2` whose `notification_settings.connected_app_params` is a JSON string (`jsonencode({...})`) instead of an HCL nested map. Schema, behaviour, and the underlying API are otherwise identical; the JSON-string form is for configs generated/consumed by tooling that can't model nested maps (e.g. the Crossplane provider). The existing `groundcover_monitor_v2` is unchanged
+* Fixed `groundcover_monitor_v2`/`groundcover_monitor_v2_json` connected-app delivery: `notification_settings.connected_app_params.channels` was sent to the API as bare strings, but the backend expects Slack channel objects, so channel delivery was silently broken. Channels are now objects with a required `id` and optional `name`. **Breaking:** existing configs must change `channels = ["C123"]` to `channels = [{ id = "C123" }]` (typed) / the equivalent JSON `{"id":"C123"}` shape (JSON variant). Updated `github.com/groundcover-com/groundcover-sdk-go` to `v1.320.0` for the corrected `ConnectedAppChannel` model
 
 ## 1.16.2
 

@@ -149,6 +149,11 @@ type monitorV2ConnectedAppDeliveryOptionsModel struct {
 	Channels types.List `tfsdk:"channels"`
 }
 
+type monitorV2ConnectedAppChannelModel struct {
+	ID   types.String `tfsdk:"id"`
+	Name types.String `tfsdk:"name"`
+}
+
 func (r *monitorV2Resource) Metadata(_ context.Context, req resource.MetadataRequest, resp *resource.MetadataResponse) {
 	resp.TypeName = req.ProviderTypeName + "_monitor_v2"
 }
@@ -431,10 +436,21 @@ func (r *monitorV2Resource) Schema(_ context.Context, _ resource.SchemaRequest, 
 						Optional:            true,
 						NestedObject: schema.NestedAttributeObject{
 							Attributes: map[string]schema.Attribute{
-								"channels": schema.ListAttribute{
-									MarkdownDescription: "Slack channel IDs to notify for this connected app.",
+								"channels": schema.ListNestedAttribute{
+									MarkdownDescription: "Slack channels to notify for this connected app.",
 									Optional:            true,
-									ElementType:         types.StringType,
+									NestedObject: schema.NestedAttributeObject{
+										Attributes: map[string]schema.Attribute{
+											"id": schema.StringAttribute{
+												MarkdownDescription: "Slack channel ID used for delivery.",
+												Required:            true,
+											},
+											"name": schema.StringAttribute{
+												MarkdownDescription: "Channel display name shown by channel selectors; optional.",
+												Optional:            true,
+											},
+										},
+									},
 								},
 							},
 						},
@@ -992,7 +1008,7 @@ func monitorV2ReducerToSDK(reducer monitorV2ReducerModel, diags *diag.Diagnostic
 	return &models.ReducerModel{
 		Expression:        monitorV2String(reducer.Expression),
 		InputName:         monitorV2String(reducer.InputName),
-		Name:              monitorV2String(reducer.Name),
+		Name:              monitorV2StringPtr(reducer.Name),
 		Type:              monitorV2StringPtr(reducer.Type),
 		RelativeTimerange: monitorV2RelativeRangeToSDK(reducer.RelativeTimerange, diags),
 	}
@@ -1260,7 +1276,7 @@ func monitorV2ReducersFromSDK(reducers []*models.ReducerModel) []monitorV2Reduce
 			continue
 		}
 		result = append(result, monitorV2ReducerModel{
-			Name:              monitorV2NullableString(reducer.Name),
+			Name:              monitorV2StringPtrToType(reducer.Name),
 			InputName:         monitorV2NullableString(reducer.InputName),
 			Type:              monitorV2StringPtrToType(reducer.Type),
 			Expression:        monitorV2NullableString(reducer.Expression),
@@ -1465,7 +1481,7 @@ func monitorV2ConnectedAppParamsToSDK(ctx context.Context, value types.Map, diag
 	result := make(models.ConnectedAppParams, len(params))
 	for appID, options := range params {
 		result[appID] = models.ConnectedAppDeliveryOptions{
-			Channels: monitorV2StringList(ctx, options.Channels, diags),
+			Channels: monitorV2ChannelsToSDK(ctx, options.Channels, diags),
 		}
 	}
 	return result
@@ -1518,7 +1534,7 @@ func monitorV2ConnectedAppParamsType(ctx context.Context, value models.Connected
 
 	elements := make(map[string]attr.Value, len(value))
 	for appID, options := range value {
-		channels := monitorV2StringListType(ctx, options.Channels, diags)
+		channels := monitorV2ChannelsType(ctx, options.Channels, diags)
 		object, objectDiags := types.ObjectValue(attrTypes, map[string]attr.Value{
 			"channels": channels,
 		})
@@ -1533,8 +1549,63 @@ func monitorV2ConnectedAppParamsType(ctx context.Context, value models.Connected
 
 func monitorV2ConnectedAppDeliveryOptionsAttrTypes() map[string]attr.Type {
 	return map[string]attr.Type{
-		"channels": types.ListType{ElemType: types.StringType},
+		"channels": types.ListType{ElemType: types.ObjectType{AttrTypes: monitorV2ConnectedAppChannelAttrTypes()}},
 	}
+}
+
+func monitorV2ConnectedAppChannelAttrTypes() map[string]attr.Type {
+	return map[string]attr.Type{
+		"id":   types.StringType,
+		"name": types.StringType,
+	}
+}
+
+// monitorV2ChannelsToSDK converts the typed channel list into the SDK's []*ConnectedAppChannel.
+func monitorV2ChannelsToSDK(ctx context.Context, value types.List, diags *diag.Diagnostics) []*models.ConnectedAppChannel {
+	if value.IsNull() || value.IsUnknown() {
+		return nil
+	}
+	var channels []monitorV2ConnectedAppChannelModel
+	diags.Append(value.ElementsAs(ctx, &channels, false)...)
+	if len(channels) == 0 {
+		return nil
+	}
+	result := make([]*models.ConnectedAppChannel, 0, len(channels))
+	for _, ch := range channels {
+		id := monitorV2String(ch.ID)
+		result = append(result, &models.ConnectedAppChannel{
+			ID:   &id,
+			Name: monitorV2String(ch.Name),
+		})
+	}
+	return result
+}
+
+// monitorV2ChannelsType converts the SDK's []*ConnectedAppChannel back into the typed channel list.
+func monitorV2ChannelsType(ctx context.Context, value []*models.ConnectedAppChannel, diags *diag.Diagnostics) types.List {
+	elemType := types.ObjectType{AttrTypes: monitorV2ConnectedAppChannelAttrTypes()}
+	if len(value) == 0 {
+		return types.ListNull(elemType)
+	}
+	elements := make([]attr.Value, 0, len(value))
+	for _, ch := range value {
+		if ch == nil {
+			continue
+		}
+		id := ""
+		if ch.ID != nil {
+			id = *ch.ID
+		}
+		object, objectDiags := types.ObjectValue(monitorV2ConnectedAppChannelAttrTypes(), map[string]attr.Value{
+			"id":   types.StringValue(id),
+			"name": monitorV2NullableString(ch.Name),
+		})
+		diags.Append(objectDiags...)
+		elements = append(elements, object)
+	}
+	result, listDiags := types.ListValue(elemType, elements)
+	diags.Append(listDiags...)
+	return result
 }
 
 func monitorV2ParseDuration(value types.String, attrPath path.Path, diags *diag.Diagnostics) (time.Duration, bool) {

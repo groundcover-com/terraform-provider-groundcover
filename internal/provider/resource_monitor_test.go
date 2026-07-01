@@ -391,9 +391,16 @@ func TestMonitorV2BuildCreateRequestConnectedAppParams(t *testing.T) {
 	if diags.HasError() {
 		t.Fatalf("types.ListValueFrom() connected apps diagnostics: %v", diags)
 	}
-	channels, diags := types.ListValueFrom(ctx, types.StringType, []string{"C0123456789"})
+	channelObj, diags := types.ObjectValue(monitorV2ConnectedAppChannelAttrTypes(), map[string]attr.Value{
+		"id":   types.StringValue("C0123456789"),
+		"name": types.StringValue("#alerts"),
+	})
 	if diags.HasError() {
-		t.Fatalf("types.ListValueFrom() channels diagnostics: %v", diags)
+		t.Fatalf("types.ObjectValue() channel diagnostics: %v", diags)
+	}
+	channels, diags := types.ListValue(types.ObjectType{AttrTypes: monitorV2ConnectedAppChannelAttrTypes()}, []attr.Value{channelObj})
+	if diags.HasError() {
+		t.Fatalf("types.ListValue() channels diagnostics: %v", diags)
 	}
 	appParams, diags := types.ObjectValue(monitorV2ConnectedAppDeliveryOptionsAttrTypes(), map[string]attr.Value{
 		"channels": channels,
@@ -434,8 +441,8 @@ func TestMonitorV2BuildCreateRequestConnectedAppParams(t *testing.T) {
 		t.Fatalf("ConnectedAppParams length = %d, want 1", len(params))
 	}
 	channelsOut := params["slack-app-id"].Channels
-	if len(channelsOut) != 1 || channelsOut[0] != "C0123456789" {
-		t.Fatalf("ConnectedAppParams channels = %#v, want [C0123456789]", channelsOut)
+	if len(channelsOut) != 1 || channelsOut[0].ID == nil || *channelsOut[0].ID != "C0123456789" || channelsOut[0].Name != "#alerts" {
+		t.Fatalf("ConnectedAppParams channels = %#v, want [{id:C0123456789 name:#alerts}]", channelsOut)
 	}
 }
 

@@ -80,7 +80,13 @@ type monitorV2JsonNotificationSettingsModel struct {
 
 // connectedAppParamJSON is the JSON shape of a single connected_app_params entry.
 type connectedAppParamJSON struct {
-	Channels []string `json:"channels"`
+	Channels []connectedAppChannelJSON `json:"channels"`
+}
+
+// connectedAppChannelJSON is the JSON shape of a single Slack channel entry.
+type connectedAppChannelJSON struct {
+	ID   string `json:"id"`
+	Name string `json:"name,omitempty"`
 }
 
 func (r *monitorV2JsonResource) Metadata(_ context.Context, req resource.MetadataRequest, resp *resource.MetadataResponse) {
@@ -97,7 +103,7 @@ func (r *monitorV2JsonResource) Schema(ctx context.Context, req resource.SchemaR
 
 	ns := s.Blocks["notification_settings"].(schema.SingleNestedBlock)
 	ns.Attributes["connected_app_params"] = schema.StringAttribute{
-		MarkdownDescription: "JSON-encoded per-connected-app delivery options keyed by connected app ID. String form of `groundcover_monitor_v2.connected_app_params`, for schema code generators (Crossplane/upjet) that cannot represent nested maps. Example: `jsonencode({ \"app-id\" = { channels = [\"C123\"] } })`.",
+		MarkdownDescription: "JSON-encoded per-connected-app delivery options keyed by connected app ID. String form of `groundcover_monitor_v2.connected_app_params`, for schema code generators (Crossplane/upjet) that cannot represent nested maps. Each channel is an object with a required `id` and optional `name`. Example: `jsonencode({ \"app-id\" = { channels = [{ id = \"C123\", name = \"#alerts\" }] } })`.",
 		Optional:            true,
 	}
 	s.Blocks["notification_settings"] = ns
@@ -390,7 +396,7 @@ func connectedAppParamsJSONToMap(ctx context.Context, value types.String, diags 
 		diags.AddAttributeError(
 			path.Root("notification_settings").AtName("connected_app_params"),
 			"Invalid connected_app_params JSON",
-			fmt.Sprintf("`connected_app_params` must be a JSON object keyed by connected app ID with only a `channels` list, e.g. {\"app-id\":{\"channels\":[\"C123\"]}}: %v", err),
+			fmt.Sprintf("`connected_app_params` must be a JSON object keyed by connected app ID with only a `channels` list of {id,name} objects, e.g. {\"app-id\":{\"channels\":[{\"id\":\"C123\"}]}}: %v", err),
 		)
 		return types.MapNull(objectType)
 	}
@@ -400,7 +406,7 @@ func connectedAppParamsJSONToMap(ctx context.Context, value types.String, diags 
 		diags.AddAttributeError(
 			path.Root("notification_settings").AtName("connected_app_params"),
 			"Invalid connected_app_params JSON",
-			"`connected_app_params` must be a JSON object (e.g. {\"app-id\":{\"channels\":[\"C123\"]}}), not null. Omit the attribute to leave it unset.",
+			"`connected_app_params` must be a JSON object (e.g. {\"app-id\":{\"channels\":[{\"id\":\"C123\"}]}}), not null. Omit the attribute to leave it unset.",
 		)
 		return types.MapNull(objectType)
 	}
@@ -411,7 +417,20 @@ func connectedAppParamsJSONToMap(ctx context.Context, value types.String, diags 
 
 	sdkParams := make(models.ConnectedAppParams, len(parsed))
 	for appID, p := range parsed {
-		sdkParams[appID] = models.ConnectedAppDeliveryOptions{Channels: p.Channels}
+		channels := make([]*models.ConnectedAppChannel, 0, len(p.Channels))
+		for _, ch := range p.Channels {
+			if ch.ID == "" {
+				diags.AddAttributeError(
+					path.Root("notification_settings").AtName("connected_app_params"),
+					"Invalid connected_app_params JSON",
+					fmt.Sprintf("each channel under app %q must have a non-empty `id`, e.g. {%q:{\"channels\":[{\"id\":\"C123\"}]}}", appID, appID),
+				)
+				continue
+			}
+			id := ch.ID
+			channels = append(channels, &models.ConnectedAppChannel{ID: &id, Name: ch.Name})
+		}
+		sdkParams[appID] = models.ConnectedAppDeliveryOptions{Channels: channels}
 	}
 	return monitorV2ConnectedAppParamsType(ctx, sdkParams, diags)
 }
@@ -430,7 +449,16 @@ func connectedAppParamsMapToJSON(ctx context.Context, value types.Map, diags *di
 
 	out := make(map[string]connectedAppParamJSON, len(elements))
 	for appID, opts := range elements {
-		out[appID] = connectedAppParamJSON{Channels: monitorV2StringList(ctx, opts.Channels, diags)}
+		sdkChannels := monitorV2ChannelsToSDK(ctx, opts.Channels, diags)
+		channels := make([]connectedAppChannelJSON, 0, len(sdkChannels))
+		for _, ch := range sdkChannels {
+			id := ""
+			if ch.ID != nil {
+				id = *ch.ID
+			}
+			channels = append(channels, connectedAppChannelJSON{ID: id, Name: ch.Name})
+		}
+		out[appID] = connectedAppParamJSON{Channels: channels}
 	}
 	encoded, err := json.Marshal(out)
 	if err != nil {

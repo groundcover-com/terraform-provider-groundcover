@@ -56,7 +56,7 @@ resource "groundcover_monitor_v2" "gcql_logs" {
     disable_renotification  = false
     connected_app_params = {
       "slack-connected-app-id" = {
-        channels = ["C0123456789"]
+        channels = [{ id = "C0123456789", name = "#alerts" }]
       }
     }
   }
@@ -323,7 +323,19 @@ Optional:
 
 Optional:
 
-- `channels` (List of String) Slack channel IDs to notify for this connected app.
+- `channels` (Attributes List) Slack channels to notify for this connected app. (see [below for nested schema](#nestedatt--notification_settings--connected_app_params--channels))
+
+<a id="nestedatt--notification_settings--connected_app_params--channels"></a>
+### Nested Schema for `notification_settings.connected_app_params.channels`
+
+Required:
+
+- `id` (String) Slack channel ID used for delivery.
+
+Optional:
+
+- `name` (String) Channel display name shown by channel selectors; optional.
+
 
 
 

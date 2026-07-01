@@ -186,7 +186,7 @@ func TestUnitConnectedAppParamsJSONRoundTrip(t *testing.T) {
 	ctx := context.Background()
 	var diags diag.Diagnostics
 
-	const input = `{"app-1":{"channels":["C123","C456"]},"app-2":{"channels":["C789"]}}`
+	const input = `{"app-1":{"channels":[{"id":"C123","name":"#alerts"},{"id":"C456"}]},"app-2":{"channels":[{"id":"C789"}]}}`
 
 	m := connectedAppParamsJSONToMap(ctx, types.StringValue(input), &diags)
 	if diags.HasError() {
@@ -258,6 +258,16 @@ func TestUnitConnectedAppParamsJSONRejectsUnknownKeys(t *testing.T) {
 	connectedAppParamsJSONToMap(ctx, types.StringValue(`{"app-1":{"chanels":["C1"]}}`), &diags)
 	if !diags.HasError() {
 		t.Fatal("expected an error for an unknown nested key")
+	}
+}
+
+func TestUnitConnectedAppParamsJSONRejectsChannelWithoutID(t *testing.T) {
+	ctx := context.Background()
+	var diags diag.Diagnostics
+	// The backend requires each channel to carry an `id`; a channel object missing it must error.
+	connectedAppParamsJSONToMap(ctx, types.StringValue(`{"app-1":{"channels":[{"name":"#alerts"}]}}`), &diags)
+	if !diags.HasError() {
+		t.Fatal("expected an error for a channel missing id")
 	}
 }
 

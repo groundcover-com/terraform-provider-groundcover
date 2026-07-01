@@ -48,7 +48,7 @@ resource "groundcover_monitor_v2_json" "gcql_logs" {
     status_filters = ["Alerting", "Resolved"]
     connected_app_params = jsonencode({
       "slack-connected-app-id" = {
-        channels = ["C0123456789"]
+        channels = [{ id = "C0123456789", name = "#alerts" }]
       }
     })
   }
@@ -112,7 +112,7 @@ Optional:
 
 Optional:
 
-- `connected_app_params` (String) JSON-encoded per-connected-app delivery options keyed by connected app ID. String form of `groundcover_monitor_v2.connected_app_params`, for schema code generators (Crossplane/upjet) that cannot represent nested maps. Example: `jsonencode({ "app-id" = { channels = ["C123"] } })`.
+- `connected_app_params` (String) JSON-encoded per-connected-app delivery options keyed by connected app ID. String form of `groundcover_monitor_v2.connected_app_params`, for schema code generators (Crossplane/upjet) that cannot represent nested maps. Each channel is an object with a required `id` and optional `name`. Example: `jsonencode({ "app-id" = { channels = [{ id = "C123", name = "#alerts" }] } })`.
 - `connected_apps` (List of String) Connected app IDs to notify.
 - `disable_renotification` (Boolean) Whether renotification is disabled.
 - `method` (String) Notification method.

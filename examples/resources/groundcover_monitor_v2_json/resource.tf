@@ -33,7 +33,7 @@ resource "groundcover_monitor_v2_json" "gcql_logs" {
     status_filters = ["Alerting", "Resolved"]
     connected_app_params = jsonencode({
       "slack-connected-app-id" = {
-        channels = ["C0123456789"]
+        channels = [{ id = "C0123456789", name = "#alerts" }]
       }
     })
   }
