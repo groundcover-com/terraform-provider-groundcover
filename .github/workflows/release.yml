@@ -86,7 +86,7 @@ jobs:
           - name: metrics-pipeline
             run_regex: '^TestAccMetricsPipelineResource.*$'
           - name: monitor
-            run_regex: '^(TestAccMonitorResource.*|TestAccMonitorV2Resource.*|TestAccCustomerApplyLoop_Monitor.*)$'
+            run_regex: '^(TestAccMonitorResource.*|TestAccMonitorV2Resource.*|TestAccMonitorV2JsonResource.*|TestAccCustomerApplyLoop_Monitor.*)$'
           - name: notification-route
             run_regex: '^TestAccNotificationRoute.*$'
           - name: rbac
