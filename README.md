@@ -14,6 +14,8 @@ Basic usage examples can be found in the `examples/` directory:
     *   Illustrates API key creation and management for service accounts.
 *   **Monitor V2 Resource:** [`examples/resources/groundcover_monitor_v2/resource.tf`](./examples/resources/groundcover_monitor_v2/resource.tf)
     *   Provides typed monitor examples for GCQL, MetricsQL, raw SQL, custom resolve thresholds, and connected-app delivery params.
+*   **Monitor V2 (JSON) Resource:** [`examples/resources/groundcover_monitor_v2_json/resource.tf`](./examples/resources/groundcover_monitor_v2_json/resource.tf)
+    *   Same as Monitor V2, but `notification_settings.connected_app_params` is a JSON string — for generated configs or tooling that can't model dynamic objects (e.g. Crossplane).
 *   **Ingestion Key Resource:** [`examples/resources/groundcover_ingestionkey/resource.tf`](./examples/resources/groundcover_ingestionkey/resource.tf)
     *   Demonstrates how to create and manage ingestion keys for data ingestion.
 *   **Logs Pipeline Resource:** [`examples/resources/groundcover_logspipeline/resource.tf`](./examples/resources/groundcover_logspipeline/resource.tf)

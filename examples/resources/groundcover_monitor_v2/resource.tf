@@ -41,7 +41,7 @@ resource "groundcover_monitor_v2" "gcql_logs" {
     disable_renotification  = false
     connected_app_params = {
       "slack-connected-app-id" = {
-        channels = ["C0123456789"]
+        channels = [{ id = "C0123456789", name = "#alerts" }]
       }
     }
   }

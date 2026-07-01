@@ -4,12 +4,26 @@ package provider
 
 import (
 	"fmt"
+	"reflect"
 	"testing"
 
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/hashicorp/terraform-plugin-testing/helper/acctest"
 	"github.com/hashicorp/terraform-plugin-testing/helper/resource"
 )
+
+// TestConnectedAppJsonModelParity guards the typed-clone against drift. Unlike monitor_v2_json,
+// groundcover_connected_app_json is a fully independent clone (its own schema and CRUD), so its
+// model must be kept in step with connected_app by hand. This fails if connected_app gains or
+// changes a field the JSON twin doesn't mirror — except data, which is intentionally a JSON
+// string here vs a dynamic object on connected_app.
+func TestConnectedAppJsonModelParity(t *testing.T) {
+	assertTfsdkFieldParity(t,
+		reflect.TypeOf(connectedAppResourceModel{}),
+		reflect.TypeOf(connectedAppJsonResourceModel{}),
+		map[string]bool{"data": true},
+	)
+}
 
 const testConnectedAppJsonData = `{"url":"https://hooks.slack.com/services/TEST/WEBHOOK/URL"}`
 
