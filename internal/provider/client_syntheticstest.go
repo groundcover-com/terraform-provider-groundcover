@@ -35,6 +35,13 @@ func (c *SdkClientWrapper) GetSyntheticTest(ctx context.Context, id string) (*mo
 	logFields := map[string]any{"req": "get_synthetic_test", "id": id}
 	tflog.Debug(ctx, "Executing SDK Call: Get Synthetic Test", logFields)
 
+	// An empty ID would otherwise be sent to GET /rules/{id}, which redirects to the
+	// collection route and returns 200 with the full list — never a 404. Treat it as
+	// not-found so callers don't mistake a list response for an existing resource.
+	if id == "" {
+		return nil, ErrNotFound
+	}
+
 	params := synthetics.NewGetSyntheticTestParamsWithContext(ctx).
 		WithTimeout(defaultTimeout).
 		WithID(id)

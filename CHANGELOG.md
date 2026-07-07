@@ -1,3 +1,7 @@
+## 1.17.1
+
+* Fixed `groundcover_synthetic_test` sending `GET /api/synthetics/v1/rules/{id}` with an empty ID — the provider now treats it as not-found instead of matching `GET /api/synthetics/v1/rules/` (which redirects to the list and returns 200)
+
 ## 1.17.0
 
 * Added `groundcover_monitor_v2_json` — a variant of `groundcover_monitor_v2` whose `notification_settings.connected_app_params` is a JSON string (`jsonencode({...})`) instead of an HCL nested map. Schema, behaviour, and the underlying API are otherwise identical; the JSON-string form is for configs generated/consumed by tooling that can't model nested maps (e.g. the Crossplane provider). The existing `groundcover_monitor_v2` is unchanged
