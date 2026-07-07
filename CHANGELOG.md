@@ -1,3 +1,7 @@
+## 1.17.1
+
+* Fixed `groundcover_synthetic_test` reads with an empty ID: `GET /api/synthetics/v1/rules/{id}` with an empty id redirects (`301`) to the collection route and returns `200` with the full list — never a `404` — so `Read` mapped an ID-less list response into state and reported the resource as existing. `Read` now removes the resource from state when the ID is empty, and the SDK client returns not-found for an empty ID. This unblocks the groundcover Crossplane provider, whose pre-create existence check reads with an empty id and was otherwise stuck failing to derive the external-name (`cannot find id in tfstate`) and re-creating on every reconcile. No change to normal Terraform create/read/update/delete behaviour
+
 ## 1.17.0
 
 * Added `groundcover_monitor_v2_json` — a variant of `groundcover_monitor_v2` whose `notification_settings.connected_app_params` is a JSON string (`jsonencode({...})`) instead of an HCL nested map. Schema, behaviour, and the underlying API are otherwise identical; the JSON-string form is for configs generated/consumed by tooling that can't model nested maps (e.g. the Crossplane provider). The existing `groundcover_monitor_v2` is unchanged
