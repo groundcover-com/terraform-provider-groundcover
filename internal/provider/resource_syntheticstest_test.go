@@ -4,6 +4,7 @@ package provider
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"testing"
@@ -15,6 +16,22 @@ import (
 	"github.com/hashicorp/terraform-plugin-testing/helper/resource"
 	"github.com/hashicorp/terraform-plugin-testing/terraform"
 )
+
+// An empty ID must be treated as not-found before any HTTP call: GET /rules/{id}
+// with an empty id redirects to the collection route and returns the full list, which
+// callers (e.g. upjet's pre-create existence check) would misread as an existing
+// resource. The guard returns ErrNotFound without touching the SDK client, so a
+// nil-client wrapper is sufficient here.
+func TestGetSyntheticTestEmptyIDReturnsNotFound(t *testing.T) {
+	c := &SdkClientWrapper{}
+	resp, err := c.GetSyntheticTest(context.Background(), "")
+	if !errors.Is(err, ErrNotFound) {
+		t.Fatalf("expected ErrNotFound for empty id, got %v", err)
+	}
+	if resp != nil {
+		t.Fatalf("expected nil response for empty id, got %v", resp)
+	}
+}
 
 func TestSyntheticTestFromSDKResponsePreservesEmptyHTTPHeaders(t *testing.T) {
 	ctx := context.Background()

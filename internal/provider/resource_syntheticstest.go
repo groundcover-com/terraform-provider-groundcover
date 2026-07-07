@@ -820,6 +820,15 @@ func (r *syntheticTestResource) Read(ctx context.Context, req resource.ReadReque
 		return
 	}
 
+	// An empty ID means the resource does not exist yet — e.g. a pre-create existence
+	// check by upjet/Crossplane. Without this guard, GetSyntheticTest("") hits the
+	// collection route (GET /rules/ -> 301 -> /rules -> 200) and returns an ID-less
+	// object, so the caller wrongly concludes the resource exists.
+	if state.ID.ValueString() == "" {
+		resp.State.RemoveResource(ctx)
+		return
+	}
+
 	tflog.Debug(ctx, "Reading Synthetic Test resource", map[string]any{"id": state.ID.ValueString()})
 
 	sdkResp, err := r.client.GetSyntheticTest(ctx, state.ID.ValueString())
