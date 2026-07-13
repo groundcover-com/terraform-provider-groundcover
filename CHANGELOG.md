@@ -1,6 +1,6 @@
 ## 1.17.2
 
-* Added `groundcover_recurring_silence`, a resource for silences that repeat on a daily, weekly, or monthly schedule (with per-day timeframes and a timezone), complementing the one-shot `groundcover_silence`
+* Added `groundcover_recurring_silence`, a resource for silences that repeat on a daily, weekly, or monthly schedule (with per-day timeframes and a timezone).
 
 ## 1.17.1
 
