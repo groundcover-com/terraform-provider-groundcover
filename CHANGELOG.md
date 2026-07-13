@@ -1,3 +1,7 @@
+## 1.17.2
+
+* Added `groundcover_recurring_silence`, a resource for silences that repeat on a daily, weekly, or monthly schedule (with per-day timeframes and a timezone), complementing the one-shot `groundcover_silence`
+
 ## 1.17.1
 
 * Fixed `groundcover_synthetic_test` sending `GET /api/synthetics/v1/rules/{id}` with an empty ID — the provider now treats it as not-found instead of matching `GET /api/synthetics/v1/rules/` (which redirects to the list and returns 200)
