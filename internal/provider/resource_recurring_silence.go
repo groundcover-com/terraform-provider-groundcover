@@ -368,14 +368,12 @@ func (r *recurringSilenceResource) Create(ctx context.Context, req resource.Crea
 		comment = fmt.Sprintf("created %s", time.Now().UTC().Format("2006-01-02 15:04:05"))
 	}
 
-	recurrenceType := plan.RecurrenceType.ValueString()
-	timezone := plan.Timezone.ValueString()
-	enabled := plan.Enabled.ValueBool()
-
-	apiRequest := &models.CreateRecurringSilenceRequest{
-		RecurrenceType: &recurrenceType,
-		Timezone:       &timezone,
-		Enabled:        &enabled,
+	silenceType := models.V2CreateSilenceRequestTypeRecurring
+	apiRequest := &models.V2CreateSilenceRequest{
+		Type:           &silenceType,
+		RecurrenceType: plan.RecurrenceType.ValueString(),
+		Timezone:       plan.Timezone.ValueString(),
+		Enabled:        plan.Enabled.ValueBool(),
 		Comment:        comment,
 		Timeframes:     timeframes,
 		Matchers:       matchers,
@@ -464,11 +462,11 @@ func (r *recurringSilenceResource) Update(ctx context.Context, req resource.Upda
 		comment = plan.Comment.ValueString()
 	}
 
-	enabled := plan.Enabled.ValueBool()
-	apiRequest := &models.UpdateRecurringSilenceRequest{
+	apiRequest := &models.V2UpdateSilenceRequest{
+		Type:           models.V2CreateSilenceRequestTypeRecurring,
 		RecurrenceType: plan.RecurrenceType.ValueString(),
 		Timezone:       plan.Timezone.ValueString(),
-		Enabled:        &enabled,
+		Enabled:        plan.Enabled.ValueBool(),
 		Comment:        comment,
 		Timeframes:     timeframes,
 		Matchers:       matchers,
@@ -516,7 +514,7 @@ func (r *recurringSilenceResource) ImportState(ctx context.Context, req resource
 }
 
 // updateModelFromResponse maps an API response back onto the Terraform model.
-func (r *recurringSilenceResource) updateModelFromResponse(m *recurringSilenceResourceModel, apiResponse *models.RecurringSilenceResponse) (diags diag.Diagnostics) {
+func (r *recurringSilenceResource) updateModelFromResponse(m *recurringSilenceResourceModel, apiResponse *models.V2SilenceResponse) (diags diag.Diagnostics) {
 	if apiResponse.UUID.String() != "" {
 		m.ID = types.StringValue(apiResponse.UUID.String())
 	}

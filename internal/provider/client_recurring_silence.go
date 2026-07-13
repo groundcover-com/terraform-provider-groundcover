@@ -13,15 +13,15 @@ import (
 	"github.com/hashicorp/terraform-plugin-log/tflog"
 )
 
-func (c *SdkClientWrapper) CreateRecurringSilence(ctx context.Context, req *models.CreateRecurringSilenceRequest) (*models.RecurringSilenceResponse, error) {
+func (c *SdkClientWrapper) CreateRecurringSilence(ctx context.Context, req *models.V2CreateSilenceRequest) (*models.V2SilenceResponse, error) {
 	tflog.Debug(ctx, "Executing SDK Call: Create Recurring Silence")
 
-	params := monitors.NewCreateRecurringSilenceParams().
+	params := monitors.NewV2CreateSilenceParams().
 		WithContext(ctx).
 		WithTimeout(defaultTimeout).
 		WithBody(req)
 
-	resp, err := c.sdkClient.Monitors.CreateRecurringSilence(params, nil)
+	resp, err := c.sdkClient.Monitors.V2CreateSilence(params, nil)
 	if err != nil {
 		return nil, handleApiError(ctx, err, "CreateRecurringSilence", req.Comment)
 	}
@@ -38,23 +38,23 @@ func (c *SdkClientWrapper) CreateRecurringSilence(ctx context.Context, req *mode
 	return resp.Payload, nil
 }
 
-func (c *SdkClientWrapper) GetRecurringSilence(ctx context.Context, id string) (*models.RecurringSilenceResponse, error) {
+func (c *SdkClientWrapper) GetRecurringSilence(ctx context.Context, id string) (*models.V2SilenceResponse, error) {
 	logFields := map[string]any{"id": id}
 	tflog.Debug(ctx, "Executing SDK Call: Get Recurring Silence", logFields)
 
-	// An empty ID would otherwise be sent to GET /recurring-silences/{id}, which redirects
+	// An empty ID would otherwise be sent to GET /v2/silences/{id}, which redirects
 	// to the collection route and returns 200 with the full list (an array) — never a 404.
 	// Treat it as not-found so callers don't mistake a list response for an existing resource.
 	if id == "" {
 		return nil, ErrNotFound
 	}
 
-	params := monitors.NewGetRecurringSilenceParams().
+	params := monitors.NewV2GetSilenceParams().
 		WithContext(ctx).
 		WithTimeout(defaultTimeout).
 		WithID(id)
 
-	resp, err := c.sdkClient.Monitors.GetRecurringSilence(params, nil)
+	resp, err := c.sdkClient.Monitors.V2GetSilence(params, nil)
 	if err != nil {
 		return nil, handleApiError(ctx, err, "GetRecurringSilence", id)
 	}
@@ -67,17 +67,17 @@ func (c *SdkClientWrapper) GetRecurringSilence(ctx context.Context, id string) (
 	return resp.Payload, nil
 }
 
-func (c *SdkClientWrapper) UpdateRecurringSilence(ctx context.Context, id string, req *models.UpdateRecurringSilenceRequest) (*models.RecurringSilenceResponse, error) {
+func (c *SdkClientWrapper) UpdateRecurringSilence(ctx context.Context, id string, req *models.V2UpdateSilenceRequest) (*models.V2SilenceResponse, error) {
 	logFields := map[string]any{"id": id}
 	tflog.Debug(ctx, "Executing SDK Call: Update Recurring Silence", logFields)
 
-	params := monitors.NewUpdateRecurringSilenceParams().
+	params := monitors.NewV2UpdateSilenceParams().
 		WithContext(ctx).
 		WithTimeout(defaultTimeout).
 		WithID(id).
 		WithBody(req)
 
-	resp, err := c.sdkClient.Monitors.UpdateRecurringSilence(params, nil)
+	resp, err := c.sdkClient.Monitors.V2UpdateSilence(params, nil)
 	if err != nil {
 		return nil, handleApiError(ctx, err, "UpdateRecurringSilence", id)
 	}
@@ -94,12 +94,12 @@ func (c *SdkClientWrapper) DeleteRecurringSilence(ctx context.Context, id string
 	logFields := map[string]any{"id": id}
 	tflog.Debug(ctx, "Executing SDK Call: Delete Recurring Silence", logFields)
 
-	params := monitors.NewDeleteRecurringSilenceParams().
+	params := monitors.NewV2DeleteSilenceParams().
 		WithContext(ctx).
 		WithTimeout(defaultTimeout).
 		WithID(id)
 
-	_, err := c.sdkClient.Monitors.DeleteRecurringSilence(params, nil)
+	_, err := c.sdkClient.Monitors.V2DeleteSilence(params, nil)
 	if err != nil {
 		mappedErr := handleApiError(ctx, err, "DeleteRecurringSilence", id)
 		if errors.Is(mappedErr, ErrNotFound) {
