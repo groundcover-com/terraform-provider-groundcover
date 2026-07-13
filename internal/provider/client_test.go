@@ -113,6 +113,16 @@ func TestHandleApiError(t *testing.T) {
 	}
 }
 
+func TestHandleApiErrorSkillDiagnostics(t *testing.T) {
+	forbidden := handleApiError(context.Background(), errors.New(`[POST /api/agent/skills][403] agentCreateSkillForbidden`), "CreateSkill", "my-skill")
+	require.Error(t, forbidden)
+	assert.Contains(t, forbidden.Error(), "admin role")
+
+	conflict := handleApiError(context.Background(), errors.New(`[POST /api/agent/skills][409] agentCreateSkillConflict`), "CreateSkill", "my-skill")
+	require.Error(t, conflict)
+	assert.Contains(t, conflict.Error(), `Skill name "my-skill" is already in use`)
+}
+
 func TestProviderErrorTypes(t *testing.T) {
 	tests := []struct {
 		name string
