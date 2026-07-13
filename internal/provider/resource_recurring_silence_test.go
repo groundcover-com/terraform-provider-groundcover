@@ -144,6 +144,8 @@ func TestAccRecurringSilenceResource(t *testing.T) {
 					resource.TestCheckResourceAttr("groundcover_recurring_silence.test", "recurrence_type", "daily"),
 					resource.TestCheckResourceAttr("groundcover_recurring_silence.test", "comment", updatedComment),
 					resource.TestCheckResourceAttr("groundcover_recurring_silence.test", "timeframes.#", "1"),
+					// enabled=false must round-trip (regression guard for the SDK *bool fix)
+					resource.TestCheckResourceAttr("groundcover_recurring_silence.test", "enabled", "false"),
 				),
 			},
 		},
@@ -216,6 +218,7 @@ resource "groundcover_recurring_silence" "test" {
   recurrence_type = "daily"
   timezone        = "UTC"
   comment         = %[1]q
+  enabled         = false
 
   timeframes = [
     { day = "every_day", start_time = "03:00", end_time = "03:30" },

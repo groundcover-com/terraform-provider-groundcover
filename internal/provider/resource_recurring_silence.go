@@ -369,11 +369,12 @@ func (r *recurringSilenceResource) Create(ctx context.Context, req resource.Crea
 	}
 
 	silenceType := models.V2CreateSilenceRequestTypeRecurring
+	enabled := plan.Enabled.ValueBool()
 	apiRequest := &models.V2CreateSilenceRequest{
 		Type:           &silenceType,
 		RecurrenceType: plan.RecurrenceType.ValueString(),
 		Timezone:       plan.Timezone.ValueString(),
-		Enabled:        plan.Enabled.ValueBool(),
+		Enabled:        &enabled,
 		Comment:        comment,
 		Timeframes:     timeframes,
 		Matchers:       matchers,
@@ -462,11 +463,12 @@ func (r *recurringSilenceResource) Update(ctx context.Context, req resource.Upda
 		comment = plan.Comment.ValueString()
 	}
 
+	enabled := plan.Enabled.ValueBool()
 	apiRequest := &models.V2UpdateSilenceRequest{
 		Type:           models.V2CreateSilenceRequestTypeRecurring,
 		RecurrenceType: plan.RecurrenceType.ValueString(),
 		Timezone:       plan.Timezone.ValueString(),
-		Enabled:        plan.Enabled.ValueBool(),
+		Enabled:        &enabled,
 		Comment:        comment,
 		Timeframes:     timeframes,
 		Matchers:       matchers,
