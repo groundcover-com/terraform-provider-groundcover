@@ -8,6 +8,7 @@ import (
 	"io"
 	"net/http"
 	"os"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -123,6 +124,34 @@ func TestDeleteSkillTreatsNotFoundAsSuccess(t *testing.T) {
 	}
 }
 
+func TestSkillClientRejectsMissingSkillPayload(t *testing.T) {
+	client := newSkillSDKTestClient(roundTripperFunc(func(r *http.Request) (*http.Response, error) {
+		return &http.Response{
+			StatusCode: http.StatusOK, Header: http.Header{"Content-Type": []string{"application/json"}},
+			Body: io.NopCloser(strings.NewReader(`{"status":"ok"}`)), Request: r,
+		}, nil
+	}))
+	name, whenToUse, instructions, organizational := "name", "when", "do", true
+	request := &models.AgentSkillRequest{
+		Name: &name, WhenToUse: &whenToUse, Instructions: &instructions, IsOrganizational: &organizational,
+	}
+	tests := []struct {
+		name string
+		call func() error
+	}{
+		{name: "create", call: func() error { _, err := client.CreateSkill(context.Background(), request); return err }},
+		{name: "get", call: func() error { _, err := client.GetSkill(context.Background(), "skill-id"); return err }},
+		{name: "update", call: func() error { _, err := client.UpdateSkill(context.Background(), "skill-id", request); return err }},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if err := tt.call(); err == nil || !strings.Contains(err.Error(), "response payload was nil") {
+				t.Fatalf("call error = %v, want missing-payload error", err)
+			}
+		})
+	}
+}
+
 func newSkillSDKTestClient(baseTransport http.RoundTripper) *SdkClientWrapper {
 	sdkHTTPTransport := gcsdktransport.NewTransport("api-key", "backend-id", baseTransport, 0, time.Millisecond, time.Millisecond, nil)
 	runtimeTransport := openapiClient.New("api.groundcover.com", "/", []string{"https"})
@@ -133,30 +162,52 @@ func newSkillSDKTestClient(baseTransport http.RoundTripper) *SdkClientWrapper {
 func TestAccSkillResource(t *testing.T) {
 	name := acctest.RandomWithPrefix("tf-skill")
 	updatedName := name + "-updated"
+	const initialWhenToUse = "Use while investigating incidents"
+	const initialDescription = "Managed by Terraform acceptance tests"
+	const initialInstructions = "Start with active alerts."
+	const updatedWhenToUse = "Use during incident response"
+	const updatedDescription = "Updated by Terraform acceptance tests"
+	const updatedInstructions = "Inspect alerts, then summarize evidence."
+	var initialRevision int64
 	resource.Test(t, resource.TestCase{
 		PreCheck: func() { testAccPreCheck(t) }, ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
 		Steps: []resource.TestStep{
 			{
-				Config: testAccSkillConfig(name, "Use while investigating incidents", "Start with active alerts."),
+				Config: testAccSkillConfig(name, initialWhenToUse, initialDescription, initialInstructions),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttrSet("groundcover_skill.test", "id"),
 					resource.TestCheckResourceAttr("groundcover_skill.test", "name", name),
+					resource.TestCheckResourceAttr("groundcover_skill.test", "when_to_use", initialWhenToUse),
+					resource.TestCheckResourceAttr("groundcover_skill.test", "description", initialDescription),
+					resource.TestCheckResourceAttr("groundcover_skill.test", "instructions", initialInstructions),
+					resource.TestCheckResourceAttrSet("groundcover_skill.test", "identifier"),
 					resource.TestCheckResourceAttr("groundcover_skill.test", "is_organizational", "true"),
 					resource.TestCheckResourceAttr("groundcover_skill.test", "is_provisioned", "true"),
 					resource.TestCheckResourceAttrSet("groundcover_skill.test", "revision"),
+					resource.TestCheckResourceAttrSet("groundcover_skill.test", "created_at"),
+					resource.TestCheckResourceAttrSet("groundcover_skill.test", "updated_at"),
+					testAccCaptureSkillRevision("groundcover_skill.test", &initialRevision),
 				),
 			},
 			{ResourceName: "groundcover_skill.test", ImportState: true, ImportStateVerify: true},
 			{
-				Config: testAccSkillConfig(updatedName, "Use during incident response", "Inspect alerts, then summarize evidence."),
+				Config: testAccSkillConfig(updatedName, updatedWhenToUse, updatedDescription, updatedInstructions),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttr("groundcover_skill.test", "name", updatedName),
-					resource.TestCheckResourceAttr("groundcover_skill.test", "when_to_use", "Use during incident response"),
+					resource.TestCheckResourceAttr("groundcover_skill.test", "when_to_use", updatedWhenToUse),
+					resource.TestCheckResourceAttr("groundcover_skill.test", "description", updatedDescription),
+					resource.TestCheckResourceAttr("groundcover_skill.test", "instructions", updatedInstructions),
+					testAccCheckSkillRevisionAdvanced("groundcover_skill.test", &initialRevision),
 				),
 			},
 			{
-				Config:   testAccSkillConfig(updatedName, "Use during incident response", "Inspect alerts, then summarize evidence."),
-				PlanOnly: true,
+				Config: testAccSkillConfigWithoutDescription(updatedName, updatedWhenToUse, updatedInstructions),
+				Check:  resource.TestCheckResourceAttr("groundcover_skill.test", "description", ""),
+			},
+			{
+				Config:             testAccSkillConfigWithoutDescription(updatedName, updatedWhenToUse, updatedInstructions),
+				PlanOnly:           true,
+				ExpectNonEmptyPlan: false,
 			},
 		},
 	})
@@ -167,7 +218,7 @@ func TestAccSkillResource_disappears(t *testing.T) {
 	resource.Test(t, resource.TestCase{
 		PreCheck: func() { testAccPreCheck(t) }, ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
 		Steps: []resource.TestStep{{
-			Config: testAccSkillConfig(name, "Use during incident response", "Inspect active alerts."),
+			Config: testAccSkillConfig(name, "Use during incident response", "Managed by Terraform acceptance tests", "Inspect active alerts."),
 			Check: resource.ComposeAggregateTestCheckFunc(
 				testAccCheckSkillResourceDisappears("groundcover_skill.test"),
 			),
@@ -176,15 +227,116 @@ func TestAccSkillResource_disappears(t *testing.T) {
 	})
 }
 
-func testAccSkillConfig(name, whenToUse, instructions string) string {
+func TestAccSkillResource_outOfBandDrift(t *testing.T) {
+	name := acctest.RandomWithPrefix("tf-skill-drift")
+	const whenToUse = "Use during incident response"
+	const description = "Managed by Terraform acceptance tests"
+	const instructions = "Inspect active alerts."
+	var skillID string
+	resource.Test(t, resource.TestCase{
+		PreCheck: func() { testAccPreCheck(t) }, ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
+		Steps: []resource.TestStep{
+			{
+				Config: testAccSkillConfig(name, whenToUse, description, instructions),
+				Check:  testAccCaptureSkillID("groundcover_skill.test", &skillID),
+			},
+			{
+				PreConfig: func() {
+					if err := testAccUpdateSkillOutOfBand(skillID, name+"-remote", "Remote use case", "Remote description", "Remote instructions"); err != nil {
+						t.Fatalf("updating Skill out of band: %v", err)
+					}
+				},
+				Config: testAccSkillConfig(name, whenToUse, description, instructions),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					resource.TestCheckResourceAttr("groundcover_skill.test", "name", name),
+					resource.TestCheckResourceAttr("groundcover_skill.test", "when_to_use", whenToUse),
+					resource.TestCheckResourceAttr("groundcover_skill.test", "description", description),
+					resource.TestCheckResourceAttr("groundcover_skill.test", "instructions", instructions),
+				),
+			},
+			{
+				Config:             testAccSkillConfig(name, whenToUse, description, instructions),
+				PlanOnly:           true,
+				ExpectNonEmptyPlan: false,
+			},
+		},
+	})
+}
+
+func testAccSkillConfig(name, whenToUse, description, instructions string) string {
 	return fmt.Sprintf(`
 resource "groundcover_skill" "test" {
   name         = %[1]q
   when_to_use  = %[2]q
-  description  = "Managed by Terraform acceptance tests"
+  description  = %[3]q
+  instructions = %[4]q
+}
+`, name, whenToUse, description, instructions)
+}
+
+func testAccSkillConfigWithoutDescription(name, whenToUse, instructions string) string {
+	return fmt.Sprintf(`
+resource "groundcover_skill" "test" {
+  name         = %[1]q
+  when_to_use  = %[2]q
   instructions = %[3]q
 }
 `, name, whenToUse, instructions)
+}
+
+func testAccCaptureSkillID(name string, skillID *string) resource.TestCheckFunc {
+	return func(state *terraform.State) error {
+		resourceState, ok := state.RootModule().Resources[name]
+		if !ok || resourceState.Primary.ID == "" {
+			return fmt.Errorf("Skill resource %q has no ID", name)
+		}
+		*skillID = resourceState.Primary.ID
+		return nil
+	}
+}
+
+func testAccCaptureSkillRevision(name string, revision *int64) resource.TestCheckFunc {
+	return func(state *terraform.State) error {
+		resourceState, ok := state.RootModule().Resources[name]
+		if !ok {
+			return fmt.Errorf("Skill resource %q not found", name)
+		}
+		parsed, err := strconv.ParseInt(resourceState.Primary.Attributes["revision"], 10, 64)
+		if err != nil {
+			return fmt.Errorf("invalid Skill revision: %w", err)
+		}
+		*revision = parsed
+		return nil
+	}
+}
+
+func testAccCheckSkillRevisionAdvanced(name string, previous *int64) resource.TestCheckFunc {
+	return func(state *terraform.State) error {
+		var current int64
+		if err := testAccCaptureSkillRevision(name, &current)(state); err != nil {
+			return err
+		}
+		if current <= *previous {
+			return fmt.Errorf("Skill revision = %d, want greater than %d after update", current, *previous)
+		}
+		return nil
+	}
+}
+
+func testAccUpdateSkillOutOfBand(id, name, whenToUse, description, instructions string) error {
+	apiURL := os.Getenv("GROUNDCOVER_API_URL")
+	if apiURL == "" {
+		apiURL = "https://api.groundcover.com"
+	}
+	client, err := NewSdkClientWrapper(context.Background(), apiURL, os.Getenv("GROUNDCOVER_API_KEY"), os.Getenv("GROUNDCOVER_BACKEND_ID"))
+	if err != nil {
+		return fmt.Errorf("failed to create client: %w", err)
+	}
+	organizational := true
+	_, err = client.UpdateSkill(context.Background(), id, &models.AgentSkillRequest{
+		Name: &name, WhenToUse: &whenToUse, Description: description, Instructions: &instructions, IsOrganizational: &organizational,
+	})
+	return err
 }
 
 func testAccCheckSkillResourceDisappears(name string) resource.TestCheckFunc {
