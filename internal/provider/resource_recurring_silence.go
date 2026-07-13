@@ -152,7 +152,7 @@ A recurring silence repeatedly suppresses alerts on a schedule (daily, weekly, o
 							Required:            true,
 						},
 						"value": schema.StringAttribute{
-							MarkdownDescription: "The value to match against. Can be an exact value or a partial match pattern if `is_contains` is true.",
+							MarkdownDescription: "The value to match against. It can be an exact value or a partial match pattern if `is_contains` is true.",
 							Required:            true,
 						},
 						"is_equal": schema.BoolAttribute{
@@ -216,6 +216,14 @@ func (r *recurringSilenceResource) ValidateConfig(ctx context.Context, req resou
 			path.Root("comment"),
 			"Invalid comment",
 			"Comment cannot be an empty string. Either omit the comment attribute or provide a non-empty value.",
+		)
+	}
+
+	if !config.Matchers.IsNull() && !config.Matchers.IsUnknown() && len(config.Matchers.Elements()) == 0 {
+		resp.Diagnostics.AddAttributeError(
+			path.Root("matchers"),
+			"Empty matchers",
+			"matchers must contain at least one matcher.",
 		)
 	}
 

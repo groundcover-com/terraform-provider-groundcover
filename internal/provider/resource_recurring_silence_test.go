@@ -4,6 +4,7 @@ package provider
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"testing"
@@ -14,6 +15,17 @@ import (
 	"github.com/hashicorp/terraform-plugin-testing/helper/resource"
 	"github.com/hashicorp/terraform-plugin-testing/terraform"
 )
+
+func TestGetRecurringSilenceEmptyIDReturnsNotFound(t *testing.T) {
+	c := &SdkClientWrapper{}
+	resp, err := c.GetRecurringSilence(context.Background(), "")
+	if !errors.Is(err, ErrNotFound) {
+		t.Fatalf("expected ErrNotFound for empty id, got %v", err)
+	}
+	if resp != nil {
+		t.Fatalf("expected nil response for empty id, got %v", resp)
+	}
+}
 
 func TestValidateTimeframeDay(t *testing.T) {
 	cases := []struct {
@@ -69,7 +81,13 @@ func TestTimeframesRoundTrip(t *testing.T) {
 	if len(m["wednesday"]) != 1 || len(m["thursday"]) != 2 {
 		t.Fatalf("unexpected grouping: %#v", m)
 	}
-	if *m["thursday"][0].StartTime != "09:00" && *m["thursday"][1].StartTime != "09:00" {
+	gotThursdayStarts := map[string]bool{}
+	for _, tr := range m["thursday"] {
+		if tr.StartTime != nil {
+			gotThursdayStarts[*tr.StartTime] = true
+		}
+	}
+	if !gotThursdayStarts["09:00"] || !gotThursdayStarts["13:00"] {
 		t.Errorf("thursday ranges lost start times: %#v", m["thursday"])
 	}
 

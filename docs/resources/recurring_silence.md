@@ -128,7 +128,7 @@ resource "groundcover_recurring_silence" "monthly_billing" {
 Required:
 
 - `name` (String) The name of the label to match (e.g., `service`, `environment`, `workload`).
-- `value` (String) The value to match against. Can be an exact value or a partial match pattern if `is_contains` is true.
+- `value` (String) The value to match against. It can be an exact value or a partial match pattern if `is_contains` is true.
 
 Optional:
 
