@@ -42,6 +42,13 @@ func (c *SdkClientWrapper) GetRecurringSilence(ctx context.Context, id string) (
 	logFields := map[string]any{"id": id}
 	tflog.Debug(ctx, "Executing SDK Call: Get Recurring Silence", logFields)
 
+	// An empty ID would otherwise be sent to GET /recurring-silences/{id}, which redirects
+	// to the collection route and returns 200 with the full list (an array) — never a 404.
+	// Treat it as not-found so callers don't mistake a list response for an existing resource.
+	if id == "" {
+		return nil, ErrNotFound
+	}
+
 	params := monitors.NewGetRecurringSilenceParams().
 		WithContext(ctx).
 		WithTimeout(defaultTimeout).
