@@ -3,12 +3,11 @@
 * Added `groundcover_recurring_silence` — silences that repeat daily, weekly, or monthly, with per-day timeframes and a timezone
 * Updated groundcover SDK to v1.345.0
 * Added Linear delivery options to monitor `connected_app_params`: team, assignee, delegate, project, resolved status, labels, and auto-resolve
+* Added `groundcover_skill` for managing organizational Agent Skills, including import and drift reconciliation. Managing Skills requires an admin service account
 
 ## 1.17.1
 
 * Fixed `groundcover_synthetic_test` sending `GET /api/synthetics/v1/rules/{id}` with an empty ID — the provider now treats it as not-found instead of matching `GET /api/synthetics/v1/rules/` (which redirects to the list and returns 200)
-* Added `groundcover_skill` for managing organizational Agent Skills, including import and drift reconciliation. Managing Skills requires an admin service account
-* Added Linear delivery options to `groundcover_monitor_v2` and `groundcover_monitor_v2_json` connected-app notification parameters and updated `github.com/groundcover-com/groundcover-sdk-go` to `v1.343.0`
 
 ## 1.17.0
 
