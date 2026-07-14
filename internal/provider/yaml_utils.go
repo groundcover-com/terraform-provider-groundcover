@@ -48,6 +48,21 @@ var (
 	// contain such a token (e.g. "retry after 1w") never match. Used for scoped,
 	// per-scalar normalization of parsed YAML values (see normalizeDurationScalar).
 	fullDayWeekDurationRegex = regexp.MustCompile(`^(\d+)([dw])(?:(\d+)h)?$`)
+
+	// monitorDurationKeys are the monitor YAML fields whose scalar values are
+	// durations, mirroring the fields the typed monitor_v2 resource normalizes.
+	// Only values under these keys are day/week-normalized, so free-text fields
+	// (title, description, labels, ...) are never rewritten. Keys are matched by
+	// leaf name; in the monitor schema these names only ever carry durations.
+	monitorDurationKeys = map[string]bool{
+		"interval":               true, // evaluationInterval.interval
+		"pendingFor":             true, // evaluationInterval.pendingFor
+		"renotificationInterval": true, // notificationSettings.renotificationInterval
+		"instantRollup":          true, // query.instantRollup
+		"time":                   true, // query.rollup.time
+		"from":                   true, // relativeTimerange.from
+		"to":                     true, // relativeTimerange.to
+	}
 )
 
 // NormalizeMonitorYaml sorts keys in a YAML string alphabetically using AST manipulation.
@@ -109,9 +124,17 @@ func sortAstNodeGoccy(node ast.Node) {
 		})
 		// Recursively sort all values
 		for _, valNode := range n.Values {
-			if valNode.Value != nil {
-				sortAstNodeGoccy(valNode.Value)
+			if valNode.Value == nil {
+				continue
 			}
+			// Scoped duration normalization: rewrite day/week scalars to hours
+			// only for keys that are actually duration fields (mirrors the typed
+			// monitor_v2 behavior). Non-duration fields like title/description are
+			// left untouched regardless of their value.
+			if sn, ok := valNode.Value.(*ast.StringNode); ok && monitorDurationKeys[getStringKeyFromNode(valNode.Key)] {
+				sn.Value = normalizeDurationScalar(sn.Value)
+			}
+			sortAstNodeGoccy(valNode.Value)
 		}
 	case *ast.SequenceNode:
 		// NOTE: We do NOT sort the sequence elements themselves (n.Values slice)
@@ -131,12 +154,6 @@ func sortAstNodeGoccy(node ast.Node) {
 	case *ast.AliasNode:
 		// Alias nodes don't have children to sort
 		return
-	case *ast.StringNode:
-		// Scoped duration normalization: only whole-value day/week scalars are
-		// rewritten to hours. Keys are never visited (the mapping case recurses
-		// into values only), and free text is left intact by the exact-match
-		// guard, so descriptions like "retry after 1w" are not mutated.
-		n.Value = normalizeDurationScalar(n.Value)
 	}
 }
 
@@ -792,10 +809,10 @@ func normalizeDayDurations(s string) string {
 
 // normalizeDurationScalar converts a scalar whose entire value is a bare
 // day/week duration ("1d", "7d", "1d4h", "1w", "2w4h") into hours, since Go's
-// time.ParseDuration understands neither "d" nor "w". Any value that is not
-// exactly such a token — including free text that merely contains one, like
-// "retry after 1w" — is returned unchanged, so non-duration scalars are never
-// mutated. Composite forms with minutes/seconds are not supported.
+// time.ParseDuration understands neither "d" nor "w". Values that are not
+// exactly such a token (e.g. "5m", "1h30m", or free text) are returned
+// unchanged. Callers additionally gate this to known duration fields (see
+// monitorDurationKeys). Composite forms with minutes/seconds are not supported.
 func normalizeDurationScalar(value string) string {
 	parts := fullDayWeekDurationRegex.FindStringSubmatch(value)
 	if parts == nil {

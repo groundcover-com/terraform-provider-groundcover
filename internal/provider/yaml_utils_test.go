@@ -1162,17 +1162,20 @@ severity: S1
 }
 
 // TestNormalizeMonitorYaml_ScopedDurationNormalization verifies day/week duration
-// scalars are converted to hours while free-text values that merely contain such a
-// token (e.g. a description) are left untouched (BE-2449 scoped fix).
+// scalars are converted to hours only for actual duration fields, while non-duration
+// fields are left untouched — even when their value is exactly a duration token, and
+// even when free text merely contains one (BE-2449 scoped fix).
 func TestNormalizeMonitorYaml_ScopedDurationNormalization(t *testing.T) {
 	ctx := context.Background()
 
-	input := `title: t
+	input := `title: 1w
 evaluationInterval:
   interval: 1d
   pendingFor: 1w
 description: retry after 1w
-renotificationInterval: "2w"`
+renotificationInterval: "2w"
+labels:
+  window: 1w`
 
 	got, err := NormalizeMonitorYaml(ctx, input)
 	if err != nil {
@@ -1180,10 +1183,12 @@ renotificationInterval: "2w"`
 	}
 
 	mustContain := []string{
-		"interval: 24h",
-		"pendingFor: 168h",
-		"description: retry after 1w", // free text preserved, not "retry after 168h"
-		`renotificationInterval: "336h"`,
+		"interval: 24h",                  // duration field converted
+		"pendingFor: 168h",               // duration field converted
+		`renotificationInterval: "336h"`, // duration field converted (quoted)
+		"title: 1w",                      // non-duration field, exact token: preserved
+		"description: retry after 1w",    // free text: preserved
+		"window: 1w",                     // non-duration label, exact token: preserved
 	}
 	for _, want := range mustContain {
 		if !strings.Contains(got, want) {
