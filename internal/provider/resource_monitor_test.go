@@ -918,6 +918,20 @@ func TestAccMonitorV2Resource(t *testing.T) {
 				PlanOnly:           true,
 				ExpectNonEmptyPlan: false,
 			},
+			// BE-2449: day/week units must not perpetually diff against the
+			// backend's canonical hour-based read-back ("1d"->24h0m0s, "1w"->168h0m0s).
+			{
+				Config: testAccMonitorV2ResourceDayWeekDurationConfig(updatedName),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					resource.TestCheckResourceAttr("groundcover_monitor_v2.test", "evaluation_interval.interval", "1d"),
+					resource.TestCheckResourceAttr("groundcover_monitor_v2.test", "evaluation_interval.pending_for", "1w"),
+				),
+			},
+			{
+				Config:             testAccMonitorV2ResourceDayWeekDurationConfig(updatedName),
+				PlanOnly:           true,
+				ExpectNonEmptyPlan: false,
+			},
 		},
 	})
 }
@@ -1131,6 +1145,51 @@ resource "groundcover_monitor_v2" "test" {
   evaluation_interval {
     interval    = "60 seconds"
     pending_for = "1 minute"
+  }
+
+  execution_error_state = "OK"
+  no_data_state         = "OK"
+}
+`, name)
+}
+
+func testAccMonitorV2ResourceDayWeekDurationConfig(name string) string {
+	return fmt.Sprintf(`
+resource "groundcover_monitor_v2" "test" {
+  title            = %[1]q
+  severity         = "critical"
+  measurement_type = "state"
+
+  display {
+    header      = %[1]q
+    description = "Test monitor created by acceptance tests"
+  }
+
+  query {
+    type       = "metricsql"
+    expression = "sum(groundcover_kube_pod_container_status_running{})"
+
+    relative_timerange {
+      from = "-5 minutes"
+      to   = "0m"
+    }
+
+    rollup {
+      function = "last"
+      time     = "5 minutes"
+    }
+  }
+
+  threshold {
+    name       = "threshold_1"
+    input_name = "threshold_input_query"
+    operator   = "gt"
+    values     = [1]
+  }
+
+  evaluation_interval {
+    interval    = "1d"
+    pending_for = "1w"
   }
 
   execution_error_state = "OK"

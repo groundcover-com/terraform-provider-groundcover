@@ -1161,6 +1161,40 @@ severity: S1
 	}
 }
 
+// TestNormalizeMonitorYaml_ScopedDurationNormalization verifies day/week duration
+// scalars are converted to hours while free-text values that merely contain such a
+// token (e.g. a description) are left untouched (BE-2449 scoped fix).
+func TestNormalizeMonitorYaml_ScopedDurationNormalization(t *testing.T) {
+	ctx := context.Background()
+
+	input := `title: t
+evaluationInterval:
+  interval: 1d
+  pendingFor: 1w
+description: retry after 1w
+renotificationInterval: "2w"`
+
+	got, err := NormalizeMonitorYaml(ctx, input)
+	if err != nil {
+		t.Fatalf("NormalizeMonitorYaml() error: %v", err)
+	}
+
+	mustContain := []string{
+		"interval: 24h",
+		"pendingFor: 168h",
+		"description: retry after 1w", // free text preserved, not "retry after 168h"
+		`renotificationInterval: "336h"`,
+	}
+	for _, want := range mustContain {
+		if !strings.Contains(got, want) {
+			t.Errorf("normalized YAML missing %q\ngot:\n%s", want, got)
+		}
+	}
+	if strings.Contains(got, "retry after 168h") {
+		t.Errorf("free-text description was corrupted:\n%s", got)
+	}
+}
+
 // TestNormalizeMonitorYaml_RemovesExtraNewlines tests that NormalizeMonitorYaml removes extra newlines
 func TestNormalizeMonitorYaml_RemovesExtraNewlines(t *testing.T) {
 	ctx := context.Background()

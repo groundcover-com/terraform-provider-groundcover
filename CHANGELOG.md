@@ -1,6 +1,6 @@
-## 1.17.2
+## 1.18.0
 
-* Fixed drift of monitor resources when using `w` (week) duration units like `1w` — week durations are now normalized the same way as `d`
+* Fixed perpetual plan diffs on monitor resources when using `w` (week) duration units like `1w`, which now round-trip cleanly instead of drifting against the backend's canonical hours. Duration normalization for `groundcover_monitor` is now scoped to actual duration values, so free-text fields (e.g. a description containing "1w") are no longer rewritten
 
 ## 1.17.1
 
