@@ -1,8 +1,9 @@
 ## 1.18.0
 
-* Added `groundcover_recurring_silence`, a resource for silences that repeat on a daily, weekly, or monthly schedule (with per-day timeframes and a timezone). Backed by the unified v2 silences API (`/api/monitors/v2/silences`, `type=recurring`)
-* Updated `github.com/groundcover-com/groundcover-sdk-go` to `v1.345.0` for the v2 silences endpoints (including the `enabled` field as `*bool` so `enabled = false` is honored)
-* Added Linear delivery options to `groundcover_monitor_v2` / `groundcover_monitor_v2_json` `notification_settings.connected_app_params`: `team_id`, `assignee_id`, `delegate_id`, `project_id`, `resolved_status_id`, `label_ids`, and `auto_resolve` (surfaced by the SDK v1.345.0 update)
+* Added `groundcover_recurring_silence` — silences that repeat daily, weekly, or monthly, with per-day timeframes and a timezone
+* Fixed `enabled = false` not being honored on silences
+* Updated groundcover SDK to v1.345.0
+* Added Linear delivery options to monitor `connected_app_params`: team, assignee, delegate, project, resolved status, labels, and auto-resolve
 
 ## 1.17.1
 
