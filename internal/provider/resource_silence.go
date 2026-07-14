@@ -88,7 +88,7 @@ A silence is defined by: a time window (starts_at, ends_at), a comment describin
 							Required:            true,
 						},
 						"value": schema.StringAttribute{
-							MarkdownDescription: "The value to match against. Can be an exact value or a partial match pattern if `is_contains` is true.",
+							MarkdownDescription: "The value to match against. It can be an exact value or a partial match pattern if `is_contains` is true.",
 							Required:            true,
 						},
 						"is_equal": schema.BoolAttribute{

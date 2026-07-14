@@ -79,8 +79,18 @@ type monitorV2JsonNotificationSettingsModel struct {
 }
 
 // connectedAppParamJSON is the JSON shape of a single connected_app_params entry.
+// It mirrors the SDK's models.ConnectedAppDeliveryOptions (enforced by
+// TestConnectedAppParamJSONTracksSDK); when the SDK gains a field, add it here and in
+// the conversion helpers below.
 type connectedAppParamJSON struct {
-	Channels []connectedAppChannelJSON `json:"channels"`
+	Channels         []connectedAppChannelJSON `json:"channels"`
+	TeamID           string                    `json:"team_id,omitempty"`
+	AssigneeID       string                    `json:"assignee_id,omitempty"`
+	DelegateID       string                    `json:"delegate_id,omitempty"`
+	ProjectID        string                    `json:"project_id,omitempty"`
+	ResolvedStatusID string                    `json:"resolved_status_id,omitempty"`
+	LabelIDs         []string                  `json:"label_ids,omitempty"`
+	AutoResolve      bool                      `json:"auto_resolve,omitempty"`
 }
 
 // connectedAppChannelJSON is the JSON shape of a single Slack channel entry.
@@ -430,7 +440,16 @@ func connectedAppParamsJSONToMap(ctx context.Context, value types.String, diags 
 			id := ch.ID
 			channels = append(channels, &models.ConnectedAppChannel{ID: &id, Name: ch.Name})
 		}
-		sdkParams[appID] = models.ConnectedAppDeliveryOptions{Channels: channels}
+		sdkParams[appID] = models.ConnectedAppDeliveryOptions{
+			Channels:         channels,
+			TeamID:           p.TeamID,
+			AssigneeID:       p.AssigneeID,
+			DelegateID:       p.DelegateID,
+			ProjectID:        p.ProjectID,
+			ResolvedStatusID: p.ResolvedStatusID,
+			LabelIDs:         p.LabelIDs,
+			AutoResolve:      p.AutoResolve,
+		}
 	}
 	return monitorV2ConnectedAppParamsType(ctx, sdkParams, diags)
 }
@@ -458,7 +477,16 @@ func connectedAppParamsMapToJSON(ctx context.Context, value types.Map, diags *di
 			}
 			channels = append(channels, connectedAppChannelJSON{ID: id, Name: ch.Name})
 		}
-		out[appID] = connectedAppParamJSON{Channels: channels}
+		out[appID] = connectedAppParamJSON{
+			Channels:         channels,
+			TeamID:           opts.TeamID.ValueString(),
+			AssigneeID:       opts.AssigneeID.ValueString(),
+			DelegateID:       opts.DelegateID.ValueString(),
+			ProjectID:        opts.ProjectID.ValueString(),
+			ResolvedStatusID: opts.ResolvedStatusID.ValueString(),
+			LabelIDs:         monitorV2StringList(ctx, opts.LabelIDs, diags),
+			AutoResolve:      opts.AutoResolve.ValueBool(),
+		}
 	}
 	encoded, err := json.Marshal(out)
 	if err != nil {

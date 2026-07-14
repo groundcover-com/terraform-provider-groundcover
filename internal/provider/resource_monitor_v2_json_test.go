@@ -191,7 +191,7 @@ func TestUnitConnectedAppParamsJSONRoundTrip(t *testing.T) {
 	ctx := context.Background()
 	var diags diag.Diagnostics
 
-	const input = `{"app-1":{"channels":[{"id":"C123","name":"#alerts"},{"id":"C456"}]},"app-2":{"channels":[{"id":"C789"}]}}`
+	const input = `{"app-1":{"channels":[{"id":"C123","name":"#alerts"},{"id":"C456"}]},"app-2":{"channels":[{"id":"C789"}],"team_id":"T1","assignee_id":"U1","delegate_id":"D1","project_id":"P1","resolved_status_id":"S1","label_ids":["L1","L2"],"auto_resolve":true}}`
 
 	m := connectedAppParamsJSONToMap(ctx, types.StringValue(input), &diags)
 	if diags.HasError() {

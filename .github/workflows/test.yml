@@ -75,7 +75,7 @@ jobs:
           - name: secret
             run_regex: '^TestAccSecretResource.*$'
           - name: silence
-            run_regex: '^TestAccSilenceResource.*$'
+            run_regex: '^TestAcc(Recurring)?SilenceResource.*$'
           - name: synthetic-test
             run_regex: '^(TestAccSyntheticTestResource_(basic|update|disappears|withMonitor|applyLoop|sslApplyLoop|notificationMethodApplyLoop|followRedirectsApplyLoop|tcpApplyLoop|sslNewStyleApplyLoop|tcpNewStyleApplyLoop|dnsApplyLoop))$'
           - name: traces-pipeline

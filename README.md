@@ -32,6 +32,8 @@ Basic usage examples can be found in the `examples/` directory:
     *   Demonstrates how to create and manage data integrations.
 *   **Silence Resource:** [`examples/resources/groundcover_silence/resource.tf`](./examples/resources/groundcover_silence/resource.tf)
     *   Demonstrates how to create and manage alert silences with time windows and matchers.
+*   **Recurring Silence Resource:** [`examples/resources/groundcover_recurring_silence/resource.tf`](./examples/resources/groundcover_recurring_silence/resource.tf)
+    *   Demonstrates how to create and manage silences that repeat on a daily, weekly, or monthly schedule with per-day timeframes and a timezone.
 *   **Connected App Resource:** [`examples/resources/groundcover_connected_app/resource.tf`](./examples/resources/groundcover_connected_app/resource.tf)
     *   Demonstrates how to create and manage integrations with external services (Slack, PagerDuty, MS Teams).
 *   **Connected App (JSON) Resource:** [`examples/resources/groundcover_connected_app_json/resource.tf`](./examples/resources/groundcover_connected_app_json/resource.tf)
@@ -262,6 +264,7 @@ TF_ACC=1 go test ./internal/provider -v -run TestAccDataIntegrationResource
 TF_ACC=1 go test ./internal/provider -v -run TestAccSyntheticTestResource
 TF_ACC=1 go test ./internal/provider -v -run TestAccTracesPipelineResource
 TF_ACC=1 go test ./internal/provider -v -run TestAccSilenceResource
+TF_ACC=1 go test ./internal/provider -v -run TestAccRecurringSilenceResource
 TF_ACC=1 go test ./internal/provider -v -run TestAccConnectedAppJson
 
 # Run unit tests only (no API calls required)
