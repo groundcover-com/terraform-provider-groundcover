@@ -1,7 +1,6 @@
 ## 1.18.0
 
 * Added `groundcover_recurring_silence` — silences that repeat daily, weekly, or monthly, with per-day timeframes and a timezone
-* Fixed `enabled = false` not being honored on silences
 * Updated groundcover SDK to v1.345.0
 * Added Linear delivery options to monitor `connected_app_params`: team, assignee, delegate, project, resolved status, labels, and auto-resolve
 
