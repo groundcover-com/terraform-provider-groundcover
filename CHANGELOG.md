@@ -1,3 +1,7 @@
+## 1.17.2
+
+* Fixed drift of monitor resources when using `w` (week) duration units like `1w` — week durations are now normalized the same way as `d`
+
 ## 1.17.1
 
 * Fixed `groundcover_synthetic_test` sending `GET /api/synthetics/v1/rules/{id}` with an empty ID — the provider now treats it as not-found instead of matching `GET /api/synthetics/v1/rules/` (which redirects to the list and returns 200)

@@ -386,6 +386,31 @@ func TestNormalizeTimeString(t *testing.T) {
 			expected: "168h",
 		},
 		{
+			name:     "1w should normalize to 168h",
+			input:    "1w",
+			expected: "168h",
+		},
+		{
+			name:     "2w should normalize to 336h",
+			input:    "2w",
+			expected: "336h",
+		},
+		{
+			name:     "1w4h should normalize to 172h",
+			input:    "1w4h",
+			expected: "172h",
+		},
+		{
+			name:     "digits inside identifier should not be mutated (week)",
+			input:    "name: field1w",
+			expected: "name: field1w",
+		},
+		{
+			name:     "pendingFor with 1w",
+			input:    "pendingFor: 1w",
+			expected: "pendingFor: 168h",
+		},
+		{
 			name:     "pendingFor with 1d",
 			input:    "pendingFor: 1d",
 			expected: "pendingFor: 24h",

@@ -611,6 +611,43 @@ func TestMonitorV2MapSDKToModelPreservesEquivalentNotificationDuration(t *testin
 	}
 }
 
+// TestMonitorV2MapSDKToModelPreservesDayWeekDurations is the BE-2449 regression:
+// a config written with "1d"/"1w" must not perpetually diff against the backend's
+// canonical read-back ("24h0m0s"/"168h0m0s"). The preserve machinery normalizes
+// both sides and keeps the configured string.
+func TestMonitorV2MapSDKToModelPreservesDayWeekDurations(t *testing.T) {
+	ctx := context.Background()
+	title := "duration monitor"
+	pendingFor := models.Duration(7 * 24 * time.Hour) // 1w
+	remote := &models.UpdateMonitorRequest{
+		Title:           &title,
+		Severity:        "critical",
+		MeasurementType: "state",
+		EvaluationInterval: &models.EvaluationInterval{
+			Interval:   strfmt.Duration(24 * time.Hour), // 1d
+			PendingFor: &pendingFor,
+		},
+	}
+
+	state := monitorV2ResourceModel{
+		EvaluationInterval: &monitorV2EvaluationIntervalModel{
+			Interval:   types.StringValue("1d"),
+			PendingFor: types.StringValue("1w"),
+		},
+	}
+	var diags diag.Diagnostics
+	mapMonitorV2SDKToModel(ctx, "monitor-id", remote, &state, &diags)
+	if diags.HasError() {
+		t.Fatalf("mapMonitorV2SDKToModel() diagnostics: %v", diags)
+	}
+	if state.EvaluationInterval.Interval.ValueString() != "1d" {
+		t.Fatalf("state.EvaluationInterval.Interval = %q, want 1d", state.EvaluationInterval.Interval.ValueString())
+	}
+	if state.EvaluationInterval.PendingFor.ValueString() != "1w" {
+		t.Fatalf("state.EvaluationInterval.PendingFor = %q, want 1w", state.EvaluationInterval.PendingFor.ValueString())
+	}
+}
+
 func TestMonitorV2DurationNormalizationPreservesZero(t *testing.T) {
 	if got := monitorV2DurationToType(0).ValueString(); got != "0m" {
 		t.Fatalf("monitorV2DurationToType(0) = %q, want 0m", got)
