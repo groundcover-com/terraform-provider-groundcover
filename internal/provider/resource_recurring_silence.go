@@ -256,11 +256,14 @@ func (r *recurringSilenceResource) ValidateConfig(ctx context.Context, req resou
 			if v.IsUnknown() {
 				continue
 			}
-			if _, err := time.Parse("15:04", v.ValueString()); err != nil {
+			// ponytail: time.Parse("15:04") is lenient (accepts "9:00"); len==5 pins it to
+			// exactly HH:MM so a set-normalized "09:00" can't produce a perpetual plan diff.
+			s := v.ValueString()
+			if _, err := time.Parse("15:04", s); err != nil || len(s) != 5 {
 				resp.Diagnostics.AddAttributeError(
 					path.Root("timeframes"),
 					"Invalid timeframe time",
-					fmt.Sprintf("%s %q must be in 24-hour HH:MM format (e.g. 09:00)", attrName, v.ValueString()),
+					fmt.Sprintf("%s %q must be in 24-hour HH:MM format (e.g. 09:00)", attrName, s),
 				)
 			}
 		}
@@ -279,8 +282,10 @@ func validateTimeframeDay(recurrenceType, day string) error {
 			return fmt.Errorf("for recurrence_type %q, day must be a lowercase weekday name (monday..sunday), got %q", recurrenceType, day)
 		}
 	case recurrenceTypeMonthly:
+		// strconv.Itoa(n) == day rejects leading zeros ("01"): a set-normalized "1"
+		// would otherwise produce a perpetual plan diff.
 		n, err := strconv.Atoi(day)
-		if err != nil || n < 1 || n > 31 {
+		if err != nil || n < 1 || n > 31 || strconv.Itoa(n) != day {
 			return fmt.Errorf("for recurrence_type %q, day must be a day-of-month string (\"1\"..\"31\"), got %q", recurrenceType, day)
 		}
 	}
@@ -465,7 +470,7 @@ func (r *recurringSilenceResource) Update(ctx context.Context, req resource.Upda
 
 	enabled := plan.Enabled.ValueBool()
 	apiRequest := &models.V2UpdateSilenceRequest{
-		Type:           models.V2CreateSilenceRequestTypeRecurring,
+		Type:           models.V2UpdateSilenceRequestTypeRecurring,
 		RecurrenceType: plan.RecurrenceType.ValueString(),
 		Timezone:       plan.Timezone.ValueString(),
 		Enabled:        &enabled,

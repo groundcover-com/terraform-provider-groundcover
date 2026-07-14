@@ -1,4 +1,4 @@
-## 1.17.2
+## 1.18.0
 
 * Added `groundcover_recurring_silence`, a resource for silences that repeat on a daily, weekly, or monthly schedule (with per-day timeframes and a timezone). Backed by the unified v2 silences API (`/api/monitors/v2/silences`, `type=recurring`)
 * Updated `github.com/groundcover-com/groundcover-sdk-go` to `v1.345.0` for the v2 silences endpoints (including the `enabled` field as `*bool` so `enabled = false` is honored)

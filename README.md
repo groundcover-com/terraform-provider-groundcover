@@ -32,6 +32,8 @@ Basic usage examples can be found in the `examples/` directory:
     *   Demonstrates how to create and manage data integrations.
 *   **Silence Resource:** [`examples/resources/groundcover_silence/resource.tf`](./examples/resources/groundcover_silence/resource.tf)
     *   Demonstrates how to create and manage alert silences with time windows and matchers.
+*   **Recurring Silence Resource:** [`examples/resources/groundcover_recurring_silence/resource.tf`](./examples/resources/groundcover_recurring_silence/resource.tf)
+    *   Demonstrates how to create and manage silences that repeat on a daily, weekly, or monthly schedule with per-day timeframes and a timezone.
 *   **Connected App Resource:** [`examples/resources/groundcover_connected_app/resource.tf`](./examples/resources/groundcover_connected_app/resource.tf)
     *   Demonstrates how to create and manage integrations with external services (Slack, PagerDuty, MS Teams).
 *   **Connected App (JSON) Resource:** [`examples/resources/groundcover_connected_app_json/resource.tf`](./examples/resources/groundcover_connected_app_json/resource.tf)
@@ -44,6 +46,8 @@ Basic usage examples can be found in the `examples/` directory:
     *   Demonstrates how to create and manage synthetic tests for proactive HTTP, SSL/TLS, TCP, and DNS endpoint monitoring with assertions, retries, authentication support, monitor configuration, and notification routing.
 *   **Silence Resource:** [`examples/resources/groundcover_silence/resource.tf`](./examples/resources/groundcover_silence/resource.tf)
     *   Demonstrates how to create and manage alert silences with matcher-based targeting.
+*   **Recurring Silence Resource:** [`examples/resources/groundcover_recurring_silence/resource.tf`](./examples/resources/groundcover_recurring_silence/resource.tf)
+    *   Demonstrates how to create and manage silences that repeat on a daily, weekly, or monthly schedule with per-day timeframes and a timezone.
 ## Importing Resources
 
 All resources support `terraform import`. To import an existing resource into your Terraform state:

@@ -43,6 +43,7 @@ func TestValidateTimeframeDay(t *testing.T) {
 		{recurrenceTypeMonthly, "31", false},
 		{recurrenceTypeMonthly, "0", true},
 		{recurrenceTypeMonthly, "32", true},
+		{recurrenceTypeMonthly, "01", true}, // leading zero would normalize to "1" -> perpetual diff
 		{recurrenceTypeMonthly, "abc", true},
 	}
 	for _, c := range cases {
