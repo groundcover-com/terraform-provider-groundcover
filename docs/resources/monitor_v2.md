@@ -323,7 +323,14 @@ Optional:
 
 Optional:
 
+- `assignee_id` (String) Linear user to assign created/updated issues to.
+- `auto_resolve` (Boolean) Whether resolved monitor issues transition the linked Linear issues. Defaults to `false`.
 - `channels` (Attributes List) Slack channels to notify for this connected app. (see [below for nested schema](#nestedatt--notification_settings--connected_app_params--channels))
+- `delegate_id` (String) Linear agent to delegate created/updated issues to.
+- `label_ids` (List of String) Linear label IDs to assign to created/updated issues.
+- `project_id` (String) Linear project to assign created/updated issues to.
+- `resolved_status_id` (String) Linear status used when auto-resolving issues.
+- `team_id` (String) Linear team that receives created issues.
 
 <a id="nestedatt--notification_settings--connected_app_params--channels"></a>
 ### Nested Schema for `notification_settings.connected_app_params.channels`

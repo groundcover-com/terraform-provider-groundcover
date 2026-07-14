@@ -146,7 +146,14 @@ type monitorV2NotificationSettingsModel struct {
 }
 
 type monitorV2ConnectedAppDeliveryOptionsModel struct {
-	Channels types.List `tfsdk:"channels"`
+	Channels         types.List   `tfsdk:"channels"`
+	TeamID           types.String `tfsdk:"team_id"`
+	AssigneeID       types.String `tfsdk:"assignee_id"`
+	DelegateID       types.String `tfsdk:"delegate_id"`
+	ProjectID        types.String `tfsdk:"project_id"`
+	ResolvedStatusID types.String `tfsdk:"resolved_status_id"`
+	LabelIDs         types.List   `tfsdk:"label_ids"`
+	AutoResolve      types.Bool   `tfsdk:"auto_resolve"`
 }
 
 type monitorV2ConnectedAppChannelModel struct {
@@ -451,6 +458,37 @@ func (r *monitorV2Resource) Schema(_ context.Context, _ resource.SchemaRequest, 
 											},
 										},
 									},
+								},
+								"team_id": schema.StringAttribute{
+									MarkdownDescription: "Linear team that receives created issues.",
+									Optional:            true,
+								},
+								"assignee_id": schema.StringAttribute{
+									MarkdownDescription: "Linear user to assign created/updated issues to.",
+									Optional:            true,
+								},
+								"delegate_id": schema.StringAttribute{
+									MarkdownDescription: "Linear agent to delegate created/updated issues to.",
+									Optional:            true,
+								},
+								"project_id": schema.StringAttribute{
+									MarkdownDescription: "Linear project to assign created/updated issues to.",
+									Optional:            true,
+								},
+								"resolved_status_id": schema.StringAttribute{
+									MarkdownDescription: "Linear status used when auto-resolving issues.",
+									Optional:            true,
+								},
+								"label_ids": schema.ListAttribute{
+									MarkdownDescription: "Linear label IDs to assign to created/updated issues.",
+									Optional:            true,
+									ElementType:         types.StringType,
+								},
+								"auto_resolve": schema.BoolAttribute{
+									MarkdownDescription: "Whether resolved monitor issues transition the linked Linear issues. Defaults to `false`.",
+									Optional:            true,
+									Computed:            true,
+									Default:             booldefault.StaticBool(false),
 								},
 							},
 						},
@@ -1481,7 +1519,14 @@ func monitorV2ConnectedAppParamsToSDK(ctx context.Context, value types.Map, diag
 	result := make(models.ConnectedAppParams, len(params))
 	for appID, options := range params {
 		result[appID] = models.ConnectedAppDeliveryOptions{
-			Channels: monitorV2ChannelsToSDK(ctx, options.Channels, diags),
+			Channels:         monitorV2ChannelsToSDK(ctx, options.Channels, diags),
+			TeamID:           options.TeamID.ValueString(),
+			AssigneeID:       options.AssigneeID.ValueString(),
+			DelegateID:       options.DelegateID.ValueString(),
+			ProjectID:        options.ProjectID.ValueString(),
+			ResolvedStatusID: options.ResolvedStatusID.ValueString(),
+			LabelIDs:         monitorV2StringList(ctx, options.LabelIDs, diags),
+			AutoResolve:      options.AutoResolve.ValueBool(),
 		}
 	}
 	return result
@@ -1536,7 +1581,14 @@ func monitorV2ConnectedAppParamsType(ctx context.Context, value models.Connected
 	for appID, options := range value {
 		channels := monitorV2ChannelsType(ctx, options.Channels, diags)
 		object, objectDiags := types.ObjectValue(attrTypes, map[string]attr.Value{
-			"channels": channels,
+			"channels":           channels,
+			"team_id":            monitorV2NullableString(options.TeamID),
+			"assignee_id":        monitorV2NullableString(options.AssigneeID),
+			"delegate_id":        monitorV2NullableString(options.DelegateID),
+			"project_id":         monitorV2NullableString(options.ProjectID),
+			"resolved_status_id": monitorV2NullableString(options.ResolvedStatusID),
+			"label_ids":          monitorV2StringListType(ctx, options.LabelIDs, diags),
+			"auto_resolve":       types.BoolValue(options.AutoResolve),
 		})
 		diags.Append(objectDiags...)
 		elements[appID] = object
@@ -1549,7 +1601,14 @@ func monitorV2ConnectedAppParamsType(ctx context.Context, value models.Connected
 
 func monitorV2ConnectedAppDeliveryOptionsAttrTypes() map[string]attr.Type {
 	return map[string]attr.Type{
-		"channels": types.ListType{ElemType: types.ObjectType{AttrTypes: monitorV2ConnectedAppChannelAttrTypes()}},
+		"channels":           types.ListType{ElemType: types.ObjectType{AttrTypes: monitorV2ConnectedAppChannelAttrTypes()}},
+		"team_id":            types.StringType,
+		"assignee_id":        types.StringType,
+		"delegate_id":        types.StringType,
+		"project_id":         types.StringType,
+		"resolved_status_id": types.StringType,
+		"label_ids":          types.ListType{ElemType: types.StringType},
+		"auto_resolve":       types.BoolType,
 	}
 }
 

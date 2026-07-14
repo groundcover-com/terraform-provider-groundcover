@@ -403,7 +403,14 @@ func TestMonitorV2BuildCreateRequestConnectedAppParams(t *testing.T) {
 		t.Fatalf("types.ListValue() channels diagnostics: %v", diags)
 	}
 	appParams, diags := types.ObjectValue(monitorV2ConnectedAppDeliveryOptionsAttrTypes(), map[string]attr.Value{
-		"channels": channels,
+		"channels":           channels,
+		"team_id":            types.StringNull(),
+		"assignee_id":        types.StringNull(),
+		"delegate_id":        types.StringNull(),
+		"project_id":         types.StringNull(),
+		"resolved_status_id": types.StringNull(),
+		"label_ids":          types.ListNull(types.StringType),
+		"auto_resolve":       types.BoolValue(false),
 	})
 	if diags.HasError() {
 		t.Fatalf("types.ObjectValue() diagnostics: %v", diags)

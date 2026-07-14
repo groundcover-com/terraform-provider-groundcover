@@ -231,6 +231,12 @@ type ApiClient interface {
 	UpdateSilence(ctx context.Context, id string, req *models.UpdateSilenceRequest) (*models.Silence, error)
 	DeleteSilence(ctx context.Context, id string) error
 
+	// Recurring Silences (backed by the unified v2 silences API, type=recurring)
+	CreateRecurringSilence(ctx context.Context, req *models.V2CreateSilenceRequest) (*models.V2SilenceResponse, error)
+	GetRecurringSilence(ctx context.Context, id string) (*models.V2SilenceResponse, error)
+	UpdateRecurringSilence(ctx context.Context, id string, req *models.V2UpdateSilenceRequest) (*models.V2SilenceResponse, error)
+	DeleteRecurringSilence(ctx context.Context, id string) error
+
 	// Connected Apps
 	CreateConnectedApp(ctx context.Context, req *models.CreateConnectedAppRequest) (*models.CreateConnectedAppResponse, error)
 	GetConnectedApp(ctx context.Context, id string) (*models.ConnectedAppResponse, error)

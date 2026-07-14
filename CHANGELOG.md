@@ -1,3 +1,9 @@
+## 1.18.0
+
+* Added `groundcover_recurring_silence` — silences that repeat daily, weekly, or monthly, with per-day timeframes and a timezone
+* Updated groundcover SDK to v1.345.0
+* Added Linear delivery options to monitor `connected_app_params`: team, assignee, delegate, project, resolved status, labels, and auto-resolve
+
 ## 1.17.1
 
 * Fixed `groundcover_synthetic_test` sending `GET /api/synthetics/v1/rules/{id}` with an empty ID — the provider now treats it as not-found instead of matching `GET /api/synthetics/v1/rules/` (which redirects to the list and returns 200)
