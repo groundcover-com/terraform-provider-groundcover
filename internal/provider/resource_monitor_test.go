@@ -618,6 +618,43 @@ func TestMonitorV2MapSDKToModelPreservesEquivalentNotificationDuration(t *testin
 	}
 }
 
+// TestMonitorV2MapSDKToModelPreservesDayWeekDurations is the BE-2449 regression:
+// a config written with "1d"/"1w" must not perpetually diff against the backend's
+// canonical read-back ("24h0m0s"/"168h0m0s"). The preserve machinery normalizes
+// both sides and keeps the configured string.
+func TestMonitorV2MapSDKToModelPreservesDayWeekDurations(t *testing.T) {
+	ctx := context.Background()
+	title := "duration monitor"
+	pendingFor := models.Duration(7 * 24 * time.Hour) // 1w
+	remote := &models.UpdateMonitorRequest{
+		Title:           &title,
+		Severity:        "critical",
+		MeasurementType: "state",
+		EvaluationInterval: &models.EvaluationInterval{
+			Interval:   strfmt.Duration(24 * time.Hour), // 1d
+			PendingFor: &pendingFor,
+		},
+	}
+
+	state := monitorV2ResourceModel{
+		EvaluationInterval: &monitorV2EvaluationIntervalModel{
+			Interval:   types.StringValue("1d"),
+			PendingFor: types.StringValue("1w"),
+		},
+	}
+	var diags diag.Diagnostics
+	mapMonitorV2SDKToModel(ctx, "monitor-id", remote, &state, &diags)
+	if diags.HasError() {
+		t.Fatalf("mapMonitorV2SDKToModel() diagnostics: %v", diags)
+	}
+	if state.EvaluationInterval.Interval.ValueString() != "1d" {
+		t.Fatalf("state.EvaluationInterval.Interval = %q, want 1d", state.EvaluationInterval.Interval.ValueString())
+	}
+	if state.EvaluationInterval.PendingFor.ValueString() != "1w" {
+		t.Fatalf("state.EvaluationInterval.PendingFor = %q, want 1w", state.EvaluationInterval.PendingFor.ValueString())
+	}
+}
+
 func TestMonitorV2DurationNormalizationPreservesZero(t *testing.T) {
 	if got := monitorV2DurationToType(0).ValueString(); got != "0m" {
 		t.Fatalf("monitorV2DurationToType(0) = %q, want 0m", got)
@@ -888,6 +925,20 @@ func TestAccMonitorV2Resource(t *testing.T) {
 				PlanOnly:           true,
 				ExpectNonEmptyPlan: false,
 			},
+			// BE-2449: day/week units must not perpetually diff against the
+			// backend's canonical hour-based read-back ("1d"->24h0m0s, "1w"->168h0m0s).
+			{
+				Config: testAccMonitorV2ResourceDayWeekDurationConfig(updatedName),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					resource.TestCheckResourceAttr("groundcover_monitor_v2.test", "evaluation_interval.interval", "1d"),
+					resource.TestCheckResourceAttr("groundcover_monitor_v2.test", "evaluation_interval.pending_for", "1w"),
+				),
+			},
+			{
+				Config:             testAccMonitorV2ResourceDayWeekDurationConfig(updatedName),
+				PlanOnly:           true,
+				ExpectNonEmptyPlan: false,
+			},
 		},
 	})
 }
@@ -1101,6 +1152,51 @@ resource "groundcover_monitor_v2" "test" {
   evaluation_interval {
     interval    = "60 seconds"
     pending_for = "1 minute"
+  }
+
+  execution_error_state = "OK"
+  no_data_state         = "OK"
+}
+`, name)
+}
+
+func testAccMonitorV2ResourceDayWeekDurationConfig(name string) string {
+	return fmt.Sprintf(`
+resource "groundcover_monitor_v2" "test" {
+  title            = %[1]q
+  severity         = "critical"
+  measurement_type = "state"
+
+  display {
+    header      = %[1]q
+    description = "Test monitor created by acceptance tests"
+  }
+
+  query {
+    type       = "metricsql"
+    expression = "sum(groundcover_kube_pod_container_status_running{})"
+
+    relative_timerange {
+      from = "-5 minutes"
+      to   = "0m"
+    }
+
+    rollup {
+      function = "last"
+      time     = "5 minutes"
+    }
+  }
+
+  threshold {
+    name       = "threshold_1"
+    input_name = "threshold_input_query"
+    operator   = "gt"
+    values     = [1]
+  }
+
+  evaluation_interval {
+    interval    = "1d"
+    pending_for = "1w"
   }
 
   execution_error_state = "OK"
