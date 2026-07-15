@@ -386,6 +386,31 @@ func TestNormalizeTimeString(t *testing.T) {
 			expected: "168h",
 		},
 		{
+			name:     "1w should normalize to 168h",
+			input:    "1w",
+			expected: "168h",
+		},
+		{
+			name:     "2w should normalize to 336h",
+			input:    "2w",
+			expected: "336h",
+		},
+		{
+			name:     "1w4h should normalize to 172h",
+			input:    "1w4h",
+			expected: "172h",
+		},
+		{
+			name:     "digits inside identifier should not be mutated (week)",
+			input:    "name: field1w",
+			expected: "name: field1w",
+		},
+		{
+			name:     "pendingFor with 1w",
+			input:    "pendingFor: 1w",
+			expected: "pendingFor: 168h",
+		},
+		{
 			name:     "pendingFor with 1d",
 			input:    "pendingFor: 1d",
 			expected: "pendingFor: 24h",
@@ -1133,6 +1158,45 @@ severity: S1
 				t.Errorf("removeExtraNewlines() mismatch.\nExpected:\n%q\n\nGot:\n%q", tt.expected, result)
 			}
 		})
+	}
+}
+
+// TestNormalizeMonitorYaml_ScopedDurationNormalization verifies day/week duration
+// scalars are converted to hours only for actual duration fields, while non-duration
+// fields are left untouched — even when their value is exactly a duration token, and
+// even when free text merely contains one (BE-2449 scoped fix).
+func TestNormalizeMonitorYaml_ScopedDurationNormalization(t *testing.T) {
+	ctx := context.Background()
+
+	input := `title: 1w
+evaluationInterval:
+  interval: 1d
+  pendingFor: 1w
+description: retry after 1w
+renotificationInterval: "2w"
+labels:
+  window: 1w`
+
+	got, err := NormalizeMonitorYaml(ctx, input)
+	if err != nil {
+		t.Fatalf("NormalizeMonitorYaml() error: %v", err)
+	}
+
+	mustContain := []string{
+		"interval: 24h",                  // duration field converted
+		"pendingFor: 168h",               // duration field converted
+		`renotificationInterval: "336h"`, // duration field converted (quoted)
+		"title: 1w",                      // non-duration field, exact token: preserved
+		"description: retry after 1w",    // free text: preserved
+		"window: 1w",                     // non-duration label, exact token: preserved
+	}
+	for _, want := range mustContain {
+		if !strings.Contains(got, want) {
+			t.Errorf("normalized YAML missing %q\ngot:\n%s", want, got)
+		}
+	}
+	if strings.Contains(got, "retry after 168h") {
+		t.Errorf("free-text description was corrupted:\n%s", got)
 	}
 }
 
