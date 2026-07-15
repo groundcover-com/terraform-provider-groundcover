@@ -3,6 +3,7 @@
 * Added `groundcover_recurring_silence` — silences that repeat daily, weekly, or monthly, with per-day timeframes and a timezone
 * Updated groundcover SDK to v1.345.0
 * Added Linear delivery options to monitor `connected_app_params`: team, assignee, delegate, project, resolved status, labels, and auto-resolve
+* Added `groundcover_skill` for managing organizational Agent Skills, including import and drift reconciliation. Managing Skills requires an admin service account
 * Fixed perpetual plan diffs on monitor resources when using `w` (week) duration units like `1w`, which now round-trip cleanly instead of drifting against the backend's canonical hours. Duration normalization for `groundcover_monitor` is now scoped to the actual duration fields, so other fields (e.g. a title or description containing "1w") are no longer rewritten
 
 ## 1.17.1

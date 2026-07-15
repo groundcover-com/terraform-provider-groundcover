@@ -254,6 +254,12 @@ type ApiClient interface {
 	GetSyntheticTest(ctx context.Context, id string) (*models.SyntheticTestCreateRequest, error)
 	UpdateSyntheticTest(ctx context.Context, id string, req *models.SyntheticTestCreateRequest) error
 	DeleteSyntheticTest(ctx context.Context, id string) error
+
+	// Agent Skills
+	CreateSkill(ctx context.Context, req *models.AgentSkillRequest) (*models.AgentSkillDetail, error)
+	GetSkill(ctx context.Context, id string) (*models.AgentSkillDetail, error)
+	UpdateSkill(ctx context.Context, id string, req *models.AgentSkillRequest) (*models.AgentSkillDetail, error)
+	DeleteSkill(ctx context.Context, id string) error
 }
 
 // SdkClientWrapper implements ApiClient using the Groundcover Go SDK.
@@ -439,6 +445,16 @@ func handleApiError(ctx context.Context, err error, operation string, resourceId
 	if operation == "DeleteConnectedApp" && (statusCode == http.StatusConflict || strings.Contains(lowerErrStr, "conflict")) {
 		tflog.Warn(ctx, "Detected 409 Conflict during DeleteConnectedApp, connected app is referenced by notification routes.", logFields)
 		return fmt.Errorf("cannot delete connected app '%s': it is referenced by one or more notification routes. Remove the references first", resourceId)
+	}
+
+	if strings.HasSuffix(operation, "Skill") && statusCode == http.StatusForbidden {
+		tflog.Warn(ctx, "Skill operation requires an admin service account.", logFields)
+		return fmt.Errorf("managing organizational Skills requires a service account with the admin role")
+	}
+
+	if (operation == "CreateSkill" || operation == "UpdateSkill") && (statusCode == http.StatusConflict || strings.Contains(lowerErrStr, "conflict")) {
+		tflog.Warn(ctx, "Detected Skill name conflict.", logFields)
+		return fmt.Errorf("organizational Skill name %q is already in use; choose a different name", resourceId)
 	}
 
 	if statusCode == http.StatusNotFound {
