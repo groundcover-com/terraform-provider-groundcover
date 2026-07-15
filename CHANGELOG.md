@@ -1,3 +1,7 @@
+## 1.18.1
+
+* Documented the `connected_app_params` Linear delivery options so they show up in the Crossplane provider
+
 ## 1.18.0
 
 * Added `groundcover_recurring_silence` — silences that repeat daily, weekly, or monthly, with per-day timeframes and a timezone
