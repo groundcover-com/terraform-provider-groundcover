@@ -30,10 +30,11 @@ resource "groundcover_monitor_v2" "gcql_logs" {
   }
 
   query {
-    type           = "gcql"
-    data_type      = "logs"
-    expression     = "level:error | stats count() count_all_result"
-    instant_rollup = "5m"
+    type             = "gcql"
+    data_type        = "logs"
+    expression       = "level:error | stats count() count_all_result"
+    instant_rollup   = "5m"
+    evaluation_delay = "15m"
   }
 
   threshold {
@@ -359,6 +360,7 @@ Optional:
 - `data_type` (String) GCQL data type. Required when `type = "gcql"`. Supported values: `logs`, `traces`, `events`, `apm`.
 - `datasource_id` (String) Optional datasource identifier for raw queries.
 - `datasource_type` (String) Metrics datasource type for MetricsQL. Defaults to `prometheus` when `type = "metricsql"`.
+- `evaluation_delay` (String) Evaluation delay as a duration from `0s` to `1h`, whole seconds only, for example `15m` or `900s`. Delays query evaluation to account for late-arriving data.
 - `instant_rollup` (String) GCQL rollup window used to add the monitor evaluation time bucket, for example `5m` or `5 minutes`.
 - `name` (String) Query name. Defaults to `threshold_input_query`.
 - `query_type` (String) Query execution type for MetricsQL or raw SQL. Defaults to `instant`.
