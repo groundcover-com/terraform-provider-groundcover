@@ -1,3 +1,7 @@
+## 1.19.0
+
+* Added `query.evaluation_delay` to `groundcover_monitor_v2` and `groundcover_monitor_v2_json` — an optional evaluation delay expressed as a duration from `0s` to `1h` (e.g. `15m`, `900s`; whole seconds only, the backend limit is 3600 seconds) that delays query evaluation to account for late-arriving data. Sent on create/update and read back during refresh and import
+
 ## 1.18.1
 
 * Documented the `connected_app_params` Linear delivery options so they show up in the Crossplane provider
