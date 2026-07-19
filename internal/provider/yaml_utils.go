@@ -34,14 +34,35 @@ var (
 	// These are converted to Go duration format during normalization
 	humanDurationRegex = regexp.MustCompile(`(\d+)\s+(days?|hours?|minutes?|seconds?)`)
 
-	// Match day durations like "1d", "7d", or "1d4h". Day is not a Go duration
-	// unit, so we convert it (and merge into any trailing hours) before
-	// time.ParseDuration sees it. Forms with minutes or seconds (e.g. "1d30m")
-	// are intentionally not supported and are left for time.ParseDuration to
-	// reject downstream. The left word boundary prevents matching digits inside
-	// identifiers (e.g. "field1d"); the right boundary ensures the trailing
-	// unit is a complete token.
-	dayDurationRegex = regexp.MustCompile(`\b(\d+)d(?:(\d+)h)?\b`)
+	// Match day/week durations like "1d", "7d", "1d4h", "1w", or "2w4h". Neither
+	// "d" nor "w" is a Go duration unit, so we convert them (and merge into any
+	// trailing hours) before time.ParseDuration sees it. Forms with minutes or
+	// seconds (e.g. "1d30m") are intentionally not supported and are left for
+	// time.ParseDuration to reject downstream. The left word boundary prevents
+	// matching digits inside identifiers (e.g. "field1d"); the right boundary
+	// ensures the trailing unit is a complete token.
+	dayDurationRegex = regexp.MustCompile(`\b(\d+)([dw])(?:(\d+)h)?\b`)
+
+	// Match a scalar whose ENTIRE value is a bare day/week duration ("1d", "7d",
+	// "1d4h", "1w", "2w4h"). Anchored on both ends so free-text values that merely
+	// contain such a token (e.g. "retry after 1w") never match. Used for scoped,
+	// per-scalar normalization of parsed YAML values (see normalizeDurationScalar).
+	fullDayWeekDurationRegex = regexp.MustCompile(`^(\d+)([dw])(?:(\d+)h)?$`)
+
+	// monitorDurationKeys are the monitor YAML fields whose scalar values are
+	// durations, mirroring the fields the typed monitor_v2 resource normalizes.
+	// Only values under these keys are day/week-normalized, so free-text fields
+	// (title, description, labels, ...) are never rewritten. Keys are matched by
+	// leaf name; in the monitor schema these names only ever carry durations.
+	monitorDurationKeys = map[string]bool{
+		"interval":               true, // evaluationInterval.interval
+		"pendingFor":             true, // evaluationInterval.pendingFor
+		"renotificationInterval": true, // notificationSettings.renotificationInterval
+		"instantRollup":          true, // query.instantRollup
+		"time":                   true, // query.rollup.time
+		"from":                   true, // relativeTimerange.from
+		"to":                     true, // relativeTimerange.to
+	}
 )
 
 // NormalizeMonitorYaml sorts keys in a YAML string alphabetically using AST manipulation.
@@ -53,13 +74,10 @@ func NormalizeMonitorYaml(ctx context.Context, yamlString string) (string, error
 		return "", nil
 	}
 
-	// Convert day tokens like "1d" or composite forms like "1d4h" into Go
-	// duration format before downstream parsing, since time.ParseDuration does
-	// not accept the "d" unit. Human-readable forms ("1 day") are handled
-	// separately by normalizeHumanDurations to avoid mutating free-text fields.
-	yamlString = normalizeDayDurations(yamlString)
-
-	// Parse with AST approach to preserve comments and handle complex structures
+	// Parse with AST approach to preserve comments and handle complex structures.
+	// Day/week tokens ("1d", "1w") are converted to hours later, per scalar value
+	// (see sortAstNodeGoccy), so free-text fields like descriptions are never
+	// mutated — only whole-value duration scalars are.
 	file, err := parser.ParseBytes([]byte(yamlString), parser.ParseComments)
 	if err != nil {
 		tflog.Error(ctx, "Failed to parse YAML in NormalizeMonitorYaml", map[string]interface{}{
@@ -106,9 +124,17 @@ func sortAstNodeGoccy(node ast.Node) {
 		})
 		// Recursively sort all values
 		for _, valNode := range n.Values {
-			if valNode.Value != nil {
-				sortAstNodeGoccy(valNode.Value)
+			if valNode.Value == nil {
+				continue
 			}
+			// Scoped duration normalization: rewrite day/week scalars to hours
+			// only for keys that are actually duration fields (mirrors the typed
+			// monitor_v2 behavior). Non-duration fields like title/description are
+			// left untouched regardless of their value.
+			if sn, ok := valNode.Value.(*ast.StringNode); ok && monitorDurationKeys[getStringKeyFromNode(valNode.Key)] {
+				sn.Value = normalizeDurationScalar(sn.Value)
+			}
+			sortAstNodeGoccy(valNode.Value)
 		}
 	case *ast.SequenceNode:
 		// NOTE: We do NOT sort the sequence elements themselves (n.Values slice)
@@ -750,23 +776,28 @@ func normalizeHumanDurations(s string) string {
 	})
 }
 
-// normalizeDayDurations converts day durations like "1d", "7d", or "1d4h"
-// into hours, since Go's time.ParseDuration does not understand the "d" unit.
-// Composite forms with minutes/seconds (e.g. "1d30m") are not supported and
-// will fail downstream parsing — users should write "24h30m" instead.
+// normalizeDayDurations converts day/week durations like "1d", "7d", "1d4h",
+// "1w", or "2w4h" into hours, since Go's time.ParseDuration understands neither
+// the "d" nor the "w" unit. Composite forms with minutes/seconds (e.g. "1d30m")
+// are not supported and will fail downstream parsing — users should write
+// "24h30m" instead.
 func normalizeDayDurations(s string) string {
 	return dayDurationRegex.ReplaceAllStringFunc(s, func(match string) string {
 		parts := dayDurationRegex.FindStringSubmatch(match)
-		if len(parts) != 3 {
+		if len(parts) != 4 {
 			return match
 		}
-		days, err := strconv.Atoi(parts[1])
+		n, err := strconv.Atoi(parts[1])
 		if err != nil {
 			return match
 		}
-		totalHours := days * 24
-		if parts[2] != "" {
-			h, err := strconv.Atoi(parts[2])
+		hoursPerUnit := 24
+		if parts[2] == "w" {
+			hoursPerUnit = 24 * 7
+		}
+		totalHours := n * hoursPerUnit
+		if parts[3] != "" {
+			h, err := strconv.Atoi(parts[3])
 			if err != nil {
 				return match
 			}
@@ -774,6 +805,36 @@ func normalizeDayDurations(s string) string {
 		}
 		return strconv.Itoa(totalHours) + "h"
 	})
+}
+
+// normalizeDurationScalar converts a scalar whose entire value is a bare
+// day/week duration ("1d", "7d", "1d4h", "1w", "2w4h") into hours, since Go's
+// time.ParseDuration understands neither "d" nor "w". Values that are not
+// exactly such a token (e.g. "5m", "1h30m", or free text) are returned
+// unchanged. Callers additionally gate this to known duration fields (see
+// monitorDurationKeys). Composite forms with minutes/seconds are not supported.
+func normalizeDurationScalar(value string) string {
+	parts := fullDayWeekDurationRegex.FindStringSubmatch(value)
+	if parts == nil {
+		return value
+	}
+	n, err := strconv.Atoi(parts[1])
+	if err != nil {
+		return value
+	}
+	hoursPerUnit := 24
+	if parts[2] == "w" {
+		hoursPerUnit = 24 * 7
+	}
+	totalHours := n * hoursPerUnit
+	if parts[3] != "" {
+		h, err := strconv.Atoi(parts[3])
+		if err != nil {
+			return value
+		}
+		totalHours += h
+	}
+	return strconv.Itoa(totalHours) + "h"
 }
 
 // normalizeTimeString normalizes a single time string

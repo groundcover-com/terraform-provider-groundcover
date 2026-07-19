@@ -228,3 +228,34 @@ resource "groundcover_monitor_v2" "gcql_logs" {
 #### Attributes
 
 *   `id` (String): Monitor identifier (UUID).
+
+### `groundcover_skill`
+
+Manages an organizational groundcover Agent Skill. Managing organizational Skills requires an admin service account.
+
+#### Example Usage
+
+```hcl
+resource "groundcover_skill" "incident_response" {
+  name         = "incident-response"
+  description  = "A repeatable workflow for investigating production incidents."
+  when_to_use  = "Use when investigating an active production incident or responding to an alert."
+  instructions = "Review alerts, correlate telemetry and deployments, then summarize the evidence and next actions."
+}
+```
+
+#### Arguments
+
+*   `name` (String, Required): Skill name, unique case-insensitively within the organization.
+*   `when_to_use` (String, Required): Guidance that tells the Agent when to use the Skill.
+*   `instructions` (String, Required): Instructions the Agent follows when using the Skill.
+*   `description` (String, Optional): Human-readable Skill description.
+
+#### Attributes
+
+*   `id` (String): Skill UUID, used for import.
+*   `identifier` (String): Stable display identifier returned by the API.
+*   `revision` (Number): Current Skill revision.
+*   `is_organizational` (Boolean): Whether the Skill is available to the organization.
+*   `is_provisioned` (Boolean): Whether the Skill is managed by an external provisioner.
+*   `created_at`, `created_by`, `updated_at`, and `updated_by`: Audit metadata returned by the API.

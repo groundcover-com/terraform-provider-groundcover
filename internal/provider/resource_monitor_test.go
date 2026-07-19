@@ -63,10 +63,11 @@ measurementType: state`
 func TestMonitorV2BuildCreateRequestGCQL(t *testing.T) {
 	ctx := context.Background()
 	plan := testMonitorV2BasePlan(t, &monitorV2QueryModel{
-		Type:          types.StringValue(monitorV2QueryTypeGCQL),
-		Expression:    types.StringValue(`level:error | stats count() count_all_result`),
-		DataType:      types.StringValue("logs"),
-		InstantRollup: types.StringValue("5 minutes"),
+		Type:            types.StringValue(monitorV2QueryTypeGCQL),
+		Expression:      types.StringValue(`level:error | stats count() count_all_result`),
+		DataType:        types.StringValue("logs"),
+		InstantRollup:   types.StringValue("5 minutes"),
+		EvaluationDelay: types.StringValue("15m"),
 	})
 
 	req, diags := buildMonitorV2CreateRequest(ctx, &plan)
@@ -91,6 +92,9 @@ func TestMonitorV2BuildCreateRequestGCQL(t *testing.T) {
 	}
 	if query.InstantRollup != "5m" {
 		t.Fatalf("query.InstantRollup = %q, want 5m", query.InstantRollup)
+	}
+	if query.EvaluationDelay == nil || *query.EvaluationDelay != 900 {
+		t.Fatalf("query.EvaluationDelay = %v, want 900", query.EvaluationDelay)
 	}
 	requireNoInternalMonitorV2Annotations(t, req.Annotations)
 }
@@ -149,7 +153,49 @@ func TestMonitorV2BuildCreateRequestMetricsQL(t *testing.T) {
 	if time.Duration(query.Rollup.Time) != 5*time.Minute {
 		t.Fatalf("query.Rollup.Time = %s, want 5m", time.Duration(query.Rollup.Time))
 	}
+	if query.EvaluationDelay != nil {
+		t.Fatalf("query.EvaluationDelay = %v, want nil when unset", *query.EvaluationDelay)
+	}
 	requireNoInternalMonitorV2Annotations(t, req.Annotations)
+}
+
+func TestMonitorV2EvaluationDelayBounds(t *testing.T) {
+	cases := []struct {
+		input     string
+		wantOK    bool
+		wantValue int64
+	}{
+		{"0s", true, 0},
+		{"3600s", true, 3600},
+		{"1h", true, 3600},
+		{"15m", true, 900},
+		{"3601s", false, 0},
+		{"-1s", false, 0},
+		{"1500ms", false, 0},
+		{"not-a-duration", false, 0},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.input, func(t *testing.T) {
+			var diags diag.Diagnostics
+			got := monitorV2EvaluationDelayToSDK(types.StringValue(tc.input), &diags)
+			if tc.wantOK {
+				if diags.HasError() {
+					t.Fatalf("unexpected diagnostics for %q: %v", tc.input, diags)
+				}
+				if got == nil || *got != tc.wantValue {
+					t.Fatalf("evaluation_delay %q = %v, want %d", tc.input, got, tc.wantValue)
+				}
+				return
+			}
+			if !diags.HasError() {
+				t.Fatalf("expected error diagnostics for %q, got none", tc.input)
+			}
+			if got != nil {
+				t.Fatalf("expected nil result for invalid %q, got %d", tc.input, *got)
+			}
+		})
+	}
 }
 
 func TestMonitorV2BuildCreateRequestRawSQL(t *testing.T) {
@@ -618,6 +664,43 @@ func TestMonitorV2MapSDKToModelPreservesEquivalentNotificationDuration(t *testin
 	}
 }
 
+// TestMonitorV2MapSDKToModelPreservesDayWeekDurations is the BE-2449 regression:
+// a config written with "1d"/"1w" must not perpetually diff against the backend's
+// canonical read-back ("24h0m0s"/"168h0m0s"). The preserve machinery normalizes
+// both sides and keeps the configured string.
+func TestMonitorV2MapSDKToModelPreservesDayWeekDurations(t *testing.T) {
+	ctx := context.Background()
+	title := "duration monitor"
+	pendingFor := models.Duration(7 * 24 * time.Hour) // 1w
+	remote := &models.UpdateMonitorRequest{
+		Title:           &title,
+		Severity:        "critical",
+		MeasurementType: "state",
+		EvaluationInterval: &models.EvaluationInterval{
+			Interval:   strfmt.Duration(24 * time.Hour), // 1d
+			PendingFor: &pendingFor,
+		},
+	}
+
+	state := monitorV2ResourceModel{
+		EvaluationInterval: &monitorV2EvaluationIntervalModel{
+			Interval:   types.StringValue("1d"),
+			PendingFor: types.StringValue("1w"),
+		},
+	}
+	var diags diag.Diagnostics
+	mapMonitorV2SDKToModel(ctx, "monitor-id", remote, &state, &diags)
+	if diags.HasError() {
+		t.Fatalf("mapMonitorV2SDKToModel() diagnostics: %v", diags)
+	}
+	if state.EvaluationInterval.Interval.ValueString() != "1d" {
+		t.Fatalf("state.EvaluationInterval.Interval = %q, want 1d", state.EvaluationInterval.Interval.ValueString())
+	}
+	if state.EvaluationInterval.PendingFor.ValueString() != "1w" {
+		t.Fatalf("state.EvaluationInterval.PendingFor = %q, want 1w", state.EvaluationInterval.PendingFor.ValueString())
+	}
+}
+
 func TestMonitorV2DurationNormalizationPreservesZero(t *testing.T) {
 	if got := monitorV2DurationToType(0).ValueString(); got != "0m" {
 		t.Fatalf("monitorV2DurationToType(0) = %q, want 0m", got)
@@ -852,6 +935,7 @@ func TestAccMonitorV2Resource(t *testing.T) {
 					resource.TestCheckResourceAttr("groundcover_monitor_v2.test", "query.type", monitorV2QueryTypeGCQL),
 					resource.TestCheckResourceAttr("groundcover_monitor_v2.test", "query.data_type", "logs"),
 					resource.TestCheckResourceAttr("groundcover_monitor_v2.test", "query.instant_rollup", "5m"),
+					resource.TestCheckResourceAttr("groundcover_monitor_v2.test", "query.evaluation_delay", "15m"),
 					resource.TestCheckResourceAttr("groundcover_monitor_v2.test", "threshold.#", "1"),
 				),
 			},
@@ -885,6 +969,20 @@ func TestAccMonitorV2Resource(t *testing.T) {
 			},
 			{
 				Config:             testAccMonitorV2ResourceHumanDurationConfig(updatedName),
+				PlanOnly:           true,
+				ExpectNonEmptyPlan: false,
+			},
+			// BE-2449: day/week units must not perpetually diff against the
+			// backend's canonical hour-based read-back ("1d"->24h0m0s, "1w"->168h0m0s).
+			{
+				Config: testAccMonitorV2ResourceDayWeekDurationConfig(updatedName),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					resource.TestCheckResourceAttr("groundcover_monitor_v2.test", "evaluation_interval.interval", "1d"),
+					resource.TestCheckResourceAttr("groundcover_monitor_v2.test", "evaluation_interval.pending_for", "1w"),
+				),
+			},
+			{
+				Config:             testAccMonitorV2ResourceDayWeekDurationConfig(updatedName),
 				PlanOnly:           true,
 				ExpectNonEmptyPlan: false,
 			},
@@ -995,10 +1093,11 @@ resource "groundcover_monitor_v2" "test" {
   }
 
   query {
-    type           = "gcql"
-    data_type      = "logs"
-    expression     = "level:error | stats count() count_all_result"
-    instant_rollup = "5m"
+    type             = "gcql"
+    data_type        = "logs"
+    expression       = "level:error | stats count() count_all_result"
+    instant_rollup   = "5m"
+    evaluation_delay = "15m"
   }
 
   threshold {
@@ -1101,6 +1200,51 @@ resource "groundcover_monitor_v2" "test" {
   evaluation_interval {
     interval    = "60 seconds"
     pending_for = "1 minute"
+  }
+
+  execution_error_state = "OK"
+  no_data_state         = "OK"
+}
+`, name)
+}
+
+func testAccMonitorV2ResourceDayWeekDurationConfig(name string) string {
+	return fmt.Sprintf(`
+resource "groundcover_monitor_v2" "test" {
+  title            = %[1]q
+  severity         = "critical"
+  measurement_type = "state"
+
+  display {
+    header      = %[1]q
+    description = "Test monitor created by acceptance tests"
+  }
+
+  query {
+    type       = "metricsql"
+    expression = "sum(groundcover_kube_pod_container_status_running{})"
+
+    relative_timerange {
+      from = "-5 minutes"
+      to   = "0m"
+    }
+
+    rollup {
+      function = "last"
+      time     = "5 minutes"
+    }
+  }
+
+  threshold {
+    name       = "threshold_1"
+    input_name = "threshold_input_query"
+    operator   = "gt"
+    values     = [1]
+  }
+
+  evaluation_interval {
+    interval    = "1d"
+    pending_for = "1w"
   }
 
   execution_error_state = "OK"

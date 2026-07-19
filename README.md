@@ -12,6 +12,8 @@ Basic usage examples can be found in the `examples/` directory:
     *   Shows how to create and manage service accounts with associated policies.
 *   **API Key Resource:** [`examples/resources/groundcover_apikey/resource.tf`](./examples/resources/groundcover_apikey/resource.tf)
     *   Illustrates API key creation and management for service accounts.
+*   **Skill Resource:** [`examples/resources/groundcover_skill/resource.tf`](./examples/resources/groundcover_skill/resource.tf)
+    *   Demonstrates how to manage an organizational Agent Skill using an admin service account.
 *   **Monitor V2 Resource:** [`examples/resources/groundcover_monitor_v2/resource.tf`](./examples/resources/groundcover_monitor_v2/resource.tf)
     *   Provides typed monitor examples for GCQL, MetricsQL, raw SQL, custom resolve thresholds, and connected-app delivery params.
 *   **Monitor V2 (JSON) Resource:** [`examples/resources/groundcover_monitor_v2_json/resource.tf`](./examples/resources/groundcover_monitor_v2_json/resource.tf)
@@ -266,6 +268,7 @@ TF_ACC=1 go test ./internal/provider -v -run TestAccTracesPipelineResource
 TF_ACC=1 go test ./internal/provider -v -run TestAccSilenceResource
 TF_ACC=1 go test ./internal/provider -v -run TestAccRecurringSilenceResource
 TF_ACC=1 go test ./internal/provider -v -run TestAccConnectedAppJson
+TF_ACC=1 go test ./internal/provider -v -run TestAccSkillResource
 
 # Run unit tests only (no API calls required)
 go test ./internal/provider -v

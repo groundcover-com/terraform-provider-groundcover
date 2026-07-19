@@ -74,6 +74,8 @@ jobs:
             run_regex: '^TestAcc(ApiKeyResource|IngestionKeyResource|PolicyResource|ServiceAccountResource).*$'
           - name: secret
             run_regex: '^TestAccSecretResource.*$'
+          - name: skill
+            run_regex: '^TestAccSkillResource.*$'
           - name: silence
             run_regex: '^TestAcc(Recurring)?SilenceResource.*$'
           - name: synthetic-test
