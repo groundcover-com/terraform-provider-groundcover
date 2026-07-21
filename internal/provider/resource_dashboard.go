@@ -6,6 +6,7 @@ import (
 	"fmt"
 
 	"github.com/groundcover-com/groundcover-sdk-go/pkg/models"
+	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
@@ -36,6 +37,7 @@ type dashboardResourceModel struct {
 	Description    types.String `tfsdk:"description"`
 	Team           types.String `tfsdk:"team"`
 	Preset         types.String `tfsdk:"preset"`
+	Tags           types.List   `tfsdk:"tags"`
 	RevisionNumber types.Int32  `tfsdk:"revision_number"`
 	Override       types.Bool   `tfsdk:"override"`
 	Owner          types.String `tfsdk:"owner"`
@@ -72,6 +74,11 @@ func (r *dashboardResource) Schema(_ context.Context, _ resource.SchemaRequest, 
 			"preset": schema.StringAttribute{
 				Description: "The preset configuration for the dashboard.",
 				Required:    true,
+			},
+			"tags": schema.ListAttribute{
+				Description: "Free-text tags for organizing the dashboard. Order and casing are preserved; each tag is trimmed of surrounding whitespace and exact duplicates are dropped. Omit or leave unset for an untagged dashboard.",
+				Optional:    true,
+				ElementType: types.StringType,
 			},
 			"revision_number": schema.Int32Attribute{
 				Description: "The revision number of the dashboard.",
@@ -133,11 +140,18 @@ func (r *dashboardResource) Create(ctx context.Context, req resource.CreateReque
 		"plan_preset_preview": getPreview(planPresetStr, 200),
 	})
 
+	tags, tagDiags := tagsToStringSlice(ctx, plan.Tags)
+	resp.Diagnostics.Append(tagDiags...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+
 	createReq := &models.CreateDashboardRequest{
 		Name:          plan.Name.ValueString(),
 		Description:   plan.Description.ValueString(),
 		Team:          plan.Team.ValueString(),
 		Preset:        planPresetStr,
+		Tags:          tags,
 		IsProvisioned: true,
 	}
 
@@ -208,6 +222,12 @@ func (r *dashboardResource) Create(ctx context.Context, req resource.CreateReque
 	plan.Owner = types.StringValue(dashboard.Owner)
 	plan.Status = types.StringValue(dashboard.Status)
 	plan.RevisionNumber = types.Int32Value(dashboard.RevisionNumber)
+
+	plan.Tags, tagDiags = tagsToState(ctx, dashboard.Tags, plan.Tags)
+	resp.Diagnostics.Append(tagDiags...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
 
 	tflog.Debug(ctx, "Dashboard created - setting state", map[string]interface{}{
 		"uuid":            dashboard.UUID,
@@ -331,6 +351,13 @@ func (r *dashboardResource) Read(ctx context.Context, req resource.ReadRequest, 
 	state.Owner = types.StringValue(dashboard.Owner)
 	state.Status = types.StringValue(dashboard.Status)
 
+	tagsValue, tagDiags := tagsToState(ctx, dashboard.Tags, state.Tags)
+	resp.Diagnostics.Append(tagDiags...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+	state.Tags = tagsValue
+
 	diags = resp.State.Set(ctx, &state)
 	resp.Diagnostics.Append(diags...)
 }
@@ -384,11 +411,18 @@ func (r *dashboardResource) Update(ctx context.Context, req resource.UpdateReque
 	// Build update request - always use plan values for all fields
 	// Use Override: true since Terraform is the source of truth.
 	// Don't send CurrentRevision — the API rejects it with excluded_if when Override is true.
+	tags, tagDiags := tagsToStringSlice(ctx, plan.Tags)
+	resp.Diagnostics.Append(tagDiags...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+
 	updateReq := &models.UpdateDashboardRequest{
 		Name:          plan.Name.ValueString(),
 		Description:   plan.Description.ValueString(),
 		Team:          plan.Team.ValueString(),
 		Preset:        plan.Preset.ValueString(),
+		Tags:          tags,
 		IsProvisioned: true,
 		Override:      true,
 	}
@@ -523,6 +557,12 @@ func (r *dashboardResource) Update(ctx context.Context, req resource.UpdateReque
 	plan.Status = types.StringValue(dashboard.Status)
 	plan.RevisionNumber = types.Int32Value(dashboard.RevisionNumber)
 
+	plan.Tags, tagDiags = tagsToState(ctx, dashboard.Tags, plan.Tags)
+	resp.Diagnostics.Append(tagDiags...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+
 	// Log final state that will be saved
 	tflog.Debug(ctx, "Update: Final state being saved", map[string]interface{}{
 		"uuid":                 state.UUID.ValueString(),
@@ -615,7 +655,8 @@ func (r *dashboardResource) ModifyPlan(ctx context.Context, req resource.ModifyP
 	// Check if there are any actual changes to the dashboard (excluding preset)
 	hasChanges := !plan.Name.Equal(state.Name) ||
 		!plan.Description.Equal(state.Description) ||
-		!plan.Team.Equal(state.Team)
+		!plan.Team.Equal(state.Team) ||
+		!plan.Tags.Equal(state.Tags)
 
 	plannedPreset := plan.Preset.ValueString()
 	statePreset := state.Preset.ValueString()
@@ -743,6 +784,30 @@ func (r *dashboardResource) ModifyPlan(ctx context.Context, req resource.ModifyP
 	}
 
 	resp.Diagnostics.Append(resp.Plan.Set(ctx, &plan)...)
+}
+
+// tagsToStringSlice converts the Terraform tags list into a []string for the
+// API request. A null or unknown list yields nil so the request omits tags
+// entirely (matching an untagged dashboard).
+func tagsToStringSlice(ctx context.Context, list types.List) ([]string, diag.Diagnostics) {
+	if list.IsNull() || list.IsUnknown() {
+		return nil, nil
+	}
+	tags := make([]string, 0, len(list.Elements()))
+	diags := list.ElementsAs(ctx, &tags, false)
+	return tags, diags
+}
+
+// tagsToState converts an API tag slice back into a Terraform list value.
+// When the API returns no tags and the prior value was null, the value stays
+// null so an unset optional attribute doesn't produce a spurious diff. The
+// backend preserves tag order and casing (it only trims and de-duplicates), so
+// a list the user supplied round-trips unchanged.
+func tagsToState(ctx context.Context, apiTags []string, prior types.List) (types.List, diag.Diagnostics) {
+	if len(apiTags) == 0 && (prior.IsNull() || prior.IsUnknown()) {
+		return types.ListNull(types.StringType), nil
+	}
+	return types.ListValueFrom(ctx, types.StringType, apiTags)
 }
 
 // getPreview returns a preview of a string, useful for logging long JSON strings

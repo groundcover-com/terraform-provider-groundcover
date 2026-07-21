@@ -49,6 +49,7 @@ resource "groundcover_dashboard" "metrics_dashboard" {
   name        = "Terraform Example - Metrics Dashboard"
   description = "Example dashboard showing system metrics"
   team        = "platform"
+  tags        = ["production", "infrastructure"]
 
   # Dashboard preset contains the JSON configuration
   preset = jsonencode({
@@ -203,6 +204,7 @@ output "simple_dashboard_owner" {
 
 - `description` (String) The description of the dashboard.
 - `override` (Boolean, Deprecated) Deprecated: this attribute is ignored. Override is always enabled for terraform-managed updates.
+- `tags` (List of String) Free-text tags for organizing the dashboard. Order and casing are preserved; each tag is trimmed of surrounding whitespace and exact duplicates are dropped. Omit or leave unset for an untagged dashboard.
 - `team` (String) The team that owns the dashboard.
 
 ### Read-Only

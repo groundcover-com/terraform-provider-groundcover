@@ -98,6 +98,47 @@ func TestAccDashboardResource_Update(t *testing.T) {
 	})
 }
 
+func TestAccDashboardResource_Tags(t *testing.T) {
+	timestamp := time.Now().Unix()
+	dashboardName := fmt.Sprintf("tags_dashboard_%d", timestamp)
+
+	resource.Test(t, resource.TestCase{
+		PreCheck:                 func() { testAccPreCheck(t) },
+		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
+		Steps: []resource.TestStep{
+			// Create with tags — order and casing must round-trip unchanged
+			{
+				Config: testAccDashboardResourceConfigWithTags(dashboardName, `["Production", "team-a"]`),
+				Check: resource.ComposeTestCheckFunc(
+					resource.TestCheckResourceAttr("groundcover_dashboard.test", "tags.#", "2"),
+					resource.TestCheckResourceAttr("groundcover_dashboard.test", "tags.0", "Production"),
+					resource.TestCheckResourceAttr("groundcover_dashboard.test", "tags.1", "team-a"),
+				),
+			},
+			// Re-apply identical config — must not produce a perpetual diff
+			{
+				Config:   testAccDashboardResourceConfigWithTags(dashboardName, `["Production", "team-a"]`),
+				PlanOnly: true,
+			},
+			// Update the tag set
+			{
+				Config: testAccDashboardResourceConfigWithTags(dashboardName, `["team-b"]`),
+				Check: resource.ComposeTestCheckFunc(
+					resource.TestCheckResourceAttr("groundcover_dashboard.test", "tags.#", "1"),
+					resource.TestCheckResourceAttr("groundcover_dashboard.test", "tags.0", "team-b"),
+				),
+			},
+			// Remove tags entirely — attribute goes back to unset (null), no diff
+			{
+				Config: testAccDashboardResourceConfigSimple(dashboardName),
+				Check: resource.ComposeTestCheckFunc(
+					resource.TestCheckNoResourceAttr("groundcover_dashboard.test", "tags"),
+				),
+			},
+		},
+	})
+}
+
 func TestAccDashboardResource_EmptyTeam(t *testing.T) {
 	timestamp := time.Now().Unix()
 	dashboardName := fmt.Sprintf("empty_team_dashboard_%d", timestamp)
@@ -475,4 +516,23 @@ resource "groundcover_dashboard" "test" {
   preset      = jsonencode(local.preset_data)
 }
 `, name)
+}
+
+// testAccDashboardResourceConfigWithTags renders a dashboard with a tags list.
+// tagsHCL is an HCL list literal, e.g. `["Production", "team-a"]`.
+func testAccDashboardResourceConfigWithTags(name, tagsHCL string) string {
+	return fmt.Sprintf(`
+resource "groundcover_dashboard" "test" {
+  name        = "%s"
+  description = "Dashboard with tags"
+  tags        = %s
+  preset      = jsonencode({
+    duration      = "Last 1 hour"
+    widgets       = []
+    layout        = []
+    variables     = {}
+    schemaVersion = 3
+  })
+}
+`, name, tagsHCL)
 }

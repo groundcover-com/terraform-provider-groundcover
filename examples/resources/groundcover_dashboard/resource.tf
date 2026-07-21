@@ -34,6 +34,7 @@ resource "groundcover_dashboard" "metrics_dashboard" {
   name        = "Terraform Example - Metrics Dashboard"
   description = "Example dashboard showing system metrics"
   team        = "platform"
+  tags        = ["production", "infrastructure"]
 
   # Dashboard preset contains the JSON configuration
   preset = jsonencode({
