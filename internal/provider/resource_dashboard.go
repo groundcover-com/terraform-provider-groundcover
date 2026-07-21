@@ -4,6 +4,8 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"slices"
+	"strings"
 
 	"github.com/groundcover-com/groundcover-sdk-go/pkg/models"
 	"github.com/hashicorp/terraform-plugin-framework/diag"
@@ -76,7 +78,7 @@ func (r *dashboardResource) Schema(_ context.Context, _ resource.SchemaRequest, 
 				Required:    true,
 			},
 			"tags": schema.ListAttribute{
-				Description: "Free-text tags for organizing the dashboard. Order and casing are preserved; each tag is trimmed of surrounding whitespace and exact duplicates are dropped. Omit or leave unset for an untagged dashboard.",
+				Description: "Free-text tags for organizing the dashboard. Your configured list is preserved as-is in Terraform state; the backend additionally trims surrounding whitespace and drops exact duplicates server-side. Omit or leave unset for an untagged dashboard.",
 				Optional:    true,
 				ElementType: types.StringType,
 			},
@@ -652,7 +654,10 @@ func (r *dashboardResource) ModifyPlan(ctx context.Context, req resource.ModifyP
 		return
 	}
 
-	// Check if there are any actual changes to the dashboard (excluding preset)
+	// Check if there are any actual changes to the dashboard (excluding preset).
+	// tagsToState preserves the user's configured list verbatim in state (see
+	// its doc), so state.Tags mirrors the config and Equal() is the correct
+	// comparison — a genuine edit flips it, an unchanged list does not.
 	hasChanges := !plan.Name.Equal(state.Name) ||
 		!plan.Description.Equal(state.Description) ||
 		!plan.Team.Equal(state.Team) ||
@@ -788,24 +793,60 @@ func (r *dashboardResource) ModifyPlan(ctx context.Context, req resource.ModifyP
 
 // tagsToStringSlice converts the Terraform tags list into a []string for the
 // API request. A null or unknown list yields nil so the request omits tags
-// entirely (matching an untagged dashboard).
+// entirely (matching an untagged dashboard). Non-empty lists are canonicalized
+// (trimmed and de-duplicated) so the request payload matches the shape the
+// backend stores and returns.
 func tagsToStringSlice(ctx context.Context, list types.List) ([]string, diag.Diagnostics) {
 	if list.IsNull() || list.IsUnknown() {
 		return nil, nil
 	}
 	tags := make([]string, 0, len(list.Elements()))
 	diags := list.ElementsAs(ctx, &tags, false)
-	return tags, diags
+	if diags.HasError() {
+		return nil, diags
+	}
+	return canonicalizeTags(tags), diags
+}
+
+// canonicalizeTags mirrors the backend's tag normalization: it trims surrounding
+// whitespace from each tag and drops exact duplicates, preserving the original
+// order and casing. A nil or empty input yields an empty slice.
+func canonicalizeTags(tags []string) []string {
+	seen := make(map[string]struct{}, len(tags))
+	canonical := make([]string, 0, len(tags))
+	for _, tag := range tags {
+		trimmed := strings.TrimSpace(tag)
+		if _, ok := seen[trimmed]; ok {
+			continue
+		}
+		seen[trimmed] = struct{}{}
+		canonical = append(canonical, trimmed)
+	}
+	return canonical
 }
 
 // tagsToState converts an API tag slice back into a Terraform list value.
 // When the API returns no tags and the prior value was null, the value stays
-// null so an unset optional attribute doesn't produce a spurious diff. The
-// backend preserves tag order and casing (it only trims and de-duplicates), so
-// a list the user supplied round-trips unchanged.
+// null so an unset optional attribute doesn't produce a spurious diff. When the
+// user's configured list canonicalizes to exactly the API's list, the prior
+// (configured) value is kept verbatim so the stored state matches the planned
+// config value. Because tags is an Optional, non-computed attribute, storing a
+// normalized value that differed from config would raise "provider produced
+// inconsistent result after apply" and a perpetual diff; preserving the config
+// value (like preset does for JSON formatting) avoids both. Only when the API
+// genuinely diverges from the config is the API value authoritative.
 func tagsToState(ctx context.Context, apiTags []string, prior types.List) (types.List, diag.Diagnostics) {
 	if len(apiTags) == 0 && (prior.IsNull() || prior.IsUnknown()) {
 		return types.ListNull(types.StringType), nil
+	}
+	if !prior.IsNull() && !prior.IsUnknown() {
+		var priorTags []string
+		if diags := prior.ElementsAs(ctx, &priorTags, false); diags.HasError() {
+			return types.ListNull(types.StringType), diags
+		}
+		if slices.Equal(canonicalizeTags(priorTags), apiTags) {
+			return prior, nil
+		}
 	}
 	return types.ListValueFrom(ctx, types.StringType, apiTags)
 }

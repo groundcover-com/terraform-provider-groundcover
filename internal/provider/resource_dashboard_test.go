@@ -106,18 +106,23 @@ func TestAccDashboardResource_Tags(t *testing.T) {
 		PreCheck:                 func() { testAccPreCheck(t) },
 		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
 		Steps: []resource.TestStep{
-			// Create with tags — order and casing must round-trip unchanged
+			// Create with whitespace and a duplicate. The backend trims and
+			// de-duplicates server-side, but the provider preserves the configured
+			// list verbatim in state (like preset preserves JSON formatting), so
+			// the apply is consistent and there is no perpetual diff.
 			{
-				Config: testAccDashboardResourceConfigWithTags(dashboardName, `["Production", "team-a"]`),
+				Config: testAccDashboardResourceConfigWithTags(dashboardName, `[" Production ", "team-a", "Production"]`),
 				Check: resource.ComposeTestCheckFunc(
-					resource.TestCheckResourceAttr("groundcover_dashboard.test", "tags.#", "2"),
-					resource.TestCheckResourceAttr("groundcover_dashboard.test", "tags.0", "Production"),
+					resource.TestCheckResourceAttr("groundcover_dashboard.test", "tags.#", "3"),
+					resource.TestCheckResourceAttr("groundcover_dashboard.test", "tags.0", " Production "),
 					resource.TestCheckResourceAttr("groundcover_dashboard.test", "tags.1", "team-a"),
+					resource.TestCheckResourceAttr("groundcover_dashboard.test", "tags.2", "Production"),
 				),
 			},
-			// Re-apply identical config — must not produce a perpetual diff
+			// Re-apply the same config — state mirrors config, so there is no
+			// perpetual diff even with whitespace and duplicates present.
 			{
-				Config:   testAccDashboardResourceConfigWithTags(dashboardName, `["Production", "team-a"]`),
+				Config:   testAccDashboardResourceConfigWithTags(dashboardName, `[" Production ", "team-a", "Production"]`),
 				PlanOnly: true,
 			},
 			// Update the tag set
@@ -134,6 +139,12 @@ func TestAccDashboardResource_Tags(t *testing.T) {
 				Check: resource.ComposeTestCheckFunc(
 					resource.TestCheckNoResourceAttr("groundcover_dashboard.test", "tags"),
 				),
+			},
+			// Re-apply the tagless config — removal must stay drift-free when the
+			// API returns no tags and state is null.
+			{
+				Config:   testAccDashboardResourceConfigSimple(dashboardName),
+				PlanOnly: true,
 			},
 		},
 	})
