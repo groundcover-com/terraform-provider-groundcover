@@ -1172,7 +1172,11 @@ func mapMonitorV2SDKToModel(ctx context.Context, id string, remote *models.Updat
 	state.MeasurementType = monitorV2NullableString(remote.MeasurementType)
 	state.ExecutionErrorState = monitorV2NullableString(remote.ExecutionErrorState)
 	state.NoDataState = monitorV2NullableString(remote.NoDataState)
-	state.IsPaused = types.BoolPointerValue(remote.IsPaused)
+	// Coalesce nil -> false: is_paused is Optional+Computed, so state must be a known
+	// bool (never null). The backend omits isPaused when false, and BoolPointerValue(nil)
+	// would yield null, which then plans as null and applies as false -> "inconsistent
+	// result". Sending is still pointer-based (monitorV2BoolPtr) so unpause works.
+	state.IsPaused = types.BoolValue(remote.IsPaused != nil && *remote.IsPaused)
 	state.AutoResolve = types.BoolValue(remote.AutoResolve)
 	state.Category = monitorV2NullableString(remote.Category)
 	state.Team = monitorV2NullableString(remote.Team)

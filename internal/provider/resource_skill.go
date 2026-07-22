@@ -222,12 +222,23 @@ func skillModelFromAPI(detail *models.AgentSkillDetail) (skillResourceModel, dia
 	}
 	return skillResourceModel{
 		ID: types.StringValue(*detail.ID), Name: types.StringValue(*detail.Name), WhenToUse: types.StringValue(*detail.WhenToUse),
-		Description: types.StringPointerValue(detail.Description), Instructions: types.StringValue(*detail.Instructions),
-		Identifier: types.StringPointerValue(detail.Identifier), Revision: types.Int64Value(*detail.Revision),
+		Description: skillString(detail.Description), Instructions: types.StringValue(*detail.Instructions),
+		Identifier: skillString(detail.Identifier), Revision: types.Int64Value(*detail.Revision),
 		IsOrganizational: types.BoolValue(*detail.IsOrganizational), IsProvisioned: types.BoolValue(*detail.IsProvisioned),
-		CreatedAt: types.StringValue(*detail.CreatedAt), CreatedBy: types.StringPointerValue(detail.CreatedBy),
-		UpdatedAt: types.StringValue(*detail.UpdatedAt), UpdatedBy: types.StringPointerValue(detail.UpdatedBy),
+		CreatedAt: types.StringValue(*detail.CreatedAt), CreatedBy: skillString(detail.CreatedBy),
+		UpdatedAt: types.StringValue(*detail.UpdatedAt), UpdatedBy: skillString(detail.UpdatedBy),
 	}, diags
+}
+
+// skillString coalesces a nullable SDK *string to a known Terraform string ("" when nil).
+// The v1.364.0 SDK made these fields *string; the schema treats them as known strings
+// (e.g. description is Optional+Computed+Default("")), so a nil must map to "" rather than
+// null to avoid "inconsistent result" errors.
+func skillString(p *string) types.String {
+	if p == nil {
+		return types.StringValue("")
+	}
+	return types.StringValue(*p)
 }
 
 type nonWhitespaceStringValidator struct{}
