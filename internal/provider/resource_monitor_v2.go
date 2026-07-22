@@ -1444,9 +1444,11 @@ func monitorV2Bool(value types.Bool) bool {
 }
 
 // monitorV2BoolPtr returns nil for null/unknown so the field is omitted from the
-// request (server keeps its current value); otherwise a pointer to the value.
-// Needed for isPaused: with a *bool the SDK serializes an explicit false, which
-// is what makes unpausing (is_paused = false) actually reach the API.
+// request; otherwise a pointer to the value. Needed for isPaused: with a *bool the
+// SDK serializes an explicit false, which is what makes unpausing (is_paused =
+// false) reach the API. On update the nil path doesn't fire (UseStateForUnknown
+// resolves an omitted is_paused to the known state value); omission only happens
+// on create with is_paused omitted.
 func monitorV2BoolPtr(value types.Bool) *bool {
 	if value.IsNull() || value.IsUnknown() {
 		return nil
