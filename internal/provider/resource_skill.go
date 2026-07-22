@@ -174,10 +174,11 @@ func (r *skillResource) ImportState(ctx context.Context, req resource.ImportStat
 }
 
 func skillRequestFromModel(model skillResourceModel) *models.AgentSkillRequest {
-	name, whenToUse, instructions := model.Name.ValueString(), model.WhenToUse.ValueString(), model.Instructions.ValueString()
+	name, whenToUse := model.Name.ValueString(), model.WhenToUse.ValueString()
+	description, instructions := model.Description.ValueString(), model.Instructions.ValueString()
 	isOrganizational := true
 	return &models.AgentSkillRequest{
-		Name: &name, WhenToUse: &whenToUse, Description: model.Description.ValueString(), Instructions: &instructions,
+		Name: &name, WhenToUse: &whenToUse, Description: &description, Instructions: &instructions,
 		IsOrganizational: &isOrganizational,
 	}
 }
@@ -220,13 +221,17 @@ func skillModelFromAPI(detail *models.AgentSkillDetail) (skillResourceModel, dia
 		diags.AddError("Invalid Skill API Response", "Skill payload is missing required fields: "+strings.Join(missing, ", "))
 		return skillResourceModel{}, diags
 	}
+	description := ""
+	if detail.Description != nil {
+		description = *detail.Description
+	}
 	return skillResourceModel{
 		ID: types.StringValue(*detail.ID), Name: types.StringValue(*detail.Name), WhenToUse: types.StringValue(*detail.WhenToUse),
-		Description: types.StringValue(detail.Description), Instructions: types.StringValue(*detail.Instructions),
-		Identifier: types.StringValue(detail.Identifier), Revision: types.Int64Value(*detail.Revision),
+		Description: types.StringValue(description), Instructions: types.StringValue(*detail.Instructions),
+		Identifier: types.StringPointerValue(detail.Identifier), Revision: types.Int64Value(*detail.Revision),
 		IsOrganizational: types.BoolValue(*detail.IsOrganizational), IsProvisioned: types.BoolValue(*detail.IsProvisioned),
-		CreatedAt: types.StringValue(*detail.CreatedAt), CreatedBy: types.StringValue(detail.CreatedBy),
-		UpdatedAt: types.StringValue(*detail.UpdatedAt), UpdatedBy: types.StringValue(detail.UpdatedBy),
+		CreatedAt: types.StringValue(*detail.CreatedAt), CreatedBy: types.StringPointerValue(detail.CreatedBy),
+		UpdatedAt: types.StringValue(*detail.UpdatedAt), UpdatedBy: types.StringPointerValue(detail.UpdatedBy),
 	}, diags
 }
 

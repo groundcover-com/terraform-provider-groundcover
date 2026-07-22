@@ -1,3 +1,7 @@
+## 1.18.1
+
+* Updated groundcover SDK to v1.362.0 and adapted `groundcover_skill` to its nullable description contract while preserving the provider's existing empty-string state behavior
+
 ## 1.18.0
 
 * Added `groundcover_recurring_silence` — silences that repeat daily, weekly, or monthly, with per-day timeframes and a timezone

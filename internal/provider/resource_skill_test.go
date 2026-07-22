@@ -37,24 +37,63 @@ func TestSkillRequestFromModelIsOrganizational(t *testing.T) {
 	if req.Name == nil || *req.Name != "incident-response" || req.Instructions == nil || *req.Instructions == "" {
 		t.Fatalf("unexpected request mapping: %#v", req)
 	}
+	if req.Description == nil || *req.Description != "Incident workflow" {
+		t.Fatalf("Description = %v, want pointer to configured value", req.Description)
+	}
+}
+
+func TestSkillRequestFromModelEmptyDescription(t *testing.T) {
+	req := skillRequestFromModel(skillResourceModel{
+		Name:         types.StringValue("incident-response"),
+		WhenToUse:    types.StringValue("When investigating an incident"),
+		Description:  types.StringValue(""),
+		Instructions: types.StringValue("Inspect alerts and summarize evidence."),
+	})
+	if req.Description == nil || *req.Description != "" {
+		t.Fatalf("Description = %v, want pointer to empty string", req.Description)
+	}
 }
 
 func TestSkillModelFromAPI(t *testing.T) {
 	id, name, whenToUse, instructions := "skill-id", "incident-response", "During incidents", "Follow the runbook"
+	description, identifier := "description", "/incident-response#skill-id"
+	createdBy, updatedBy := "creator", "updater"
 	createdAt, updatedAt := "2026-07-13T10:00:00Z", "2026-07-13T11:00:00Z"
 	revision := int64(2)
 	organizational, provisioned := true, true
 	model, diags := skillModelFromAPI(&models.AgentSkillDetail{
 		ID: &id, Name: &name, WhenToUse: &whenToUse, Instructions: &instructions,
-		Description: "description", Identifier: "/incident-response#skill-id", Revision: &revision,
+		Description: &description, Identifier: &identifier, Revision: &revision,
 		IsOrganizational: &organizational, IsProvisioned: &provisioned,
-		CreatedAt: &createdAt, CreatedBy: "creator", UpdatedAt: &updatedAt, UpdatedBy: "updater",
+		CreatedAt: &createdAt, CreatedBy: &createdBy, UpdatedAt: &updatedAt, UpdatedBy: &updatedBy,
 	})
 	if diags.HasError() {
 		t.Fatalf("unexpected diagnostics: %v", diags.Errors())
 	}
-	if model.ID.ValueString() != id || model.Revision.ValueInt64() != revision || !model.IsProvisioned.ValueBool() {
+	if model.ID.ValueString() != id || model.Description.ValueString() != description || model.Identifier.ValueString() != identifier ||
+		model.CreatedBy.ValueString() != createdBy || model.UpdatedBy.ValueString() != updatedBy ||
+		model.Revision.ValueInt64() != revision || !model.IsProvisioned.ValueBool() {
 		t.Fatalf("unexpected model: %#v", model)
+	}
+}
+
+func TestSkillModelFromAPINullOptionalStrings(t *testing.T) {
+	id, name, whenToUse, instructions := "skill-id", "incident-response", "During incidents", "Follow the runbook"
+	createdAt, updatedAt := "2026-07-13T10:00:00Z", "2026-07-13T11:00:00Z"
+	revision := int64(2)
+	organizational, provisioned := true, true
+	model, diags := skillModelFromAPI(&models.AgentSkillDetail{
+		ID: &id, Name: &name, WhenToUse: &whenToUse, Instructions: &instructions, Revision: &revision,
+		IsOrganizational: &organizational, IsProvisioned: &provisioned, CreatedAt: &createdAt, UpdatedAt: &updatedAt,
+	})
+	if diags.HasError() {
+		t.Fatalf("unexpected diagnostics: %v", diags.Errors())
+	}
+	if model.Description.IsNull() || model.Description.ValueString() != "" {
+		t.Fatalf("Description = %#v, want non-null empty string", model.Description)
+	}
+	if !model.Identifier.IsNull() || !model.CreatedBy.IsNull() || !model.UpdatedBy.IsNull() {
+		t.Fatalf("nullable metadata was not mapped to Terraform null: %#v", model)
 	}
 }
 
@@ -96,7 +135,7 @@ func TestCreateSkillSendsTerraformUserAgent(t *testing.T) {
 		gotUserAgent = r.Header.Get("User-Agent")
 		return &http.Response{
 			StatusCode: http.StatusOK, Header: http.Header{"Content-Type": []string{"application/json"}},
-			Body:    io.NopCloser(strings.NewReader(`{"status":"ok","skill":{"id":"skill-id","name":"name","when_to_use":"when","instructions":"do","revision":1,"is_organizational":true,"is_provisioned":true,"created_at":"now","updated_at":"now"}}`)),
+			Body:    io.NopCloser(strings.NewReader(`{"status":"ok","skill":{"id":"skill-id","name":"name","when_to_use":"when","instructions":"do","owner_user_id":"owner-id","revision":1,"is_organizational":true,"is_provisioned":true,"created_at":"now","updated_at":"now"}}`)),
 			Request: r,
 		}, nil
 	})
@@ -334,7 +373,7 @@ func testAccUpdateSkillOutOfBand(id, name, whenToUse, description, instructions 
 	}
 	organizational := true
 	_, err = client.UpdateSkill(context.Background(), id, &models.AgentSkillRequest{
-		Name: &name, WhenToUse: &whenToUse, Description: description, Instructions: &instructions, IsOrganizational: &organizational,
+		Name: &name, WhenToUse: &whenToUse, Description: &description, Instructions: &instructions, IsOrganizational: &organizational,
 	})
 	return err
 }
