@@ -63,10 +63,11 @@ measurementType: state`
 func TestMonitorV2BuildCreateRequestGCQL(t *testing.T) {
 	ctx := context.Background()
 	plan := testMonitorV2BasePlan(t, &monitorV2QueryModel{
-		Type:          types.StringValue(monitorV2QueryTypeGCQL),
-		Expression:    types.StringValue(`level:error | stats count() count_all_result`),
-		DataType:      types.StringValue("logs"),
-		InstantRollup: types.StringValue("5 minutes"),
+		Type:            types.StringValue(monitorV2QueryTypeGCQL),
+		Expression:      types.StringValue(`level:error | stats count() count_all_result`),
+		DataType:        types.StringValue("logs"),
+		InstantRollup:   types.StringValue("5 minutes"),
+		EvaluationDelay: types.StringValue("15m"),
 	})
 
 	req, diags := buildMonitorV2CreateRequest(ctx, &plan)
@@ -91,6 +92,9 @@ func TestMonitorV2BuildCreateRequestGCQL(t *testing.T) {
 	}
 	if query.InstantRollup != "5m" {
 		t.Fatalf("query.InstantRollup = %q, want 5m", query.InstantRollup)
+	}
+	if query.EvaluationDelay == nil || *query.EvaluationDelay != 900 {
+		t.Fatalf("query.EvaluationDelay = %v, want 900", query.EvaluationDelay)
 	}
 	requireNoInternalMonitorV2Annotations(t, req.Annotations)
 }
@@ -149,7 +153,49 @@ func TestMonitorV2BuildCreateRequestMetricsQL(t *testing.T) {
 	if time.Duration(query.Rollup.Time) != 5*time.Minute {
 		t.Fatalf("query.Rollup.Time = %s, want 5m", time.Duration(query.Rollup.Time))
 	}
+	if query.EvaluationDelay != nil {
+		t.Fatalf("query.EvaluationDelay = %v, want nil when unset", *query.EvaluationDelay)
+	}
 	requireNoInternalMonitorV2Annotations(t, req.Annotations)
+}
+
+func TestMonitorV2EvaluationDelayBounds(t *testing.T) {
+	cases := []struct {
+		input     string
+		wantOK    bool
+		wantValue int64
+	}{
+		{"0s", true, 0},
+		{"3600s", true, 3600},
+		{"1h", true, 3600},
+		{"15m", true, 900},
+		{"3601s", false, 0},
+		{"-1s", false, 0},
+		{"1500ms", false, 0},
+		{"not-a-duration", false, 0},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.input, func(t *testing.T) {
+			var diags diag.Diagnostics
+			got := monitorV2EvaluationDelayToSDK(types.StringValue(tc.input), &diags)
+			if tc.wantOK {
+				if diags.HasError() {
+					t.Fatalf("unexpected diagnostics for %q: %v", tc.input, diags)
+				}
+				if got == nil || *got != tc.wantValue {
+					t.Fatalf("evaluation_delay %q = %v, want %d", tc.input, got, tc.wantValue)
+				}
+				return
+			}
+			if !diags.HasError() {
+				t.Fatalf("expected error diagnostics for %q, got none", tc.input)
+			}
+			if got != nil {
+				t.Fatalf("expected nil result for invalid %q, got %d", tc.input, *got)
+			}
+		})
+	}
 }
 
 func TestMonitorV2BuildCreateRequestRawSQL(t *testing.T) {
@@ -889,6 +935,7 @@ func TestAccMonitorV2Resource(t *testing.T) {
 					resource.TestCheckResourceAttr("groundcover_monitor_v2.test", "query.type", monitorV2QueryTypeGCQL),
 					resource.TestCheckResourceAttr("groundcover_monitor_v2.test", "query.data_type", "logs"),
 					resource.TestCheckResourceAttr("groundcover_monitor_v2.test", "query.instant_rollup", "5m"),
+					resource.TestCheckResourceAttr("groundcover_monitor_v2.test", "query.evaluation_delay", "15m"),
 					resource.TestCheckResourceAttr("groundcover_monitor_v2.test", "threshold.#", "1"),
 				),
 			},
@@ -1046,10 +1093,11 @@ resource "groundcover_monitor_v2" "test" {
   }
 
   query {
-    type           = "gcql"
-    data_type      = "logs"
-    expression     = "level:error | stats count() count_all_result"
-    instant_rollup = "5m"
+    type             = "gcql"
+    data_type        = "logs"
+    expression       = "level:error | stats count() count_all_result"
+    instant_rollup   = "5m"
+    evaluation_delay = "15m"
   }
 
   threshold {

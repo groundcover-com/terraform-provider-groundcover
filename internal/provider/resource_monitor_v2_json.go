@@ -113,7 +113,7 @@ func (r *monitorV2JsonResource) Schema(ctx context.Context, req resource.SchemaR
 
 	ns := s.Blocks["notification_settings"].(schema.SingleNestedBlock)
 	ns.Attributes["connected_app_params"] = schema.StringAttribute{
-		MarkdownDescription: "JSON-encoded per-connected-app delivery options keyed by connected app ID. String form of `groundcover_monitor_v2.connected_app_params`, for schema code generators (Crossplane/upjet) that cannot represent nested maps. Each channel is an object with a required `id` and optional `name`. Example: `jsonencode({ \"app-id\" = { channels = [{ id = \"C123\", name = \"#alerts\" }] } })`.",
+		MarkdownDescription: "JSON-encoded per-connected-app delivery options keyed by connected app ID. String form of `groundcover_monitor_v2.connected_app_params`, for schema code generators (Crossplane/upjet) that cannot represent nested maps. Each entry is an object with: `channels` (list of `{ id (required), name }`) and the optional Linear fields `team_id`, `assignee_id`, `delegate_id`, `project_id`, `resolved_status_id`, `label_ids` (list of strings), and `auto_resolve` (bool). Example: `jsonencode({ \"app-id\" = { channels = [{ id = \"C123\", name = \"#alerts\" }], team_id = \"T1\", label_ids = [\"L1\"], auto_resolve = true } })`.",
 		Optional:            true,
 	}
 	s.Blocks["notification_settings"] = ns

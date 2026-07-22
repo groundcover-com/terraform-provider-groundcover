@@ -15,10 +15,11 @@ resource "groundcover_monitor_v2" "gcql_logs" {
   }
 
   query {
-    type           = "gcql"
-    data_type      = "logs"
-    expression     = "level:error | stats count() count_all_result"
-    instant_rollup = "5m"
+    type             = "gcql"
+    data_type        = "logs"
+    expression       = "level:error | stats count() count_all_result"
+    instant_rollup   = "5m"
+    evaluation_delay = "15m"
   }
 
   threshold {

@@ -87,6 +87,7 @@ type monitorV2QueryModel struct {
 	DatasourceID      types.String                 `tfsdk:"datasource_id"`
 	QueryType         types.String                 `tfsdk:"query_type"`
 	InstantRollup     types.String                 `tfsdk:"instant_rollup"`
+	EvaluationDelay   types.String                 `tfsdk:"evaluation_delay"`
 	Rollup            *monitorV2RollupModel        `tfsdk:"rollup"`
 	RelativeTimerange *monitorV2RelativeRangeModel `tfsdk:"relative_timerange"`
 }
@@ -293,6 +294,11 @@ func (r *monitorV2Resource) Schema(_ context.Context, _ resource.SchemaRequest, 
 					},
 					"instant_rollup": schema.StringAttribute{
 						MarkdownDescription: "GCQL rollup window used to add the monitor evaluation time bucket, for example `5m` or `5 minutes`.",
+						Optional:            true,
+						Computed:            true,
+					},
+					"evaluation_delay": schema.StringAttribute{
+						MarkdownDescription: "Evaluation delay as a duration from `0s` to `1h`, whole seconds only, for example `15m` or `900s`. Delays query evaluation to account for late-arriving data.",
 						Optional:            true,
 						Computed:            true,
 					},
@@ -643,6 +649,9 @@ func validateMonitorV2Config(ctx context.Context, config *monitorV2ResourceModel
 			)
 		}
 	}
+
+	// Surface evaluation_delay parse/range errors at plan time; the result is discarded here.
+	monitorV2EvaluationDelayToSDK(config.Query.EvaluationDelay, diags)
 
 	if len(config.Thresholds) == 0 {
 		diags.AddAttributeError(
@@ -997,6 +1006,7 @@ func monitorV2QueryToSDK(query *monitorV2QueryModel, diags *diag.Diagnostics) *m
 		Name:              name,
 		Expression:        monitorV2String(query.Expression),
 		DatasourceID:      monitorV2String(query.DatasourceID),
+		EvaluationDelay:   monitorV2EvaluationDelayToSDK(query.EvaluationDelay, diags),
 		RelativeTimerange: monitorV2RelativeRangeToSDK(query.RelativeTimerange, diags),
 	}
 
@@ -1185,6 +1195,7 @@ func monitorV2PreserveQueryDurations(previous, updated *monitorV2QueryModel) *mo
 	}
 
 	updated.InstantRollup = monitorV2PreserveDurationString(previous.InstantRollup, updated.InstantRollup)
+	updated.EvaluationDelay = monitorV2PreserveDurationString(previous.EvaluationDelay, updated.EvaluationDelay)
 	updated.RelativeTimerange = monitorV2PreserveRelativeRangeDurations(previous.RelativeTimerange, updated.RelativeTimerange)
 	if previous.Rollup != nil && updated.Rollup != nil {
 		updated.Rollup.Time = monitorV2PreserveDurationString(previous.Rollup.Time, updated.Rollup.Time)
@@ -1267,6 +1278,7 @@ func monitorV2QueryFromSDK(query *models.BaseQuery, annotations map[string]strin
 		DatasourceID:      monitorV2NullableString(query.DatasourceID),
 		QueryType:         monitorV2NullableString(query.QueryType),
 		InstantRollup:     monitorV2DurationStringToType(query.InstantRollup),
+		EvaluationDelay:   monitorV2EvaluationDelayFromSDK(query.EvaluationDelay),
 		Rollup:            monitorV2RollupFromSDK(query.Rollup),
 		RelativeTimerange: monitorV2RelativeRangeFromSDK(query.RelativeTimerange),
 	}
@@ -1426,6 +1438,34 @@ func monitorV2StringPtr(value types.String) *string {
 		return nil
 	}
 	return &str
+}
+
+// monitorV2EvaluationDelayToSDK parses the duration string into the backend's whole-second int64 (0..3600).
+func monitorV2EvaluationDelayToSDK(value types.String, diags *diag.Diagnostics) *int64 {
+	attrPath := path.Root("query").AtName("evaluation_delay")
+	parsed, ok := monitorV2ParseDuration(value, attrPath, diags)
+	if !ok {
+		return nil
+	}
+	if parsed%time.Second != 0 {
+		diags.AddAttributeError(attrPath, "Invalid evaluation delay",
+			fmt.Sprintf("`query.evaluation_delay` must be a whole number of seconds; got %q.", value.ValueString()))
+		return nil
+	}
+	if parsed < 0 || parsed > time.Hour {
+		diags.AddAttributeError(attrPath, "Invalid evaluation delay",
+			fmt.Sprintf("`query.evaluation_delay` must be between `0s` and `1h` (3600 seconds); got %q.", value.ValueString()))
+		return nil
+	}
+	seconds := int64(parsed / time.Second)
+	return &seconds
+}
+
+func monitorV2EvaluationDelayFromSDK(value *int64) types.String {
+	if value == nil {
+		return types.StringNull()
+	}
+	return monitorV2DurationToType(time.Duration(*value) * time.Second)
 }
 
 func monitorV2StringPtrToType(value *string) types.String {
