@@ -46,7 +46,7 @@ resource "groundcover_policy" "my_policy" {
 *   `data_scope` (Block, Optional): Defines the data scope restrictions for the policy. At most one of `simple` or `advanced` may be specified. Omitting `data_scope`, or providing an empty block, means no data restrictions (access to all data).
     *   `simple` (Block, Optional): Applies a single set of filtering rules to all data types. A group block with the following nested arguments:
         *   `operator` (String, Required): Logical operator (`and` or `or`).
-        *   `disabled` (Boolean, Optional): When `true`, users have no access to this data type.
+        *   `disabled` (Boolean, Optional): When `true`, denies access to all data covered by this simple scope (i.e. all data types). Under `advanced`, the same flag applies only to the data type of the block it appears in.
         *   `conditions` (List of Blocks, Required): List of conditions for the data scope.
             *   `key` (String, Required): The key for the condition (e.g., `k8s.cluster.name`).
             *   `origin` (String, Required): The origin of the key.
