@@ -105,6 +105,57 @@ resource "groundcover_notification_route" "all_alerts_to_slack" {
   }
 }
 
+# slack-app and linear connected apps are installed through the groundcover UI
+# (OAuth flow), so they are referenced by ID rather than created in Terraform.
+variable "slack_app_id" {
+  type        = string
+  description = "ID of an existing slack-app connected app"
+}
+
+variable "linear_app_id" {
+  type        = string
+  description = "ID of an existing linear connected app"
+}
+
+resource "groundcover_notification_route" "slack_app_and_linear" {
+  name  = "critical-alerts-slack-app-linear"
+  query = "severity:critical"
+
+  routes = [
+    {
+      status = ["Alerting", "Resolved"]
+      connected_apps = [
+        {
+          # slack-app routes require params.channels
+          type = "slack-app"
+          id   = var.slack_app_id
+          params = {
+            channels = [
+              {
+                id   = "C0123456789"
+                name = "#alerts"
+              }
+            ]
+          }
+        },
+        {
+          # linear routes require params.team_id, and resolved_status_id
+          # unless auto_resolve is set to false
+          type = "linear"
+          id   = var.linear_app_id
+          params = {
+            team_id            = "d1b2c3d4-team"
+            project_id         = "d1b2c3d4-project"
+            label_ids          = ["d1b2c3d4-label"]
+            resolved_status_id = "d1b2c3d4-status"
+            auto_resolve       = true
+          }
+        }
+      ]
+    }
+  ]
+}
+
 output "critical_route_id" {
   description = "ID of the critical alerts notification route"
   value       = groundcover_notification_route.critical_alerts.id
