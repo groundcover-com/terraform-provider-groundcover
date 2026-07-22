@@ -111,7 +111,7 @@ resource "groundcover_dashboard" "metrics_dashboard" {
           }
         ]
         visualizationConfig = {
-          type = "gauge"
+          type = "stat"
         }
       },
       {
@@ -128,7 +128,8 @@ resource "groundcover_dashboard" "metrics_dashboard" {
 
 # Example Dashboard: Simple monitoring dashboard
 resource "groundcover_dashboard" "simple_dashboard" {
-  name = "Simple Dashboard"
+  name        = "Simple Dashboard"
+  description = "Simple monitoring dashboard"
 
   preset = jsonencode({
     duration = "Last 30 minutes"
@@ -153,15 +154,11 @@ resource "groundcover_dashboard" "simple_dashboard" {
             expr       = "sum(rate(http_requests_total[5m]))"
             dataType   = "metrics"
             step       = null
-            editorMode = "code"
+            editorMode = "builder"
           }
         ]
         visualizationConfig = {
           type = "time-series"
-          config = {
-            showLegend = true
-            unit       = "ops"
-          }
         }
       }
     ]
