@@ -11,6 +11,9 @@ import (
 	"testing"
 
 	"github.com/hashicorp/terraform-plugin-framework/attr"
+	fwresource "github.com/hashicorp/terraform-plugin-framework/resource"
+	rschema "github.com/hashicorp/terraform-plugin-framework/resource/schema"
+	fwvalidator "github.com/hashicorp/terraform-plugin-framework/schema/validator"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/hashicorp/terraform-plugin-testing/helper/acctest"
 	"github.com/hashicorp/terraform-plugin-testing/helper/resource"
@@ -666,5 +669,106 @@ func TestNotificationRouteConnectedAppParamsFromSDK(t *testing.T) {
 	wantNull := types.ObjectNull(routeParamsTestAttrTypes())
 	if got := getParams(t, apps[2]); !got.Equal(wantNull) {
 		t.Errorf("expected null params for app without params, got: %v", got)
+	}
+}
+
+// Params values that routeConnectedAppParamsToSDK would silently drop (empty
+// object, empty lists, empty strings) must be rejected at validation time.
+// Otherwise a known non-null plan value round-trips through the API as absent
+// and comes back null, which Terraform reports as an inconsistent result
+// after apply.
+func TestNotificationRouteParamsSchemaValidators(t *testing.T) {
+	ctx := context.Background()
+	r := &notificationRouteResource{}
+	var resp fwresource.SchemaResponse
+	r.Schema(ctx, fwresource.SchemaRequest{}, &resp)
+
+	routes, ok := resp.Schema.Attributes["routes"].(rschema.ListNestedAttribute)
+	if !ok {
+		t.Fatalf("unexpected routes attribute type: %T", resp.Schema.Attributes["routes"])
+	}
+	apps, ok := routes.NestedObject.Attributes["connected_apps"].(rschema.ListNestedAttribute)
+	if !ok {
+		t.Fatalf("unexpected connected_apps attribute type: %T", routes.NestedObject.Attributes["connected_apps"])
+	}
+	params, ok := apps.NestedObject.Attributes["params"].(rschema.SingleNestedAttribute)
+	if !ok {
+		t.Fatalf("unexpected params attribute type: %T", apps.NestedObject.Attributes["params"])
+	}
+
+	if len(params.Validators) == 0 {
+		t.Error("params must have a validator rejecting an all-null object")
+	}
+
+	channels, ok := params.Attributes["channels"].(rschema.ListNestedAttribute)
+	if !ok {
+		t.Fatalf("unexpected channels attribute type: %T", params.Attributes["channels"])
+	}
+	if len(channels.Validators) == 0 {
+		t.Error("channels must have a validator rejecting an empty list")
+	}
+	for _, name := range []string{"id", "name"} {
+		s, ok := channels.NestedObject.Attributes[name].(rschema.StringAttribute)
+		if !ok {
+			t.Fatalf("unexpected channel %s attribute type: %T", name, channels.NestedObject.Attributes[name])
+		}
+		if len(s.Validators) == 0 {
+			t.Errorf("channel %s must have a validator rejecting an empty string", name)
+		}
+	}
+
+	for _, name := range []string{"team_id", "assignee_id", "delegate_id", "project_id", "resolved_status_id"} {
+		s, ok := params.Attributes[name].(rschema.StringAttribute)
+		if !ok {
+			t.Fatalf("unexpected %s attribute type: %T", name, params.Attributes[name])
+		}
+		if len(s.Validators) == 0 {
+			t.Errorf("%s must have a validator rejecting an empty string", name)
+		}
+	}
+
+	labelIDs, ok := params.Attributes["label_ids"].(rschema.ListAttribute)
+	if !ok {
+		t.Fatalf("unexpected label_ids attribute type: %T", params.Attributes["label_ids"])
+	}
+	if len(labelIDs.Validators) == 0 {
+		t.Error("label_ids must have a validator rejecting an empty list")
+	}
+}
+
+func TestRouteParamsNotEmptyValidator(t *testing.T) {
+	ctx := context.Background()
+
+	cases := []struct {
+		name      string
+		value     types.Object
+		wantError bool
+	}{
+		{"null object", types.ObjectNull(routeParamsTestAttrTypes()), false},
+		{"unknown object", types.ObjectUnknown(routeParamsTestAttrTypes()), false},
+		{"all attributes null", testRouteParamsObject(t, nil), true},
+		{
+			"one attribute set",
+			testRouteParamsObject(t, map[string]attr.Value{"team_id": types.StringValue("T1")}),
+			false,
+		},
+		{
+			// An unknown config value may resolve to a real value at apply
+			// time, so it must not be rejected during validation.
+			"unknown attribute counts as set",
+			testRouteParamsObject(t, map[string]attr.Value{"team_id": types.StringUnknown()}),
+			false,
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			req := fwvalidator.ObjectRequest{ConfigValue: tc.value}
+			var resp fwvalidator.ObjectResponse
+			routeParamsNotEmptyValidator{}.ValidateObject(ctx, req, &resp)
+			if resp.Diagnostics.HasError() != tc.wantError {
+				t.Errorf("wantError=%v, got diagnostics: %v", tc.wantError, resp.Diagnostics)
+			}
+		})
 	}
 }

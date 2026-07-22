@@ -10,6 +10,8 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/hashicorp/terraform-plugin-framework-validators/listvalidator"
+	"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
 	"github.com/hashicorp/terraform-plugin-framework/attr"
 	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/path"
@@ -17,6 +19,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
+	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/hashicorp/terraform-plugin-framework/types/basetypes"
 	"github.com/hashicorp/terraform-plugin-log/tflog"
@@ -143,19 +146,31 @@ func (r *notificationRouteResource) Schema(_ context.Context, _ resource.SchemaR
 									"params": schema.SingleNestedAttribute{
 										Description: "Route-specific delivery parameters for this connected app. 'slack-app' routes require channels; Linear routes use team_id and the related Linear fields. Omit for connected app types that don't support route params.",
 										Optional:    true,
+										Validators: []validator.Object{
+											routeParamsNotEmptyValidator{},
+										},
 										Attributes: map[string]schema.Attribute{
 											"channels": schema.ListNestedAttribute{
 												Description: "Slack channels to notify for this connected app. Required for 'slack-app' routes.",
 												Optional:    true,
+												Validators: []validator.List{
+													listvalidator.SizeAtLeast(1),
+												},
 												NestedObject: schema.NestedAttributeObject{
 													Attributes: map[string]schema.Attribute{
 														"id": schema.StringAttribute{
 															Description: "Slack channel ID used for delivery.",
 															Required:    true,
+															Validators: []validator.String{
+																stringvalidator.LengthAtLeast(1),
+															},
 														},
 														"name": schema.StringAttribute{
 															Description: "Channel display name shown by channel selectors; optional.",
 															Optional:    true,
+															Validators: []validator.String{
+																stringvalidator.LengthAtLeast(1),
+															},
 														},
 													},
 												},
@@ -163,27 +178,45 @@ func (r *notificationRouteResource) Schema(_ context.Context, _ resource.SchemaR
 											"team_id": schema.StringAttribute{
 												Description: "Linear team that receives created issues.",
 												Optional:    true,
+												Validators: []validator.String{
+													stringvalidator.LengthAtLeast(1),
+												},
 											},
 											"assignee_id": schema.StringAttribute{
 												Description: "Linear user to assign created/updated issues to.",
 												Optional:    true,
+												Validators: []validator.String{
+													stringvalidator.LengthAtLeast(1),
+												},
 											},
 											"delegate_id": schema.StringAttribute{
 												Description: "Linear agent to delegate created/updated issues to.",
 												Optional:    true,
+												Validators: []validator.String{
+													stringvalidator.LengthAtLeast(1),
+												},
 											},
 											"project_id": schema.StringAttribute{
 												Description: "Linear project to assign created/updated issues to.",
 												Optional:    true,
+												Validators: []validator.String{
+													stringvalidator.LengthAtLeast(1),
+												},
 											},
 											"resolved_status_id": schema.StringAttribute{
 												Description: "Linear status used when auto-resolving issues. Required when auto_resolve is true or unset.",
 												Optional:    true,
+												Validators: []validator.String{
+													stringvalidator.LengthAtLeast(1),
+												},
 											},
 											"label_ids": schema.ListAttribute{
 												Description: "Linear label IDs to assign to created/updated issues.",
 												Optional:    true,
 												ElementType: types.StringType,
+												Validators: []validator.List{
+													listvalidator.SizeAtLeast(1),
+												},
 											},
 											"auto_resolve": schema.BoolAttribute{
 												Description: "Whether resolved issues transition the linked Linear issues. The backend defaults this to true when unset.",
@@ -757,6 +790,39 @@ func preserveEquivalentDuration(ctx context.Context, original, updated types.Obj
 	}
 
 	return updated
+}
+
+// routeParamsNotEmptyValidator rejects a params object whose attributes are
+// all null. routeConnectedAppParamsToSDK omits unset attributes from the API
+// request, so an all-null params object would be sent as absent, read back as
+// null, and no longer match the known non-null object in the plan — which
+// Terraform reports as an inconsistent result after apply. Rejecting it at
+// validation time keeps every accepted config round-trippable.
+type routeParamsNotEmptyValidator struct{}
+
+func (routeParamsNotEmptyValidator) Description(context.Context) string {
+	return "params must set at least one attribute"
+}
+
+func (v routeParamsNotEmptyValidator) MarkdownDescription(ctx context.Context) string {
+	return v.Description(ctx)
+}
+
+func (routeParamsNotEmptyValidator) ValidateObject(_ context.Context, req validator.ObjectRequest, resp *validator.ObjectResponse) {
+	if req.ConfigValue.IsNull() || req.ConfigValue.IsUnknown() {
+		return
+	}
+	for _, value := range req.ConfigValue.Attributes() {
+		// An unknown value may resolve to a real value at apply time.
+		if !value.IsNull() {
+			return
+		}
+	}
+	resp.Diagnostics.AddAttributeError(
+		req.Path,
+		"Empty connected app params",
+		"params must set at least one attribute when specified; omit params entirely for connected app types that don't support route parameters.",
+	)
 }
 
 // routeConnectedAppParamsToSDK converts the typed params object into the
