@@ -17,6 +17,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/booldefault"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/boolplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
@@ -210,7 +211,13 @@ func (r *monitorV2Resource) Schema(_ context.Context, _ resource.SchemaRequest, 
 				MarkdownDescription: "Whether the monitor is paused.",
 				Optional:            true,
 				Computed:            true,
-				Default:             booldefault.StaticBool(false),
+				// No Default: with Optional+Computed+Default(false), an omitted config plans as a
+				// known false, so an unrelated update would send is_paused=false and unpause a
+				// monitor paused out-of-band. UseStateForUnknown preserves the refreshed value
+				// when the attribute is absent; an explicit false still reaches the API (unpause).
+				PlanModifiers: []planmodifier.Bool{
+					boolplanmodifier.UseStateForUnknown(),
+				},
 			},
 			"auto_resolve": schema.BoolAttribute{
 				MarkdownDescription: "Whether the monitor should auto-resolve.",
@@ -931,7 +938,7 @@ func buildMonitorV2CreateRequest(ctx context.Context, plan *monitorV2ResourceMod
 		AutoResolve:          monitorV2Bool(plan.AutoResolve),
 		Category:             monitorV2String(plan.Category),
 		ExecutionErrorState:  monitorV2String(plan.ExecutionErrorState),
-		IsPaused:             monitorV2Bool(plan.IsPaused),
+		IsPaused:             monitorV2BoolPtr(plan.IsPaused),
 		IsProvisioned:        &isProvisioned,
 		Labels:               monitorV2StringMap(ctx, plan.Labels, &diags),
 		MeasurementType:      monitorV2String(plan.MeasurementType),
@@ -956,7 +963,7 @@ func buildMonitorV2UpdateRequest(ctx context.Context, plan *monitorV2ResourceMod
 		AutoResolve:          monitorV2Bool(plan.AutoResolve),
 		Category:             monitorV2String(plan.Category),
 		ExecutionErrorState:  monitorV2String(plan.ExecutionErrorState),
-		IsPaused:             monitorV2Bool(plan.IsPaused),
+		IsPaused:             monitorV2BoolPtr(plan.IsPaused),
 		Labels:               monitorV2StringMap(ctx, plan.Labels, &diags),
 		MeasurementType:      monitorV2String(plan.MeasurementType),
 		NoDataState:          monitorV2String(plan.NoDataState),
@@ -1165,7 +1172,11 @@ func mapMonitorV2SDKToModel(ctx context.Context, id string, remote *models.Updat
 	state.MeasurementType = monitorV2NullableString(remote.MeasurementType)
 	state.ExecutionErrorState = monitorV2NullableString(remote.ExecutionErrorState)
 	state.NoDataState = monitorV2NullableString(remote.NoDataState)
-	state.IsPaused = types.BoolValue(remote.IsPaused)
+	// Coalesce nil -> false: is_paused is Optional+Computed, so state must be a known
+	// bool (never null). The backend omits isPaused when false, and BoolPointerValue(nil)
+	// would yield null, which then plans as null and applies as false -> "inconsistent
+	// result". Sending is still pointer-based (monitorV2BoolPtr) so unpause works.
+	state.IsPaused = types.BoolValue(remote.IsPaused != nil && *remote.IsPaused)
 	state.AutoResolve = types.BoolValue(remote.AutoResolve)
 	state.Category = monitorV2NullableString(remote.Category)
 	state.Team = monitorV2NullableString(remote.Team)
@@ -1430,6 +1441,19 @@ func monitorV2Bool(value types.Bool) bool {
 		return false
 	}
 	return value.ValueBool()
+}
+
+// monitorV2BoolPtr returns nil for null/unknown so the field is omitted from the
+// request; otherwise a pointer to the value. Needed for isPaused: with a *bool the
+// SDK serializes an explicit false, which is what makes unpausing (is_paused =
+// false) reach the API. On update the nil path doesn't fire (UseStateForUnknown
+// resolves an omitted is_paused to the known state value); omission only happens
+// on create with is_paused omitted.
+func monitorV2BoolPtr(value types.Bool) *bool {
+	if value.IsNull() || value.IsUnknown() {
+		return nil
+	}
+	return value.ValueBoolPointer()
 }
 
 func monitorV2StringPtr(value types.String) *string {
