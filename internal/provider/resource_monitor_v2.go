@@ -17,6 +17,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/booldefault"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/boolplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
@@ -210,7 +211,13 @@ func (r *monitorV2Resource) Schema(_ context.Context, _ resource.SchemaRequest, 
 				MarkdownDescription: "Whether the monitor is paused.",
 				Optional:            true,
 				Computed:            true,
-				Default:             booldefault.StaticBool(false),
+				// No Default: with Optional+Computed+Default(false), an omitted config plans as a
+				// known false, so an unrelated update would send is_paused=false and unpause a
+				// monitor paused out-of-band. UseStateForUnknown preserves the refreshed value
+				// when the attribute is absent; an explicit false still reaches the API (unpause).
+				PlanModifiers: []planmodifier.Bool{
+					boolplanmodifier.UseStateForUnknown(),
+				},
 			},
 			"auto_resolve": schema.BoolAttribute{
 				MarkdownDescription: "Whether the monitor should auto-resolve.",

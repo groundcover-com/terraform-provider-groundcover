@@ -990,6 +990,44 @@ func TestAccMonitorV2Resource(t *testing.T) {
 	})
 }
 
+// BE-2568: is_paused must round-trip (explicit false unpauses) and an unrelated
+// update that omits is_paused must NOT change the pause state. Before the fix,
+// Optional+Computed+Default(false) forced an omitted config to plan as false, so
+// any unrelated update silently unpaused a paused monitor.
+func TestAccMonitorV2Resource_pauseState(t *testing.T) {
+	name := acctest.RandomWithPrefix("test-monitor-v2-pause")
+	updatedName := acctest.RandomWithPrefix("test-monitor-v2-pause-updated")
+
+	resource.Test(t, resource.TestCase{
+		PreCheck:                 func() { testAccPreCheck(t) },
+		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
+		Steps: []resource.TestStep{
+			{
+				Config: testAccMonitorV2PauseConfig(name, "is_paused = true"),
+				Check: resource.TestCheckResourceAttr(
+					"groundcover_monitor_v2.test", "is_paused", "true"),
+			},
+			{
+				// Unrelated change (title) with is_paused omitted: must stay paused.
+				Config: testAccMonitorV2PauseConfig(updatedName, ""),
+				Check: resource.TestCheckResourceAttr(
+					"groundcover_monitor_v2.test", "is_paused", "true"),
+			},
+			{
+				// Explicit false must reach the API and unpause.
+				Config: testAccMonitorV2PauseConfig(updatedName, "is_paused = false"),
+				Check: resource.TestCheckResourceAttr(
+					"groundcover_monitor_v2.test", "is_paused", "false"),
+			},
+			{
+				Config:             testAccMonitorV2PauseConfig(updatedName, "is_paused = false"),
+				PlanOnly:           true,
+				ExpectNonEmptyPlan: false,
+			},
+		},
+	})
+}
+
 func TestAccMonitorV2Resource_importThenUpdate(t *testing.T) {
 	name := acctest.RandomWithPrefix("test-monitor-v2-import")
 	updatedName := acctest.RandomWithPrefix("test-monitor-v2-import-updated")
@@ -1116,6 +1154,44 @@ resource "groundcover_monitor_v2" "test" {
   no_data_state         = "OK"
 }
 `, name)
+}
+
+func testAccMonitorV2PauseConfig(name, isPausedLine string) string {
+	return fmt.Sprintf(`
+resource "groundcover_monitor_v2" "test" {
+  title            = %[1]q
+  severity         = "critical"
+  measurement_type = "event"
+  %[2]s
+
+  display {
+    header      = %[1]q
+    description = "Test monitor created by acceptance tests"
+  }
+
+  query {
+    type           = "gcql"
+    data_type      = "logs"
+    expression     = "level:error | stats count() count_all_result"
+    instant_rollup = "5m"
+  }
+
+  threshold {
+    name       = "threshold_1"
+    input_name = "threshold_input_query"
+    operator   = "gt"
+    values     = [1]
+  }
+
+  evaluation_interval {
+    interval    = "1m"
+    pending_for = "1m"
+  }
+
+  execution_error_state = "OK"
+  no_data_state         = "OK"
+}
+`, name, isPausedLine)
 }
 
 func testAccMonitorV2MetricsQLImportUpdateConfig(name string) string {

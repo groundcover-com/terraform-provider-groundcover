@@ -44,11 +44,12 @@ func TestSkillModelFromAPI(t *testing.T) {
 	createdAt, updatedAt := "2026-07-13T10:00:00Z", "2026-07-13T11:00:00Z"
 	revision := int64(2)
 	organizational, provisioned := true, true
+	description, identifier, createdBy, updatedBy := "description", "/incident-response#skill-id", "creator", "updater"
 	model, diags := skillModelFromAPI(&models.AgentSkillDetail{
 		ID: &id, Name: &name, WhenToUse: &whenToUse, Instructions: &instructions,
-		Description: "description", Identifier: "/incident-response#skill-id", Revision: &revision,
+		Description: &description, Identifier: &identifier, Revision: &revision,
 		IsOrganizational: &organizational, IsProvisioned: &provisioned,
-		CreatedAt: &createdAt, CreatedBy: "creator", UpdatedAt: &updatedAt, UpdatedBy: "updater",
+		CreatedAt: &createdAt, CreatedBy: &createdBy, UpdatedAt: &updatedAt, UpdatedBy: &updatedBy,
 	})
 	if diags.HasError() {
 		t.Fatalf("unexpected diagnostics: %v", diags.Errors())
@@ -334,7 +335,7 @@ func testAccUpdateSkillOutOfBand(id, name, whenToUse, description, instructions 
 	}
 	organizational := true
 	_, err = client.UpdateSkill(context.Background(), id, &models.AgentSkillRequest{
-		Name: &name, WhenToUse: &whenToUse, Description: description, Instructions: &instructions, IsOrganizational: &organizational,
+		Name: &name, WhenToUse: &whenToUse, Description: &description, Instructions: &instructions, IsOrganizational: &organizational,
 	})
 	return err
 }
