@@ -43,9 +43,10 @@ resource "groundcover_policy" "my_policy" {
 *   `role` (Map of String, Required): Role definitions associated with the policy. Currently, only a single key/value pair is supported, where the key must be one of `read`, `write`, or `admin`, and the value is ignored.
 *   `description` (String, Optional): A description for the policy.
 *   `claim_role` (String, Optional): SSO Role claim name used for mapping.
-*   `data_scope` (Block, Optional): Defines the data scope restrictions for the policy. Omitting `data_scope`, or providing an empty block, means no data restrictions (access to all data). Currently supports a `simple` block with the following nested arguments:
-    *   `simple` (Block, Optional):
+*   `data_scope` (Block, Optional): Defines the data scope restrictions for the policy. At most one of `simple` or `advanced` may be specified. Omitting `data_scope`, or providing an empty block, means no data restrictions (access to all data).
+    *   `simple` (Block, Optional): Applies a single set of filtering rules to all data types. A group block with the following nested arguments:
         *   `operator` (String, Required): Logical operator (`and` or `or`).
+        *   `disabled` (Boolean, Optional): When `true`, users have no access to this data type.
         *   `conditions` (List of Blocks, Required): List of conditions for the data scope.
             *   `key` (String, Required): The key for the condition (e.g., `k8s.cluster.name`).
             *   `origin` (String, Required): The origin of the key.
@@ -53,6 +54,12 @@ resource "groundcover_policy" "my_policy" {
             *   `filters` (List of Blocks, Required): Filter criteria for the condition.
                 *   `op` (String, Required): The filter operation (e.g., `match`).
                 *   `value` (String, Required): The value to filter on.
+    *   `advanced` (Block, Optional): Per-data-type filtering rules for fine-grained access control. Each nested block is optional and uses the same group structure as `simple` (`operator`, `disabled`, `conditions`):
+        *   `events` (Block, Optional): Data scope rules for events.
+        *   `logs` (Block, Optional): Data scope rules for logs.
+        *   `metrics` (Block, Optional): Data scope rules for metrics.
+        *   `traces` (Block, Optional): Data scope rules for traces.
+        *   `workloads` (Block, Optional): Data scope rules for workloads.
 
 #### Attributes
 
