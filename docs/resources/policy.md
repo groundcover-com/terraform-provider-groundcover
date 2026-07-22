@@ -102,7 +102,7 @@ output "policy_revision_number" {
 ### Optional
 
 - `claim_role` (String) SSO Role claim name used for mapping.
-- `data_scope` (Attributes) Defines the data scope restrictions for the policy. Either 'simple' or 'advanced' must be specified, but not both. (see [below for nested schema](#nestedatt--data_scope))
+- `data_scope` (Attributes) Defines the data scope restrictions for the policy. At most one of 'simple' or 'advanced' may be specified. Omitting data_scope, or providing an empty block, means no data restrictions (access to all data). (see [below for nested schema](#nestedatt--data_scope))
 - `description` (String) A description for the policy.
 
 ### Read-Only

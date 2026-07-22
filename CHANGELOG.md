@@ -1,3 +1,7 @@
+## 1.21.0
+
+* `groundcover_policy` now accepts an empty `data_scope = {}` block, treating it the same as omitting `data_scope` entirely — no data restrictions (access to all data). Previously the provider rejected it with "data_scope must have either 'simple' or 'advanced' specified", forcing tools that always emit the block (e.g. the Crossplane provider) to send an empty `simple` group as a workaround
+
 ## 1.20.1
 
 * Fixed the `groundcover_dashboard` example, which failed `terraform apply` with `Dashboard validation failed` — unsupported `gauge` visualization type (now `stat`), `editorMode = "code"` rejected by the create validator (now `builder`), a rejected `visualizationConfig.config` block (removed), and a missing `description` that caused an inconsistent-result-after-apply error

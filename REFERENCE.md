@@ -43,8 +43,8 @@ resource "groundcover_policy" "my_policy" {
 *   `role` (Map of String, Required): Role definitions associated with the policy. Currently, only a single key/value pair is supported, where the key must be one of `read`, `write`, or `admin`, and the value is ignored.
 *   `description` (String, Optional): A description for the policy.
 *   `claim_role` (String, Optional): SSO Role claim name used for mapping.
-*   `data_scope` (Block, Optional): Defines the data scope restrictions for the policy. Currently supports a `simple` block with the following nested arguments:
-    *   `simple` (Block, Required if `data_scope` is present):
+*   `data_scope` (Block, Optional): Defines the data scope restrictions for the policy. Omitting `data_scope`, or providing an empty block, means no data restrictions (access to all data). Currently supports a `simple` block with the following nested arguments:
+    *   `simple` (Block, Optional):
         *   `operator` (String, Required): Logical operator (`and` or `or`).
         *   `conditions` (List of Blocks, Required): List of conditions for the data scope.
             *   `key` (String, Required): The key for the condition (e.g., `k8s.cluster.name`).

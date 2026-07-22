@@ -10,6 +10,7 @@ import (
 	"testing"
 
 	"github.com/hashicorp/terraform-plugin-framework/attr"
+	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/hashicorp/terraform-plugin-testing/helper/acctest"
 	"github.com/hashicorp/terraform-plugin-testing/helper/resource"
@@ -303,16 +304,21 @@ func TestAccPolicyResource_invalidBothScopes(t *testing.T) {
 	})
 }
 
-func TestAccPolicyResource_invalidNeitherScope(t *testing.T) {
-	name := acctest.RandomWithPrefix("test-policy-invalid-neither")
+func TestAccPolicyResource_emptyDataScope(t *testing.T) {
+	name := acctest.RandomWithPrefix("test-policy-empty-scope")
 
 	resource.Test(t, resource.TestCase{
 		PreCheck:                 func() { testAccPreCheck(t) },
 		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
 		Steps: []resource.TestStep{
+			// An empty data_scope block is valid and means no data restrictions (allow all),
+			// same as omitting data_scope. Tools like the Crossplane provider emit it this way.
 			{
-				Config:      testAccPolicyResourceConfigNeitherScope(name),
-				ExpectError: regexp.MustCompile("data_scope must have either 'simple' or 'advanced' specified"),
+				Config: testAccPolicyResourceConfigNeitherScope(name),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					resource.TestCheckResourceAttr("groundcover_policy.test", "name", name),
+					resource.TestCheckResourceAttr("groundcover_policy.test", "role.read", "read"),
+				),
 			},
 		},
 	})
@@ -346,7 +352,7 @@ func testAccPolicyResourceConfigNeitherScope(name string) string {
 	return fmt.Sprintf(`
 resource "groundcover_policy" "test" {
   name        = %[1]q
-  description = "Invalid policy with neither scope"
+  description = "Policy with an empty data scope (allow all)"
   role = {
     read = "read"
   }
@@ -354,6 +360,75 @@ resource "groundcover_policy" "test" {
   }
 }
 `, name)
+}
+
+func TestValidateDataScopeConfiguration(t *testing.T) {
+	ctx := context.Background()
+
+	simpleGroup := types.ObjectValueMust(groupAttrTypes(), map[string]attr.Value{
+		"operator":   types.StringValue("and"),
+		"disabled":   types.BoolValue(false),
+		"conditions": types.ListValueMust(types.ObjectType{AttrTypes: conditionAttrTypes()}, []attr.Value{}),
+	})
+	advancedScope := types.ObjectValueMust(advancedDataScopeAttrTypes(), map[string]attr.Value{
+		"events":    types.ObjectNull(groupAttrTypes()),
+		"logs":      simpleGroup,
+		"metrics":   types.ObjectNull(groupAttrTypes()),
+		"traces":    types.ObjectNull(groupAttrTypes()),
+		"workloads": types.ObjectNull(groupAttrTypes()),
+	})
+
+	dataScopeObj := func(simple, advanced attr.Value) types.Object {
+		return types.ObjectValueMust(dataScopeAttrTypes(), map[string]attr.Value{
+			"simple":   simple,
+			"advanced": advanced,
+		})
+	}
+
+	testCases := []struct {
+		name      string
+		dataScope types.Object
+		wantValid bool
+	}{
+		{
+			name:      "null data_scope is valid",
+			dataScope: types.ObjectNull(dataScopeAttrTypes()),
+			wantValid: true,
+		},
+		{
+			name:      "empty data_scope is valid (allow all)",
+			dataScope: dataScopeObj(types.ObjectNull(groupAttrTypes()), types.ObjectNull(advancedDataScopeAttrTypes())),
+			wantValid: true,
+		},
+		{
+			name:      "simple only is valid",
+			dataScope: dataScopeObj(simpleGroup, types.ObjectNull(advancedDataScopeAttrTypes())),
+			wantValid: true,
+		},
+		{
+			name:      "advanced only is valid",
+			dataScope: dataScopeObj(types.ObjectNull(groupAttrTypes()), advancedScope),
+			wantValid: true,
+		},
+		{
+			name:      "both simple and advanced is invalid",
+			dataScope: dataScopeObj(simpleGroup, advancedScope),
+			wantValid: false,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			var diags diag.Diagnostics
+			valid := validateDataScopeConfiguration(ctx, tc.dataScope, &diags)
+			if valid != tc.wantValid {
+				t.Errorf("validateDataScopeConfiguration() = %v, want %v (diags: %v)", valid, tc.wantValid, diags)
+			}
+			if !tc.wantValid && !diags.HasError() {
+				t.Error("expected error diagnostics for invalid configuration")
+			}
+		})
+	}
 }
 
 func testAccCheckPolicyResourceExists(n string) resource.TestCheckFunc {
