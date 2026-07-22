@@ -1,6 +1,6 @@
 ## 1.18.1
 
-* Updated groundcover SDK to v1.362.0 and adapted `groundcover_skill` to its nullable description contract while preserving the provider's existing empty-string state behavior
+* Updated groundcover SDK to v1.362.0
 
 ## 1.18.0
 
