@@ -120,6 +120,57 @@ resource "groundcover_notification_route" "all_alerts_to_slack" {
   }
 }
 
+# slack-app and linear connected apps are installed through the groundcover UI
+# (OAuth flow), so they are referenced by ID rather than created in Terraform.
+variable "slack_app_id" {
+  type        = string
+  description = "ID of an existing slack-app connected app"
+}
+
+variable "linear_app_id" {
+  type        = string
+  description = "ID of an existing linear connected app"
+}
+
+resource "groundcover_notification_route" "slack_app_and_linear" {
+  name  = "critical-alerts-slack-app-linear"
+  query = "severity:critical"
+
+  routes = [
+    {
+      status = ["Alerting", "Resolved"]
+      connected_apps = [
+        {
+          # slack-app routes require params.channels
+          type = "slack-app"
+          id   = var.slack_app_id
+          params = {
+            channels = [
+              {
+                id   = "C0123456789"
+                name = "#alerts"
+              }
+            ]
+          }
+        },
+        {
+          # linear routes require params.team_id, and resolved_status_id
+          # unless auto_resolve is set to false
+          type = "linear"
+          id   = var.linear_app_id
+          params = {
+            team_id            = "d1b2c3d4-team"
+            project_id         = "d1b2c3d4-project"
+            label_ids          = ["d1b2c3d4-label"]
+            resolved_status_id = "d1b2c3d4-status"
+            auto_resolve       = true
+          }
+        }
+      ]
+    }
+  ]
+}
+
 output "critical_route_id" {
   description = "ID of the critical alerts notification route"
   value       = groundcover_notification_route.critical_alerts.id
@@ -166,7 +217,38 @@ Required:
 Required:
 
 - `id` (String) ID of the connected app.
-- `type` (String) Type of connected app (e.g., 'slack-webhook', 'pagerduty').
+- `type` (String) Type of connected app (e.g., 'slack-webhook', 'slack-app', 'pagerduty', 'linear').
+
+Optional:
+
+- `params` (Attributes) Route-specific delivery parameters for this connected app. 'slack-app' routes require channels; Linear routes use team_id and the related Linear fields. Omit for connected app types that don't support route params. (see [below for nested schema](#nestedatt--routes--connected_apps--params))
+
+<a id="nestedatt--routes--connected_apps--params"></a>
+### Nested Schema for `routes.connected_apps.params`
+
+Optional:
+
+- `assignee_id` (String) Linear user to assign created/updated issues to.
+- `auto_resolve` (Boolean) Whether resolved issues transition the linked Linear issues. The backend defaults this to true when unset.
+- `channels` (Attributes List) Slack channels to notify for this connected app. Required for 'slack-app' routes. (see [below for nested schema](#nestedatt--routes--connected_apps--params--channels))
+- `delegate_id` (String) Linear agent to delegate created/updated issues to.
+- `label_ids` (List of String) Linear label IDs to assign to created/updated issues.
+- `project_id` (String) Linear project to assign created/updated issues to.
+- `resolved_status_id` (String) Linear status used when auto-resolving issues. Required when auto_resolve is true or unset.
+- `team_id` (String) Linear team that receives created issues.
+
+<a id="nestedatt--routes--connected_apps--params--channels"></a>
+### Nested Schema for `routes.connected_apps.params.channels`
+
+Required:
+
+- `id` (String) Slack channel ID used for delivery.
+
+Optional:
+
+- `name` (String) Channel display name shown by channel selectors; optional.
+
+
 
 
 

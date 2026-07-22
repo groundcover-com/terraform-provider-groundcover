@@ -5,6 +5,7 @@ package provider
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"time"
@@ -55,8 +56,38 @@ type routeRuleModel struct {
 }
 
 type routeConnectedAppModel struct {
-	Type types.String `tfsdk:"type"`
-	Id   types.String `tfsdk:"id"`
+	Type   types.String `tfsdk:"type"`
+	Id     types.String `tfsdk:"id"`
+	Params types.Object `tfsdk:"params"`
+}
+
+type routeConnectedAppParamsModel struct {
+	Channels         types.List   `tfsdk:"channels"`
+	TeamID           types.String `tfsdk:"team_id"`
+	AssigneeID       types.String `tfsdk:"assignee_id"`
+	DelegateID       types.String `tfsdk:"delegate_id"`
+	ProjectID        types.String `tfsdk:"project_id"`
+	ResolvedStatusID types.String `tfsdk:"resolved_status_id"`
+	LabelIDs         types.List   `tfsdk:"label_ids"`
+	AutoResolve      types.Bool   `tfsdk:"auto_resolve"`
+}
+
+type routeConnectedAppChannelModel struct {
+	ID   types.String `tfsdk:"id"`
+	Name types.String `tfsdk:"name"`
+}
+
+// routeConnectedAppParamsWire mirrors the JSON shape the API uses inside
+// RouteConnectedApp{Request,Response}.Params (see models.ConnectedAppDeliveryOptions).
+type routeConnectedAppParamsWire struct {
+	Channels         []*models.ConnectedAppChannel `json:"channels"`
+	TeamID           string                        `json:"team_id"`
+	AssigneeID       string                        `json:"assignee_id"`
+	DelegateID       string                        `json:"delegate_id"`
+	ProjectID        string                        `json:"project_id"`
+	ResolvedStatusID string                        `json:"resolved_status_id"`
+	LabelIDs         []string                      `json:"label_ids"`
+	AutoResolve      *bool                         `json:"auto_resolve"`
 }
 
 type notificationSettingsModel struct {
@@ -102,12 +133,64 @@ func (r *notificationRouteResource) Schema(_ context.Context, _ resource.SchemaR
 							NestedObject: schema.NestedAttributeObject{
 								Attributes: map[string]schema.Attribute{
 									"type": schema.StringAttribute{
-										Description: "Type of connected app (e.g., 'slack-webhook', 'pagerduty').",
+										Description: "Type of connected app (e.g., 'slack-webhook', 'slack-app', 'pagerduty', 'linear').",
 										Required:    true,
 									},
 									"id": schema.StringAttribute{
 										Description: "ID of the connected app.",
 										Required:    true,
+									},
+									"params": schema.SingleNestedAttribute{
+										Description: "Route-specific delivery parameters for this connected app. 'slack-app' routes require channels; Linear routes use team_id and the related Linear fields. Omit for connected app types that don't support route params.",
+										Optional:    true,
+										Attributes: map[string]schema.Attribute{
+											"channels": schema.ListNestedAttribute{
+												Description: "Slack channels to notify for this connected app. Required for 'slack-app' routes.",
+												Optional:    true,
+												NestedObject: schema.NestedAttributeObject{
+													Attributes: map[string]schema.Attribute{
+														"id": schema.StringAttribute{
+															Description: "Slack channel ID used for delivery.",
+															Required:    true,
+														},
+														"name": schema.StringAttribute{
+															Description: "Channel display name shown by channel selectors; optional.",
+															Optional:    true,
+														},
+													},
+												},
+											},
+											"team_id": schema.StringAttribute{
+												Description: "Linear team that receives created issues.",
+												Optional:    true,
+											},
+											"assignee_id": schema.StringAttribute{
+												Description: "Linear user to assign created/updated issues to.",
+												Optional:    true,
+											},
+											"delegate_id": schema.StringAttribute{
+												Description: "Linear agent to delegate created/updated issues to.",
+												Optional:    true,
+											},
+											"project_id": schema.StringAttribute{
+												Description: "Linear project to assign created/updated issues to.",
+												Optional:    true,
+											},
+											"resolved_status_id": schema.StringAttribute{
+												Description: "Linear status used when auto-resolving issues. Required when auto_resolve is true or unset.",
+												Optional:    true,
+											},
+											"label_ids": schema.ListAttribute{
+												Description: "Linear label IDs to assign to created/updated issues.",
+												Optional:    true,
+												ElementType: types.StringType,
+											},
+											"auto_resolve": schema.BoolAttribute{
+												Description: "Whether resolved issues transition the linked Linear issues. The backend defaults this to true when unset.",
+												Optional:    true,
+												Computed:    true,
+											},
+										},
 									},
 								},
 							},
@@ -429,9 +512,17 @@ func routesListToSDK(ctx context.Context, routesList types.List) ([]*models.Rout
 		for j, appModel := range connectedAppModels {
 			typeStr := appModel.Type.ValueString()
 			idStr := appModel.Id.ValueString()
+
+			params, paramsDiags := routeConnectedAppParamsToSDK(ctx, appModel.Params)
+			diags.Append(paramsDiags...)
+			if diags.HasError() {
+				return nil, diags
+			}
+
 			sdkConnectedApps[j] = &models.RouteConnectedAppRequest{
-				Type: &typeStr,
-				ID:   &idStr,
+				Type:   &typeStr,
+				ID:     &idStr,
+				Params: params,
 			}
 		}
 
@@ -467,11 +558,18 @@ func routesSDKToList(ctx context.Context, sdkRoutes []*models.RouteRuleResponse)
 		// Convert connected apps list
 		connectedAppElements := make([]attr.Value, len(sdkRoute.ConnectedApps))
 		for j, sdkApp := range sdkRoute.ConnectedApps {
+			paramsObj, paramsDiags := routeConnectedAppParamsToObject(ctx, sdkApp.Params)
+			diags.Append(paramsDiags...)
+			if diags.HasError() {
+				return types.ListNull(types.ObjectType{AttrTypes: routeRuleAttrTypes()}), diags
+			}
+
 			appObj, appDiags := types.ObjectValue(
 				routeConnectedAppAttrTypes(),
 				map[string]attr.Value{
-					"type": types.StringValue(sdkApp.Type),
-					"id":   types.StringValue(sdkApp.ID),
+					"type":   types.StringValue(sdkApp.Type),
+					"id":     types.StringValue(sdkApp.ID),
+					"params": paramsObj,
 				},
 			)
 			diags.Append(appDiags...)
@@ -661,12 +759,184 @@ func preserveEquivalentDuration(ctx context.Context, original, updated types.Obj
 	return updated
 }
 
+// routeConnectedAppParamsToSDK converts the typed params object into the
+// map[string]any the API expects in RouteConnectedAppRequest.Params. Only
+// attributes that are actually set are included, so connected app types that
+// don't support route params (or don't use a given field) never receive it.
+// An explicitly set auto_resolve is always sent — including false, which must
+// not be dropped because the backend defaults auto_resolve to true when unset.
+func routeConnectedAppParamsToSDK(ctx context.Context, params types.Object) (map[string]any, diag.Diagnostics) {
+	var diags diag.Diagnostics
+
+	if params.IsNull() || params.IsUnknown() {
+		return nil, diags
+	}
+
+	var model routeConnectedAppParamsModel
+	diags.Append(params.As(ctx, &model, basetypes.ObjectAsOptions{})...)
+	if diags.HasError() {
+		return nil, diags
+	}
+
+	result := map[string]any{}
+
+	if !model.Channels.IsNull() && !model.Channels.IsUnknown() {
+		var channelModels []routeConnectedAppChannelModel
+		diags.Append(model.Channels.ElementsAs(ctx, &channelModels, false)...)
+		if diags.HasError() {
+			return nil, diags
+		}
+		channels := make([]*models.ConnectedAppChannel, 0, len(channelModels))
+		for _, ch := range channelModels {
+			id := ch.ID.ValueString()
+			channels = append(channels, &models.ConnectedAppChannel{
+				ID:   &id,
+				Name: ch.Name.ValueString(),
+			})
+		}
+		if len(channels) > 0 {
+			result["channels"] = channels
+		}
+	}
+
+	setRouteParamString(result, "team_id", model.TeamID)
+	setRouteParamString(result, "assignee_id", model.AssigneeID)
+	setRouteParamString(result, "delegate_id", model.DelegateID)
+	setRouteParamString(result, "project_id", model.ProjectID)
+	setRouteParamString(result, "resolved_status_id", model.ResolvedStatusID)
+
+	if !model.LabelIDs.IsNull() && !model.LabelIDs.IsUnknown() {
+		var labelIDs []string
+		diags.Append(model.LabelIDs.ElementsAs(ctx, &labelIDs, false)...)
+		if diags.HasError() {
+			return nil, diags
+		}
+		if len(labelIDs) > 0 {
+			result["label_ids"] = labelIDs
+		}
+	}
+
+	if !model.AutoResolve.IsNull() && !model.AutoResolve.IsUnknown() {
+		result["auto_resolve"] = model.AutoResolve.ValueBool()
+	}
+
+	if len(result) == 0 {
+		return nil, diags
+	}
+	return result, diags
+}
+
+func setRouteParamString(params map[string]any, key string, value types.String) {
+	if !value.IsNull() && !value.IsUnknown() && value.ValueString() != "" {
+		params[key] = value.ValueString()
+	}
+}
+
+// routeConnectedAppParamsToObject converts RouteConnectedAppResponse.Params
+// back into the typed params object. Absent params map to a null object.
+func routeConnectedAppParamsToObject(ctx context.Context, params map[string]any) (types.Object, diag.Diagnostics) {
+	var diags diag.Diagnostics
+	attrTypes := routeConnectedAppParamsAttrTypes()
+
+	if len(params) == 0 {
+		return types.ObjectNull(attrTypes), diags
+	}
+
+	raw, err := json.Marshal(params)
+	if err != nil {
+		diags.AddError("Error mapping notification route connected app params", err.Error())
+		return types.ObjectNull(attrTypes), diags
+	}
+	var wire routeConnectedAppParamsWire
+	if err := json.Unmarshal(raw, &wire); err != nil {
+		diags.AddError("Error mapping notification route connected app params", err.Error())
+		return types.ObjectNull(attrTypes), diags
+	}
+
+	channelType := types.ObjectType{AttrTypes: routeConnectedAppChannelAttrTypes()}
+	channelsList := types.ListNull(channelType)
+	if len(wire.Channels) > 0 {
+		channelElements := make([]attr.Value, 0, len(wire.Channels))
+		for _, ch := range wire.Channels {
+			if ch == nil {
+				continue
+			}
+			id := ""
+			if ch.ID != nil {
+				id = *ch.ID
+			}
+			channelObj, channelDiags := types.ObjectValue(routeConnectedAppChannelAttrTypes(), map[string]attr.Value{
+				"id":   types.StringValue(id),
+				"name": routeNullableString(ch.Name),
+			})
+			diags.Append(channelDiags...)
+			channelElements = append(channelElements, channelObj)
+		}
+		list, listDiags := types.ListValue(channelType, channelElements)
+		diags.Append(listDiags...)
+		channelsList = list
+	}
+
+	labelIDs := types.ListNull(types.StringType)
+	if len(wire.LabelIDs) > 0 {
+		list, listDiags := types.ListValueFrom(ctx, types.StringType, wire.LabelIDs)
+		diags.Append(listDiags...)
+		labelIDs = list
+	}
+
+	autoResolve := types.BoolNull()
+	if wire.AutoResolve != nil {
+		autoResolve = types.BoolValue(*wire.AutoResolve)
+	}
+
+	obj, objDiags := types.ObjectValue(attrTypes, map[string]attr.Value{
+		"channels":           channelsList,
+		"team_id":            routeNullableString(wire.TeamID),
+		"assignee_id":        routeNullableString(wire.AssigneeID),
+		"delegate_id":        routeNullableString(wire.DelegateID),
+		"project_id":         routeNullableString(wire.ProjectID),
+		"resolved_status_id": routeNullableString(wire.ResolvedStatusID),
+		"label_ids":          labelIDs,
+		"auto_resolve":       autoResolve,
+	})
+	diags.Append(objDiags...)
+	return obj, diags
+}
+
+func routeNullableString(value string) types.String {
+	if value == "" {
+		return types.StringNull()
+	}
+	return types.StringValue(value)
+}
+
 // Attribute type definitions for nested structures
 
 func routeConnectedAppAttrTypes() map[string]attr.Type {
 	return map[string]attr.Type{
-		"type": types.StringType,
+		"type":   types.StringType,
+		"id":     types.StringType,
+		"params": types.ObjectType{AttrTypes: routeConnectedAppParamsAttrTypes()},
+	}
+}
+
+func routeConnectedAppParamsAttrTypes() map[string]attr.Type {
+	return map[string]attr.Type{
+		"channels":           types.ListType{ElemType: types.ObjectType{AttrTypes: routeConnectedAppChannelAttrTypes()}},
+		"team_id":            types.StringType,
+		"assignee_id":        types.StringType,
+		"delegate_id":        types.StringType,
+		"project_id":         types.StringType,
+		"resolved_status_id": types.StringType,
+		"label_ids":          types.ListType{ElemType: types.StringType},
+		"auto_resolve":       types.BoolType,
+	}
+}
+
+func routeConnectedAppChannelAttrTypes() map[string]attr.Type {
+	return map[string]attr.Type{
 		"id":   types.StringType,
+		"name": types.StringType,
 	}
 }
 
