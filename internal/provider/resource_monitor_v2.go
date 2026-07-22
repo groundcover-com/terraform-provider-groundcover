@@ -931,7 +931,7 @@ func buildMonitorV2CreateRequest(ctx context.Context, plan *monitorV2ResourceMod
 		AutoResolve:          monitorV2Bool(plan.AutoResolve),
 		Category:             monitorV2String(plan.Category),
 		ExecutionErrorState:  monitorV2String(plan.ExecutionErrorState),
-		IsPaused:             monitorV2Bool(plan.IsPaused),
+		IsPaused:             monitorV2BoolPtr(plan.IsPaused),
 		IsProvisioned:        &isProvisioned,
 		Labels:               monitorV2StringMap(ctx, plan.Labels, &diags),
 		MeasurementType:      monitorV2String(plan.MeasurementType),
@@ -956,7 +956,7 @@ func buildMonitorV2UpdateRequest(ctx context.Context, plan *monitorV2ResourceMod
 		AutoResolve:          monitorV2Bool(plan.AutoResolve),
 		Category:             monitorV2String(plan.Category),
 		ExecutionErrorState:  monitorV2String(plan.ExecutionErrorState),
-		IsPaused:             monitorV2Bool(plan.IsPaused),
+		IsPaused:             monitorV2BoolPtr(plan.IsPaused),
 		Labels:               monitorV2StringMap(ctx, plan.Labels, &diags),
 		MeasurementType:      monitorV2String(plan.MeasurementType),
 		NoDataState:          monitorV2String(plan.NoDataState),
@@ -1165,7 +1165,7 @@ func mapMonitorV2SDKToModel(ctx context.Context, id string, remote *models.Updat
 	state.MeasurementType = monitorV2NullableString(remote.MeasurementType)
 	state.ExecutionErrorState = monitorV2NullableString(remote.ExecutionErrorState)
 	state.NoDataState = monitorV2NullableString(remote.NoDataState)
-	state.IsPaused = types.BoolValue(remote.IsPaused)
+	state.IsPaused = types.BoolPointerValue(remote.IsPaused)
 	state.AutoResolve = types.BoolValue(remote.AutoResolve)
 	state.Category = monitorV2NullableString(remote.Category)
 	state.Team = monitorV2NullableString(remote.Team)
@@ -1430,6 +1430,17 @@ func monitorV2Bool(value types.Bool) bool {
 		return false
 	}
 	return value.ValueBool()
+}
+
+// monitorV2BoolPtr returns nil for null/unknown so the field is omitted from the
+// request (server keeps its current value); otherwise a pointer to the value.
+// Needed for isPaused: with a *bool the SDK serializes an explicit false, which
+// is what makes unpausing (is_paused = false) actually reach the API.
+func monitorV2BoolPtr(value types.Bool) *bool {
+	if value.IsNull() || value.IsUnknown() {
+		return nil
+	}
+	return value.ValueBoolPointer()
 }
 
 func monitorV2StringPtr(value types.String) *string {

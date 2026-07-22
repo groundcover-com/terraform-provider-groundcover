@@ -1,5 +1,6 @@
 ## 1.20.0
 
+* Fixed unpausing monitors: setting `is_paused = false` now works. Updated groundcover SDK to v1.364.0
 * Added `params` to `groundcover_notification_route` route connected apps — optional per-app delivery parameters: `channels` (list of `{ id, name }` Slack channel objects) for `slack-app` routes, and the Linear fields `team_id`, `assignee_id`, `delegate_id`, `project_id`, `resolved_status_id`, `label_ids`, and `auto_resolve`. Previously connected apps only accepted `id` and `type`, so `slack-app` and `linear` notification routes could not be managed with Terraform
 
 ## 1.19.0
