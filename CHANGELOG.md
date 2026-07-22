@@ -1,3 +1,7 @@
+## 1.20.0
+
+* Added `params` to `groundcover_notification_route` route connected apps — optional per-app delivery parameters: `channels` (list of `{ id, name }` Slack channel objects) for `slack-app` routes, and the Linear fields `team_id`, `assignee_id`, `delegate_id`, `project_id`, `resolved_status_id`, `label_ids`, and `auto_resolve`. Previously connected apps only accepted `id` and `type`, so `slack-app` and `linear` notification routes could not be managed with Terraform
+
 ## 1.19.0
 
 * Added `query.evaluation_delay` to `groundcover_monitor_v2` and `groundcover_monitor_v2_json` — an optional evaluation delay expressed as a duration from `0s` to `1h` (e.g. `15m`, `900s`; whole seconds only, the backend limit is 3600 seconds) that delays query evaluation to account for late-arriving data. Sent on create/update and read back during refresh and import

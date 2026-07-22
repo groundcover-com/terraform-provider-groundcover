@@ -41,7 +41,7 @@ Basic usage examples can be found in the `examples/` directory:
 *   **Connected App (JSON) Resource:** [`examples/resources/groundcover_connected_app_json/resource.tf`](./examples/resources/groundcover_connected_app_json/resource.tf)
     *   Same as Connected App, but `data` is a JSON string — for generated configs or tooling that can't model dynamic objects (e.g. Crossplane).
 *   **Notification Route Resource:** [`examples/resources/groundcover_notification_route/resource.tf`](./examples/resources/groundcover_notification_route/resource.tf)
-    *   Demonstrates how to create and manage notification routes for routing alerts to connected apps.
+    *   Demonstrates how to create and manage notification routes for routing alerts to connected apps, including per-app delivery `params` (Slack channels for `slack-app`, Linear team/project/label options).
 *   **Secret Resource:** [`examples/resources/groundcover_secret/resource.tf`](./examples/resources/groundcover_secret/resource.tf)
     *   Demonstrates how to securely store sensitive values and receive reference IDs for use in other resources.
 *   **Synthetic Test Resource:** [`examples/resources/groundcover_synthetic_test/resource.tf`](./examples/resources/groundcover_synthetic_test/resource.tf)
