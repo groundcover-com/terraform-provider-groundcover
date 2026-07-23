@@ -27,6 +27,21 @@ func (c *SdkClientWrapper) CreateDataIntegration(ctx context.Context, integratio
 	return createResp.Payload, nil
 }
 
+// ListDataIntegrations retrieves all data integration configurations of the given type
+func (c *SdkClientWrapper) ListDataIntegrations(ctx context.Context, integrationType string) ([]*models.DataIntegrationConfig, error) {
+	logFields := map[string]any{"req": "list_data_integrations", "type": integrationType}
+	tflog.Debug(ctx, "Executing SDK Call: List DataIntegrations", logFields)
+
+	listParams := integrations.NewGetDataIntegrationConfigsByTypeParamsWithContext(ctx).WithType(integrationType)
+	listResp, err := c.sdkClient.Integrations.GetDataIntegrationConfigsByType(listParams, nil)
+	if err != nil {
+		return nil, handleApiError(ctx, err, "ListDataIntegrations", dataIntegrationResourceId)
+	}
+
+	tflog.Debug(ctx, "SDK Call Successful: List DataIntegrations", logFields)
+	return listResp.Payload, nil
+}
+
 // GetDataIntegration retrieves a data integration configuration by type and ID
 func (c *SdkClientWrapper) GetDataIntegration(ctx context.Context, integrationType string, id string) (*models.DataIntegrationConfig, error) {
 	logFields := map[string]any{"req": "get_data_integration", "id": id, "type": integrationType}
