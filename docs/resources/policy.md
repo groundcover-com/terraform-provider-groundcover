@@ -78,6 +78,22 @@ resource "groundcover_policy" "my_policy" {
   }
 }
 
+# Define a policy with unrestricted data access.
+# An empty data_scope block means no data restrictions — the policy grants access to
+# all data (all clusters, namespaces, etc.), exactly like omitting data_scope entirely.
+# Useful for tooling that always emits the data_scope block (e.g. the Crossplane
+# provider generated from this provider).
+resource "groundcover_policy" "admin_all_data" {
+  name        = "Admin All Data (Terraform)"
+  description = "Full admin access to all data."
+
+  role = {
+    admin = "admin"
+  }
+
+  data_scope = {}
+}
+
 # Output the generated policy UUID
 output "policy_uuid" {
   description = "The unique ID (UUID) of the created policy."
