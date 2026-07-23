@@ -63,6 +63,17 @@ func TestAccDashboardResource(t *testing.T) {
 					resource.TestCheckResourceAttr("groundcover_dashboard.test", "tags.1", "team-a"),
 				),
 			},
+			// Import the tagged dashboard to verify API-to-state tag
+			// reconstruction (the earlier import step ran before tags existed).
+			{
+				ResourceName:      "groundcover_dashboard.test",
+				ImportState:       true,
+				ImportStateVerify: true,
+				ImportStateVerifyIgnore: []string{
+					"override",
+					"preset",
+				},
+			},
 			// Configured tags with surrounding whitespace and a duplicate are
 			// preserved verbatim in state (the backend trims and de-duplicates
 			// server-side), so the apply is consistent.
