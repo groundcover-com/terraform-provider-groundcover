@@ -809,13 +809,19 @@ func tagsToStringSlice(ctx context.Context, list types.List) ([]string, diag.Dia
 }
 
 // canonicalizeTags mirrors the backend's tag normalization: it trims surrounding
-// whitespace from each tag and drops exact duplicates, preserving the original
-// order and casing. A nil or empty input yields an empty slice.
+// whitespace from each tag, drops entries that are empty after trimming, and
+// drops exact duplicates, preserving the original order and casing. A nil or
+// empty input yields an empty slice. Dropping trimmed-empty entries keeps the
+// canonical form aligned with the backend (which does not store an empty tag),
+// so a configured whitespace-only tag round-trips without a perpetual diff.
 func canonicalizeTags(tags []string) []string {
 	seen := make(map[string]struct{}, len(tags))
 	canonical := make([]string, 0, len(tags))
 	for _, tag := range tags {
 		trimmed := strings.TrimSpace(tag)
+		if trimmed == "" {
+			continue
+		}
 		if _, ok := seen[trimmed]; ok {
 			continue
 		}

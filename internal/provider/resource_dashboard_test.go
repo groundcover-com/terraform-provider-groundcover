@@ -74,22 +74,24 @@ func TestAccDashboardResource(t *testing.T) {
 					"preset",
 				},
 			},
-			// Configured tags with surrounding whitespace and a duplicate are
-			// preserved verbatim in state (the backend trims and de-duplicates
-			// server-side), so the apply is consistent.
+			// Configured tags with surrounding whitespace, a whitespace-only
+			// entry, and a duplicate are preserved verbatim in state (the
+			// backend trims, drops empties, and de-duplicates server-side), so
+			// the apply stays consistent.
 			{
-				Config: testAccDashboardResourceConfigWithTags(dashboardName, `[" Production ", "team-a", "Production"]`),
+				Config: testAccDashboardResourceConfigWithTags(dashboardName, `[" Production ", "   ", "team-a", "Production"]`),
 				Check: resource.ComposeTestCheckFunc(
-					resource.TestCheckResourceAttr("groundcover_dashboard.test", "tags.#", "3"),
+					resource.TestCheckResourceAttr("groundcover_dashboard.test", "tags.#", "4"),
 					resource.TestCheckResourceAttr("groundcover_dashboard.test", "tags.0", " Production "),
-					resource.TestCheckResourceAttr("groundcover_dashboard.test", "tags.1", "team-a"),
-					resource.TestCheckResourceAttr("groundcover_dashboard.test", "tags.2", "Production"),
+					resource.TestCheckResourceAttr("groundcover_dashboard.test", "tags.1", "   "),
+					resource.TestCheckResourceAttr("groundcover_dashboard.test", "tags.2", "team-a"),
+					resource.TestCheckResourceAttr("groundcover_dashboard.test", "tags.3", "Production"),
 				),
 			},
-			// Re-apply the same whitespace/duplicate config — state mirrors
-			// config, so there is no perpetual diff.
+			// Re-apply the same config (whitespace-only + duplicate included) —
+			// state mirrors config, so there is no perpetual diff.
 			{
-				Config:   testAccDashboardResourceConfigWithTags(dashboardName, `[" Production ", "team-a", "Production"]`),
+				Config:   testAccDashboardResourceConfigWithTags(dashboardName, `[" Production ", "   ", "team-a", "Production"]`),
 				PlanOnly: true,
 			},
 			// Remove tags entirely — the attribute goes back to unset (null),
