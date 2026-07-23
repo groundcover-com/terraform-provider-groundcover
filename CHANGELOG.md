@@ -1,3 +1,8 @@
+## 1.20.1
+
+* Documented the `groundcover_dashboard` preset structure — top-level fields, layout grid, widget/query fields, and the supported `visualizationConfig.type` values
+* Fixed the `groundcover_dashboard` example, which failed `terraform apply` with `Dashboard validation failed` — unsupported `gauge` visualization type (now `stat`), `editorMode = "code"` rejected by the create validator (now `builder`), a rejected `visualizationConfig.config` block (removed), and a missing `description` that caused an inconsistent-result-after-apply error
+
 ## 1.20.0
 
 * Fixed monitor pause handling: setting `is_paused = false` now unpauses, and omitting `is_paused` preserves the monitor's current pause state instead of resetting it
