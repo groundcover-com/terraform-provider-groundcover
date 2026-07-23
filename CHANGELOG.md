@@ -1,5 +1,6 @@
-## 1.20.1
+## 1.21.0
 
+* Added `tags` to `groundcover_dashboard` — an optional list of free-text strings for organizing dashboards. Sent on create/update and read back during refresh and import. Tag order and casing are preserved by the backend (it only trims surrounding whitespace and drops exact duplicates), so a supplied list round-trips without drift; leaving the attribute unset keeps the dashboard untagged
 * Documented the `groundcover_dashboard` preset structure — top-level fields, layout grid, widget/query fields, and the supported `visualizationConfig.type` values
 * Fixed the `groundcover_dashboard` example, which failed `terraform apply` with `Dashboard validation failed` — unsupported `gauge` visualization type (now `stat`), `editorMode = "code"` rejected by the create validator (now `builder`), a rejected `visualizationConfig.config` block (removed), and a missing `description` that caused an inconsistent-result-after-apply error
 

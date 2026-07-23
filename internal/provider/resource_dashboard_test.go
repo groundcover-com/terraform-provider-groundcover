@@ -52,6 +52,56 @@ func TestAccDashboardResource(t *testing.T) {
 					resource.TestCheckResourceAttrSet("groundcover_dashboard.test", "preset"),
 				),
 			},
+			// Tags coverage is folded in here rather than in a separate
+			// acceptance test. Add tags and confirm they land on the remote
+			// resource.
+			{
+				Config: testAccDashboardResourceConfigWithTags(dashboardName, `["Production", "team-a"]`),
+				Check: resource.ComposeTestCheckFunc(
+					resource.TestCheckResourceAttr("groundcover_dashboard.test", "tags.#", "2"),
+					resource.TestCheckResourceAttr("groundcover_dashboard.test", "tags.0", "Production"),
+					resource.TestCheckResourceAttr("groundcover_dashboard.test", "tags.1", "team-a"),
+				),
+			},
+			// Import the tagged dashboard to verify API-to-state tag
+			// reconstruction (the earlier import step ran before tags existed).
+			{
+				ResourceName:      "groundcover_dashboard.test",
+				ImportState:       true,
+				ImportStateVerify: true,
+				ImportStateVerifyIgnore: []string{
+					"override",
+					"preset",
+				},
+			},
+			// Configured tags with surrounding whitespace, a whitespace-only
+			// entry, and a duplicate are preserved verbatim in state (the
+			// backend trims, drops empties, and de-duplicates server-side), so
+			// the apply stays consistent.
+			{
+				Config: testAccDashboardResourceConfigWithTags(dashboardName, `[" Production ", "   ", "team-a", "Production"]`),
+				Check: resource.ComposeTestCheckFunc(
+					resource.TestCheckResourceAttr("groundcover_dashboard.test", "tags.#", "4"),
+					resource.TestCheckResourceAttr("groundcover_dashboard.test", "tags.0", " Production "),
+					resource.TestCheckResourceAttr("groundcover_dashboard.test", "tags.1", "   "),
+					resource.TestCheckResourceAttr("groundcover_dashboard.test", "tags.2", "team-a"),
+					resource.TestCheckResourceAttr("groundcover_dashboard.test", "tags.3", "Production"),
+				),
+			},
+			// Re-apply the same config (whitespace-only + duplicate included) —
+			// state mirrors config, so there is no perpetual diff.
+			{
+				Config:   testAccDashboardResourceConfigWithTags(dashboardName, `[" Production ", "   ", "team-a", "Production"]`),
+				PlanOnly: true,
+			},
+			// Remove tags entirely — the attribute goes back to unset (null),
+			// no diff.
+			{
+				Config: testAccDashboardResourceConfigSimple(dashboardName),
+				Check: resource.ComposeTestCheckFunc(
+					resource.TestCheckNoResourceAttr("groundcover_dashboard.test", "tags"),
+				),
+			},
 		},
 	})
 }
@@ -475,4 +525,23 @@ resource "groundcover_dashboard" "test" {
   preset      = jsonencode(local.preset_data)
 }
 `, name)
+}
+
+// testAccDashboardResourceConfigWithTags renders a dashboard with a tags list.
+// tagsHCL is an HCL list literal, e.g. `["Production", "team-a"]`.
+func testAccDashboardResourceConfigWithTags(name, tagsHCL string) string {
+	return fmt.Sprintf(`
+resource "groundcover_dashboard" "test" {
+  name        = "%s"
+  description = "Dashboard with tags"
+  tags        = %s
+  preset      = jsonencode({
+    duration      = "Last 1 hour"
+    widgets       = []
+    layout        = []
+    variables     = {}
+    schemaVersion = 3
+  })
+}
+`, name, tagsHCL)
 }
