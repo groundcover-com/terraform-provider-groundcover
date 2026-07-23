@@ -1,3 +1,7 @@
+## 1.20.1
+
+* Fixed the `groundcover_dashboard` example, which failed `terraform apply` with `Dashboard validation failed` — unsupported `gauge` visualization type (now `stat`), `editorMode = "code"` rejected by the create validator (now `builder`), a rejected `visualizationConfig.config` block (removed), and a missing `description` that caused an inconsistent-result-after-apply error
+
 ## 1.20.0
 
 * Added `params` to `groundcover_notification_route` route connected apps — optional per-app delivery parameters: `channels` (list of `{ id, name }` Slack channel objects) for `slack-app` routes, and the Linear fields `team_id`, `assignee_id`, `delegate_id`, `project_id`, `resolved_status_id`, `label_ids`, and `auto_resolve`. Previously connected apps only accepted `id` and `type`, so `slack-app` and `linear` notification routes could not be managed with Terraform
