@@ -201,7 +201,7 @@ func (r *policyResource) Schema(ctx context.Context, req resource.SchemaRequest,
 				Optional:            true,
 			},
 			"data_scope": schema.SingleNestedAttribute{
-				MarkdownDescription: "Defines the data scope restrictions for the policy. Either 'simple' or 'advanced' must be specified, but not both.",
+				MarkdownDescription: "Defines the data scope restrictions for the policy. At most one of 'simple' or 'advanced' may be specified. Omitting data_scope, or providing an empty block, means no data restrictions (access to all data).",
 				Optional:            true,
 				Attributes: map[string]schema.Attribute{
 					"simple": schema.SingleNestedAttribute{
@@ -565,7 +565,9 @@ func (r *policyResource) Delete(ctx context.Context, req resource.DeleteRequest,
 
 // --- Helper Functions for Validation ---
 
-// validateDataScopeConfiguration validates that data_scope has exactly one of simple or advanced specified.
+// validateDataScopeConfiguration validates that data_scope has at most one of simple or advanced specified.
+// An empty data_scope block (neither simple nor advanced) is valid and means no data restrictions (allow all),
+// same as omitting data_scope entirely.
 func validateDataScopeConfiguration(ctx context.Context, dataScope types.Object, diags *diag.Diagnostics) bool {
 	if dataScope.IsNull() || dataScope.IsUnknown() {
 		return true // No validation needed if data_scope is not specified
@@ -584,14 +586,6 @@ func validateDataScopeConfiguration(ctx context.Context, dataScope types.Object,
 		diags.AddError(
 			"Invalid Data Scope Configuration",
 			"data_scope cannot have both 'simple' and 'advanced' specified. Please specify only one.",
-		)
-		return false
-	}
-
-	if !simpleSpecified && !advancedSpecified {
-		diags.AddError(
-			"Invalid Data Scope Configuration",
-			"data_scope must have either 'simple' or 'advanced' specified when data_scope is provided.",
 		)
 		return false
 	}
