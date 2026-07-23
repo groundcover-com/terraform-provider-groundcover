@@ -1,3 +1,7 @@
+## 1.20.1
+
+* Documented the `groundcover_dashboard` preset structure — top-level fields, layout grid, widget/query fields, and the supported `visualizationConfig.type` values
+
 ## 1.20.0
 
 * Fixed monitor pause handling: setting `is_paused = false` now unpauses, and omitting `is_paused` preserves the monitor's current pause state instead of resetting it
