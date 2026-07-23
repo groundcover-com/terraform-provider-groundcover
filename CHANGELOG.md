@@ -1,9 +1,7 @@
 ## 1.21.0
 
 * `groundcover_policy` now accepts an empty `data_scope = {}` block, treating it the same as omitting `data_scope` entirely — no data restrictions (access to all data). Previously the provider rejected it with "data_scope must have either 'simple' or 'advanced' specified", forcing tools that always emit the block (e.g. the Crossplane provider) to send an empty `simple` group as a workaround
-
-## 1.20.1
-
+* Added `tags` to `groundcover_dashboard` — an optional list of free-text strings for organizing dashboards. Sent on create/update and read back during refresh and import. Tag order and casing are preserved by the backend (it only trims surrounding whitespace and drops exact duplicates), so a supplied list round-trips without drift; leaving the attribute unset keeps the dashboard untagged
 * Documented the `groundcover_dashboard` preset structure — top-level fields, layout grid, widget/query fields, and the supported `visualizationConfig.type` values
 * Fixed the `groundcover_dashboard` example, which failed `terraform apply` with `Dashboard validation failed` — unsupported `gauge` visualization type (now `stat`), `editorMode = "code"` rejected by the create validator (now `builder`), a rejected `visualizationConfig.config` block (removed), and a missing `description` that caused an inconsistent-result-after-apply error
 
