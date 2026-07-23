@@ -204,7 +204,7 @@ output "simple_dashboard_owner" {
 
 - `description` (String) The description of the dashboard.
 - `override` (Boolean, Deprecated) Deprecated: this attribute is ignored. Override is always enabled for terraform-managed updates.
-- `tags` (List of String) Free-text tags for organizing the dashboard. Order and casing are preserved; each tag is trimmed of surrounding whitespace and exact duplicates are dropped. Omit or leave unset for an untagged dashboard.
+- `tags` (List of String) Free-text tags for organizing the dashboard. Your configured list is preserved as-is in Terraform state; the backend additionally trims surrounding whitespace and drops exact duplicates server-side. Omit or leave unset for an untagged dashboard.
 - `team` (String) The team that owns the dashboard.
 
 ### Read-Only
