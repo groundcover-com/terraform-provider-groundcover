@@ -15,7 +15,7 @@ import (
 
 func TestAccDataIntegrationResource(t *testing.T) {
 	resource.Test(t, resource.TestCase{
-		PreCheck:                 func() { testAccPreCheck(t); testAccCleanupDataIntegrations(t, "cloudwatch") },
+		PreCheck:                 func() { testAccPreCheck(t) },
 		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
 		Steps: []resource.TestStep{
 			// Create and Read testing
@@ -60,7 +60,7 @@ func TestAccDataIntegrationResource(t *testing.T) {
 
 func TestAccDataIntegrationResource_disappears(t *testing.T) {
 	resource.Test(t, resource.TestCase{
-		PreCheck:                 func() { testAccPreCheck(t); testAccCleanupDataIntegrations(t, "cloudwatch") },
+		PreCheck:                 func() { testAccPreCheck(t) },
 		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
 		Steps: []resource.TestStep{
 			{
@@ -73,42 +73,6 @@ func TestAccDataIntegrationResource_disappears(t *testing.T) {
 			},
 		},
 	})
-}
-
-// testAccCleanupDataIntegrations deletes any existing data integration configs of the
-// given type before the test runs. Data integrations are effectively singletons per
-// type on the backend, so a leftover config from an aborted run (e.g. a CI job killed
-// between create and destroy) makes every subsequent create fail with 409 Conflict.
-// This makes the acceptance tests self-healing instead of wedging CI for every PR.
-func testAccCleanupDataIntegrations(t *testing.T, integrationType string) {
-	ctx := context.Background()
-
-	apiKey := os.Getenv("GROUNDCOVER_API_KEY")
-	orgName := os.Getenv("GROUNDCOVER_BACKEND_ID")
-	apiURL := os.Getenv("GROUNDCOVER_API_URL")
-	if apiURL == "" {
-		apiURL = "https://api.groundcover.io"
-	}
-
-	client, err := NewSdkClientWrapper(ctx, apiURL, apiKey, orgName)
-	if err != nil {
-		t.Fatalf("cleanup: failed to create client: %v", err)
-	}
-
-	configs, err := client.ListDataIntegrations(ctx, integrationType)
-	if err != nil {
-		t.Fatalf("cleanup: failed to list %s data integrations: %v", integrationType, err)
-	}
-
-	for _, config := range configs {
-		if config == nil || config.ID == "" {
-			continue
-		}
-		t.Logf("cleanup: deleting leftover %s data integration %s", integrationType, config.ID)
-		if err := client.DeleteDataIntegration(ctx, integrationType, config.ID, config.Cluster); err != nil {
-			t.Fatalf("cleanup: failed to delete leftover %s data integration %s: %v", integrationType, config.ID, err)
-		}
-	}
 }
 
 func testAccDataIntegrationResourceConfig() string {

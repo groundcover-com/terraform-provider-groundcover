@@ -215,7 +215,6 @@ type ApiClient interface {
 
 	// DataIntegrations
 	CreateDataIntegration(ctx context.Context, integrationType string, req *models.CreateDataIntegrationConfigRequest) (*models.DataIntegrationConfig, error)
-	ListDataIntegrations(ctx context.Context, integrationType string) ([]*models.DataIntegrationConfig, error)
 	GetDataIntegration(ctx context.Context, integrationType string, id string) (*models.DataIntegrationConfig, error)
 	UpdateDataIntegration(ctx context.Context, integrationType string, id string, req *models.CreateDataIntegrationConfigRequest) (*models.DataIntegrationConfig, error)
 	DeleteDataIntegration(ctx context.Context, integrationType string, id string, cluster *string) error
