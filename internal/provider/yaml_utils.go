@@ -50,22 +50,26 @@ var (
 	// values (see normalizeDurationScalar). The optional leading "-" is required
 	// for relativeTimerange.from values the UI stores as "-1d".
 	fullDayWeekDurationRegex = regexp.MustCompile(`^(-?)(\d+)([dw])(?:(\d+)h)?$`)
-
-	// monitorDurationKeys are the monitor YAML fields whose scalar values are
-	// durations, mirroring the fields the typed monitor_v2 resource normalizes.
-	// Only values under these keys are day/week-normalized, so free-text fields
-	// (title, description, labels, ...) are never rewritten. Keys are matched by
-	// leaf name; in the monitor schema these names only ever carry durations.
-	monitorDurationKeys = map[string]bool{
-		"interval":               true, // evaluationInterval.interval
-		"pendingFor":             true, // evaluationInterval.pendingFor
-		"renotificationInterval": true, // notificationSettings.renotificationInterval
-		"instantRollup":          true, // query.instantRollup
-		"time":                   true, // query.rollup.time
-		"from":                   true, // relativeTimerange.from
-		"to":                     true, // relativeTimerange.to
-	}
 )
+
+// isMonitorDurationField reports whether parentKey.key is a known monitor
+// duration field. Short/ambiguous leaf names (from, to, time, interval,
+// pendingFor) require the expected parent so arbitrary nested fields such as
+// labels.from are never rewritten. Schema-unique names are matched by leaf.
+func isMonitorDurationField(parentKey, key string) bool {
+	switch key {
+	case "from", "to":
+		return parentKey == "relativeTimerange"
+	case "time":
+		return parentKey == "rollup"
+	case "interval", "pendingFor":
+		return parentKey == "evaluationInterval"
+	case "instantRollup", "renotificationInterval":
+		return true
+	default:
+		return false
+	}
+}
 
 // NormalizeMonitorYaml sorts keys in a YAML string alphabetically using AST manipulation.
 // This approach preserves comments and handles complex YAML structures consistently.
@@ -112,6 +116,13 @@ func NormalizeMonitorYaml(ctx context.Context, yamlString string) (string, error
 
 // sortAstNodeGoccy recursively sorts nodes in the AST provided by goccy/go-yaml.
 func sortAstNodeGoccy(node ast.Node) {
+	sortAstNodeGoccyWithParent(node, "")
+}
+
+// sortAstNodeGoccyWithParent is the recursive AST walker. parentKey is the
+// mapping key that owns the current node (empty at the document root) and is
+// used for structural duration-field detection.
+func sortAstNodeGoccyWithParent(node ast.Node, parentKey string) {
 	if node == nil {
 		return
 	}
@@ -129,29 +140,29 @@ func sortAstNodeGoccy(node ast.Node) {
 			if valNode.Value == nil {
 				continue
 			}
+			key := getStringKeyFromNode(valNode.Key)
 			// Scoped duration normalization: rewrite day/week scalars to hours
-			// only for keys that are actually duration fields (mirrors the typed
-			// monitor_v2 behavior). Non-duration fields like title/description are
-			// left untouched regardless of their value.
-			if sn, ok := valNode.Value.(*ast.StringNode); ok && monitorDurationKeys[getStringKeyFromNode(valNode.Key)] {
+			// only on known monitor duration paths. Non-duration fields like
+			// title/description/labels are left untouched.
+			if sn, ok := valNode.Value.(*ast.StringNode); ok && isMonitorDurationField(parentKey, key) {
 				sn.Value = normalizeDurationScalar(sn.Value)
 			}
-			sortAstNodeGoccy(valNode.Value)
+			sortAstNodeGoccyWithParent(valNode.Value, key)
 		}
 	case *ast.SequenceNode:
 		// NOTE: We do NOT sort the sequence elements themselves (n.Values slice)
 		// because array order often matters semantically in configuration files.
 		// We only recursively sort the internal structure of each element.
 		for _, valNode := range n.Values {
-			sortAstNodeGoccy(valNode)
+			sortAstNodeGoccyWithParent(valNode, parentKey)
 		}
 	case *ast.DocumentNode:
 		if n.Body != nil {
-			sortAstNodeGoccy(n.Body)
+			sortAstNodeGoccyWithParent(n.Body, parentKey)
 		}
 	case *ast.AnchorNode:
 		if n.Value != nil {
-			sortAstNodeGoccy(n.Value)
+			sortAstNodeGoccyWithParent(n.Value, parentKey)
 		}
 	case *ast.AliasNode:
 		// Alias nodes don't have children to sort
@@ -814,7 +825,7 @@ func normalizeDayDurations(s string) string {
 // "-1d") into hours, since Go's time.ParseDuration understands neither "d" nor
 // "w". Values that are not exactly such a token (e.g. "5m", "1h30m", or free
 // text) are returned unchanged. Callers additionally gate this to known
-// duration fields (see monitorDurationKeys). Composite forms with
+// duration fields (see isMonitorDurationField). Composite forms with
 // minutes/seconds are not supported.
 func normalizeDurationScalar(value string) string {
 	parts := fullDayWeekDurationRegex.FindStringSubmatch(value)
