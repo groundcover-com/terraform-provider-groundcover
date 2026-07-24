@@ -44,10 +44,12 @@ var (
 	dayDurationRegex = regexp.MustCompile(`\b(\d+)([dw])(?:(\d+)h)?\b`)
 
 	// Match a scalar whose ENTIRE value is a bare day/week duration ("1d", "7d",
-	// "1d4h", "1w", "2w4h"). Anchored on both ends so free-text values that merely
-	// contain such a token (e.g. "retry after 1w") never match. Used for scoped,
-	// per-scalar normalization of parsed YAML values (see normalizeDurationScalar).
-	fullDayWeekDurationRegex = regexp.MustCompile(`^(\d+)([dw])(?:(\d+)h)?$`)
+	// "1d4h", "1w", "2w4h"), optionally signed ("-1d"). Anchored on both ends so
+	// free-text values that merely contain such a token (e.g. "retry after 1w")
+	// never match. Used for scoped, per-scalar normalization of parsed YAML
+	// values (see normalizeDurationScalar). The optional leading "-" is required
+	// for relativeTimerange.from values the UI stores as "-1d".
+	fullDayWeekDurationRegex = regexp.MustCompile(`^(-?)(\d+)([dw])(?:(\d+)h)?$`)
 
 	// monitorDurationKeys are the monitor YAML fields whose scalar values are
 	// durations, mirroring the fields the typed monitor_v2 resource normalizes.
@@ -808,33 +810,35 @@ func normalizeDayDurations(s string) string {
 }
 
 // normalizeDurationScalar converts a scalar whose entire value is a bare
-// day/week duration ("1d", "7d", "1d4h", "1w", "2w4h") into hours, since Go's
-// time.ParseDuration understands neither "d" nor "w". Values that are not
-// exactly such a token (e.g. "5m", "1h30m", or free text) are returned
-// unchanged. Callers additionally gate this to known duration fields (see
-// monitorDurationKeys). Composite forms with minutes/seconds are not supported.
+// day/week duration ("1d", "7d", "1d4h", "1w", "2w4h", optionally signed like
+// "-1d") into hours, since Go's time.ParseDuration understands neither "d" nor
+// "w". Values that are not exactly such a token (e.g. "5m", "1h30m", or free
+// text) are returned unchanged. Callers additionally gate this to known
+// duration fields (see monitorDurationKeys). Composite forms with
+// minutes/seconds are not supported.
 func normalizeDurationScalar(value string) string {
 	parts := fullDayWeekDurationRegex.FindStringSubmatch(value)
 	if parts == nil {
 		return value
 	}
-	n, err := strconv.Atoi(parts[1])
+	sign := parts[1]
+	n, err := strconv.Atoi(parts[2])
 	if err != nil {
 		return value
 	}
 	hoursPerUnit := 24
-	if parts[2] == "w" {
+	if parts[3] == "w" {
 		hoursPerUnit = 24 * 7
 	}
 	totalHours := n * hoursPerUnit
-	if parts[3] != "" {
-		h, err := strconv.Atoi(parts[3])
+	if parts[4] != "" {
+		h, err := strconv.Atoi(parts[4])
 		if err != nil {
 			return value
 		}
 		totalHours += h
 	}
-	return strconv.Itoa(totalHours) + "h"
+	return sign + strconv.Itoa(totalHours) + "h"
 }
 
 // normalizeTimeString normalizes a single time string
