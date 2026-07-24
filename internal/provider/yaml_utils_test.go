@@ -1175,7 +1175,18 @@ evaluationInterval:
 description: retry after 1w
 renotificationInterval: "2w"
 labels:
-  window: 1w`
+  window: 1w
+  from: -1d
+model:
+  queries:
+  - name: threshold_input_query
+    expression: up
+    relativeTimerange:
+      from: -1d
+      to: 0m
+    rollup:
+      function: last
+      time: 1d`
 
 	got, err := NormalizeMonitorYaml(ctx, input)
 	if err != nil {
@@ -1186,9 +1197,12 @@ labels:
 		"interval: 24h",                  // duration field converted
 		"pendingFor: 168h",               // duration field converted
 		`renotificationInterval: "336h"`, // duration field converted (quoted)
+		"from: -24h",                     // signed relativeTimerange.from converted
+		"time: 24h",                      // rollup window converted
 		"title: 1w",                      // non-duration field, exact token: preserved
 		"description: retry after 1w",    // free text: preserved
 		"window: 1w",                     // non-duration label, exact token: preserved
+		"from: -1d",                      // labels.from must not collide with relativeTimerange.from
 	}
 	for _, want := range mustContain {
 		if !strings.Contains(got, want) {

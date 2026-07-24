@@ -19,6 +19,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-testing/helper/acctest"
 	"github.com/hashicorp/terraform-plugin-testing/helper/resource"
 	"github.com/hashicorp/terraform-plugin-testing/terraform"
+	"gopkg.in/yaml.v3"
 )
 
 func TestMonitorResourceRequestsForceIsProvisioned(t *testing.T) {
@@ -707,6 +708,69 @@ func TestMonitorV2DurationNormalizationPreservesZero(t *testing.T) {
 	}
 	if got := monitorV2DurationStringToType("5 minutes").ValueString(); got != "5m" {
 		t.Fatalf("monitorV2DurationStringToType(5 minutes) = %q, want 5m", got)
+	}
+}
+
+// TestMonitorV2UnmarshalRemoteYAML_NormalizesDayDurations is the regression for
+// UI-edited monitors that store rollup.time as "1d" / relativeTimerange.from as
+// "-1d". models.Duration uses time.ParseDuration, which rejects those units, so
+// Read must normalize before unmarshaling — matching groundcover_monitor.
+func TestMonitorV2UnmarshalRemoteYAML_NormalizesDayDurations(t *testing.T) {
+	ctx := context.Background()
+	remoteYAML := []byte(`title: Azure Files Storage Utilization High
+severity: high
+measurementType: state
+evaluationInterval:
+  interval: 10m
+  pendingFor: 5m
+model:
+  queries:
+  - name: threshold_input_query
+    expression: max by (resource_name) (up)
+    datasourceType: prometheus
+    queryType: instant
+    relativeTimerange:
+      from: -1d
+      to: 0m
+    rollup:
+      function: last
+      time: 1d
+  thresholds:
+  - name: threshold_1
+    inputName: threshold_input_query
+    operator: gte
+    values:
+    - 50
+`)
+
+	// Prove the raw API payload still fails without normalization (documents why
+	// Read must call NormalizeMonitorYaml — do not remove this check).
+	var raw models.UpdateMonitorRequest
+	if err := yaml.Unmarshal(remoteYAML, &raw); err == nil {
+		t.Fatal("yaml.Unmarshal(raw) unexpectedly succeeded; expected time.ParseDuration failure on 1d")
+	} else if !strings.Contains(err.Error(), `unknown unit "d"`) {
+		t.Fatalf("yaml.Unmarshal(raw) error = %v, want unknown unit \"d\"", err)
+	}
+
+	remote, err := monitorV2UnmarshalRemoteYAML(ctx, remoteYAML)
+	if err != nil {
+		t.Fatalf("monitorV2UnmarshalRemoteYAML() error: %v", err)
+	}
+	if remote.Model == nil || len(remote.Model.Queries) != 1 {
+		t.Fatalf("expected 1 query, got %#v", remote.Model)
+	}
+	query := remote.Model.Queries[0]
+	if query.Rollup == nil {
+		t.Fatal("expected rollup")
+	}
+	if got := time.Duration(query.Rollup.Time); got != 24*time.Hour {
+		t.Fatalf("rollup.time = %s, want 24h", got)
+	}
+	if query.RelativeTimerange == nil {
+		t.Fatal("expected relativeTimerange")
+	}
+	if got := time.Duration(query.RelativeTimerange.From); got != -24*time.Hour {
+		t.Fatalf("relativeTimerange.from = %s, want -24h", got)
 	}
 }
 

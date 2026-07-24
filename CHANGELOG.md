@@ -1,3 +1,7 @@
+## 1.21.1
+
+* Fixed `groundcover_monitor_v2` / `groundcover_monitor_v2_json` Read/refresh failures when the monitors API returns day or week duration units such as `rollup.time: 1d` or `relativeTimerange.from: -1d` (as stored by the UI). Go's `time.ParseDuration` rejects those units, so refresh failed with `unknown unit "d" in duration "1d"`. Read now runs the same scoped `NormalizeMonitorYaml` path used by `groundcover_monitor` before unmarshaling into the typed SDK model.
+
 ## 1.21.0
 
 * `groundcover_policy` now accepts an empty `data_scope = {}` block, treating it the same as omitting `data_scope` entirely — no data restrictions (access to all data). Previously the provider rejected it with "data_scope must have either 'simple' or 'advanced' specified", forcing tools that always emit the block (e.g. the Crossplane provider) to send an empty `simple` group as a workaround
