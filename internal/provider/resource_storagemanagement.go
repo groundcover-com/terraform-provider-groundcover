@@ -14,7 +14,6 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
-	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 )
@@ -31,6 +30,34 @@ type storageManagementPolicyResource struct{ client ApiClient }
 
 // coldVolume is fixed for all policies and is not user-configurable.
 const coldVolume = "cold"
+
+// dataTypeImmutable rejects data_type changes at plan time. A RequiresReplace
+// plan would never converge: the destroy half of the replace has no delete API
+// and always fails, so the error must surface before apply.
+type dataTypeImmutable struct{}
+
+func (dataTypeImmutable) Description(ctx context.Context) string {
+	return "data_type cannot be changed after the policy is managed"
+}
+
+func (m dataTypeImmutable) MarkdownDescription(ctx context.Context) string {
+	return m.Description(ctx)
+}
+
+func (dataTypeImmutable) PlanModifyString(_ context.Context, req planmodifier.StringRequest, resp *planmodifier.StringResponse) {
+	if req.StateValue.IsNull() || req.PlanValue.IsNull() || req.PlanValue.IsUnknown() {
+		return
+	}
+	if !req.PlanValue.Equal(req.StateValue) {
+		resp.Diagnostics.AddAttributeError(
+			req.Path,
+			"Data Type Cannot Be Changed",
+			fmt.Sprintf("Changing data_type (from %q to %q) would require deleting the existing policy, which is not supported. "+
+				"To manage a different data type, add a new resource for it and remove this one from state with `terraform state rm`.",
+				req.StateValue.ValueString(), req.PlanValue.ValueString()),
+		)
+	}
+}
 
 type storageManagementPolicyResourceModel struct {
 	DataType         types.String             `tfsdk:"data_type"`
@@ -55,12 +82,14 @@ func (r *storageManagementPolicyResource) Metadata(_ context.Context, req resour
 func (r *storageManagementPolicyResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *resource.SchemaResponse) {
 	resp.Schema = schema.Schema{
 		MarkdownDescription: "Manages the groundcover storage management (retention) policy for a single data type. " +
-			"Policies are seeded by groundcover and can only be updated, never created or deleted — removing this resource is not supported.",
+			"Policies are seeded by groundcover and can only be updated, never created or deleted — removing this resource is not supported. " +
+			"Applying replaces the entire policy with the configured values: custom rules that are not declared are archived and their names cannot be reused. " +
+			"When adopting a policy that may already have custom rules, `terraform import` it first and align the configuration.",
 		Attributes: map[string]schema.Attribute{
 			"data_type": schema.StringAttribute{
-				MarkdownDescription: "Data type the policy applies to (e.g. `logs`, `traces`, `events`). Identifies the policy. Validated by the API on apply.",
+				MarkdownDescription: "Data type the policy applies to (e.g. `logs`, `traces`, `events`). Identifies the policy and cannot be changed. Validated by the API on apply.",
 				Required:            true,
-				PlanModifiers:       []planmodifier.String{stringplanmodifier.RequiresReplace()},
+				PlanModifiers:       []planmodifier.String{dataTypeImmutable{}},
 			},
 			"retention": schema.StringAttribute{
 				MarkdownDescription: "Default retention duration for this data type (e.g. `30d`).",

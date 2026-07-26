@@ -8,6 +8,7 @@ import (
 
 	"github.com/groundcover-com/groundcover-sdk-go/pkg/models"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/tfsdk"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 )
@@ -237,6 +238,28 @@ func TestStoragePolicyUpdatePassesCurrentVersionThrough(t *testing.T) {
 	}
 	if got := storagePolicyStateModel(t, resp.State); got.Version.ValueInt64() != 8 {
 		t.Fatalf("state must carry the backend-bumped version (8), got %d", got.Version.ValueInt64())
+	}
+}
+
+func TestStoragePolicyDataTypeChangeIsBlockedAtPlanTime(t *testing.T) {
+	// data_type must fail at plan time: a replace would need a delete, which the
+	// backend does not support, so the apply could never converge.
+	cases := []struct {
+		name        string
+		state, plan types.String
+		wantErr     bool
+	}{
+		{"create", types.StringNull(), types.StringValue("logs"), false},
+		{"unchanged", types.StringValue("logs"), types.StringValue("logs"), false},
+		{"changed", types.StringValue("logs"), types.StringValue("traces"), true},
+	}
+	for _, tc := range cases {
+		resp := &planmodifier.StringResponse{PlanValue: tc.plan}
+		dataTypeImmutable{}.PlanModifyString(context.Background(),
+			planmodifier.StringRequest{StateValue: tc.state, PlanValue: tc.plan}, resp)
+		if resp.Diagnostics.HasError() != tc.wantErr {
+			t.Fatalf("%s: HasError() = %v, want %v (%v)", tc.name, resp.Diagnostics.HasError(), tc.wantErr, resp.Diagnostics)
+		}
 	}
 }
 

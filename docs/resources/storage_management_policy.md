@@ -3,12 +3,12 @@
 page_title: "groundcover_storage_management_policy Resource - groundcover"
 subcategory: ""
 description: |-
-  Manages the groundcover storage management (retention) policy for a single data type. Policies are seeded by groundcover and can only be updated, never created or deleted — removing this resource is not supported.
+  Manages the groundcover storage management (retention) policy for a single data type. Policies are seeded by groundcover and can only be updated, never created or deleted — removing this resource is not supported. Applying replaces the entire policy with the configured values: custom rules that are not declared are archived and their names cannot be reused. When adopting a policy that may already have custom rules, terraform import it first and align the configuration.
 ---
 
 # groundcover_storage_management_policy (Resource)
 
-Manages the groundcover storage management (retention) policy for a single data type. Policies are seeded by groundcover and can only be updated, never created or deleted — removing this resource is not supported.
+Manages the groundcover storage management (retention) policy for a single data type. Policies are seeded by groundcover and can only be updated, never created or deleted — removing this resource is not supported. Applying replaces the entire policy with the configured values: custom rules that are not declared are archived and their names cannot be reused. When adopting a policy that may already have custom rules, `terraform import` it first and align the configuration.
 
 ## Example Usage
 
@@ -59,7 +59,7 @@ output "logs_policy" {
 
 ### Required
 
-- `data_type` (String) Data type the policy applies to (e.g. `logs`, `traces`, `events`). Identifies the policy. Validated by the API on apply.
+- `data_type` (String) Data type the policy applies to (e.g. `logs`, `traces`, `events`). Identifies the policy and cannot be changed. Validated by the API on apply.
 - `retention` (String) Default retention duration for this data type (e.g. `30d`).
 
 ### Optional
