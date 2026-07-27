@@ -3,6 +3,7 @@ package provider
 import (
 	"context"
 	"fmt"
+	"reflect"
 	"regexp"
 	"sort"
 	"strconv"
@@ -478,6 +479,36 @@ func CompareYamlSemantically(yaml1, yaml2 string) (bool, error) {
 	result := deepEqual(normalizedData1, normalizedData2)
 
 	return result, nil
+}
+
+// YamlSemanticallyEqual reports whether two YAML documents carry the same data.
+// Only representation differs freely — indentation, key order, quoting style,
+// comments, and trailing newlines. Any difference in the parsed data (including
+// null vs missing keys, sequence order, and int vs float scalars) makes the two
+// documents unequal.
+//
+// This is deliberately stricter than CompareYamlSemantically, which additionally
+// drops empty/ignored fields, rewrites duration strings, and applies monitor
+// default-value rules. Those normalizations are correct for monitors but would
+// make unrelated pipeline configs compare equal, so pipelines use this instead.
+//
+// Input that does not parse as YAML falls back to exact string comparison — the
+// backend rejects invalid configs anyway, and reporting a parse failure on every
+// refresh would be worse than treating the strings as opaque.
+func YamlSemanticallyEqual(a, b string) bool {
+	if a == b {
+		return true
+	}
+
+	var dataA, dataB interface{}
+	if err := yaml.Unmarshal([]byte(a), &dataA); err != nil {
+		return false
+	}
+	if err := yaml.Unmarshal([]byte(b), &dataB); err != nil {
+		return false
+	}
+
+	return reflect.DeepEqual(dataA, dataB)
 }
 
 // removeIgnoredFields recursively removes fields that should be ignored during comparison

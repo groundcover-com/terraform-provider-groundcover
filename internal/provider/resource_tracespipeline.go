@@ -44,8 +44,10 @@ func (r *tracesPipelineResource) Schema(_ context.Context, _ resource.SchemaRequ
 		Description: "Traces Pipeline resource. This is a singleton resource.",
 		Attributes: map[string]schema.Attribute{
 			"value": schema.StringAttribute{
-				Description: "The YAML representation of the traces pipeline configuration.",
-				Required:    true,
+				Description: "The YAML representation of the traces pipeline configuration. Compared semantically, so " +
+					"differences in formatting only — indentation, mapping key order, quoting style, comments — are not " +
+					"treated as changes, and the configured YAML is kept verbatim in state.",
+				Required: true,
 			},
 			"updated_at": schema.StringAttribute{
 				Description: "The last update timestamp of the traces pipeline configuration.",
@@ -145,9 +147,25 @@ func (r *tracesPipelineResource) Read(ctx context.Context, req resource.ReadRequ
 		createdAt = configEntry.CreatedTimestamp.String()
 	}
 
-	// Update state
-	state.UpdatedAt = types.StringValue(createdAt)
-	state.Value = types.StringValue(value)
+	// Update state, but keep what is already there when the pipeline the API returns is
+	// semantically the same YAML. See the equivalent comment in resource_logspipeline.go:
+	// the append-only config store re-serializes the document and mints a fresh timestamp
+	// on every write, so refreshing unconditionally causes a perpetual no-op diff
+	// (BE-2625).
+	semanticallyUnchanged := !state.Value.IsNull() && !state.Value.IsUnknown() &&
+		YamlSemanticallyEqual(state.Value.ValueString(), value)
+
+	if semanticallyUnchanged {
+		tflog.Debug(ctx, "TracesPipeline is semantically unchanged, keeping the value already in state")
+	} else {
+		state.Value = types.StringValue(value)
+	}
+
+	// The timestamp follows the value, except when state has none to keep (a resource
+	// created before this behaviour existed, or a hand-edited state file).
+	if !semanticallyUnchanged || state.UpdatedAt.IsNull() || state.UpdatedAt.IsUnknown() {
+		state.UpdatedAt = types.StringValue(createdAt)
+	}
 
 	// Set refreshed state
 	diags = resp.State.Set(ctx, &state)
@@ -252,22 +270,39 @@ func (r *tracesPipelineResource) ImportState(ctx context.Context, req resource.I
 func (r *tracesPipelineResource) ModifyPlan(ctx context.Context, req resource.ModifyPlanRequest, resp *resource.ModifyPlanResponse) {
 	tflog.Debug(ctx, "Modifying TracesPipeline plan")
 
-	_, err := r.checkAndImportExisting(ctx, &req.State, &resp.Diagnostics)
-	if err != nil {
-		resp.Diagnostics.AddError(
-			"Error Importing TracesPipeline",
-			fmt.Sprintf("Could not import TracesPipeline: %s", err.Error()),
-		)
+	resp.Diagnostics.AddWarning(
+		"TracesPipeline is a Singleton",
+		"Your plan should never include more than one traces pipeline resource. If it does, only the latest will take place.\n"+
+			"Renaming the resource will show an incorrect plan.",
+	)
+
+	// Nothing to reconcile when creating (no prior state) or destroying (no plan).
+	if req.State.Raw.IsNull() || req.Plan.Raw.IsNull() {
 		return
 	}
 
-	resp.Diagnostics.AddWarning(
-		"TracesPipeline is a Singleton",
-		fmt.Sprintf(
-			"Your plan should never include more than one traces pipeline resource. If it does, only the latest will take place.\n"+
-				"Renaming the resource will show an incorrect plan.",
-		),
-	)
+	var state, plan tracesPipelineResourceModel
+	resp.Diagnostics.Append(req.State.Get(ctx, &state)...)
+	resp.Diagnostics.Append(req.Plan.Get(ctx, &plan)...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+
+	if plan.Value.IsNull() || plan.Value.IsUnknown() || state.Value.IsNull() || state.Value.IsUnknown() {
+		return
+	}
+	if plan.Value.ValueString() == state.Value.ValueString() {
+		return
+	}
+	if !YamlSemanticallyEqual(plan.Value.ValueString(), state.Value.ValueString()) {
+		return
+	}
+
+	// Formatting-only change — plan the prior value so the diff, and the "known after
+	// apply" on `updated_at` that comes with it, disappear. See resource_logspipeline.go.
+	tflog.Debug(ctx, "TracesPipeline config is semantically equal to state, planning no changes")
+	resp.Diagnostics.Append(resp.Plan.SetAttribute(ctx, path.Root("value"), state.Value)...)
+	resp.Diagnostics.Append(resp.Plan.SetAttribute(ctx, path.Root("updated_at"), state.UpdatedAt)...)
 }
 
 func (r *tracesPipelineResource) checkAndImportExisting(ctx context.Context, state *tfsdk.State, diags *diag.Diagnostics) (*models.TracesPipelineConfig, error) {

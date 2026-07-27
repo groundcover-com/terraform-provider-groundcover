@@ -44,8 +44,10 @@ func (r *logsPipelineResource) Schema(_ context.Context, _ resource.SchemaReques
 		Description: "Logs Pipeline resource. This is a singleton resource.",
 		Attributes: map[string]schema.Attribute{
 			"value": schema.StringAttribute{
-				Description: "The YAML representation of the logs pipeline configuration.",
-				Required:    true,
+				Description: "The YAML representation of the logs pipeline configuration. Compared semantically, so " +
+					"differences in formatting only — indentation, mapping key order, quoting style, comments — are not " +
+					"treated as changes, and the configured YAML is kept verbatim in state.",
+				Required: true,
 			},
 			"updated_at": schema.StringAttribute{
 				Description: "The last update timestamp of the logs pipeline configuration.",
@@ -147,9 +149,27 @@ func (r *logsPipelineResource) Read(ctx context.Context, req resource.ReadReques
 		uuid = configEntry.UUID
 	}
 
-	// Update state
-	state.UpdatedAt = types.StringValue(createdAt)
-	state.Value = types.StringValue(value)
+	// Update state, but keep what is already there when the pipeline the API returns is
+	// semantically the same YAML. The pipeline config store is append-only: every write
+	// re-serializes the document and mints a fresh timestamp, so an unconditional refresh
+	// can replace the practitioner's formatting with the backend's. That makes the next
+	// plan propose a no-op update, which writes again and mints another timestamp — a
+	// perpetual diff that never converges (BE-2625). `updated_at` is pinned alongside
+	// `value` because it tracks writes to the pipeline, and semantically nothing changed.
+	semanticallyUnchanged := !state.Value.IsNull() && !state.Value.IsUnknown() &&
+		YamlSemanticallyEqual(state.Value.ValueString(), value)
+
+	if semanticallyUnchanged {
+		tflog.Debug(ctx, "LogsPipeline is semantically unchanged, keeping the value already in state")
+	} else {
+		state.Value = types.StringValue(value)
+	}
+
+	// The timestamp follows the value, except when state has none to keep (a resource
+	// created before this behaviour existed, or a hand-edited state file).
+	if !semanticallyUnchanged || state.UpdatedAt.IsNull() || state.UpdatedAt.IsUnknown() {
+		state.UpdatedAt = types.StringValue(createdAt)
+	}
 
 	// Set refreshed state
 	diags = resp.State.Set(ctx, &state)
@@ -239,22 +259,41 @@ func (r *logsPipelineResource) ImportState(ctx context.Context, req resource.Imp
 func (r *logsPipelineResource) ModifyPlan(ctx context.Context, req resource.ModifyPlanRequest, resp *resource.ModifyPlanResponse) {
 	tflog.Debug(ctx, "Modifying LogsPipeline plan")
 
-	_, err := r.checkAndImportExisting(ctx, &req.State, &resp.Diagnostics)
-	if err != nil {
-		resp.Diagnostics.AddError(
-			"Error Importing LogsPipeline",
-			fmt.Sprintf("Could not import LogsPipeline: %s", err.Error()),
-		)
+	resp.Diagnostics.AddWarning(
+		"LogsPipeline is a Singleton",
+		"Your plan should never include more than one logs pipeline resource. If it does, only the latest will take place.\n"+
+			"Renaming the resource will show an incorrect plan.",
+	)
+
+	// Nothing to reconcile when creating (no prior state) or destroying (no plan).
+	if req.State.Raw.IsNull() || req.Plan.Raw.IsNull() {
 		return
 	}
 
-	resp.Diagnostics.AddWarning(
-		"LogsPipeline is a Singleton",
-		fmt.Sprintf(
-			"Your plan should never include more than one logs pipeline resource. If it does, only the latest will take place.\n"+
-				"Renaming the resource will show an incorrect plan.",
-		),
-	)
+	var state, plan logsPipelineResourceModel
+	resp.Diagnostics.Append(req.State.Get(ctx, &state)...)
+	resp.Diagnostics.Append(req.Plan.Get(ctx, &plan)...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+
+	if plan.Value.IsNull() || plan.Value.IsUnknown() || state.Value.IsNull() || state.Value.IsUnknown() {
+		return
+	}
+	if plan.Value.ValueString() == state.Value.ValueString() {
+		return
+	}
+	if !YamlSemanticallyEqual(plan.Value.ValueString(), state.Value.ValueString()) {
+		return
+	}
+
+	// The configuration and the state describe the same pipeline and differ only in YAML
+	// formatting, so applying would rewrite an identical document and mint a new
+	// timestamp for nothing. Plan the prior value instead, which makes the diff — and the
+	// `updated_at` the framework would otherwise mark as "known after apply" — disappear.
+	tflog.Debug(ctx, "LogsPipeline config is semantically equal to state, planning no changes")
+	resp.Diagnostics.Append(resp.Plan.SetAttribute(ctx, path.Root("value"), state.Value)...)
+	resp.Diagnostics.Append(resp.Plan.SetAttribute(ctx, path.Root("updated_at"), state.UpdatedAt)...)
 }
 
 func (r *logsPipelineResource) checkAndImportExisting(ctx context.Context, state *tfsdk.State, diags *diag.Diagnostics) (*models.LogsPipelineConfig, error) {

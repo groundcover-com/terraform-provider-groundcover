@@ -67,7 +67,7 @@ output "logs_pipeline_updated_at" {
 
 ### Required
 
-- `value` (String) The YAML representation of the logs pipeline configuration.
+- `value` (String) The YAML representation of the logs pipeline configuration. Compared semantically, so differences in formatting only — indentation, mapping key order, quoting style, comments — are not treated as changes, and the configured YAML is kept verbatim in state.
 
 ### Read-Only
 
