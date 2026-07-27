@@ -1,6 +1,6 @@
 ## 1.22.0
 
-* Added `groundcover_storage_management_policy` — manages the per-data-type storage retention policy (default retention, cold-storage move duration, and ordered custom rules). Policies are seeded by groundcover and can be updated and imported but not created or deleted; the policy version is managed by the backend
+* Added `groundcover_storage_management_policy` — manages the per-data-type storage retention policy (default retention, cold-storage move duration, and ordered custom rules). Policies are seeded by groundcover and can be updated and imported but not created or deleted — destroying the resource only removes it from Terraform state; the policy version is managed by the backend
 
 ## 1.21.0
 

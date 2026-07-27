@@ -21,6 +21,7 @@ import (
 var _ resource.Resource = &storageManagementPolicyResource{}
 var _ resource.ResourceWithConfigure = &storageManagementPolicyResource{}
 var _ resource.ResourceWithImportState = &storageManagementPolicyResource{}
+var _ resource.ResourceWithModifyPlan = &storageManagementPolicyResource{}
 
 func NewStorageManagementPolicyResource() resource.Resource {
 	return &storageManagementPolicyResource{}
@@ -31,9 +32,9 @@ type storageManagementPolicyResource struct{ client ApiClient }
 // coldVolume is fixed for all policies and is not user-configurable.
 const coldVolume = "cold"
 
-// dataTypeImmutable rejects data_type changes at plan time. A RequiresReplace
-// plan would never converge: the destroy half of the replace has no delete API
-// and always fails, so the error must surface before apply.
+// dataTypeImmutable rejects data_type changes at plan time. A replace would
+// silently abandon the old policy (destroy is a state-only no-op) while its
+// applied configuration stays active, so require an explicit new resource instead.
 type dataTypeImmutable struct{}
 
 func (dataTypeImmutable) Description(ctx context.Context) string {
@@ -52,9 +53,9 @@ func (dataTypeImmutable) PlanModifyString(_ context.Context, req planmodifier.St
 		resp.Diagnostics.AddAttributeError(
 			req.Path,
 			"Data Type Cannot Be Changed",
-			fmt.Sprintf("Changing data_type (from %q to %q) would require deleting the existing policy, which is not supported. "+
-				"To manage a different data type, add a new resource for it and remove this one from state with `terraform state rm`.",
-				req.StateValue.ValueString(), req.PlanValue.ValueString()),
+			fmt.Sprintf("Changing data_type (from %q to %q) would replace the resource, leaving the %q policy active but unmanaged. "+
+				"Add a separate resource for the new data type and remove this one instead.",
+				req.StateValue.ValueString(), req.PlanValue.ValueString(), req.StateValue.ValueString()),
 		)
 	}
 }
@@ -82,7 +83,7 @@ func (r *storageManagementPolicyResource) Metadata(_ context.Context, req resour
 func (r *storageManagementPolicyResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *resource.SchemaResponse) {
 	resp.Schema = schema.Schema{
 		MarkdownDescription: "Manages the groundcover storage management (retention) policy for a single data type. " +
-			"Policies are seeded by groundcover and can only be updated, never created or deleted — removing this resource is not supported. " +
+			"Policies are seeded by groundcover and can only be updated, never created or deleted — destroying this resource only removes it from Terraform state and leaves the policy active with its current configuration. " +
 			"Applying replaces the entire policy with the configured values: custom rules that are not declared are archived and their names cannot be reused. " +
 			"When adopting a policy that may already have custom rules, `terraform import` it first and align the configuration.",
 		Attributes: map[string]schema.Attribute{
@@ -204,13 +205,22 @@ func (r *storageManagementPolicyResource) Update(ctx context.Context, req resour
 	resp.Diagnostics.Append(resp.State.Set(ctx, model)...)
 }
 
+const (
+	storagePolicyDeleteWarningSummary = "Storage Management Policy Not Deleted"
+	storagePolicyDeleteWarningDetail  = "groundcover has no delete API for storage management policies: a data type must always have a retention policy. " +
+		"Destroying this resource only removes it from Terraform state; the policy remains active with its current configuration."
+)
+
+// ModifyPlan surfaces the destroy semantics at plan time, before the practitioner confirms.
+func (r *storageManagementPolicyResource) ModifyPlan(_ context.Context, req resource.ModifyPlanRequest, resp *resource.ModifyPlanResponse) {
+	if req.Plan.Raw.IsNull() {
+		resp.Diagnostics.AddWarning(storagePolicyDeleteWarningSummary, storagePolicyDeleteWarningDetail)
+	}
+}
+
+// Delete never calls the API; returning only a warning lets the framework remove the resource from state.
 func (r *storageManagementPolicyResource) Delete(_ context.Context, _ resource.DeleteRequest, resp *resource.DeleteResponse) {
-	resp.Diagnostics.AddError(
-		"Storage Management Policy Cannot Be Deleted",
-		"groundcover has no delete API for storage management policies: a data type must always have a retention policy, "+
-			"and deletion is not recoverable (removed custom rule names are archived and cannot be reused). "+
-			"Remove the resource from Terraform state with `terraform state rm` to stop managing it, or update it instead.",
-	)
+	resp.Diagnostics.AddWarning(storagePolicyDeleteWarningSummary, storagePolicyDeleteWarningDetail)
 }
 
 func (r *storageManagementPolicyResource) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {

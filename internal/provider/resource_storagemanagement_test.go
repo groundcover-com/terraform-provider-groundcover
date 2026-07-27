@@ -263,16 +263,25 @@ func TestStoragePolicyDataTypeChangeIsBlockedAtPlanTime(t *testing.T) {
 	}
 }
 
-func TestStoragePolicyDeleteIsBlocked(t *testing.T) {
-	// Policies have no delete API and deleting is not recoverable; Delete must fail.
-	r := &storageManagementPolicyResource{}
+func TestStoragePolicyDeleteWarnsWithoutCallingAPI(t *testing.T) {
+	// Policies have no delete API; Delete must succeed with only a warning so the
+	// framework removes the resource from state, and must never reach the client.
+	r := &storageManagementPolicyResource{client: &storageMockClient{}}
 	resp := &resource.DeleteResponse{}
 	r.Delete(context.Background(), resource.DeleteRequest{}, resp)
 
-	if !resp.Diagnostics.HasError() {
-		t.Fatal("expected Delete to be blocked with an error diagnostic")
+	if resp.Diagnostics.HasError() {
+		t.Fatalf("expected Delete to succeed, got errors: %v", resp.Diagnostics.Errors())
 	}
-	if got := resp.Diagnostics.Errors()[0].Summary(); got != "Storage Management Policy Cannot Be Deleted" {
-		t.Fatalf("unexpected error summary: %q", got)
+	warnings := resp.Diagnostics.Warnings()
+	if len(warnings) != 1 || warnings[0].Summary() != "Storage Management Policy Not Deleted" {
+		t.Fatalf("expected a single not-deleted warning, got: %v", warnings)
+	}
+
+	// The same warning must surface at plan time on a destroy plan (null plan).
+	planResp := &resource.ModifyPlanResponse{}
+	r.ModifyPlan(context.Background(), resource.ModifyPlanRequest{}, planResp)
+	if got := planResp.Diagnostics.Warnings(); len(got) != 1 || got[0].Summary() != "Storage Management Policy Not Deleted" {
+		t.Fatalf("expected destroy-plan warning, got: %v", got)
 	}
 }
