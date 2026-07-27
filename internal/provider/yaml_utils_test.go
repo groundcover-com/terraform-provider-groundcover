@@ -1485,8 +1485,6 @@ func TestNormalizeHumanDurations(t *testing.T) {
 	}
 }
 
-// TestYamlSemanticallyEqual covers the comparison that keeps semantically unchanged
-// pipeline configs from producing a plan diff (BE-2625).
 func TestYamlSemanticallyEqual(t *testing.T) {
 	const pipeline = `ottlRules:
 - ruleName: test-rule

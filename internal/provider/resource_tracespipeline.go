@@ -147,22 +147,19 @@ func (r *tracesPipelineResource) Read(ctx context.Context, req resource.ReadRequ
 		createdAt = configEntry.CreatedTimestamp.String()
 	}
 
-	// Update state, but keep what is already there when the pipeline the API returns is
-	// semantically the same YAML. See the equivalent comment in resource_logspipeline.go:
-	// the append-only config store re-serializes the document and mints a fresh timestamp
-	// on every write, so refreshing unconditionally causes a perpetual no-op diff
-	// (BE-2625).
-	semanticallyUnchanged := !state.Value.IsNull() && !state.Value.IsUnknown() &&
+	// Every write re-serializes the document and mints a new timestamp, so refreshing
+	// unconditionally would swap the configured YAML for the backend's formatting and leave
+	// a diff that writes again on the next apply, forever. An absent singleton is a real
+	// change, not an unchanged empty document.
+	semanticallyUnchanged := configEntry != nil &&
+		!state.Value.IsNull() && !state.Value.IsUnknown() &&
 		YamlSemanticallyEqual(state.Value.ValueString(), value)
 
-	if semanticallyUnchanged {
-		tflog.Debug(ctx, "TracesPipeline is semantically unchanged, keeping the value already in state")
-	} else {
+	if !semanticallyUnchanged {
 		state.Value = types.StringValue(value)
 	}
 
-	// The timestamp follows the value, except when state has none to keep (a resource
-	// created before this behaviour existed, or a hand-edited state file).
+	// updated_at tracks writes, so it follows the value — unless state has none to keep.
 	if !semanticallyUnchanged || state.UpdatedAt.IsNull() || state.UpdatedAt.IsUnknown() {
 		state.UpdatedAt = types.StringValue(createdAt)
 	}
@@ -276,7 +273,7 @@ func (r *tracesPipelineResource) ModifyPlan(ctx context.Context, req resource.Mo
 			"Renaming the resource will show an incorrect plan.",
 	)
 
-	// Nothing to reconcile when creating (no prior state) or destroying (no plan).
+	// No prior state means create; no plan means destroy.
 	if req.State.Raw.IsNull() || req.Plan.Raw.IsNull() {
 		return
 	}
@@ -298,9 +295,8 @@ func (r *tracesPipelineResource) ModifyPlan(ctx context.Context, req resource.Mo
 		return
 	}
 
-	// Formatting-only change — plan the prior value so the diff, and the "known after
-	// apply" on `updated_at` that comes with it, disappear. See resource_logspipeline.go.
-	tflog.Debug(ctx, "TracesPipeline config is semantically equal to state, planning no changes")
+	// Formatting-only difference. Planning the prior value drops the diff, and with it the
+	// "known after apply" the framework would otherwise put on updated_at.
 	resp.Diagnostics.Append(resp.Plan.SetAttribute(ctx, path.Root("value"), state.Value)...)
 	resp.Diagnostics.Append(resp.Plan.SetAttribute(ctx, path.Root("updated_at"), state.UpdatedAt)...)
 }

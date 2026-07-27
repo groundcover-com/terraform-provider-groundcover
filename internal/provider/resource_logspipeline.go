@@ -149,24 +149,19 @@ func (r *logsPipelineResource) Read(ctx context.Context, req resource.ReadReques
 		uuid = configEntry.UUID
 	}
 
-	// Update state, but keep what is already there when the pipeline the API returns is
-	// semantically the same YAML. The pipeline config store is append-only: every write
-	// re-serializes the document and mints a fresh timestamp, so an unconditional refresh
-	// can replace the practitioner's formatting with the backend's. That makes the next
-	// plan propose a no-op update, which writes again and mints another timestamp — a
-	// perpetual diff that never converges (BE-2625). `updated_at` is pinned alongside
-	// `value` because it tracks writes to the pipeline, and semantically nothing changed.
-	semanticallyUnchanged := !state.Value.IsNull() && !state.Value.IsUnknown() &&
+	// Every write re-serializes the document and mints a new timestamp, so refreshing
+	// unconditionally would swap the configured YAML for the backend's formatting and leave
+	// a diff that writes again on the next apply, forever. An absent singleton is a real
+	// change, not an unchanged empty document.
+	semanticallyUnchanged := configEntry != nil &&
+		!state.Value.IsNull() && !state.Value.IsUnknown() &&
 		YamlSemanticallyEqual(state.Value.ValueString(), value)
 
-	if semanticallyUnchanged {
-		tflog.Debug(ctx, "LogsPipeline is semantically unchanged, keeping the value already in state")
-	} else {
+	if !semanticallyUnchanged {
 		state.Value = types.StringValue(value)
 	}
 
-	// The timestamp follows the value, except when state has none to keep (a resource
-	// created before this behaviour existed, or a hand-edited state file).
+	// updated_at tracks writes, so it follows the value — unless state has none to keep.
 	if !semanticallyUnchanged || state.UpdatedAt.IsNull() || state.UpdatedAt.IsUnknown() {
 		state.UpdatedAt = types.StringValue(createdAt)
 	}
@@ -265,7 +260,7 @@ func (r *logsPipelineResource) ModifyPlan(ctx context.Context, req resource.Modi
 			"Renaming the resource will show an incorrect plan.",
 	)
 
-	// Nothing to reconcile when creating (no prior state) or destroying (no plan).
+	// No prior state means create; no plan means destroy.
 	if req.State.Raw.IsNull() || req.Plan.Raw.IsNull() {
 		return
 	}
@@ -287,11 +282,8 @@ func (r *logsPipelineResource) ModifyPlan(ctx context.Context, req resource.Modi
 		return
 	}
 
-	// The configuration and the state describe the same pipeline and differ only in YAML
-	// formatting, so applying would rewrite an identical document and mint a new
-	// timestamp for nothing. Plan the prior value instead, which makes the diff — and the
-	// `updated_at` the framework would otherwise mark as "known after apply" — disappear.
-	tflog.Debug(ctx, "LogsPipeline config is semantically equal to state, planning no changes")
+	// Formatting-only difference. Planning the prior value drops the diff, and with it the
+	// "known after apply" the framework would otherwise put on updated_at.
 	resp.Diagnostics.Append(resp.Plan.SetAttribute(ctx, path.Root("value"), state.Value)...)
 	resp.Diagnostics.Append(resp.Plan.SetAttribute(ctx, path.Root("updated_at"), state.UpdatedAt)...)
 }

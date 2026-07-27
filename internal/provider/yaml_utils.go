@@ -481,20 +481,13 @@ func CompareYamlSemantically(yaml1, yaml2 string) (bool, error) {
 	return result, nil
 }
 
-// YamlSemanticallyEqual reports whether two YAML documents carry the same data.
-// Only representation differs freely — indentation, key order, quoting style,
-// comments, and trailing newlines. Any difference in the parsed data (including
-// null vs missing keys, sequence order, and int vs float scalars) makes the two
-// documents unequal.
+// YamlSemanticallyEqual reports whether two YAML documents carry the same data, letting
+// only representation differ: indentation, key order, quoting style, comments and trailing
+// newlines. Sequence order, null vs missing keys and int vs float scalars all count as
+// differences. Input that does not parse falls back to exact string comparison.
 //
-// This is deliberately stricter than CompareYamlSemantically, which additionally
-// drops empty/ignored fields, rewrites duration strings, and applies monitor
-// default-value rules. Those normalizations are correct for monitors but would
-// make unrelated pipeline configs compare equal, so pipelines use this instead.
-//
-// Input that does not parse as YAML falls back to exact string comparison — the
-// backend rejects invalid configs anyway, and reporting a parse failure on every
-// refresh would be worse than treating the strings as opaque.
+// Stricter than CompareYamlSemantically, whose empty-field stripping, duration rewriting
+// and monitor default-value rules would make unrelated configs compare equal.
 func YamlSemanticallyEqual(a, b string) bool {
 	if a == b {
 		return true

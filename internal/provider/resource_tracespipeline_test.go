@@ -73,8 +73,7 @@ YAML
 `
 }
 
-// Regression test for BE-2625, mirroring TestAccLogsPipelineResource_noDiffOnReformattedYaml:
-// a semantically identical config must not plan any changes.
+// Mirrors TestAccLogsPipelineResource_noDiffOnReformattedYaml.
 func TestAccTracesPipelineResource_noDiffOnReformattedYaml(t *testing.T) {
 	resource.Test(t, resource.TestCase{
 		PreCheck:                 func() { testAccPreCheck(t) },
@@ -134,8 +133,7 @@ func (c *stubTracesPipelineClient) GetTracesPipeline(context.Context) (*models.T
 	return c.config, c.err
 }
 
-// TestTracesPipelineReadKeepsSemanticallyUnchangedState mirrors the logs pipeline refresh
-// test: the traces pipeline shares the same append-only config store and the same defect.
+// Mirrors the logs pipeline refresh test; both resources share the same config store.
 func TestTracesPipelineReadKeepsSemanticallyUnchangedState(t *testing.T) {
 	ctx := context.Background()
 
@@ -154,10 +152,17 @@ func TestTracesPipelineReadKeepsSemanticallyUnchangedState(t *testing.T) {
 
 	tests := []struct {
 		name              string
+		remoteAbsent      bool
 		remoteValue       string
 		expectedValue     string
 		expectedUpdatedAt string
 	}{
+		{
+			name:              "absent singleton clears the value and timestamp",
+			remoteAbsent:      true,
+			expectedValue:     "",
+			expectedUpdatedAt: "",
+		},
 		{
 			name:              "reformatted remote value keeps state value and timestamp",
 			remoteValue:       testLogsPipelineRemoteValue,
@@ -179,11 +184,16 @@ func TestTracesPipelineReadKeepsSemanticallyUnchangedState(t *testing.T) {
 				"updated_at": tftypes.NewValue(tftypes.String, testLogsPipelineStateTimestamp),
 			})
 
-			res := &tracesPipelineResource{client: &stubTracesPipelineClient{config: &models.TracesPipelineConfig{
-				UUID:             "d6f4d1a0-0f4c-4b6a-9f5e-3f2b1c0d9e8a",
-				Value:            tc.remoteValue,
-				CreatedTimestamp: strfmt.DateTime(remoteTs),
-			}}}
+			var remote *models.TracesPipelineConfig
+			if !tc.remoteAbsent {
+				remote = &models.TracesPipelineConfig{
+					UUID:             "d6f4d1a0-0f4c-4b6a-9f5e-3f2b1c0d9e8a",
+					Value:            tc.remoteValue,
+					CreatedTimestamp: strfmt.DateTime(remoteTs),
+				}
+			}
+
+			res := &tracesPipelineResource{client: &stubTracesPipelineClient{config: remote}}
 
 			resp := &fwresource.ReadResponse{State: tfsdk.State{Schema: s, Raw: raw.Copy()}}
 			res.Read(ctx, fwresource.ReadRequest{State: tfsdk.State{Schema: s, Raw: raw}}, resp)
@@ -207,7 +217,7 @@ func TestTracesPipelineReadKeepsSemanticallyUnchangedState(t *testing.T) {
 	}
 }
 
-// TestTracesPipelineModifyPlanCollapsesFormattingOnlyDiff mirrors the logs pipeline plan test.
+// Mirrors the logs pipeline plan test.
 func TestTracesPipelineModifyPlanCollapsesFormattingOnlyDiff(t *testing.T) {
 	ctx := context.Background()
 

@@ -11,6 +11,7 @@ import (
 	"os"
 	"os/exec"
 	"regexp"
+	"sync"
 	"testing"
 	"time"
 
@@ -80,9 +81,8 @@ YAML
 `
 }
 
-// Regression test for BE-2625: a config that is semantically identical to what is already
-// in state must not plan any changes, even after a refresh returns the backend's own
-// serialization of the document.
+// A config that is semantically identical to state must not plan any changes, even after a
+// refresh returns the backend's own serialization of the document.
 func TestAccLogsPipelineResource_noDiffOnReformattedYaml(t *testing.T) {
 	resource.Test(t, resource.TestCase{
 		PreCheck:                 func() { testAccPreCheck(t) },
@@ -131,9 +131,8 @@ YAML
 `
 }
 
-// stubLogsPipelineClient serves a canned GetLogsPipeline response. Embedding ApiClient
-// keeps the stub to the one method these tests exercise; any other call would panic,
-// which is the intent.
+// Embedding ApiClient keeps the stub to the one method these tests exercise; any other call
+// panics, which is the intent.
 type stubLogsPipelineClient struct {
 	ApiClient
 	config *models.LogsPipelineConfig
@@ -156,8 +155,8 @@ func logsPipelineTestSchema(ctx context.Context, t *testing.T) fwschema.Schema {
 	return resp.Schema
 }
 
-// logsPipelineTestValue builds a raw object for the logs pipeline schema. Passing nil for
-// either field makes it null; passing tftypes.UnknownValue makes it unknown.
+// logsPipelineTestValue builds a raw object for the logs pipeline schema. nil makes a field
+// null; tftypes.UnknownValue makes it unknown.
 func logsPipelineTestValue(ctx context.Context, s fwschema.Schema, value, updatedAt interface{}) tftypes.Value {
 	objType := s.Type().TerraformType(ctx)
 	return tftypes.NewValue(objType, map[string]tftypes.Value{
@@ -168,8 +167,7 @@ func logsPipelineTestValue(ctx context.Context, s fwschema.Schema, value, update
 
 const (
 	testLogsPipelineStateValue = "ottlRules:\n- ruleName: test-rule\n  conditions:\n    - container_name == \"nginx\"\n"
-	// Same document as testLogsPipelineStateValue, serialized differently — this is what
-	// the backend's append-only config store hands back.
+	// Same document as testLogsPipelineStateValue, serialized differently.
 	testLogsPipelineRemoteValue = "ottlRules:\n  - conditions:\n      - container_name == \"nginx\"\n    ruleName: test-rule\n"
 	testLogsPipelineOtherValue  = "ottlRules:\n- ruleName: other-rule\n"
 
@@ -189,8 +187,7 @@ func testLogsPipelineRemoteConfig(value string) *models.LogsPipelineConfig {
 	}
 }
 
-// TestLogsPipelineReadKeepsSemanticallyUnchangedState covers the refresh half of BE-2625:
-// the backend re-serializes the document and mints a fresh timestamp on every write, so a
+// The backend re-serializes the document and mints a fresh timestamp on every write, so a
 // refresh must not overwrite state that means the same thing.
 func TestLogsPipelineReadKeepsSemanticallyUnchangedState(t *testing.T) {
 	ctx := context.Background()
@@ -244,6 +241,14 @@ func TestLogsPipelineReadKeepsSemanticallyUnchangedState(t *testing.T) {
 			expectedValue:     "",
 			expectedUpdatedAt: "",
 		},
+		{
+			name:              "empty remote config clears the timestamp even when state is already empty",
+			remote:            nil,
+			stateValue:        "",
+			stateUpdatedAt:    testLogsPipelineStateTimestamp,
+			expectedValue:     "",
+			expectedUpdatedAt: "",
+		},
 	}
 
 	for _, tc := range tests {
@@ -273,8 +278,7 @@ func TestLogsPipelineReadKeepsSemanticallyUnchangedState(t *testing.T) {
 	}
 }
 
-// TestLogsPipelineReadRemovesResourceWhenNotFound guards the not-found branch, which the
-// refresh reconciliation must not swallow.
+// The refresh reconciliation must not swallow the not-found branch.
 func TestLogsPipelineReadRemovesResourceWhenNotFound(t *testing.T) {
 	ctx := context.Background()
 	s := logsPipelineTestSchema(ctx, t)
@@ -293,14 +297,13 @@ func TestLogsPipelineReadRemovesResourceWhenNotFound(t *testing.T) {
 	}
 }
 
-// TestLogsPipelineModifyPlanCollapsesFormattingOnlyDiff covers the plan half of BE-2625.
 func TestLogsPipelineModifyPlanCollapsesFormattingOnlyDiff(t *testing.T) {
 	ctx := context.Background()
 	s := logsPipelineTestSchema(ctx, t)
 
 	tests := []struct {
 		name string
-		// nil raw means "null object", i.e. no prior state (create) or no plan (destroy).
+		// nil means a null object: no prior state (create) or no plan (destroy).
 		stateRaw          *tftypes.Value
 		planRaw           *tftypes.Value
 		expectedValue     string
@@ -378,8 +381,7 @@ func TestLogsPipelineModifyPlanCollapsesFormattingOnlyDiff(t *testing.T) {
 	}
 }
 
-// TestLogsPipelineModifyPlanOnDestroy makes sure a destroy plan (null plan) is left
-// untouched rather than erroring while reading the absent plan data.
+// A destroy plan must be left untouched rather than erroring on the absent plan data.
 func TestLogsPipelineModifyPlanOnDestroy(t *testing.T) {
 	ctx := context.Background()
 	s := logsPipelineTestSchema(ctx, t)
@@ -407,7 +409,6 @@ func tfValuePtr(v tftypes.Value) *tftypes.Value {
 	return &v
 }
 
-// --- Fake-backend regression tests for BE-2625 -------------------------------------------
 //
 // These drive the provider through the real Terraform CLI against an in-process stand-in
 // for the pipeline config API, so the perpetual-diff regression is covered without
@@ -416,10 +417,12 @@ func tfValuePtr(v tftypes.Value) *tftypes.Value {
 //
 // They need the `terraform` binary and skip cleanly when it is missing.
 
-// fakeLogsPipelineBackend stands in for the append-only pipeline config store: it
-// re-serializes the document it is handed and mints a fresh timestamp on every write.
+// fakeLogsPipelineBackend stands in for the append-only pipeline config store.
 type fakeLogsPipelineBackend struct {
-	t       *testing.T
+	t *testing.T
+
+	// mu guards the fields below, written by handler goroutines and read by the test.
+	mu      sync.Mutex
 	stored  string
 	present bool
 	writes  int
@@ -428,8 +431,7 @@ type fakeLogsPipelineBackend struct {
 	// backend's own serialization. Nil means "return it verbatim".
 	remoteFn func(string) string
 
-	// bumpTimestampOnRead reports a later timestamp on every read, which is what the
-	// customer's drift detection was flagging.
+	// bumpTimestampOnRead reports a later timestamp on every read.
 	bumpTimestampOnRead bool
 	readBumps           int
 }
@@ -437,6 +439,9 @@ type fakeLogsPipelineBackend struct {
 func (f *fakeLogsPipelineBackend) handler() http.Handler {
 	mux := http.NewServeMux()
 	mux.HandleFunc(logsPipelineEndpoint, func(w http.ResponseWriter, r *http.Request) {
+		f.mu.Lock()
+		defer f.mu.Unlock()
+
 		switch r.Method {
 		case http.MethodGet:
 			if !f.present {
@@ -472,6 +477,13 @@ func (f *fakeLogsPipelineBackend) handler() http.Handler {
 	return mux
 }
 
+func (f *fakeLogsPipelineBackend) writeCount() int {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return f.writes
+}
+
+// respond must be called with f.mu held.
 func (f *fakeLogsPipelineBackend) respond(w http.ResponseWriter, status int) {
 	value := f.stored
 	if f.remoteFn != nil {
@@ -494,9 +506,8 @@ func (f *fakeLogsPipelineBackend) respond(w http.ResponseWriter, status int) {
 	})
 }
 
-// reserializeYaml parses a document and marshals it back out, the way a config store that
-// round-trips through a YAML library does. The result means the same thing and differs
-// byte-for-byte (yaml.v3 re-indents sequences and orders keys its own way).
+// reserializeYaml round-trips a document through a YAML library, the way the config store
+// does: same meaning, different bytes.
 func reserializeYaml(stored string) string {
 	if stored == "" {
 		return ""
@@ -512,8 +523,7 @@ func reserializeYaml(stored string) string {
 	return string(out)
 }
 
-// startFakeLogsPipelineBackend skips the test when the Terraform CLI is unavailable, then
-// returns the backend and the provider block pointing at it.
+// startFakeLogsPipelineBackend returns the backend and a provider block pointing at it.
 func startFakeLogsPipelineBackend(t *testing.T, backend *fakeLogsPipelineBackend) (*fakeLogsPipelineBackend, string) {
 	t.Helper()
 
@@ -549,10 +559,8 @@ YAML
 `
 }
 
-// TestLogsPipelineNoPerpetualDiffAgainstReserializingBackend is the BE-2625 regression: the
-// backend hands back its own serialization of an unchanged pipeline, and the next plan must
-// still be empty. Before the fix, the refresh overwrote state with the backend's formatting
-// and every plan proposed a no-op update.
+// The backend hands back its own serialization of an unchanged pipeline; the next plan must
+// still be empty.
 func TestLogsPipelineNoPerpetualDiffAgainstReserializingBackend(t *testing.T) {
 	backend, providerBlock := startFakeLogsPipelineBackend(t, &fakeLogsPipelineBackend{remoteFn: reserializeYaml})
 
@@ -575,14 +583,13 @@ func TestLogsPipelineNoPerpetualDiffAgainstReserializingBackend(t *testing.T) {
 		},
 	})
 
-	if backend.writes != 1 {
-		t.Errorf("expected exactly 1 write (the create), got %d", backend.writes)
+	if backend.writeCount() != 1 {
+		t.Errorf("expected exactly 1 write (the create), got %d", backend.writeCount())
 	}
 }
 
-// TestLogsPipelineUpdatedAtStableWhenUnchanged covers the symptom as it was reported: a
-// refresh that sees a newer backend timestamp for an unchanged pipeline must not move
-// `updated_at`, because that is what drift detection was reporting.
+// A refresh that sees a newer backend timestamp for an unchanged pipeline must not move
+// updated_at, which is what drift detection reports on.
 func TestLogsPipelineUpdatedAtStableWhenUnchanged(t *testing.T) {
 	backend, providerBlock := startFakeLogsPipelineBackend(t, &fakeLogsPipelineBackend{
 		remoteFn:            reserializeYaml,
@@ -607,13 +614,12 @@ func TestLogsPipelineUpdatedAtStableWhenUnchanged(t *testing.T) {
 		},
 	})
 
-	if backend.writes != 1 {
-		t.Errorf("expected exactly 1 write (the create), got %d", backend.writes)
+	if backend.writeCount() != 1 {
+		t.Errorf("expected exactly 1 write (the create), got %d", backend.writeCount())
 	}
 }
 
-// TestLogsPipelineReformattedConfigPlansNoChange covers reformatting the config itself:
-// reindenting or reordering the YAML in the .tf file must not schedule a write.
+// Reindenting or reordering the YAML in the .tf file must not schedule a write.
 func TestLogsPipelineReformattedConfigPlansNoChange(t *testing.T) {
 	_, providerBlock := startFakeLogsPipelineBackend(t, &fakeLogsPipelineBackend{})
 
@@ -642,8 +648,8 @@ YAML
 	})
 }
 
-// TestLogsPipelineRealChangeStillApplies is the counterweight: the reconciliation must not
-// swallow an actual content change, and the resource must settle after one apply.
+// The reconciliation must not swallow an actual content change, and the resource must
+// settle after one apply.
 func TestLogsPipelineRealChangeStillApplies(t *testing.T) {
 	backend, providerBlock := startFakeLogsPipelineBackend(t, &fakeLogsPipelineBackend{remoteFn: reserializeYaml})
 
@@ -661,7 +667,7 @@ func TestLogsPipelineRealChangeStillApplies(t *testing.T) {
 		},
 	})
 
-	if backend.writes != 2 {
-		t.Errorf("expected exactly 2 writes (create plus one real update), got %d", backend.writes)
+	if backend.writeCount() != 2 {
+		t.Errorf("expected exactly 2 writes (create plus one real update), got %d", backend.writeCount())
 	}
 }

@@ -1,7 +1,7 @@
 ## 1.21.1
 
 * Fixed spurious drift on `groundcover_logspipeline` and `groundcover_tracespipeline`: `terraform plan` reported an in-place update and a changed `updated_at` even when the pipeline YAML was unchanged, so CI/CD drift detection failed on false positives and operators had to run a no-op `terraform apply` to re-sync state. The pipeline config store re-serializes the document and mints a fresh timestamp on every write, so refreshing replaced the configured YAML in state with the backend's formatting; the resulting diff triggered another write, which produced another timestamp — a loop that never converged. `value` is now compared semantically, so formatting-only differences (indentation, mapping key order, quoting style, comments, trailing newlines) are not treated as changes: refresh keeps the configured YAML verbatim, `updated_at` stays put while the pipeline is semantically unchanged, and reformatting the YAML in your configuration no longer schedules a write. Any real content change — including out-of-band edits — still plans and applies as before
-* `groundcover_logspipeline` and `groundcover_tracespipeline` no longer issue a `GET` on every `terraform plan`. The plan-time call wrote to a discarded copy of prior state, so it never reconciled anything; the reconciliation now happens against the plan, where it takes effect
+* `groundcover_logspipeline` and `groundcover_tracespipeline` no longer issue a redundant `GET` on every `terraform plan`
 
 ## 1.21.0
 
