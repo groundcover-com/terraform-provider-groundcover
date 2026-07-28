@@ -707,18 +707,22 @@ resource "groundcover_dataintegration" "aws_cur_example" {
     version = 1
     enabled = true
 
-    # The data export must live in us-east-1
+    # Base region for the AWS clients; sourceRegion falls back to this
     region = "us-east-1"
 
-    # S3 bucket names are globally unique across all of AWS, so there is no
-    # usable default here — replace this with your own bucket. The placeholder
-    # below is deliberately invalid (S3 rejects uppercase letters) so a
-    # copy-paste fails loudly instead of pointing at someone else's bucket.
-    sourceBucket = "groundcover-cur-REPLACE-ME"
+    # S3 bucket names are globally unique across all of AWS, so replace this with
+    # your own. The placeholder matches the name the stack derives when you don't
+    # pass one (groundcover-cur-integration-<account-id>), with the same fake
+    # account ID as the roleArn below.
+    sourceBucket = "groundcover-cur-integration-123456789012"
+
+    # Region of sourceBucket — only needed when it differs from region. The CUR
+    # export bucket must be us-east-1 (AWS Data Exports only delivers there), so
+    # keep this pinned even if you point region at your own home region.
     sourceRegion = "us-east-1"
 
     # Prefix the export writes under, and the only keys this integration reads
-    sourcePrefix = "billing/data"
+    sourcePrefix = "groundcover-cur-integration"
 
     # Role groundcover assumes to read the CUR objects.
     # stsRegion is required whenever roleArn is set.
