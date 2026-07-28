@@ -7,6 +7,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strings"
 
 	"github.com/groundcover-com/groundcover-sdk-go/pkg/models"
 	"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
@@ -85,7 +86,7 @@ func (r *storageManagementPolicyResource) Schema(_ context.Context, _ resource.S
 		MarkdownDescription: "Manages the groundcover storage management (retention) policy for a single data type. " +
 			"Policies are seeded by groundcover and can only be updated, never created or deleted — destroying this resource only removes it from Terraform state and leaves the policy active with its current configuration. " +
 			"Applying replaces the entire policy with the configured values: custom rules that are not declared are archived and their names cannot be reused. " +
-			"When adopting a policy that may already have custom rules, `terraform import` it first and align the configuration.",
+			"Adopting a policy whose existing custom rules are not all declared in the configuration fails — `terraform import` it first and align the configuration.",
 		Attributes: map[string]schema.Attribute{
 			"data_type": schema.StringAttribute{
 				MarkdownDescription: "Data type the policy applies to (e.g. `logs`, `traces`, `events`). Identifies the policy and cannot be changed. Validated by the API on apply.",
@@ -95,6 +96,7 @@ func (r *storageManagementPolicyResource) Schema(_ context.Context, _ resource.S
 			"retention": schema.StringAttribute{
 				MarkdownDescription: "Default retention duration for this data type (e.g. `30d`).",
 				Required:            true,
+				Validators:          []validator.String{stringvalidator.LengthAtLeast(1)},
 			},
 			"cold_move_duration": schema.StringAttribute{
 				MarkdownDescription: "Optional duration after which data is moved to cold storage (e.g. `7d`).",
@@ -151,6 +153,20 @@ func (r *storageManagementPolicyResource) Create(ctx context.Context, req resour
 			return
 		}
 		resp.Diagnostics.AddError("Unable to Read Storage Management Policy", fmt.Sprintf("Failed to read policy for %q: %s", dataType, err))
+		return
+	}
+
+	// Refuse to adopt over existing rules the config doesn't declare: applying would
+	// archive them irreversibly (archived rule names can never be reused).
+	if undeclared := undeclaredCustomRules(plan.CustomRules, existing.CustomRules); len(undeclared) > 0 {
+		resp.Diagnostics.AddError(
+			"Existing Custom Rules Not Declared",
+			fmt.Sprintf("The %q policy has custom rules not present in the configuration: %s. "+
+				"Applying would archive them permanently and their names could never be reused. "+
+				"Import the policy and align the configuration first, e.g. by adding:\n\n"+
+				"import {\n  to = groundcover_storage_management_policy.<name>\n  id = %q\n}",
+				dataType, strings.Join(undeclared, ", "), dataType),
+		)
 		return
 	}
 
@@ -291,4 +307,21 @@ func stringValue(s *string) string {
 		return ""
 	}
 	return *s
+}
+
+func undeclaredCustomRules(declared []storageCustomRuleModel, existing []*models.CustomRule) []string {
+	names := make(map[string]struct{}, len(declared))
+	for _, rule := range declared {
+		names[rule.Name.ValueString()] = struct{}{}
+	}
+	var undeclared []string
+	for _, rule := range existing {
+		if rule == nil {
+			continue
+		}
+		if _, ok := names[stringValue(rule.Name)]; !ok {
+			undeclared = append(undeclared, stringValue(rule.Name))
+		}
+	}
+	return undeclared
 }

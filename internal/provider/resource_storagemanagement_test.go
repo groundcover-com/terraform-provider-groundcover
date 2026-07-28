@@ -134,6 +134,49 @@ func TestStoragePolicyCreateFailsWhenPolicyNotSeeded(t *testing.T) {
 	}
 }
 
+func TestStoragePolicyCreateBlocksUndeclaredExistingRules(t *testing.T) {
+	// Adopting must not silently archive existing rules the config doesn't declare —
+	// archived rule names can never be reused, so Create errors before the PUT.
+	existingName, ret, filters := "existing-rule", "3d", "level = 'debug'"
+	cases := []struct {
+		name    string
+		rules   []storageCustomRuleModel
+		wantErr bool
+	}{
+		{"omitted", nil, true},
+		{"different rule declared", []storageCustomRuleModel{
+			{Name: types.StringValue("other"), Retention: types.StringValue("5d"), Filters: types.StringValue("level = 'info'")},
+		}, true},
+		{"existing rule declared", []storageCustomRuleModel{
+			{Name: types.StringValue("existing-rule"), Retention: types.StringValue("5d"), Filters: types.StringValue("level = 'info'")},
+		}, false},
+	}
+	for _, tc := range cases {
+		mock := &storageMockClient{
+			getResp: &models.StorageManagementPolicyResponse{
+				DataType: "logs", Retention: "90d", Version: 3,
+				CustomRules: []*models.CustomRule{{Name: &existingName, Retention: &ret, Filters: &filters}},
+			},
+			updateResp: &models.StorageManagementPolicyResponse{DataType: "logs", Retention: "30d", Version: 4},
+		}
+		plan := storageManagementPolicyResourceModel{
+			DataType:    types.StringValue("logs"),
+			Retention:   types.StringValue("30d"),
+			CustomRules: tc.rules,
+		}
+		resp := &resource.CreateResponse{State: tfsdk.State{Schema: storagePolicyTestState(t, plan).Schema}}
+		storagePolicyTestResource(mock).Create(context.Background(),
+			resource.CreateRequest{Plan: tfsdk.Plan(storagePolicyTestState(t, plan))}, resp)
+
+		if resp.Diagnostics.HasError() != tc.wantErr {
+			t.Fatalf("%s: HasError() = %v, want %v (%v)", tc.name, resp.Diagnostics.HasError(), tc.wantErr, resp.Diagnostics)
+		}
+		if mock.updateCalled == tc.wantErr {
+			t.Fatalf("%s: updateCalled = %v, want %v — the PUT must only run when adoption is allowed", tc.name, mock.updateCalled, !tc.wantErr)
+		}
+	}
+}
+
 func TestStoragePolicyCreatePreservesExplicitEmptyCustomRules(t *testing.T) {
 	// custom_rules = [] (e.g. an empty for-expression) must round-trip as an empty
 	// list, not null, or Terraform fails with an inconsistent-result error.
@@ -283,5 +326,16 @@ func TestStoragePolicyDeleteWarnsWithoutCallingAPI(t *testing.T) {
 	r.ModifyPlan(context.Background(), resource.ModifyPlanRequest{}, planResp)
 	if got := planResp.Diagnostics.Warnings(); len(got) != 1 || got[0].Summary() != "Storage Management Policy Not Deleted" {
 		t.Fatalf("expected destroy-plan warning, got: %v", got)
+	}
+
+	// A non-destroy plan must not warn.
+	normalPlan := tfsdk.Plan(storagePolicyTestState(t, storageManagementPolicyResourceModel{
+		DataType:  types.StringValue("logs"),
+		Retention: types.StringValue("30d"),
+	}))
+	noWarnResp := &resource.ModifyPlanResponse{}
+	r.ModifyPlan(context.Background(), resource.ModifyPlanRequest{Plan: normalPlan}, noWarnResp)
+	if got := noWarnResp.Diagnostics.Warnings(); len(got) != 0 {
+		t.Fatalf("non-destroy plan must not warn, got: %v", got)
 	}
 }

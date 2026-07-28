@@ -29,7 +29,7 @@ resource "groundcover_storage_management_policy" "logs" {
 # Example values after apply:
 #   version           = 4
 #   uuid              = "3f1c8a2e-9b7d-4e6a-8c11-0a2b3c4d5e6f"
-#   created_timestamp = "2026-07-22 09:14:03 +0000 UTC"
+#   created_timestamp = "2026-07-22T09:14:03.000Z"
 output "logs_policy" {
   value = {
     version           = groundcover_storage_management_policy.logs.version

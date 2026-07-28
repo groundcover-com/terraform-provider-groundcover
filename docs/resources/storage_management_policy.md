@@ -3,12 +3,12 @@
 page_title: "groundcover_storage_management_policy Resource - groundcover"
 subcategory: ""
 description: |-
-  Manages the groundcover storage management (retention) policy for a single data type. Policies are seeded by groundcover and can only be updated, never created or deleted — destroying this resource only removes it from Terraform state and leaves the policy active with its current configuration. Applying replaces the entire policy with the configured values: custom rules that are not declared are archived and their names cannot be reused. When adopting a policy that may already have custom rules, terraform import it first and align the configuration.
+  Manages the groundcover storage management (retention) policy for a single data type. Policies are seeded by groundcover and can only be updated, never created or deleted — destroying this resource only removes it from Terraform state and leaves the policy active with its current configuration. Applying replaces the entire policy with the configured values: custom rules that are not declared are archived and their names cannot be reused. Adopting a policy whose existing custom rules are not all declared in the configuration fails — terraform import it first and align the configuration.
 ---
 
 # groundcover_storage_management_policy (Resource)
 
-Manages the groundcover storage management (retention) policy for a single data type. Policies are seeded by groundcover and can only be updated, never created or deleted — destroying this resource only removes it from Terraform state and leaves the policy active with its current configuration. Applying replaces the entire policy with the configured values: custom rules that are not declared are archived and their names cannot be reused. When adopting a policy that may already have custom rules, `terraform import` it first and align the configuration.
+Manages the groundcover storage management (retention) policy for a single data type. Policies are seeded by groundcover and can only be updated, never created or deleted — destroying this resource only removes it from Terraform state and leaves the policy active with its current configuration. Applying replaces the entire policy with the configured values: custom rules that are not declared are archived and their names cannot be reused. Adopting a policy whose existing custom rules are not all declared in the configuration fails — `terraform import` it first and align the configuration.
 
 ## Example Usage
 
@@ -44,7 +44,7 @@ resource "groundcover_storage_management_policy" "logs" {
 # Example values after apply:
 #   version           = 4
 #   uuid              = "3f1c8a2e-9b7d-4e6a-8c11-0a2b3c4d5e6f"
-#   created_timestamp = "2026-07-22 09:14:03 +0000 UTC"
+#   created_timestamp = "2026-07-22T09:14:03.000Z"
 output "logs_policy" {
   value = {
     version           = groundcover_storage_management_policy.logs.version
