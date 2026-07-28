@@ -42,6 +42,6 @@ EOT
 }
 
 output "traces_pipeline_updated_at" {
-  description = "The timestamp when the traces pipeline was last updated."
+  description = "The timestamp of the last traces pipeline change Terraform treated as semantic. Reformatting the YAML does not advance it."
   value       = groundcover_tracespipeline.tracespipeline.updated_at
 }
