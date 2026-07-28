@@ -678,6 +678,48 @@ EOT
   is_paused = false
 }
 
+# Example: AWS Cost and Usage Report (CUR 2.0)
+# Point this at the S3 bucket holding the CUR 2.0 data export and the IAM role
+# groundcover assumes to read it. Create both with the aws_cost_reports_sink
+# stack (bucket + BCM data export + reader role), then wire its outputs here:
+#   sourceBucket = the export's S3 bucket name
+#   sourcePrefix = export_path_prefix output
+#   roleArn      = role_arn output
+resource "groundcover_dataintegration" "aws_cur_example" {
+  type = "awscur"
+  config = jsonencode({
+    name    = "aws-cur"
+    version = 1
+    enabled = true
+
+    # The data export must live in us-east-1
+    region = "us-east-1"
+
+    # S3 bucket names are globally unique across all of AWS, so there is no
+    # usable default here — replace this with your own bucket. The placeholder
+    # below is deliberately invalid (S3 rejects uppercase letters) so a
+    # copy-paste fails loudly instead of pointing at someone else's bucket.
+    sourceBucket = "groundcover-cur-REPLACE-ME"
+    sourceRegion = "us-east-1"
+
+    # Prefix the export writes under, and the only keys this integration reads
+    sourcePrefix = "billing/data"
+
+    # Role groundcover assumes to read the CUR objects.
+    # stsRegion is required whenever roleArn is set.
+    roleArn   = "arn:aws:iam::123456789012:role/groundcover-cur-integration-reader"
+    stsRegion = "us-east-1"
+
+    # Optional - how far back billing periods are processed. Defaults to 12 months.
+    maxBillingPeriodMonths = 12
+
+    labelSettings = {
+      extraLabels = { env = "prod" }
+    }
+  })
+  is_paused = false
+}
+
 # Output the data integration IDs for reference
 output "cloudwatch_dataintegration_id" {
   description = "The ID of the CloudWatch data integration"
@@ -737,4 +779,9 @@ output "postgresql_demo_dataintegration_id" {
 output "postgresql_system_metrics_dataintegration_id" {
   description = "The ID of the PostgreSQL System Metrics data integration"
   value       = groundcover_dataintegration.postgresql_system_metrics_example.id
+}
+
+output "aws_cur_dataintegration_id" {
+  description = "The ID of the AWS Cost and Usage Report data integration"
+  value       = groundcover_dataintegration.aws_cur_example.id
 }
