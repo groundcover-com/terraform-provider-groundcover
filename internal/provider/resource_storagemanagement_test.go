@@ -152,28 +152,75 @@ func TestStoragePolicyCreateBlocksUndeclaredExistingRules(t *testing.T) {
 		}, false},
 	}
 	for _, tc := range cases {
-		mock := &storageMockClient{
-			getResp: &models.StorageManagementPolicyResponse{
-				DataType: "logs", Retention: "90d", Version: 3,
-				CustomRules: []*models.CustomRule{{Name: &existingName, Retention: &ret, Filters: &filters}},
-			},
-			updateResp: &models.StorageManagementPolicyResponse{DataType: "logs", Retention: "30d", Version: 4},
-		}
-		plan := storageManagementPolicyResourceModel{
-			DataType:    types.StringValue("logs"),
-			Retention:   types.StringValue("30d"),
-			CustomRules: tc.rules,
-		}
-		resp := &resource.CreateResponse{State: tfsdk.State{Schema: storagePolicyTestState(t, plan).Schema}}
-		storagePolicyTestResource(mock).Create(context.Background(),
-			resource.CreateRequest{Plan: tfsdk.Plan(storagePolicyTestState(t, plan))}, resp)
+		t.Run(tc.name, func(t *testing.T) {
+			mock := &storageMockClient{
+				getResp: &models.StorageManagementPolicyResponse{
+					DataType: "logs", Retention: "90d", Version: 3,
+					CustomRules: []*models.CustomRule{{Name: &existingName, Retention: &ret, Filters: &filters}},
+				},
+				updateResp: &models.StorageManagementPolicyResponse{DataType: "logs", Retention: "30d", Version: 4},
+			}
+			plan := storageManagementPolicyResourceModel{
+				DataType:    types.StringValue("logs"),
+				Retention:   types.StringValue("30d"),
+				CustomRules: tc.rules,
+			}
+			resp := &resource.CreateResponse{State: tfsdk.State{Schema: storagePolicyTestState(t, plan).Schema}}
+			storagePolicyTestResource(mock).Create(context.Background(),
+				resource.CreateRequest{Plan: tfsdk.Plan(storagePolicyTestState(t, plan))}, resp)
 
-		if resp.Diagnostics.HasError() != tc.wantErr {
-			t.Fatalf("%s: HasError() = %v, want %v (%v)", tc.name, resp.Diagnostics.HasError(), tc.wantErr, resp.Diagnostics)
-		}
-		if mock.updateCalled == tc.wantErr {
-			t.Fatalf("%s: updateCalled = %v, want %v — the PUT must only run when adoption is allowed", tc.name, mock.updateCalled, !tc.wantErr)
-		}
+			if resp.Diagnostics.HasError() != tc.wantErr {
+				t.Fatalf("HasError() = %v, want %v (%v)", resp.Diagnostics.HasError(), tc.wantErr, resp.Diagnostics)
+			}
+			if mock.updateCalled == tc.wantErr {
+				t.Fatalf("updateCalled = %v, want %v — the PUT must only run when adoption is allowed", mock.updateCalled, !tc.wantErr)
+			}
+		})
+	}
+}
+
+func TestStoragePolicyCreateWarnsWhenColdTierNotDeclared(t *testing.T) {
+	// Adopting without cold_move_duration replaces a policy that had a cold tier with
+	// one that doesn't; that is reversible, so it warns instead of erroring.
+	cases := []struct {
+		name     string
+		plan     types.String
+		wantWarn bool
+	}{
+		{"omitted", types.StringNull(), true},
+		{"declared", types.StringValue("7d"), false},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			mock := &storageMockClient{
+				getResp:    &models.StorageManagementPolicyResponse{DataType: "logs", Retention: "90d", ColdVolume: "cold", ColdMoveDuration: "7d", Version: 3},
+				updateResp: &models.StorageManagementPolicyResponse{DataType: "logs", Retention: "30d", Version: 4},
+			}
+			plan := storageManagementPolicyResourceModel{
+				DataType:         types.StringValue("logs"),
+				Retention:        types.StringValue("30d"),
+				ColdMoveDuration: tc.plan,
+			}
+			resp := &resource.CreateResponse{State: tfsdk.State{Schema: storagePolicyTestState(t, plan).Schema}}
+			storagePolicyTestResource(mock).Create(context.Background(),
+				resource.CreateRequest{Plan: tfsdk.Plan(storagePolicyTestState(t, plan))}, resp)
+
+			if resp.Diagnostics.HasError() {
+				t.Fatalf("unexpected errors: %v", resp.Diagnostics)
+			}
+			if !mock.updateCalled {
+				t.Fatal("the PUT must still run — the cold-tier warning is not blocking")
+			}
+			warned := false
+			for _, w := range resp.Diagnostics.Warnings() {
+				if w.Summary() == "Existing Cold Storage Configuration Not Declared" {
+					warned = true
+				}
+			}
+			if warned != tc.wantWarn {
+				t.Fatalf("cold-tier warning = %v, want %v (%v)", warned, tc.wantWarn, resp.Diagnostics)
+			}
+		})
 	}
 }
 
@@ -297,12 +344,14 @@ func TestStoragePolicyDataTypeChangeIsBlockedAtPlanTime(t *testing.T) {
 		{"changed", types.StringValue("logs"), types.StringValue("traces"), true},
 	}
 	for _, tc := range cases {
-		resp := &planmodifier.StringResponse{PlanValue: tc.plan}
-		dataTypeImmutable{}.PlanModifyString(context.Background(),
-			planmodifier.StringRequest{StateValue: tc.state, PlanValue: tc.plan}, resp)
-		if resp.Diagnostics.HasError() != tc.wantErr {
-			t.Fatalf("%s: HasError() = %v, want %v (%v)", tc.name, resp.Diagnostics.HasError(), tc.wantErr, resp.Diagnostics)
-		}
+		t.Run(tc.name, func(t *testing.T) {
+			resp := &planmodifier.StringResponse{PlanValue: tc.plan}
+			dataTypeImmutable{}.PlanModifyString(context.Background(),
+				planmodifier.StringRequest{StateValue: tc.state, PlanValue: tc.plan}, resp)
+			if resp.Diagnostics.HasError() != tc.wantErr {
+				t.Fatalf("HasError() = %v, want %v (%v)", resp.Diagnostics.HasError(), tc.wantErr, resp.Diagnostics)
+			}
+		})
 	}
 }
 

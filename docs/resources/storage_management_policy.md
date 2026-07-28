@@ -3,12 +3,12 @@
 page_title: "groundcover_storage_management_policy Resource - groundcover"
 subcategory: ""
 description: |-
-  Manages the groundcover storage management (retention) policy for a single data type. Policies are seeded by groundcover and can only be updated, never created or deleted — destroying this resource only removes it from Terraform state and leaves the policy active with its current configuration. Applying replaces the entire policy with the configured values: custom rules that are not declared are archived and their names cannot be reused. Adopting a policy whose existing custom rules are not all declared in the configuration fails — terraform import it first and align the configuration.
+  Manages the groundcover storage management (retention) policy for a single data type. Only supported for groundcover inCloud backends. Policies are seeded by groundcover and can only be updated, never created or deleted — destroying this resource only removes it from Terraform state and leaves the policy active with its current configuration. Applying replaces the entire policy with the configured values: custom rules that are not declared are archived and their names cannot be reused. Adopting a policy whose existing custom rules are not all declared in the configuration fails — terraform import it first and align the configuration.
 ---
 
 # groundcover_storage_management_policy (Resource)
 
-Manages the groundcover storage management (retention) policy for a single data type. Policies are seeded by groundcover and can only be updated, never created or deleted — destroying this resource only removes it from Terraform state and leaves the policy active with its current configuration. Applying replaces the entire policy with the configured values: custom rules that are not declared are archived and their names cannot be reused. Adopting a policy whose existing custom rules are not all declared in the configuration fails — `terraform import` it first and align the configuration.
+Manages the groundcover storage management (retention) policy for a single data type. Only supported for groundcover inCloud backends. Policies are seeded by groundcover and can only be updated, never created or deleted — destroying this resource only removes it from Terraform state and leaves the policy active with its current configuration. Applying replaces the entire policy with the configured values: custom rules that are not declared are archived and their names cannot be reused. Adopting a policy whose existing custom rules are not all declared in the configuration fails — `terraform import` it first and align the configuration.
 
 ## Example Usage
 

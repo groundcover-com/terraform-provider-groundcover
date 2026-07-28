@@ -84,6 +84,7 @@ func (r *storageManagementPolicyResource) Metadata(_ context.Context, req resour
 func (r *storageManagementPolicyResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *resource.SchemaResponse) {
 	resp.Schema = schema.Schema{
 		MarkdownDescription: "Manages the groundcover storage management (retention) policy for a single data type. " +
+			"Only supported for groundcover inCloud backends. " +
 			"Policies are seeded by groundcover and can only be updated, never created or deleted — destroying this resource only removes it from Terraform state and leaves the policy active with its current configuration. " +
 			"Applying replaces the entire policy with the configured values: custom rules that are not declared are archived and their names cannot be reused. " +
 			"Adopting a policy whose existing custom rules are not all declared in the configuration fails — `terraform import` it first and align the configuration.",
@@ -143,6 +144,8 @@ func (r *storageManagementPolicyResource) Create(ctx context.Context, req resour
 	dataType := plan.DataType.ValueString()
 
 	// Adopt the existing (seeded) policy to obtain its current version, which the update requires.
+	// The SDK's CreateStorageManagementPolicyByType (POST) is not a fallback for a missing
+	// policy: the backend registers POST and PUT to the same update handler.
 	existing, err := r.client.GetStorageManagementPolicy(ctx, dataType)
 	if err != nil {
 		if errors.Is(err, ErrNotFound) {
@@ -168,6 +171,16 @@ func (r *storageManagementPolicyResource) Create(ctx context.Context, req resour
 				dataType, strings.Join(undeclared, ", "), dataType),
 		)
 		return
+	}
+
+	// Dropping the cold tier is reversible (unlike rule archival), so only warn.
+	if existing.ColdMoveDuration != "" && plan.ColdMoveDuration.ValueString() == "" {
+		resp.Diagnostics.AddWarning(
+			"Existing Cold Storage Configuration Not Declared",
+			fmt.Sprintf("The %q policy moves data to cold storage after %s, but the configuration does not set cold_move_duration. "+
+				"Applying removes the cold storage tier; set cold_move_duration to keep it.",
+				dataType, existing.ColdMoveDuration),
+		)
 	}
 
 	updated, err := r.client.UpdateStorageManagementPolicy(ctx, dataType, storagePolicyRequestFromModel(plan, existing.Version))
@@ -277,9 +290,9 @@ func storagePolicyModelFromAPI(dataType string, policy *models.StorageManagement
 			continue
 		}
 		model.CustomRules = append(model.CustomRules, storageCustomRuleModel{
-			Name:      types.StringValue(stringValue(rule.Name)),
-			Retention: types.StringValue(stringValue(rule.Retention)),
-			Filters:   types.StringValue(stringValue(rule.Filters)),
+			Name:      types.StringValue(derefString(rule.Name)),
+			Retention: types.StringValue(derefString(rule.Retention)),
+			Filters:   types.StringValue(derefString(rule.Filters)),
 		})
 	}
 	return model
@@ -302,13 +315,6 @@ func optionalStorageString(s string) types.String {
 	return types.StringValue(s)
 }
 
-func stringValue(s *string) string {
-	if s == nil {
-		return ""
-	}
-	return *s
-}
-
 func undeclaredCustomRules(declared []storageCustomRuleModel, existing []*models.CustomRule) []string {
 	names := make(map[string]struct{}, len(declared))
 	for _, rule := range declared {
@@ -319,8 +325,8 @@ func undeclaredCustomRules(declared []storageCustomRuleModel, existing []*models
 		if rule == nil {
 			continue
 		}
-		if _, ok := names[stringValue(rule.Name)]; !ok {
-			undeclared = append(undeclared, stringValue(rule.Name))
+		if _, ok := names[derefString(rule.Name)]; !ok {
+			undeclared = append(undeclared, derefString(rule.Name))
 		}
 	}
 	return undeclared
