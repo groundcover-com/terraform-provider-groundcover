@@ -124,6 +124,16 @@ func (c *stubTracesPipelineClient) GetTracesPipeline(context.Context) (*models.T
 	return c.config, c.err
 }
 
+const (
+	testTracesPipelineStateValue = "ottlRules:\n- ruleName: test-rule\n  conditions:\n    - workload == \"nginx\"\n"
+	// Same document as testTracesPipelineStateValue, serialized differently.
+	testTracesPipelineRemoteValue = "ottlRules:\n  - conditions:\n      - workload == \"nginx\"\n    ruleName: test-rule\n"
+	testTracesPipelineOtherValue  = "ottlRules:\n- ruleName: other-rule\n"
+
+	testTracesPipelineStateTimestamp  = "2026-07-01T10:00:00.000Z"
+	testTracesPipelineRemoteTimestamp = "2026-07-27T09:00:00.000Z"
+)
+
 // Mirrors the logs pipeline refresh test; both resources share the same config store.
 func TestTracesPipelineReadKeepsSemanticallyUnchangedState(t *testing.T) {
 	ctx := context.Background()
@@ -136,7 +146,7 @@ func TestTracesPipelineReadKeepsSemanticallyUnchangedState(t *testing.T) {
 	}
 	s := schemaResp.Schema
 
-	remoteTs, err := time.Parse(time.RFC3339, testPipelineRemoteTimestamp)
+	remoteTs, err := time.Parse(time.RFC3339, testTracesPipelineRemoteTimestamp)
 	if err != nil {
 		t.Fatalf("could not parse test timestamp: %v", err)
 	}
@@ -156,23 +166,23 @@ func TestTracesPipelineReadKeepsSemanticallyUnchangedState(t *testing.T) {
 		},
 		{
 			name:              "reformatted remote value keeps state value and timestamp",
-			remoteValue:       testPipelineRemoteValue,
-			expectedValue:     testPipelineStateValue,
-			expectedUpdatedAt: testPipelineStateTimestamp,
+			remoteValue:       testTracesPipelineRemoteValue,
+			expectedValue:     testTracesPipelineStateValue,
+			expectedUpdatedAt: testTracesPipelineStateTimestamp,
 		},
 		{
 			name:              "genuinely changed remote value is adopted with its timestamp",
-			remoteValue:       testPipelineOtherValue,
-			expectedValue:     testPipelineOtherValue,
-			expectedUpdatedAt: testPipelineRemoteTimestamp,
+			remoteValue:       testTracesPipelineOtherValue,
+			expectedValue:     testTracesPipelineOtherValue,
+			expectedUpdatedAt: testTracesPipelineRemoteTimestamp,
 		},
 	}
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
 			raw := tftypes.NewValue(s.Type().TerraformType(ctx), map[string]tftypes.Value{
-				"value":      tftypes.NewValue(tftypes.String, testPipelineStateValue),
-				"updated_at": tftypes.NewValue(tftypes.String, testPipelineStateTimestamp),
+				"value":      tftypes.NewValue(tftypes.String, testTracesPipelineStateValue),
+				"updated_at": tftypes.NewValue(tftypes.String, testTracesPipelineStateTimestamp),
 			})
 
 			var remote *models.TracesPipelineConfig
@@ -219,11 +229,11 @@ func TestTracesPipelineModifyPlanCollapsesFormattingOnlyDiff(t *testing.T) {
 	objType := s.Type().TerraformType(ctx)
 
 	stateRaw := tftypes.NewValue(objType, map[string]tftypes.Value{
-		"value":      tftypes.NewValue(tftypes.String, testPipelineStateValue),
-		"updated_at": tftypes.NewValue(tftypes.String, testPipelineStateTimestamp),
+		"value":      tftypes.NewValue(tftypes.String, testTracesPipelineStateValue),
+		"updated_at": tftypes.NewValue(tftypes.String, testTracesPipelineStateTimestamp),
 	})
 	planRaw := tftypes.NewValue(objType, map[string]tftypes.Value{
-		"value":      tftypes.NewValue(tftypes.String, testPipelineRemoteValue),
+		"value":      tftypes.NewValue(tftypes.String, testTracesPipelineRemoteValue),
 		"updated_at": tftypes.NewValue(tftypes.String, tftypes.UnknownValue),
 	})
 
@@ -244,10 +254,10 @@ func TestTracesPipelineModifyPlanCollapsesFormattingOnlyDiff(t *testing.T) {
 		t.Fatalf("could not read modified plan: %v", diags)
 	}
 
-	if got.Value.ValueString() != testPipelineStateValue {
-		t.Errorf("value = %q, want the prior state value %q", got.Value.ValueString(), testPipelineStateValue)
+	if got.Value.ValueString() != testTracesPipelineStateValue {
+		t.Errorf("value = %q, want the prior state value %q", got.Value.ValueString(), testTracesPipelineStateValue)
 	}
-	if got.UpdatedAt.ValueString() != testPipelineStateTimestamp {
-		t.Errorf("updated_at = %q, want the prior state timestamp %q", got.UpdatedAt.ValueString(), testPipelineStateTimestamp)
+	if got.UpdatedAt.ValueString() != testTracesPipelineStateTimestamp {
+		t.Errorf("updated_at = %q, want the prior state timestamp %q", got.UpdatedAt.ValueString(), testTracesPipelineStateTimestamp)
 	}
 }
