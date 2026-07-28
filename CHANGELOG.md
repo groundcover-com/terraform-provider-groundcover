@@ -2,6 +2,10 @@
 
 * Added `groundcover_storage_management_policy` — manages the per-data-type storage retention policy (default retention, cold-storage move duration, and ordered custom rules). Policies are seeded by groundcover and can be updated and imported but not created or deleted — destroying the resource only removes it from Terraform state; the policy version is managed by the backend
 
+## 1.21.1
+
+* Add `awscur` example to `groundcover_dataintegration`
+
 ## 1.21.0
 
 * `groundcover_policy` now accepts an empty `data_scope = {}` block, treating it the same as omitting `data_scope` entirely — no data restrictions (access to all data). Previously the provider rejected it with "data_scope must have either 'simple' or 'advanced' specified", forcing tools that always emit the block (e.g. the Crossplane provider) to send an empty `simple` group as a workaround
