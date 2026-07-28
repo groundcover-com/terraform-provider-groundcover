@@ -67,11 +67,11 @@ output "logs_pipeline_updated_at" {
 
 ### Required
 
-- `value` (String) The YAML representation of the logs pipeline configuration. Compared semantically, so differences in formatting only — indentation, mapping key order, quoting style, comments — are not treated as changes, and the configured YAML is kept verbatim in state.
+- `value` (String) The YAML representation of the logs pipeline configuration. Compared semantically, so differences in formatting only — indentation, mapping key order, quoting style, comments — are not treated as changes. The YAML as first written is kept verbatim in state; later formatting-only edits are not persisted.
 
 ### Read-Only
 
-- `updated_at` (String) The last update timestamp of the logs pipeline configuration.
+- `updated_at` (String) The timestamp of the last change to the logs pipeline configuration that Terraform treated as semantic. Formatting-only differences do not advance it, so it can lag the backend's last-write time — an out-of-band edit that only reformats the YAML leaves it unchanged.
 
 ## Import
 

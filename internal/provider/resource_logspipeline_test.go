@@ -4,14 +4,7 @@ package provider
 
 import (
 	"context"
-	"encoding/json"
-	"fmt"
-	"net/http"
-	"net/http/httptest"
-	"os"
-	"os/exec"
 	"regexp"
-	"sync"
 	"testing"
 	"time"
 
@@ -22,7 +15,6 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/tfsdk"
 	"github.com/hashicorp/terraform-plugin-go/tftypes"
 	"github.com/hashicorp/terraform-plugin-testing/helper/resource"
-	"gopkg.in/yaml.v3"
 )
 
 func TestAccLogsPipelineResource(t *testing.T) {
@@ -95,19 +87,10 @@ func TestAccLogsPipelineResource_noDiffOnReformattedYaml(t *testing.T) {
 					resource.TestCheckResourceAttrSet("groundcover_logspipeline.test", "updated_at"),
 				),
 			},
-			// Same config, replanned: refreshing must not introduce a diff.
-			{
-				Config:             testAccLogsPipelineResourceConfig(),
-				PlanOnly:           true,
-				ExpectNonEmptyPlan: false,
-			},
-			// Same pipeline, reformatted YAML (indentation, key order, a comment): still
-			// no diff, so no write and no new timestamp.
-			{
-				Config:             testAccLogsPipelineResourceConfigReformatted(),
-				PlanOnly:           true,
-				ExpectNonEmptyPlan: false,
-			},
+			// Same pipeline, reformatted YAML (indentation, key order, a comment): no
+			// diff, so no write and no new timestamp. The framework's post-apply plan on
+			// the previous step already covers the unchanged-config case.
+			{Config: testAccLogsPipelineResourceConfigReformatted(), PlanOnly: true},
 		},
 	})
 }
@@ -165,18 +148,8 @@ func logsPipelineTestValue(ctx context.Context, s fwschema.Schema, value, update
 	})
 }
 
-const (
-	testLogsPipelineStateValue = "ottlRules:\n- ruleName: test-rule\n  conditions:\n    - container_name == \"nginx\"\n"
-	// Same document as testLogsPipelineStateValue, serialized differently.
-	testLogsPipelineRemoteValue = "ottlRules:\n  - conditions:\n      - container_name == \"nginx\"\n    ruleName: test-rule\n"
-	testLogsPipelineOtherValue  = "ottlRules:\n- ruleName: other-rule\n"
-
-	testLogsPipelineStateTimestamp  = "2026-07-01T10:00:00.000Z"
-	testLogsPipelineRemoteTimestamp = "2026-07-27T09:00:00.000Z"
-)
-
 func testLogsPipelineRemoteConfig(value string) *models.LogsPipelineConfig {
-	ts, err := time.Parse(time.RFC3339, testLogsPipelineRemoteTimestamp)
+	ts, err := time.Parse(time.RFC3339, testPipelineRemoteTimestamp)
 	if err != nil {
 		panic(err)
 	}
@@ -203,41 +176,41 @@ func TestLogsPipelineReadKeepsSemanticallyUnchangedState(t *testing.T) {
 	}{
 		{
 			name:              "reformatted remote value keeps state value and timestamp",
-			remote:            testLogsPipelineRemoteConfig(testLogsPipelineRemoteValue),
-			stateValue:        testLogsPipelineStateValue,
-			stateUpdatedAt:    testLogsPipelineStateTimestamp,
-			expectedValue:     testLogsPipelineStateValue,
-			expectedUpdatedAt: testLogsPipelineStateTimestamp,
+			remote:            testLogsPipelineRemoteConfig(testPipelineRemoteValue),
+			stateValue:        testPipelineStateValue,
+			stateUpdatedAt:    testPipelineStateTimestamp,
+			expectedValue:     testPipelineStateValue,
+			expectedUpdatedAt: testPipelineStateTimestamp,
 		},
 		{
 			name:              "byte-identical remote value keeps state timestamp",
-			remote:            testLogsPipelineRemoteConfig(testLogsPipelineStateValue),
-			stateValue:        testLogsPipelineStateValue,
-			stateUpdatedAt:    testLogsPipelineStateTimestamp,
-			expectedValue:     testLogsPipelineStateValue,
-			expectedUpdatedAt: testLogsPipelineStateTimestamp,
+			remote:            testLogsPipelineRemoteConfig(testPipelineStateValue),
+			stateValue:        testPipelineStateValue,
+			stateUpdatedAt:    testPipelineStateTimestamp,
+			expectedValue:     testPipelineStateValue,
+			expectedUpdatedAt: testPipelineStateTimestamp,
 		},
 		{
 			name:              "genuinely changed remote value is adopted with its timestamp",
-			remote:            testLogsPipelineRemoteConfig(testLogsPipelineOtherValue),
-			stateValue:        testLogsPipelineStateValue,
-			stateUpdatedAt:    testLogsPipelineStateTimestamp,
-			expectedValue:     testLogsPipelineOtherValue,
-			expectedUpdatedAt: testLogsPipelineRemoteTimestamp,
+			remote:            testLogsPipelineRemoteConfig(testPipelineOtherValue),
+			stateValue:        testPipelineStateValue,
+			stateUpdatedAt:    testPipelineStateTimestamp,
+			expectedValue:     testPipelineOtherValue,
+			expectedUpdatedAt: testPipelineRemoteTimestamp,
 		},
 		{
 			name:              "missing timestamp in state is repopulated from the API",
-			remote:            testLogsPipelineRemoteConfig(testLogsPipelineRemoteValue),
-			stateValue:        testLogsPipelineStateValue,
+			remote:            testLogsPipelineRemoteConfig(testPipelineRemoteValue),
+			stateValue:        testPipelineStateValue,
 			stateUpdatedAt:    nil,
-			expectedValue:     testLogsPipelineStateValue,
-			expectedUpdatedAt: testLogsPipelineRemoteTimestamp,
+			expectedValue:     testPipelineStateValue,
+			expectedUpdatedAt: testPipelineRemoteTimestamp,
 		},
 		{
 			name:              "empty remote config clears the value",
 			remote:            nil,
-			stateValue:        testLogsPipelineStateValue,
-			stateUpdatedAt:    testLogsPipelineStateTimestamp,
+			stateValue:        testPipelineStateValue,
+			stateUpdatedAt:    testPipelineStateTimestamp,
 			expectedValue:     "",
 			expectedUpdatedAt: "",
 		},
@@ -245,7 +218,7 @@ func TestLogsPipelineReadKeepsSemanticallyUnchangedState(t *testing.T) {
 			name:              "empty remote config clears the timestamp even when state is already empty",
 			remote:            nil,
 			stateValue:        "",
-			stateUpdatedAt:    testLogsPipelineStateTimestamp,
+			stateUpdatedAt:    testPipelineStateTimestamp,
 			expectedValue:     "",
 			expectedUpdatedAt: "",
 		},
@@ -283,7 +256,7 @@ func TestLogsPipelineReadRemovesResourceWhenNotFound(t *testing.T) {
 	ctx := context.Background()
 	s := logsPipelineTestSchema(ctx, t)
 
-	raw := logsPipelineTestValue(ctx, s, testLogsPipelineStateValue, testLogsPipelineStateTimestamp)
+	raw := logsPipelineTestValue(ctx, s, testPipelineStateValue, testPipelineStateTimestamp)
 	r := &logsPipelineResource{client: &stubLogsPipelineClient{err: ErrNotFound}}
 
 	resp := &fwresource.ReadResponse{State: tfsdk.State{Schema: s, Raw: raw.Copy()}}
@@ -312,30 +285,30 @@ func TestLogsPipelineModifyPlanCollapsesFormattingOnlyDiff(t *testing.T) {
 	}{
 		{
 			name:              "formatting-only change is planned as the prior value",
-			stateRaw:          tfValuePtr(logsPipelineTestValue(ctx, s, testLogsPipelineStateValue, testLogsPipelineStateTimestamp)),
-			planRaw:           tfValuePtr(logsPipelineTestValue(ctx, s, testLogsPipelineRemoteValue, tftypes.UnknownValue)),
-			expectedValue:     testLogsPipelineStateValue,
-			expectedUpdatedAt: testLogsPipelineStateTimestamp,
+			stateRaw:          tfValuePtr(logsPipelineTestValue(ctx, s, testPipelineStateValue, testPipelineStateTimestamp)),
+			planRaw:           tfValuePtr(logsPipelineTestValue(ctx, s, testPipelineRemoteValue, tftypes.UnknownValue)),
+			expectedValue:     testPipelineStateValue,
+			expectedUpdatedAt: testPipelineStateTimestamp,
 		},
 		{
 			name:          "real change keeps the planned value and unknown timestamp",
-			stateRaw:      tfValuePtr(logsPipelineTestValue(ctx, s, testLogsPipelineStateValue, testLogsPipelineStateTimestamp)),
-			planRaw:       tfValuePtr(logsPipelineTestValue(ctx, s, testLogsPipelineOtherValue, tftypes.UnknownValue)),
-			expectedValue: testLogsPipelineOtherValue,
+			stateRaw:      tfValuePtr(logsPipelineTestValue(ctx, s, testPipelineStateValue, testPipelineStateTimestamp)),
+			planRaw:       tfValuePtr(logsPipelineTestValue(ctx, s, testPipelineOtherValue, tftypes.UnknownValue)),
+			expectedValue: testPipelineOtherValue,
 			expectUnknown: true,
 		},
 		{
 			name:              "unchanged plan is left alone",
-			stateRaw:          tfValuePtr(logsPipelineTestValue(ctx, s, testLogsPipelineStateValue, testLogsPipelineStateTimestamp)),
-			planRaw:           tfValuePtr(logsPipelineTestValue(ctx, s, testLogsPipelineStateValue, testLogsPipelineStateTimestamp)),
-			expectedValue:     testLogsPipelineStateValue,
-			expectedUpdatedAt: testLogsPipelineStateTimestamp,
+			stateRaw:          tfValuePtr(logsPipelineTestValue(ctx, s, testPipelineStateValue, testPipelineStateTimestamp)),
+			planRaw:           tfValuePtr(logsPipelineTestValue(ctx, s, testPipelineStateValue, testPipelineStateTimestamp)),
+			expectedValue:     testPipelineStateValue,
+			expectedUpdatedAt: testPipelineStateTimestamp,
 		},
 		{
 			name:          "create plan has no prior state to reconcile against",
 			stateRaw:      nil,
-			planRaw:       tfValuePtr(logsPipelineTestValue(ctx, s, testLogsPipelineStateValue, tftypes.UnknownValue)),
-			expectedValue: testLogsPipelineStateValue,
+			planRaw:       tfValuePtr(logsPipelineTestValue(ctx, s, testPipelineStateValue, tftypes.UnknownValue)),
+			expectedValue: testPipelineStateValue,
 			expectUnknown: true,
 		},
 	}
@@ -387,7 +360,7 @@ func TestLogsPipelineModifyPlanOnDestroy(t *testing.T) {
 	s := logsPipelineTestSchema(ctx, t)
 
 	r := &logsPipelineResource{}
-	state := tfsdk.State{Schema: s, Raw: logsPipelineTestValue(ctx, s, testLogsPipelineStateValue, testLogsPipelineStateTimestamp)}
+	state := tfsdk.State{Schema: s, Raw: logsPipelineTestValue(ctx, s, testPipelineStateValue, testPipelineStateTimestamp)}
 	plan := tfsdk.Plan{Schema: s, Raw: nullLogsPipelineValue(ctx, s)}
 
 	resp := &fwresource.ModifyPlanResponse{Plan: tfsdk.Plan{Schema: s, Raw: plan.Raw.Copy()}}
@@ -409,189 +382,12 @@ func tfValuePtr(v tftypes.Value) *tftypes.Value {
 	return &v
 }
 
-//
-// These drive the provider through the real Terraform CLI against an in-process stand-in
-// for the pipeline config API, so the perpetual-diff regression is covered without
-// credentials. They exercise what the resource-level tests above cannot: whether Terraform
-// itself considers the resulting plan empty.
-//
-// They need the `terraform` binary and skip cleanly when it is missing.
-
-// fakeLogsPipelineBackend stands in for the append-only pipeline config store.
-type fakeLogsPipelineBackend struct {
-	t *testing.T
-
-	// mu guards the fields below, written by handler goroutines and read by the test.
-	mu      sync.Mutex
-	stored  string
-	present bool
-	writes  int
-
-	// remoteFn transforms the stored value before returning it, standing in for the
-	// backend's own serialization. Nil means "return it verbatim".
-	remoteFn func(string) string
-
-	// bumpTimestampOnRead reports a later timestamp on every read.
-	bumpTimestampOnRead bool
-	readBumps           int
-}
-
-func (f *fakeLogsPipelineBackend) handler() http.Handler {
-	mux := http.NewServeMux()
-	mux.HandleFunc(logsPipelineEndpoint, func(w http.ResponseWriter, r *http.Request) {
-		f.mu.Lock()
-		defer f.mu.Unlock()
-
-		switch r.Method {
-		case http.MethodGet:
-			if !f.present {
-				w.WriteHeader(http.StatusNoContent)
-				return
-			}
-			if f.bumpTimestampOnRead {
-				f.readBumps++
-			}
-			f.respond(w, http.StatusOK)
-		case http.MethodPost, http.MethodPut:
-			var body struct{ Value string }
-			if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
-				f.t.Errorf("could not decode %s body: %v", r.Method, err)
-			}
-			f.stored = body.Value
-			f.present = true
-			f.writes++
-			status := http.StatusOK
-			if r.Method == http.MethodPost {
-				status = http.StatusCreated
-			}
-			f.respond(w, status)
-		case http.MethodDelete:
-			f.present = false
-			f.stored = ""
-			w.Header().Set("Content-Type", "application/json")
-			_, _ = w.Write([]byte(`{"message":"deleted"}`))
-		default:
-			w.WriteHeader(http.StatusMethodNotAllowed)
-		}
-	})
-	return mux
-}
-
-func (f *fakeLogsPipelineBackend) writeCount() int {
-	f.mu.Lock()
-	defer f.mu.Unlock()
-	return f.writes
-}
-
-// respond must be called with f.mu held.
-func (f *fakeLogsPipelineBackend) respond(w http.ResponseWriter, status int) {
-	value := f.stored
-	if f.remoteFn != nil {
-		value = f.remoteFn(f.stored)
-	}
-
-	// Writes advance the timestamp; reads advance it too when bumpTimestampOnRead is set.
-	ts := fmt.Sprintf("2026-07-27T09:%02d:00.000Z", f.writes)
-	if f.bumpTimestampOnRead && f.readBumps > 0 {
-		ts = fmt.Sprintf("2026-07-27T10:%02d:00.000Z", f.readBumps)
-	}
-
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(status)
-	_ = json.NewEncoder(w).Encode(map[string]any{
-		"uuid":              "6b09aee0-9001-4095-afb1-152b487e5bdd",
-		"value":             value,
-		"created_timestamp": ts,
-		"created_by":        "terraform",
-	})
-}
-
-// reserializeYaml round-trips a document through a YAML library, the way the config store
-// does: same meaning, different bytes.
-func reserializeYaml(stored string) string {
-	if stored == "" {
-		return ""
-	}
-	var data interface{}
-	if err := yaml.Unmarshal([]byte(stored), &data); err != nil {
-		return stored
-	}
-	out, err := yaml.Marshal(data)
-	if err != nil {
-		return stored
-	}
-	return string(out)
-}
-
-// startFakeLogsPipelineBackend returns the backend and a provider block pointing at it.
-func startFakeLogsPipelineBackend(t *testing.T, backend *fakeLogsPipelineBackend) (*fakeLogsPipelineBackend, string) {
-	t.Helper()
-
-	if _, err := exec.LookPath("terraform"); err != nil {
-		if os.Getenv("TF_ACC_TERRAFORM_PATH") == "" {
-			t.Skip("terraform CLI not found in PATH; skipping fake-backend regression test")
-		}
-	}
-
-	backend.t = t
-	srv := httptest.NewServer(backend.handler())
-	t.Cleanup(srv.Close)
-
-	return backend, `
-provider "groundcover" {
-  api_key    = "fake-api-key"
-  backend_id = "fake-backend"
-  api_url    = "` + srv.URL + `"
-}
-`
-}
-
-func fakeLogsPipelineConfig(providerBlock, rule string) string {
-	return providerBlock + `
-resource "groundcover_logspipeline" "test" {
-  value = <<-YAML
-ottlRules:
-- ruleName: ` + rule + `
-  conditions:
-    - container_name == "nginx"
-YAML
-}
-`
-}
-
-// The backend hands back its own serialization of an unchanged pipeline; the next plan must
-// still be empty.
-func TestLogsPipelineNoPerpetualDiffAgainstReserializingBackend(t *testing.T) {
-	backend, providerBlock := startFakeLogsPipelineBackend(t, &fakeLogsPipelineBackend{remoteFn: reserializeYaml})
-
-	cfg := fakeLogsPipelineConfig(providerBlock, "test-rule")
-	const configValue = "ottlRules:\n- ruleName: test-rule\n  conditions:\n    - container_name == \"nginx\"\n"
-
-	resource.UnitTest(t, resource.TestCase{
-		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
-		Steps: []resource.TestStep{
-			{
-				Config: cfg,
-				// State keeps the practitioner's YAML, not the backend's re-serialization.
-				Check: resource.TestCheckResourceAttr("groundcover_logspipeline.test", "value", configValue),
-			},
-			{
-				Config:             cfg,
-				PlanOnly:           true,
-				ExpectNonEmptyPlan: false,
-			},
-		},
-	})
-
-	if backend.writeCount() != 1 {
-		t.Errorf("expected exactly 1 write (the create), got %d", backend.writeCount())
-	}
-}
-
-// A refresh that sees a newer backend timestamp for an unchanged pipeline must not move
-// updated_at, which is what drift detection reports on.
-func TestLogsPipelineUpdatedAtStableWhenUnchanged(t *testing.T) {
-	backend, providerBlock := startFakeLogsPipelineBackend(t, &fakeLogsPipelineBackend{
+// An unchanged pipeline must not drift: a backend that re-serializes the stored document and
+// reports a newer timestamp on every read must move neither value nor updated_at, and must
+// not cause a write. updated_at is the attribute drift detection reports on.
+func TestLogsPipelineUnchangedPipelineDoesNotDrift(t *testing.T) {
+	backend, providerBlock := startFakePipelineBackend(t, &fakePipelineBackend{
+		endpoint:            logsPipelineEndpoint,
 		remoteFn:            reserializeYaml,
 		bumpTimestampOnRead: true,
 	})
@@ -604,13 +400,19 @@ func TestLogsPipelineUpdatedAtStableWhenUnchanged(t *testing.T) {
 		Steps: []resource.TestStep{
 			{
 				Config: cfg,
-				Check:  resource.TestCheckResourceAttr("groundcover_logspipeline.test", "updated_at", createTimestamp),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					// State keeps the practitioner's YAML, not the backend's re-serialization.
+					resource.TestCheckResourceAttr("groundcover_logspipeline.test", "value", testPipelineStateValue),
+					resource.TestCheckResourceAttr("groundcover_logspipeline.test", "updated_at", createTimestamp),
+				),
 			},
+			// Re-applying refreshes first, so this asserts the refresh left both alone. The
+			// framework plans after every apply step and fails on a non-empty plan, which
+			// covers the no-diff half without a separate PlanOnly step.
 			{
 				Config: cfg,
 				Check:  resource.TestCheckResourceAttr("groundcover_logspipeline.test", "updated_at", createTimestamp),
 			},
-			{Config: cfg, PlanOnly: true, ExpectNonEmptyPlan: false},
 		},
 	})
 
@@ -621,7 +423,7 @@ func TestLogsPipelineUpdatedAtStableWhenUnchanged(t *testing.T) {
 
 // Reindenting or reordering the YAML in the .tf file must not schedule a write.
 func TestLogsPipelineReformattedConfigPlansNoChange(t *testing.T) {
-	_, providerBlock := startFakeLogsPipelineBackend(t, &fakeLogsPipelineBackend{})
+	_, providerBlock := startFakePipelineBackend(t, &fakePipelineBackend{endpoint: logsPipelineEndpoint})
 
 	reformatted := providerBlock + `
 resource "groundcover_logspipeline" "test" {
@@ -639,11 +441,7 @@ YAML
 		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
 		Steps: []resource.TestStep{
 			{Config: fakeLogsPipelineConfig(providerBlock, "test-rule")},
-			{
-				Config:             reformatted,
-				PlanOnly:           true,
-				ExpectNonEmptyPlan: false,
-			},
+			{Config: reformatted, PlanOnly: true},
 		},
 	})
 }
@@ -651,23 +449,34 @@ YAML
 // The reconciliation must not swallow an actual content change, and the resource must
 // settle after one apply.
 func TestLogsPipelineRealChangeStillApplies(t *testing.T) {
-	backend, providerBlock := startFakeLogsPipelineBackend(t, &fakeLogsPipelineBackend{remoteFn: reserializeYaml})
+	backend, providerBlock := startFakePipelineBackend(t, &fakePipelineBackend{endpoint: logsPipelineEndpoint, remoteFn: reserializeYaml})
 
 	resource.UnitTest(t, resource.TestCase{
 		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
 		Steps: []resource.TestStep{
 			{Config: fakeLogsPipelineConfig(providerBlock, "first")},
-			{Config: fakeLogsPipelineConfig(providerBlock, "first"), PlanOnly: true, ExpectNonEmptyPlan: false},
 			{
 				Config: fakeLogsPipelineConfig(providerBlock, "second"),
 				Check: resource.TestMatchResourceAttr("groundcover_logspipeline.test", "value",
 					regexp.MustCompile(`ruleName: second`)),
 			},
-			{Config: fakeLogsPipelineConfig(providerBlock, "second"), PlanOnly: true, ExpectNonEmptyPlan: false},
 		},
 	})
 
 	if backend.writeCount() != 2 {
 		t.Errorf("expected exactly 2 writes (create plus one real update), got %d", backend.writeCount())
 	}
+}
+
+func fakeLogsPipelineConfig(providerBlock, rule string) string {
+	return providerBlock + `
+resource "groundcover_logspipeline" "test" {
+  value = <<-YAML
+ottlRules:
+- ruleName: ` + rule + `
+  conditions:
+    - container_name == "nginx"
+YAML
+}
+`
 }

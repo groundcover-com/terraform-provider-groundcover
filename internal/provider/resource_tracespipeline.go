@@ -46,12 +46,15 @@ func (r *tracesPipelineResource) Schema(_ context.Context, _ resource.SchemaRequ
 			"value": schema.StringAttribute{
 				Description: "The YAML representation of the traces pipeline configuration. Compared semantically, so " +
 					"differences in formatting only — indentation, mapping key order, quoting style, comments — are not " +
-					"treated as changes, and the configured YAML is kept verbatim in state.",
+					"treated as changes. The YAML as first written is kept verbatim in state; later formatting-only " +
+					"edits are not persisted.",
 				Required: true,
 			},
 			"updated_at": schema.StringAttribute{
-				Description: "The last update timestamp of the traces pipeline configuration.",
-				Computed:    true,
+				Description: "The timestamp of the last change to the traces pipeline configuration that Terraform " +
+					"treated as semantic. Formatting-only differences do not advance it, so it can lag the backend's " +
+					"last-write time — an out-of-band edit that only reformats the YAML leaves it unchanged.",
+				Computed: true,
 			},
 		},
 	}
