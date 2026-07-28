@@ -1,6 +1,7 @@
 ## 1.21.1
 
-* Fixed `groundcover_monitor_v2` / `groundcover_monitor_v2_json` Read/refresh failures when the monitors API returns day or week duration units such as `rollup.time: 1d` or `relativeTimerange.from: -1d` (as stored by the UI). Go's `time.ParseDuration` rejects those units, so refresh failed with `unknown unit "d" in duration "1d"`. Read now runs the same scoped `NormalizeMonitorYaml` path used by `groundcover_monitor` before unmarshaling into the typed SDK model.
+* Fixed normalization of day/week relative time ranges in `groundcover_monitor_v2` and `groundcover_monitor_v2_json`. Previously values such as `-1d` were normalized to `24h`, dropping the sign. After upgrading, the first plan may show existing monitor time ranges changing to the corrected negative values.
+* Add `awscur` example to `groundcover_dataintegration`
 
 ## 1.21.0
 
