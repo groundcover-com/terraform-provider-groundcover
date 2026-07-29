@@ -1,3 +1,7 @@
+## 1.21.1
+
+* Documented the consolidated `aws` data integration type for `groundcover_dataintegration` — a single integration that carries one sub-config block per AWS capability, starting with `vpc` (subnet IPv4 capacity from EC2 `DescribeSubnets`). Added an example and a reference section covering the root configuration keys, the `vpc` block, the integration-wide `regions` / `roleArn` / `stsRegion` / `scrapeInterval` that every capability inherits with no per-capability override, the validation rules (strict decoding at every level, the `1m` interval floor, the "at least one capability" requirement, and an empty block being treated as absent), the emitted metrics and their labels, and the required `ec2:DescribeSubnets` permission. No schema change was needed — `type` and `config` were already passed through to the API — so the existing `cloudwatch`, `awsinventory`, `dynamodb`, `rdsenhanced`, `awscur` and `awsbillingsqs` types are unaffected. Requires a backend that supports the `aws` type
+
 ## 1.21.0
 
 * `groundcover_policy` now accepts an empty `data_scope = {}` block, treating it the same as omitting `data_scope` entirely — no data restrictions (access to all data). Previously the provider rejected it with "data_scope must have either 'simple' or 'advanced' specified", forcing tools that always emit the block (e.g. the Crossplane provider) to send an empty `simple` group as a workaround

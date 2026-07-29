@@ -28,6 +28,40 @@ provider "groundcover" {
   # api_url can be set via the GROUNDCOVER_API_URL environment variable (optional)
 }
 
+# Example: AWS DataIntegration (consolidated)
+# A single integration that carries one sub-config block per AWS capability.
+# `regions`, `roleArn`, `stsRegion` and `scrapeInterval` are integration-wide and are
+# inherited by every capability - there is no per-capability override, and setting one
+# of those keys inside a capability block is rejected as an unknown key.
+# To scrape different regions or assume a different role per capability, create a
+# second groundcover_dataintegration of type "aws".
+# Required IAM permission for the vpc capability: ec2:DescribeSubnets
+resource "groundcover_dataintegration" "aws_example" {
+  type = "aws"
+  config = jsonencode({
+    version = 1
+    name    = "prod-aws"
+    enabled = true
+    # required; every entry must be a valid AWS region
+    regions = ["us-east-1", "eu-west-1"]
+    # omit or leave empty for same-account access
+    roleArn   = "arn:aws:iam::123456789012:role/groundcover"
+    stsRegion = "us-east-1"
+    # required, minimum 1m - applies to every capability of this integration
+    scrapeInterval = "5m"
+    labelSettings = {
+      extraLabels = { env = "prod" }
+    }
+    # capability block - an empty block ({}) is treated as absent, so set at least one field
+    vpc = {
+      enabled = true
+      # empty means every subnet in each configured region
+      subnetIds = []
+    }
+  })
+  is_paused = false
+}
+
 # Example: CloudWatch DataIntegration
 # For a full list of supported AWS metrics and statistics, visit the official CloudWatch documentation:
 # https://docs.aws.amazon.com/AmazonCloudWatch/latest/monitoring/aws-services-cloudwatch-metrics.html
@@ -694,6 +728,11 @@ EOT
 }
 
 # Output the data integration IDs for reference
+output "aws_dataintegration_id" {
+  description = "The ID of the AWS data integration"
+  value       = groundcover_dataintegration.aws_example.id
+}
+
 output "cloudwatch_dataintegration_id" {
   description = "The ID of the CloudWatch data integration"
   value       = groundcover_dataintegration.cloudwatch_example.id
@@ -754,6 +793,73 @@ output "postgresql_system_metrics_dataintegration_id" {
   value       = groundcover_dataintegration.postgresql_system_metrics_example.id
 }
 ```
+
+## AWS Integration Reference (`type = "aws"`)
+
+The `aws` type is a single integration that carries **one sub-config block per capability**, so an AWS account is configured once instead of once per signal. This phase ships the `vpc` capability, which reports subnet IPv4 capacity. Later capabilities are added as additional blocks without reshaping the configuration.
+
+`awscur` and `awsbillingsqs` remain separate data integration types and will not become capability blocks.
+
+The `config` argument is a JSON string (produced with `jsonencode`). The Terraform schema treats it as an opaque string, so its structure is documented here.
+
+### Configuration keys
+
+| Key | Level | Required | Description |
+|---|---|---|---|
+| `version` | root | yes | Configuration version. Must be `1`. |
+| `name` | root | yes | Display name of the integration. |
+| `enabled` | root | no | Whether the integration is enabled. |
+| `labelSettings` | root | no | `extraLabels` / `dropLabels` applied to every emitted metric. |
+| `regions` | root | **yes** | AWS regions to scrape. Every entry must be a valid AWS region. |
+| `roleArn` | root | no | Role to assume, validated as an ARN. Empty or omitted means same-account access. |
+| `stsRegion` | root | no | Region used for the STS call. Must be a valid AWS region. |
+| `scrapeInterval` | root | **yes** | Scrape cadence, minimum `1m` (inclusive). Integration-wide — see below. |
+| `vpc` | block | yes\* | The VPC capability block. |
+| `vpc.enabled` | block | no | Defaults to `true` when the block is present. Set `false` to keep the block's settings but turn the capability off. |
+| `vpc.subnetIds` | block | no | Narrows discovery to specific subnets. Empty means every subnet in each configured region. |
+
+\* At least one capability block must be present **and** enabled.
+
+`scrapeInterval` accepts a duration string (`"5m"`) or a nanosecond number (`300000000000`).
+
+### Capability blocks
+
+A capability block accepts **only** `enabled` plus its own settings. There is deliberately no `vpc.scrapeInterval`, and no `vpc.regions`, `vpc.roleArn` or `vpc.stsRegion` — authentication and scrape cadence are integration-wide and capabilities inherit them with **no per-capability override**. Those keys do not exist on a block, so sending one is a hard validation error rather than a silently ignored field.
+
+An empty block (`vpc = {}`) is treated as **absent**, not as an enabled capability with defaults. Always set at least one field inside a block, for example `enabled = true`.
+
+### Multiple accounts, regions or roles
+
+To scrape different regions or assume a different role for different capabilities, create a **second `groundcover_dataintegration` of type `aws`** — one data source type, two instances. The same applies to covering more than one AWS account.
+
+### Validation
+
+The backend validates `config` on create and update, and Terraform forwards it as-is, so a rejected configuration surfaces as an `apply` error.
+
+1. `version` must be `1`; any other value is rejected.
+2. Unknown keys are rejected **at every level**, including inside a capability block.
+3. At least one capability block must be present *and* enabled, otherwise the apply fails with `at least one AWS capability must be configured (one of: vpc)` or `at least one AWS capability must be enabled`.
+4. `regions` is required at the root and every entry must be a valid AWS region.
+5. `scrapeInterval` is required at the root and must be at least `1m`. The bound is inclusive, so exactly `1m` is accepted.
+6. A `scrapeInterval`, `regions`, `roleArn` or `stsRegion` **inside** a block is rejected as an unknown key.
+7. Errors originating in a capability block are prefixed with the block name, e.g. `vpc: ...`.
+
+### Metrics emitted by the `vpc` capability
+
+| Metric | Description |
+|---|---|
+| `aws_vpc_subnet_available_ip_address_count` | Available IPv4 addresses in the subnet. |
+| `aws_vpc_subnet_total_ip_address_count` | Usable IPv4 addresses in the subnet — its size minus the 5 addresses AWS reserves. |
+
+`aws_vpc_subnet_total_ip_address_count` is not emitted for IPv6-only subnets or for blocks smaller than 6 addresses, so the two gauges can differ in cardinality.
+
+Both carry the labels `subnet_id`, `subnet_arn`, `vpc_id`, `cidr_block`, `availability_zone`, `availability_zone_id` and `subnet_state`, plus `account_id`, `account_name`, `region` and `provided_role_arn`, plus the subnet's own AWS tags. A tag whose name collides with one of the structured labels is prefixed with `tag_`.
+
+The identity labels are `gc_integration_type = "aws"` and `gc_integration_id = "aws-<id>"`, where `<id>` is the resource's `id` attribute. Both identify the **integration**, not the capability — the capability is identifiable from the `aws_vpc_` metric name prefix.
+
+### Required IAM permissions
+
+The `vpc` capability requires `ec2:DescribeSubnets`.
 
 <!-- schema generated by tfplugindocs -->
 ## Schema

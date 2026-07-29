@@ -13,6 +13,40 @@ provider "groundcover" {
   # api_url can be set via the GROUNDCOVER_API_URL environment variable (optional)
 }
 
+# Example: AWS DataIntegration (consolidated)
+# A single integration that carries one sub-config block per AWS capability.
+# `regions`, `roleArn`, `stsRegion` and `scrapeInterval` are integration-wide and are
+# inherited by every capability - there is no per-capability override, and setting one
+# of those keys inside a capability block is rejected as an unknown key.
+# To scrape different regions or assume a different role per capability, create a
+# second groundcover_dataintegration of type "aws".
+# Required IAM permission for the vpc capability: ec2:DescribeSubnets
+resource "groundcover_dataintegration" "aws_example" {
+  type = "aws"
+  config = jsonencode({
+    version = 1
+    name    = "prod-aws"
+    enabled = true
+    # required; every entry must be a valid AWS region
+    regions = ["us-east-1", "eu-west-1"]
+    # omit or leave empty for same-account access
+    roleArn   = "arn:aws:iam::123456789012:role/groundcover"
+    stsRegion = "us-east-1"
+    # required, minimum 1m - applies to every capability of this integration
+    scrapeInterval = "5m"
+    labelSettings = {
+      extraLabels = { env = "prod" }
+    }
+    # capability block - an empty block ({}) is treated as absent, so set at least one field
+    vpc = {
+      enabled = true
+      # empty means every subnet in each configured region
+      subnetIds = []
+    }
+  })
+  is_paused = false
+}
+
 # Example: CloudWatch DataIntegration
 # For a full list of supported AWS metrics and statistics, visit the official CloudWatch documentation:
 # https://docs.aws.amazon.com/AmazonCloudWatch/latest/monitoring/aws-services-cloudwatch-metrics.html
@@ -679,6 +713,11 @@ EOT
 }
 
 # Output the data integration IDs for reference
+output "aws_dataintegration_id" {
+  description = "The ID of the AWS data integration"
+  value       = groundcover_dataintegration.aws_example.id
+}
+
 output "cloudwatch_dataintegration_id" {
   description = "The ID of the CloudWatch data integration"
   value       = groundcover_dataintegration.cloudwatch_example.id
