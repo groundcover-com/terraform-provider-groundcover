@@ -70,7 +70,7 @@ output "logs_policy" {
 ### Read-Only
 
 - `created_timestamp` (String) Timestamp of the current policy version.
-- `uuid` (String) Policy UUID returned by the API.
+- `uuid` (String) UUID of the current policy version; the backend generates a new one on every update.
 - `version` (Number) Policy version, managed by groundcover.
 
 <a id="nestedatt--custom_rules"></a>

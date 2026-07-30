@@ -117,7 +117,7 @@ func (r *storageManagementPolicyResource) Schema(_ context.Context, _ resource.S
 				},
 			},
 			"version":           schema.Int64Attribute{MarkdownDescription: "Policy version, managed by groundcover.", Computed: true},
-			"uuid":              schema.StringAttribute{MarkdownDescription: "Policy UUID returned by the API.", Computed: true},
+			"uuid":              schema.StringAttribute{MarkdownDescription: "UUID of the current policy version; the backend generates a new one on every update.", Computed: true},
 			"created_timestamp": schema.StringAttribute{MarkdownDescription: "Timestamp of the current policy version.", Computed: true},
 		},
 	}

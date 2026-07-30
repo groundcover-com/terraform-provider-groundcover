@@ -29,7 +29,7 @@ Basic usage examples can be found in the `examples/` directory:
 *   **Metrics Pipeline Resource:** [`examples/resources/groundcover_metricspipeline/resource.tf`](./examples/resources/groundcover_metricspipeline/resource.tf)
     *   Demonstrates how to configure metrics relabeling rules (keep/drop metrics, add labels, raw VM relabel rules).
 *   **Storage Management Policy Resource:** [`examples/resources/groundcover_storage_management_policy/resource.tf`](./examples/resources/groundcover_storage_management_policy/resource.tf)
-    *   Demonstrates how to manage the per-data-type retention policy (default retention, cold storage, custom rules). Policies can be updated but not created or deleted.
+    *   Demonstrates how to manage the per-data-type retention policy (default retention, cold storage, custom rules) on groundcover inCloud clusters. Policies can be updated but not created or deleted.
 *   **Dashboard Resource:** [`examples/resources/groundcover_dashboard/resource.tf`](./examples/resources/groundcover_dashboard/resource.tf)
     *   Demonstrates how to create and manage dashboards with customizable widgets and layouts.
 *   **Data Integration Resource:** [`examples/resources/groundcover_dataintegration/resource.tf`](./examples/resources/groundcover_dataintegration/resource.tf)
