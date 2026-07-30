@@ -28,6 +28,8 @@ Basic usage examples can be found in the `examples/` directory:
     *   Demonstrates how to configure metrics aggregation rules for reducing cardinality.
 *   **Metrics Pipeline Resource:** [`examples/resources/groundcover_metricspipeline/resource.tf`](./examples/resources/groundcover_metricspipeline/resource.tf)
     *   Demonstrates how to configure metrics relabeling rules (keep/drop metrics, add labels, raw VM relabel rules).
+*   **Storage Management Policy Resource:** [`examples/resources/groundcover_storage_management_policy/resource.tf`](./examples/resources/groundcover_storage_management_policy/resource.tf)
+    *   Demonstrates how to manage the per-data-type retention policy (default retention, cold storage, custom rules) on groundcover inCloud clusters. Policies can be updated but not created or deleted.
 *   **Dashboard Resource:** [`examples/resources/groundcover_dashboard/resource.tf`](./examples/resources/groundcover_dashboard/resource.tf)
     *   Demonstrates how to create and manage dashboards with customizable widgets and layouts.
 *   **Data Integration Resource:** [`examples/resources/groundcover_dataintegration/resource.tf`](./examples/resources/groundcover_dataintegration/resource.tf)
@@ -63,6 +65,7 @@ For most resources, the import ID is the resource's UUID. Some exceptions:
 *   **Logs Pipeline:** Singleton resource — use any value: `terraform import groundcover_logspipeline.example any`
 *   **Traces Pipeline:** Singleton resource — use any value: `terraform import groundcover_tracespipeline.example any`
 *   **Metrics Pipeline:** Singleton resource — use any value: `terraform import groundcover_metricspipeline.example any`
+*   **Storage Management Policy:** Import by data type: `terraform import groundcover_storage_management_policy.logs logs`
 See each resource's documentation in `docs/resources/` for the exact import syntax.
 
 ## Local Development and Testing
