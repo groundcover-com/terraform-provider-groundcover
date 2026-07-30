@@ -1,3 +1,7 @@
+## 1.22.1
+
+* Removed the inCloud-only wording from the `groundcover_storage_management_policy` documentation (resource description, docs, and README)
+
 ## 1.22.0
 
 * Added `groundcover_storage_management_policy` — manages the per-data-type storage retention policy (default retention, cold-storage move duration, and ordered custom rules) on groundcover inCloud backends. Policies are seeded by groundcover and can be updated and imported but not created or deleted — destroying the resource only removes it from Terraform state; the policy version is managed by the backend

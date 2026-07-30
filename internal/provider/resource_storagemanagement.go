@@ -84,7 +84,6 @@ func (r *storageManagementPolicyResource) Metadata(_ context.Context, req resour
 func (r *storageManagementPolicyResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *resource.SchemaResponse) {
 	resp.Schema = schema.Schema{
 		MarkdownDescription: "Manages the groundcover storage management (retention) policy for a single data type. " +
-			"Only supported for groundcover inCloud backends. " +
 			"Policies are seeded by groundcover and can only be updated, never created or deleted — destroying this resource only removes it from Terraform state and leaves the policy active with its current configuration. " +
 			"Applying replaces the entire policy with the configured values: custom rules that are not declared are archived and their names cannot be reused. " +
 			"Adopting a policy whose existing custom rules are not all declared in the configuration fails — `terraform import` it first and align the configuration.",
