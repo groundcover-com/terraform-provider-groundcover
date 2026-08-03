@@ -20,7 +20,10 @@ provider "groundcover" {
 # of those keys inside a capability block is rejected as an unknown key.
 # To scrape different regions or assume a different role per capability, create a
 # second groundcover_dataintegration of type "aws".
-# Required IAM permission for the vpc capability: ec2:DescribeSubnets
+# Required IAM permissions:
+#   vpc      - ec2:DescribeSubnets
+#   dynamodb - dynamodb:ListTables, dynamodb:DescribeTable
+#   rds      - rds:DescribeDBInstances, logs:GetLogEvents
 resource "groundcover_dataintegration" "aws_example" {
   type = "aws"
   config = jsonencode({
@@ -37,11 +40,21 @@ resource "groundcover_dataintegration" "aws_example" {
     labelSettings = {
       extraLabels = { env = "prod" }
     }
-    # capability block - an empty block ({}) is treated as absent, so set at least one field
+    # capability blocks - an empty block ({}) is treated as absent, so set at least one field
     vpc = {
       enabled = true
       # empty means every subnet in each configured region
       subnetIds = []
+    }
+    dynamodb = {
+      enabled = true
+      # empty means every table in each configured region
+      tableNames = []
+    }
+    rds = {
+      enabled = true
+      # empty means every instance in each configured region
+      dbInstanceIdentifiers = []
     }
   })
   is_paused = false

@@ -16,7 +16,7 @@ description: |-
 
 ## AWS Integration Reference (`type = "aws"`)
 
-The `aws` type is a single integration that carries **one sub-config block per capability**, so an AWS account is configured once instead of once per signal. This phase ships the `vpc` capability, which reports subnet IPv4 capacity. Later capabilities are added as additional blocks without reshaping the configuration.
+The `aws` type is a single integration that carries **one sub-config block per capability**, so an AWS account is configured once instead of once per signal. This phase ships the `vpc`, `dynamodb` and `rds` capabilities. Later capabilities are added as additional blocks without reshaping the configuration.
 
 `awscur` and `awsbillingsqs` remain separate data integration types and will not become capability blocks.
 
@@ -37,6 +37,12 @@ The `config` argument is a JSON string (produced with `jsonencode`). The Terrafo
 | `vpc` | block | yes\* | The VPC capability block. |
 | `vpc.enabled` | block | no | Defaults to `true` when the block is present. Set `false` to keep the block's settings but turn the capability off. |
 | `vpc.subnetIds` | block | no | Narrows discovery to specific subnets. Empty means every subnet in each configured region. |
+| `dynamodb` | block | yes\* | The DynamoDB capability block. |
+| `dynamodb.enabled` | block | no | Defaults to `true` when the block is present. Set `false` to keep the block's settings but turn the capability off. |
+| `dynamodb.tableNames` | block | no | Narrows discovery to specific tables. Empty means every table in each configured region. |
+| `rds` | block | yes\* | The RDS capability block. |
+| `rds.enabled` | block | no | Defaults to `true` when the block is present. Set `false` to keep the block's settings but turn the capability off. |
+| `rds.dbInstanceIdentifiers` | block | no | Narrows discovery to specific instances. Empty means every instance in each configured region. |
 
 \* At least one capability block must be present **and** enabled.
 
@@ -44,9 +50,9 @@ The `config` argument is a JSON string (produced with `jsonencode`). The Terrafo
 
 ### Capability blocks
 
-A capability block accepts **only** `enabled` plus its own settings. There is deliberately no `vpc.scrapeInterval`, and no `vpc.regions`, `vpc.roleArn` or `vpc.stsRegion` — authentication and scrape cadence are integration-wide and capabilities inherit them with **no per-capability override**. Those keys do not exist on a block, so sending one is a hard validation error rather than a silently ignored field.
+A capability block accepts **only** `enabled` plus its own settings. There is deliberately no per-block `scrapeInterval`, `regions`, `roleArn` or `stsRegion` — authentication and scrape cadence are integration-wide and capabilities inherit them with **no per-capability override**. Those keys do not exist on a block, so sending one is a hard validation error rather than a silently ignored field.
 
-An empty block (`vpc = {}`) is treated as **absent**, not as an enabled capability with defaults. Always set at least one field inside a block, for example `enabled = true`.
+An empty block (`vpc = {}`, `dynamodb = {}` or `rds = {}`) is treated as **absent**, not as an enabled capability with defaults. Always set at least one field inside a block, for example `enabled = true`.
 
 ### Multiple accounts, regions or roles
 
@@ -58,7 +64,7 @@ The backend validates `config` on create and update, and Terraform forwards it a
 
 1. `version` must be `1`; any other value is rejected.
 2. Unknown keys are rejected **at every level**, including inside a capability block.
-3. At least one capability block must be present *and* enabled, otherwise the apply fails with `at least one AWS capability must be configured (one of: vpc)` or `at least one AWS capability must be enabled`.
+3. At least one capability block must be present *and* enabled, otherwise the apply fails with `at least one AWS capability must be configured (one of: vpc, dynamodb, rds)` or `at least one AWS capability must be enabled`.
 4. `regions` is required at the root and every entry must be a valid AWS region.
 5. `scrapeInterval` is required at the root and must be at least `1m`. The bound is inclusive, so exactly `1m` is accepted.
 6. A `scrapeInterval`, `regions`, `roleArn` or `stsRegion` **inside** a block is rejected as an unknown key.
@@ -75,11 +81,50 @@ The backend validates `config` on create and update, and Terraform forwards it a
 
 Both carry the labels `subnet_id`, `subnet_arn`, `vpc_id`, `cidr_block`, `availability_zone`, `availability_zone_id` and `subnet_state`, plus `account_id`, `account_name`, `region` and `provided_role_arn`, plus the subnet's own AWS tags. A tag whose name collides with one of the structured labels is prefixed with `tag_`.
 
-The identity labels are `gc_integration_type = "aws"` and `gc_integration_id = "aws-<id>"`, where `<id>` is the resource's `id` attribute. Both identify the **integration**, not the capability — the capability is identifiable from the `aws_vpc_` metric name prefix.
+### Metrics emitted by the `dynamodb` capability
+
+| Metric | Description |
+|---|---|
+| `aws_dynamodb_table_item_count` | Number of items in the table, as reported by `DescribeTable` (updated by AWS roughly every six hours). |
+| `aws_dynamodb_table_size` | Size of the table in bytes, as reported by `DescribeTable` (updated by AWS roughly every six hours). |
+
+Both carry the label `table_name`, plus `account_id`, `account_name`, `region` and `provided_role_arn`.
+
+### Metrics emitted by the `rds` capability
+
+Read directly from the `DescribeDBInstances` API, always available:
+
+| Metric | Description |
+|---|---|
+| `aws_rds_allocated_storage_bytes` | Provisioned storage. |
+| `aws_rds_iops` | Provisioned IOPS. |
+| `aws_rds_max_allocated_storage_bytes` | Storage autoscaling ceiling. |
+| `aws_rds_backup_retention_period_seconds` | Backup retention period. |
+| `aws_rds_storage_throughput_bytes_per_second` | Provisioned storage throughput. |
+
+Read from RDS Enhanced Monitoring (the `RDSOSMetrics` CloudWatch Logs group), reported best-effort — an instance without Enhanced Monitoring enabled, or with no recent message, simply contributes none of these:
+
+| Metric | Description |
+|---|---|
+| `aws_rds_memory_total_bytes` / `_free_bytes` / `_used_bytes` / `_cached_bytes` / `_buffers_bytes` / `_active_bytes` / `_inactive_bytes` / `_slab_bytes` / `_dirty_bytes` / `_mapped_bytes` / `_page_tables_bytes` / `_writeback_bytes` | OS memory breakdown. |
+| `aws_rds_swap_free_bytes` / `_swap_used_bytes` | OS swap usage. |
+| `aws_rds_cpu_total_percent` / `_user_percent` / `_system_percent` / `_idle_percent` / `_wait_percent` / `_nice_percent` / `_steal_percent` / `_irq_percent` / `_guest_percent` | CPU utilization breakdown, `0`-`100`. |
+| `aws_rds_tasks_total` / `_running` / `_sleeping` / `_stopped` / `_blocked` / `_zombie` | OS task counts. |
+| `aws_rds_network_rx_bytes_per_second` / `_tx_bytes_per_second` | Per-interface network throughput, labeled with `network_interface`. |
+
+The `DescribeDBInstances` gauges carry `db_instance_id`, `engine`, `engine_version`, `db_instance_class`, `availability_zone` and `storage_type`, plus `account_id`, `account_name`, `region`, `provided_role_arn` and the instance's own AWS tags (collisions prefixed with `tag_`, as for `vpc`). The Enhanced Monitoring gauges carry the same labels plus `instance_resource_id`.
+
+### Identity labels
+
+Every capability's metrics carry `gc_integration_type = "aws"` and `gc_integration_id = "aws-<id>"`, where `<id>` is the resource's `id` attribute. Both identify the **integration**, not the capability — the capability is identifiable from the metric name prefix (`aws_vpc_`, `aws_dynamodb_` or `aws_rds_`).
 
 ### Required IAM permissions
 
-The `vpc` capability requires `ec2:DescribeSubnets`.
+| Capability | Permissions |
+|---|---|
+| `vpc` | `ec2:DescribeSubnets` |
+| `dynamodb` | `dynamodb:ListTables`, `dynamodb:DescribeTable` |
+| `rds` | `rds:DescribeDBInstances`, `logs:GetLogEvents` (on the `RDSOSMetrics` log group, for Enhanced Monitoring) |
 
 {{ .SchemaMarkdown | trimspace }}
 
