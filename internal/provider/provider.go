@@ -169,6 +169,7 @@ func (p *GroundcoverProvider) Resources(ctx context.Context) []func() resource.R
 		NewSyntheticTestResource,
 		NewTracesPipelineResource,
 		NewSkillResource,
+		NewStorageManagementPolicyResource,
 	}
 }
 
