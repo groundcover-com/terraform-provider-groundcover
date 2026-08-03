@@ -5,6 +5,7 @@ package provider
 import (
 	"fmt"
 	"os"
+	"regexp"
 	"strings"
 	"sync"
 	"testing"
@@ -127,6 +128,13 @@ func TestComputeTestRunTokenDefaultsAttempt(t *testing.T) {
 	}
 }
 
+// fixtureTokenRegexp matches prefix followed by this run's token, for asserting that a
+// singleton actually holds the document this run wrote. Without it the acceptance checks
+// are satisfied by shape alone, so a value written by someone else passes.
+func fixtureTokenRegexp(prefix string) *regexp.Regexp {
+	return regexp.MustCompile(regexp.QuoteMeta(prefix + testRunToken()))
+}
+
 // The reformatted acceptance fixtures must stay semantically equal to the base ones,
 // or TestAcc{Logs,Traces}PipelineResource_noDiffOnReformattedYaml would be asserting an
 // empty plan for configs that genuinely differ — the test would pass for the wrong
@@ -166,6 +174,50 @@ func TestAccPipelineReformattedFixturesAreSemanticallyEqual(t *testing.T) {
 				if !strings.Contains(fixture, testRunToken()) {
 					t.Errorf("%s fixture does not carry the run token %q:\n%s", label, testRunToken(), fixture)
 				}
+			}
+		})
+	}
+}
+
+// The base-step token pattern must not also match the updated-step fixture, or the two
+// steps would assert the same thing and an update that never landed would pass. The
+// prefixes are nested by construction ("test-rule-" is a prefix of "test-rule-updated-"),
+// so this only holds because the token follows immediately.
+func TestFixtureTokenRegexpDiscriminatesBaseFromUpdated(t *testing.T) {
+	tests := []struct {
+		name    string
+		base    string
+		updated string
+		prefix  string
+	}{
+		{
+			name:    "logs",
+			base:    testAccLogsPipelineResourceConfig(),
+			updated: testAccLogsPipelineResourceConfigUpdated(),
+			prefix:  "test-rule-",
+		},
+		{
+			name:    "traces",
+			base:    testAccTracesPipelineResourceConfig(),
+			updated: testAccTracesPipelineResourceConfigUpdated(),
+			prefix:  "test-rule-",
+		},
+		{
+			name:    "metrics aggregation",
+			base:    testAccMetricsAggregationResourceConfig(),
+			updated: testAccMetricsAggregationResourceConfigUpdated(),
+			prefix:  "test_metric_counter_",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			re := fixtureTokenRegexp(tt.prefix)
+			if !re.MatchString(tt.base) {
+				t.Errorf("%s does not match its own base fixture", re)
+			}
+			if re.MatchString(tt.updated) {
+				t.Errorf("%s also matches the updated fixture, so the two steps do not discriminate", re)
 			}
 		})
 	}

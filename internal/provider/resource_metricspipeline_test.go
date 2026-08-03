@@ -29,6 +29,10 @@ func TestAccMetricsPipelineResource(t *testing.T) {
 				Config: testAccMetricsPipelineResourceConfigUpdated(),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttr("groundcover_metricspipeline.test", "rules.keep_regex.#", "2"),
+					// Assert the values, not just the shape, so a singleton written by
+					// someone else cannot satisfy this step.
+					resource.TestCheckResourceAttr("groundcover_metricspipeline.test", "rules.keep_regex.0", testAccMetricsPipelineKeepRegex()),
+					resource.TestCheckResourceAttr("groundcover_metricspipeline.test", "rules.keep_regex.1", "process_cpu_seconds_total"),
 					resource.TestCheckResourceAttr("groundcover_metricspipeline.test", "rules.drop_regex.#", "1"),
 					resource.TestCheckResourceAttr("groundcover_metricspipeline.test", "rules.drop_regex.0", "go_.*"),
 					resource.TestCheckResourceAttr("groundcover_metricspipeline.test", "rules.add_label.team", "platform"),

@@ -23,6 +23,10 @@ func TestAccMetricsAggregationResource(t *testing.T) {
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttrSet("groundcover_metricsaggregation.test", "value"),
 					resource.TestCheckResourceAttrSet("groundcover_metricsaggregation.test", "updated_at"),
+					// Assert the singleton holds this run's own document, not one that
+					// merely has the right shape.
+					resource.TestMatchResourceAttr("groundcover_metricsaggregation.test", "value",
+						fixtureTokenRegexp("test_metric_counter_")),
 				),
 			},
 			// Update and Read testing
@@ -31,6 +35,8 @@ func TestAccMetricsAggregationResource(t *testing.T) {
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttrSet("groundcover_metricsaggregation.test", "value"),
 					resource.TestCheckResourceAttrSet("groundcover_metricsaggregation.test", "updated_at"),
+					resource.TestMatchResourceAttr("groundcover_metricsaggregation.test", "value",
+						fixtureTokenRegexp("test_metric_counter_updated_")),
 				),
 			},
 			// Delete testing automatically occurs in TestCase

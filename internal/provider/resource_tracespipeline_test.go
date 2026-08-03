@@ -5,7 +5,6 @@ package provider
 import (
 	"context"
 	"fmt"
-	"regexp"
 	"testing"
 	"time"
 
@@ -28,6 +27,10 @@ func TestAccTracesPipelineResource(t *testing.T) {
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttrSet("groundcover_tracespipeline.test", "value"),
 					resource.TestCheckResourceAttrSet("groundcover_tracespipeline.test", "updated_at"),
+					// Assert the singleton holds this run's own document, not one that
+					// merely has the right shape.
+					resource.TestMatchResourceAttr("groundcover_tracespipeline.test", "value",
+						fixtureTokenRegexp("test-rule-")),
 				),
 			},
 			// Update and Read testing
@@ -37,7 +40,7 @@ func TestAccTracesPipelineResource(t *testing.T) {
 					resource.TestCheckResourceAttrSet("groundcover_tracespipeline.test", "value"),
 					resource.TestCheckResourceAttrSet("groundcover_tracespipeline.test", "updated_at"),
 					resource.TestMatchResourceAttr("groundcover_tracespipeline.test", "value",
-						regexp.MustCompile("test-rule-updated-"+regexp.QuoteMeta(testRunToken()))),
+						fixtureTokenRegexp("test-rule-updated-")),
 				),
 			},
 			// Delete testing automatically occurs in TestCase
@@ -88,6 +91,8 @@ func TestAccTracesPipelineResource_noDiffOnReformattedYaml(t *testing.T) {
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttrSet("groundcover_tracespipeline.test", "value"),
 					resource.TestCheckResourceAttrSet("groundcover_tracespipeline.test", "updated_at"),
+					resource.TestMatchResourceAttr("groundcover_tracespipeline.test", "value",
+						fixtureTokenRegexp("test-rule-")),
 				),
 			},
 			// Same pipeline, reformatted YAML: no diff, so no write and no new timestamp.

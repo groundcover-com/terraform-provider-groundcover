@@ -28,6 +28,10 @@ func TestAccLogsPipelineResource(t *testing.T) {
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttrSet("groundcover_logspipeline.test", "value"),
 					resource.TestCheckResourceAttrSet("groundcover_logspipeline.test", "updated_at"),
+					// Assert the singleton holds this run's own document, not one that
+					// merely has the right shape.
+					resource.TestMatchResourceAttr("groundcover_logspipeline.test", "value",
+						fixtureTokenRegexp("test-rule-")),
 				),
 			},
 			// Update and Read testing
@@ -36,6 +40,8 @@ func TestAccLogsPipelineResource(t *testing.T) {
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttrSet("groundcover_logspipeline.test", "value"),
 					resource.TestCheckResourceAttrSet("groundcover_logspipeline.test", "updated_at"),
+					resource.TestMatchResourceAttr("groundcover_logspipeline.test", "value",
+						fixtureTokenRegexp("test-rule-updated-")),
 				),
 			},
 			// Delete testing automatically occurs in TestCase
@@ -87,6 +93,8 @@ func TestAccLogsPipelineResource_noDiffOnReformattedYaml(t *testing.T) {
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttrSet("groundcover_logspipeline.test", "value"),
 					resource.TestCheckResourceAttrSet("groundcover_logspipeline.test", "updated_at"),
+					resource.TestMatchResourceAttr("groundcover_logspipeline.test", "value",
+						fixtureTokenRegexp("test-rule-")),
 				),
 			},
 			// Same pipeline, reformatted YAML (indentation, key order, a comment): no
