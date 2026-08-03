@@ -1,4 +1,4 @@
-## 1.23.0
+## 1.22.2
 
 * Fixed spurious drift on `groundcover_logspipeline` and `groundcover_tracespipeline`. `value` is now compared semantically, so differences in formatting only — indentation, mapping key order, quoting style, comments, trailing newlines — are no longer treated as changes. Reformatting the YAML in your configuration no longer schedules a write; a refresh that returns the same document in a different serialization no longer replaces the YAML in state or advances `updated_at`; and `updated_at` no longer flaps while the pipeline is semantically unchanged, which is what made CI/CD drift detection report false positives. Any real content change, including an out-of-band edit, still plans and applies as before
 * **Behaviour change:** `updated_at` on both resources now reports the last change Terraform treated as *semantic*, not the backend's last-write time. An out-of-band edit that only reformats the YAML leaves it unchanged
