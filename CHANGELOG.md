@@ -1,6 +1,15 @@
-## 1.21.1
+## 1.22.2
 
 * Documented the consolidated `aws` data integration type for `groundcover_dataintegration` — a single integration that carries one sub-config block per AWS capability, starting with `vpc` (subnet IPv4 capacity from EC2 `DescribeSubnets`). Added an example and a reference section covering the root configuration keys, the `vpc` block, the integration-wide `regions` / `roleArn` / `stsRegion` / `scrapeInterval` that every capability inherits with no per-capability override, the validation rules (strict decoding at every level, the `1m` interval floor, the "at least one capability" requirement, and an empty block being treated as absent), the emitted metrics and their labels, and the required `ec2:DescribeSubnets` permission. No schema change was needed — `type` and `config` were already passed through to the API — so the existing `cloudwatch`, `awsinventory`, `dynamodb`, `rdsenhanced`, `awscur` and `awsbillingsqs` types are unaffected. Requires a backend that supports the `aws` type
+
+## 1.22.1
+
+* Removed the inCloud-only wording from the `groundcover_storage_management_policy` documentation (resource description, docs, and README)
+
+## 1.22.0
+
+* Added `groundcover_storage_management_policy` — manages the per-data-type storage retention policy (default retention, cold-storage move duration, and ordered custom rules) on groundcover inCloud backends. Policies are seeded by groundcover and can be updated and imported but not created or deleted — destroying the resource only removes it from Terraform state; the policy version is managed by the backend
+* Add `awscur` example to `groundcover_dataintegration`
 
 ## 1.21.0
 
