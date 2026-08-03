@@ -4,6 +4,7 @@ package provider
 
 import (
 	"context"
+	"fmt"
 	"regexp"
 	"testing"
 	"time"
@@ -35,7 +36,8 @@ func TestAccTracesPipelineResource(t *testing.T) {
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttrSet("groundcover_tracespipeline.test", "value"),
 					resource.TestCheckResourceAttrSet("groundcover_tracespipeline.test", "updated_at"),
-					resource.TestMatchResourceAttr("groundcover_tracespipeline.test", "value", regexp.MustCompile("test-rule-updated")),
+					resource.TestMatchResourceAttr("groundcover_tracespipeline.test", "value",
+						regexp.MustCompile("test-rule-updated-"+regexp.QuoteMeta(testRunToken()))),
 				),
 			},
 			// Delete testing automatically occurs in TestCase
@@ -43,34 +45,36 @@ func TestAccTracesPipelineResource(t *testing.T) {
 	})
 }
 
+// The ruleName carries testRunToken so that a value written by another CI run is
+// attributable in the plan diff rather than indistinguishable from this run's own.
 func testAccTracesPipelineResourceConfig() string {
-	return `
+	return fmt.Sprintf(`
 resource "groundcover_tracespipeline" "test" {
   value = <<-YAML
 ottlRules:
-- ruleName: test-rule
+- ruleName: test-rule-%[1]s
   conditions:
     - workload == "nginx"
   statements:
     - set(attributes["test.key"], "test-value")
 YAML
 }
-`
+`, testRunToken())
 }
 
 func testAccTracesPipelineResourceConfigUpdated() string {
-	return `
+	return fmt.Sprintf(`
 resource "groundcover_tracespipeline" "test" {
   value = <<-YAML
 ottlRules:
-- ruleName: test-rule-updated
+- ruleName: test-rule-updated-%[1]s
   conditions:
     - workload == "nginx"
   statements:
     - set(attributes["test.key"], "test-value-updated")
 YAML
 }
-`
+`, testRunToken())
 }
 
 // Mirrors TestAccLogsPipelineResource_noDiffOnReformattedYaml.
@@ -98,7 +102,7 @@ func TestAccTracesPipelineResource_noDiffOnReformattedYaml(t *testing.T) {
 // with the same ottlRules written differently: deeper sequence indentation, reordered
 // mapping keys, and an added comment.
 func testAccTracesPipelineResourceConfigReformatted() string {
-	return `
+	return fmt.Sprintf(`
 resource "groundcover_tracespipeline" "test" {
   value = <<-YAML
 # managed by terraform
@@ -107,10 +111,10 @@ ottlRules:
       - workload == "nginx"
     statements:
       - set(attributes["test.key"], "test-value")
-    ruleName: test-rule
+    ruleName: test-rule-%[1]s
 YAML
 }
-`
+`, testRunToken())
 }
 
 // stubTracesPipelineClient serves a canned GetTracesPipeline response.

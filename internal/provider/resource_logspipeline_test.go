@@ -4,6 +4,7 @@ package provider
 
 import (
 	"context"
+	"fmt"
 	"testing"
 	"time"
 
@@ -42,34 +43,36 @@ func TestAccLogsPipelineResource(t *testing.T) {
 	})
 }
 
+// The ruleName carries testRunToken so that a value written by another CI run is
+// attributable in the plan diff rather than indistinguishable from this run's own.
 func testAccLogsPipelineResourceConfig() string {
-	return `
+	return fmt.Sprintf(`
 resource "groundcover_logspipeline" "test" {
   value = <<-YAML
 ottlRules:
-- ruleName: test-rule
+- ruleName: test-rule-%[1]s
   conditions:
     - container_name == "nginx"
   statements:
     - set(attributes["test.key"], "test-value")
 YAML
 }
-`
+`, testRunToken())
 }
 
 func testAccLogsPipelineResourceConfigUpdated() string {
-	return `
+	return fmt.Sprintf(`
 resource "groundcover_logspipeline" "test" {
   value = <<-YAML
 ottlRules:
-- ruleName: test-rule-updated
+- ruleName: test-rule-updated-%[1]s
   conditions:
     - container_name == "nginx"
   statements:
     - set(attributes["test.key"], "test-value-updated")
 YAML
 }
-`
+`, testRunToken())
 }
 
 // A config that is semantically identical to state must not plan any changes, even after a
@@ -98,7 +101,7 @@ func TestAccLogsPipelineResource_noDiffOnReformattedYaml(t *testing.T) {
 // the same ottlRules written differently: deeper sequence indentation, reordered mapping
 // keys, and an added comment.
 func testAccLogsPipelineResourceConfigReformatted() string {
-	return `
+	return fmt.Sprintf(`
 resource "groundcover_logspipeline" "test" {
   value = <<-YAML
 # managed by terraform
@@ -107,10 +110,10 @@ ottlRules:
       - container_name == "nginx"
     statements:
       - set(attributes["test.key"], "test-value")
-    ruleName: test-rule
+    ruleName: test-rule-%[1]s
 YAML
 }
-`
+`, testRunToken())
 }
 
 // Embedding ApiClient keeps the stub to the one method these tests exercise; any other call
