@@ -860,8 +860,7 @@ output "aws_cur_dataintegration_id" {
 
 ## AWS Integration Reference (`type = "aws"`)
 
-The `aws` type is a single integration that carries **one sub-config block per capability**, so an AWS account is configured once instead of once per signal. 
-
+The `aws` type is a single integration that carries **one sub-config block per capability**, so an AWS account is configured once instead of once per signal.
 `awscur` and `awsbillingsqs` remain separate data integration types and will not become capability blocks.
 
 The `config` argument is a JSON string (produced with `jsonencode`). The Terraform schema treats it as an opaque string, so its structure is documented here.
