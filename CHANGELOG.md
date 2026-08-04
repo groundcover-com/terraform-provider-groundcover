@@ -1,8 +1,7 @@
 ## 1.22.2
 
-* Fixed YAML drift for logs and traces pipelines — formatting-only differences no longer plan a change
-* `updated_at` now advances only on semantic changes, not on reformatting
-* Removed a redundant `GET` on every `terraform plan` for both pipelines
+* Fixed YAML drift on `groundcover_logspipeline` and `groundcover_tracespipeline` — formatting-only differences no longer plan a change
+* `groundcover_logspipeline` and `groundcover_tracespipeline` no longer issue a redundant `GET` on every `terraform plan`
 
 ## 1.22.1
 
