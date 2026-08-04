@@ -1,6 +1,6 @@
 ## 1.23.0
 
-* Documented the consolidated `aws` data integration type for `groundcover_dataintegration` — a single integration that carries one sub-config block per AWS capability: `vpc` (subnet IPv4 capacity from EC2 `DescribeSubnets`), `dynamodb` (per-table item count and size from `DescribeTable`) and `rds` (instance gauges from `DescribeDBInstances` plus Enhanced Monitoring OS metrics from CloudWatch Logs). Added an example and a reference section covering the root configuration keys, each capability block, the integration-wide `regions` / `roleArn` / `stsRegion` / `scrapeInterval` that every capability inherits with no per-capability override, the validation rules (strict decoding at every level, the `1m` interval floor, the "at least one capability" requirement, and an empty block being treated as absent), the emitted metrics and their labels, and the required IAM permissions per capability. No schema change was needed — `type` and `config` were already passed through to the API — so the existing `cloudwatch`, `awsinventory`, `dynamodb`, `rdsenhanced`, `awscur` and `awsbillingsqs` types are unaffected. Requires a backend that supports the `aws` type
+* Add documentation for the consolidated aws data integration
 
 ## 1.22.1
 
