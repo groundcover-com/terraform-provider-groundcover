@@ -59,7 +59,7 @@ output "logs_policy" {
 
 ### Required
 
-- `data_type` (String) Data type the policy applies to. One of `logs`, `traces`, `events`, `monitor_instance`, or `measurements`. Identifies the policy and cannot be changed. Validated by the API on apply.
+- `data_type` (String) Data type the policy applies to. One of `logs`, `traces`, `events`, `monitor_instance` (Monitor Issues), or `measurements` (APM). Identifies the policy and cannot be changed. Validated by the API on apply.
 - `retention` (String) Default retention duration for this data type (e.g. `30d`).
 
 ### Optional
