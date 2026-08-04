@@ -1,4 +1,4 @@
-## 1.23.0
+## 1.22.2
 
 * Add documentation for the consolidated aws data integration
 
