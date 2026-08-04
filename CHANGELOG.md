@@ -1,6 +1,8 @@
 ## 1.22.2
 
 * Add documentation for the consolidated aws data integration
+* Fixed YAML drift on `groundcover_logspipeline` and `groundcover_tracespipeline` — formatting-only differences no longer plan a change
+* `groundcover_logspipeline` and `groundcover_tracespipeline` no longer issue a redundant `GET` on every `terraform plan`
 
 ## 1.22.1
 
