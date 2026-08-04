@@ -23,6 +23,10 @@ func TestAccMetricsAggregationResource(t *testing.T) {
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttrSet("groundcover_metricsaggregation.test", "value"),
 					resource.TestCheckResourceAttrSet("groundcover_metricsaggregation.test", "updated_at"),
+					// Assert the singleton holds this run's own document, not one that
+					// merely has the right shape.
+					resource.TestMatchResourceAttr("groundcover_metricsaggregation.test", "value",
+						fixtureTokenRegexp("test_metric_counter_")),
 				),
 			},
 			// Update and Read testing
@@ -31,6 +35,8 @@ func TestAccMetricsAggregationResource(t *testing.T) {
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttrSet("groundcover_metricsaggregation.test", "value"),
 					resource.TestCheckResourceAttrSet("groundcover_metricsaggregation.test", "updated_at"),
+					resource.TestMatchResourceAttr("groundcover_metricsaggregation.test", "value",
+						fixtureTokenRegexp("test_metric_counter_updated_")),
 				),
 			},
 			// Delete testing automatically occurs in TestCase
@@ -55,34 +61,36 @@ func TestAccMetricsAggregationResource_disappears(t *testing.T) {
 	})
 }
 
+// The metric name carries testRunToken so that a value written by another CI run is
+// attributable in the plan diff rather than indistinguishable from this run's own.
 func testAccMetricsAggregationResourceConfig() string {
-	return `
+	return fmt.Sprintf(`
 resource "groundcover_metricsaggregation" "test" {
   value = <<-YAML
 content: |
   - ignore_old_samples: true
-    match: '{__name__=~"test_metric_counter"}'
+    match: '{__name__=~"test_metric_counter_%[1]s"}'
     without: [instance]
     interval: 30s
     outputs: [total_prometheus]
 YAML
 }
-`
+`, testRunToken())
 }
 
 func testAccMetricsAggregationResourceConfigUpdated() string {
-	return `
+	return fmt.Sprintf(`
 resource "groundcover_metricsaggregation" "test" {
   value = <<-YAML
 content: |
   - ignore_old_samples: true
-    match: '{__name__=~"test_metric_counter_updated"}'
+    match: '{__name__=~"test_metric_counter_updated_%[1]s"}'
     without: [instance, pod]
     interval: 60s
     outputs: [total_prometheus]
 YAML
 }
-`
+`, testRunToken())
 }
 
 func testAccCheckMetricsAggregationResourceExists(n string) resource.TestCheckFunc {
