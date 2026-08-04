@@ -1,3 +1,7 @@
+## 1.22.2
+
+* Documented the full list of supported `data_type` values for `groundcover_storage_management_policy` — `logs`, `traces`, `events`, `monitor_instance`, and `measurements` — instead of a non-exhaustive example list, and documented what datatypes support `cold_move_duration`.
+
 ## 1.22.1
 
 * Removed the inCloud-only wording from the `groundcover_storage_management_policy` documentation (resource description, docs, and README)

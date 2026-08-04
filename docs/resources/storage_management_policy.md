@@ -59,12 +59,12 @@ output "logs_policy" {
 
 ### Required
 
-- `data_type` (String) Data type the policy applies to (e.g. `logs`, `traces`, `events`). Identifies the policy and cannot be changed. Validated by the API on apply.
+- `data_type` (String) Data type the policy applies to. One of `logs`, `traces`, `events`, `monitor_instance`, or `measurements`. Identifies the policy and cannot be changed. Validated by the API on apply.
 - `retention` (String) Default retention duration for this data type (e.g. `30d`).
 
 ### Optional
 
-- `cold_move_duration` (String) Optional duration after which data is moved to cold storage (e.g. `7d`).
+- `cold_move_duration` (String) Optional duration after which data is moved to cold storage (e.g. `7d`); supported for the `logs`, `traces`, `events`, and `measurements` data types.
 - `custom_rules` (Attributes List) Ordered custom retention rules; supported only for the `logs`, `traces`, and `events` data types. The full list is replaced on every update. Removing a rule archives it in groundcover and its name cannot be reused. (see [below for nested schema](#nestedatt--custom_rules))
 
 ### Read-Only
