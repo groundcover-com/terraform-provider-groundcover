@@ -57,7 +57,7 @@ EOT
 }
 
 output "traces_pipeline_updated_at" {
-  description = "The timestamp of the last traces pipeline change Terraform treated as semantic. Reformatting the YAML does not advance it."
+  description = "The timestamp when the traces pipeline was last updated."
   value       = groundcover_tracespipeline.tracespipeline.updated_at
 }
 ```
@@ -67,11 +67,11 @@ output "traces_pipeline_updated_at" {
 
 ### Required
 
-- `value` (String) The YAML representation of the traces pipeline configuration. Compared semantically, so differences in formatting only — indentation, mapping key order, quoting style, comments — are not treated as changes. The YAML as first written is kept verbatim in state; later formatting-only edits are not persisted.
+- `value` (String) The YAML representation of the traces pipeline configuration.
 
 ### Read-Only
 
-- `updated_at` (String) The timestamp of the last change to the traces pipeline configuration that Terraform treated as semantic. Formatting-only differences do not advance it, so it can lag the backend's last-write time — an out-of-band edit that only reformats the YAML leaves it unchanged.
+- `updated_at` (String) The last update timestamp of the traces pipeline configuration.
 
 ## Import
 

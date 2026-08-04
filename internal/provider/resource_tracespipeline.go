@@ -44,17 +44,12 @@ func (r *tracesPipelineResource) Schema(_ context.Context, _ resource.SchemaRequ
 		Description: "Traces Pipeline resource. This is a singleton resource.",
 		Attributes: map[string]schema.Attribute{
 			"value": schema.StringAttribute{
-				Description: "The YAML representation of the traces pipeline configuration. Compared semantically, so " +
-					"differences in formatting only — indentation, mapping key order, quoting style, comments — are not " +
-					"treated as changes. The YAML as first written is kept verbatim in state; later formatting-only " +
-					"edits are not persisted.",
-				Required: true,
+				Description: "The YAML representation of the traces pipeline configuration.",
+				Required:    true,
 			},
 			"updated_at": schema.StringAttribute{
-				Description: "The timestamp of the last change to the traces pipeline configuration that Terraform " +
-					"treated as semantic. Formatting-only differences do not advance it, so it can lag the backend's " +
-					"last-write time — an out-of-band edit that only reformats the YAML leaves it unchanged.",
-				Computed: true,
+				Description: "The last update timestamp of the traces pipeline configuration.",
+				Computed:    true,
 			},
 		},
 	}
