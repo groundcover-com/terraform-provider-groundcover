@@ -27,7 +27,7 @@ The `config` argument is a JSON string (produced with `jsonencode`). The Terrafo
 |---|---|---|---|
 | `version` | root | yes | Configuration version. Must be `1`. |
 | `name` | root | yes | Display name of the integration. |
-| `enabled` | root | no | Whether the integration is enabled. |
+| `enabled` | root | no | Accepted for compatibility. Use the resource's `is_paused` to stop collection. |
 | `labelSettings` | root | no | `extraLabels` / `dropLabels` applied to every emitted metric. |
 | `regions` | root | **yes** | AWS regions to scrape. Every entry must be a valid AWS region. |
 | `roleArn` | root | no | Role to assume, validated as an ARN. Empty or omitted means same-account access. |
