@@ -41,13 +41,30 @@ jobs:
           gofmt -s -l .
           exit 1
         fi
-    
+
+
+  # Assert the matrix below still selects every TestAcc test. Without this a renamed or
+  # newly added test drops out of the matrix silently and only surfaces at release time.
+  acceptance-test-coverage:
+    runs-on: ubuntu-latest
+    needs: unit-tests
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Set up Go
+      uses: actions/setup-go@v5
+      with:
+        go-version-file: 'go.mod'
+        cache: true
+
+    - name: Check acceptance test group coverage
+      run: ./scripts/check-acceptance-coverage.sh .github/workflows/test.yml
 
   # Run acceptance tests (with API calls)
   acceptance-test-group:
     name: acceptance-tests / ${{ matrix.name }}
     runs-on: ubuntu-latest
-    needs: unit-tests
+    needs: [unit-tests, acceptance-test-coverage]
     environment: testing
     strategy:
       fail-fast: false
@@ -67,7 +84,7 @@ jobs:
           - name: metrics-pipeline
             run_regex: '^TestAccMetricsPipelineResource.*$'
           - name: monitor
-            run_regex: '^(TestAccMonitorResource.*|TestAccMonitorV2Resource.*|TestAccCustomerApplyLoop_Monitor.*)$'
+            run_regex: '^(TestAccMonitorResource.*|TestAccMonitorV2Resource.*|TestAccMonitorV2JsonResource.*|TestAccCustomerApplyLoop_Monitor.*)$'
           - name: notification-route
             run_regex: '^TestAccNotificationRoute.*$'
           - name: rbac
