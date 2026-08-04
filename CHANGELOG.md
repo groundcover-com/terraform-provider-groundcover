@@ -3,6 +3,7 @@
 * Add documentation for the consolidated aws data integration
 * Fixed YAML drift on `groundcover_logspipeline` and `groundcover_tracespipeline` — formatting-only differences no longer plan a change
 * `groundcover_logspipeline` and `groundcover_tracespipeline` no longer issue a redundant `GET` on every `terraform plan`
+* Documented the full list of supported `data_type` values for `groundcover_storage_management_policy` — `logs`, `traces`, `events`, `monitor_instance`, and `measurements`, and documented what datatypes support `cold_move_duration`.
 
 ## 1.22.1
 

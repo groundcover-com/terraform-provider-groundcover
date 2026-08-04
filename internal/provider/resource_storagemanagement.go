@@ -89,7 +89,7 @@ func (r *storageManagementPolicyResource) Schema(_ context.Context, _ resource.S
 			"Adopting a policy whose existing custom rules are not all declared in the configuration fails — `terraform import` it first and align the configuration.",
 		Attributes: map[string]schema.Attribute{
 			"data_type": schema.StringAttribute{
-				MarkdownDescription: "Data type the policy applies to (e.g. `logs`, `traces`, `events`). Identifies the policy and cannot be changed. Validated by the API on apply.",
+				MarkdownDescription: "Data type the policy applies to. One of `logs`, `traces`, `events`, `monitor_instance` (Monitor Issues), or `measurements` (APM). Identifies the policy and cannot be changed. Validated by the API on apply.",
 				Required:            true,
 				PlanModifiers:       []planmodifier.String{dataTypeImmutable{}},
 			},
@@ -99,7 +99,7 @@ func (r *storageManagementPolicyResource) Schema(_ context.Context, _ resource.S
 				Validators:          []validator.String{stringvalidator.LengthAtLeast(1)},
 			},
 			"cold_move_duration": schema.StringAttribute{
-				MarkdownDescription: "Optional duration after which data is moved to cold storage (e.g. `7d`).",
+				MarkdownDescription: "Optional duration after which data is moved to cold storage (e.g. `7d`); supported for the `logs`, `traces`, `events`, and `measurements` data types.",
 				Optional:            true,
 				Validators:          []validator.String{stringvalidator.LengthAtLeast(1)},
 			},
