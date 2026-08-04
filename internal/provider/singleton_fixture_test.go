@@ -140,7 +140,7 @@ func fixtureTokenRegexp(prefix string) *regexp.Regexp {
 // empty plan for configs that genuinely differ — the test would pass for the wrong
 // reason. Salting makes that easy to get wrong: a token in one fixture and not the
 // other, or two different tokens, reads as a real content change.
-func TestAccPipelineReformattedFixturesAreSemanticallyEqual(t *testing.T) {
+func TestPipelineReformattedFixturesAreSemanticallyEqual(t *testing.T) {
 	tests := []struct {
 		name        string
 		base        string
