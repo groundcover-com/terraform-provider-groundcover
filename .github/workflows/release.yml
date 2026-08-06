@@ -35,33 +35,7 @@ jobs:
           go-version-file: 'go.mod'
           cache: true
       - name: Check acceptance test group coverage
-        run: |
-          set -euo pipefail
-          all_tests="$(mktemp)"
-          covered_tests="$(mktemp)"
-          regexes="$(mktemp)"
-
-          go test ./internal/provider -list '^TestAcc' | awk '/^TestAcc/ { print }' | sort -u > "$all_tests"
-          sed -n '/^  acceptance-test-group:/,/^  acceptance-tests:/p' .github/workflows/release.yml \
-            | awk -F"'" '/^[[:space:]]*run_regex: / { print $2 }' > "$regexes"
-
-          if [ ! -s "$regexes" ]; then
-            echo "No acceptance test groups were found in the release workflow."
-            exit 1
-          fi
-
-          while IFS= read -r regex; do
-            go test ./internal/provider -list "$regex" | awk '/^TestAcc/ { print }'
-          done < "$regexes" | sort -u > "$covered_tests"
-
-          uncovered="$(comm -23 "$all_tests" "$covered_tests")"
-          if [ -n "$uncovered" ]; then
-            echo "The release acceptance-test matrix does not cover every TestAcc test:"
-            printf '%s\n' "$uncovered"
-            exit 1
-          fi
-
-          echo "All acceptance tests are covered by release matrix groups."
+        run: ./scripts/check-acceptance-coverage.sh .github/workflows/release.yml
 
   acceptance-test-group:
     name: acceptance-tests / ${{ matrix.name }}
