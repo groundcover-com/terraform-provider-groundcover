@@ -176,8 +176,8 @@ func sortAstNodeGoccyWithPath(node ast.Node, path []string) {
 	}
 }
 
-// NormalizeMonitorYAMLDurations rewrites only supported day/week duration
-// scalar values while preserving every other byte of the API YAML. Unlike
+// NormalizeMonitorYAMLDurations rewrites supported day/week and human-readable
+// duration scalar values while preserving every other byte of the API YAML. Unlike
 // NormalizeMonitorYaml, it deliberately does not sort or reformat YAML: Read
 // must preserve block scalar descriptions and query expressions before SDK
 // unmarshaling.
@@ -222,7 +222,7 @@ func collectYAMLDurationReplacements(source string, node *yaml.Node, path []stri
 		for i := 0; i+1 < len(node.Content); i += 2 {
 			key, value := node.Content[i], node.Content[i+1]
 			if value.Kind == yaml.ScalarNode && isMonitorDurationPath(path, key.Value) {
-				normalized := normalizeDurationScalar(value.Value)
+				normalized := monitorV2NormalizeDurationForParse(value.Value)
 				if normalized != value.Value {
 					if start, end, ok := yamlScalarTokenBounds(source, value); ok {
 						*replacements = append(*replacements, yamlScalarReplacement{start: start, end: end, value: normalized})

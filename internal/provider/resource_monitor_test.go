@@ -790,6 +790,59 @@ model:
 	}
 }
 
+func TestMonitorV2UnmarshalRemoteYAML_NormalizesHumanDurations(t *testing.T) {
+	remoteYAML := []byte(`title: Human-readable duration monitor
+severity: high
+measurementType: state
+evaluationInterval:
+  interval: 1 hour
+  pendingFor: 10 minutes
+model:
+  queries:
+  - name: threshold_input_query
+    expression: up
+    datasourceType: prometheus
+    queryType: instant
+    instantRollup: 10 minutes
+    relativeTimerange:
+      from: -1 day
+      to: 0m
+    rollup:
+      function: last
+      time: 1 day
+  thresholds:
+  - name: threshold_1
+    inputName: threshold_input_query
+    operator: gte
+    values:
+    - 50
+`)
+
+	remote, err := monitorV2UnmarshalRemoteYAML(context.Background(), remoteYAML)
+	if err != nil {
+		t.Fatalf("monitorV2UnmarshalRemoteYAML() error: %v", err)
+	}
+	if got := time.Duration(remote.EvaluationInterval.Interval); got != time.Hour {
+		t.Fatalf("evaluationInterval.interval = %s, want 1h", got)
+	}
+	if got := time.Duration(*remote.EvaluationInterval.PendingFor); got != 10*time.Minute {
+		t.Fatalf("evaluationInterval.pendingFor = %s, want 10m", got)
+	}
+	if remote.Model == nil || len(remote.Model.Queries) != 1 {
+		t.Fatalf("expected 1 query, got %#v", remote.Model)
+	}
+	query := remote.Model.Queries[0]
+	if query.InstantRollup != "10m" {
+		t.Fatalf("instantRollup = %q, want 10m", query.InstantRollup)
+	}
+	if got := time.Duration(query.RelativeTimerange.From); got != -24*time.Hour {
+		t.Fatalf("relativeTimerange.from = %s, want -24h", got)
+	}
+	if got := time.Duration(query.Rollup.Time); got != 24*time.Hour {
+		t.Fatalf("rollup.time = %s, want 24h", got)
+	}
+}
+
 func TestMonitorV2MapSDKToModelClassifiesMetricsQLByRollup(t *testing.T) {
 	query := monitorV2QueryFromSDK(&models.BaseQuery{
 		Expression:     "sum(metric)",

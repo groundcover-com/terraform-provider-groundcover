@@ -930,8 +930,8 @@ func (r *monitorV2Resource) readMonitorV2IntoState(ctx context.Context, id strin
 	return nil
 }
 
-// monitorV2UnmarshalRemoteYAML normalizes day/week duration scalars in the API
-// YAML (e.g. rollup.time "1d", relativeTimerange.from "-1d") before unmarshaling
+// monitorV2UnmarshalRemoteYAML normalizes day/week and human-readable duration
+// scalars in the API YAML (e.g. rollup.time "1d", relativeTimerange.from "-1 day") before unmarshaling
 // into the SDK typed model. strfmt.Duration accepts the UI's "d"/"w" units,
 // but loses a leading negative sign; the duration-only transform preserves it
 // while leaving descriptions and query expressions byte-for-byte intact.
