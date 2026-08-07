@@ -188,7 +188,9 @@ func NormalizeMonitorYAMLDurations(yamlString string) (string, error) {
 	}
 
 	replacements := make([]yamlScalarReplacement, 0)
-	collectYAMLDurationReplacements(yamlString, &document, nil, &replacements)
+	if err := collectYAMLDurationReplacements(yamlString, &document, nil, &replacements); err != nil {
+		return "", err
+	}
 	sort.Slice(replacements, func(i, j int) bool {
 		return replacements[i].start > replacements[j].start
 	})
@@ -208,34 +210,44 @@ type yamlScalarReplacement struct {
 
 // collectYAMLDurationReplacements finds duration scalars at supported monitor
 // paths without rendering or otherwise modifying the parsed YAML tree.
-func collectYAMLDurationReplacements(source string, node *yaml.Node, path []string, replacements *[]yamlScalarReplacement) {
+func collectYAMLDurationReplacements(source string, node *yaml.Node, path []string, replacements *[]yamlScalarReplacement) error {
 	if node == nil {
-		return
+		return nil
 	}
 
 	switch node.Kind {
 	case yaml.DocumentNode:
 		for _, child := range node.Content {
-			collectYAMLDurationReplacements(source, child, path, replacements)
+			if err := collectYAMLDurationReplacements(source, child, path, replacements); err != nil {
+				return err
+			}
 		}
 	case yaml.MappingNode:
 		for i := 0; i+1 < len(node.Content); i += 2 {
 			key, value := node.Content[i], node.Content[i+1]
 			if value.Kind == yaml.ScalarNode && isMonitorDurationPath(path, key.Value) {
-				normalized := monitorV2NormalizeDurationForParse(value.Value)
+				normalized, err := monitorV2NormalizeDurationForParse(value.Value)
+				if err != nil {
+					return err
+				}
 				if normalized != value.Value {
 					if start, end, ok := yamlScalarTokenBounds(source, value); ok {
 						*replacements = append(*replacements, yamlScalarReplacement{start: start, end: end, value: normalized})
 					}
 				}
 			}
-			collectYAMLDurationReplacements(source, value, append(path, key.Value), replacements)
+			if err := collectYAMLDurationReplacements(source, value, append(path, key.Value), replacements); err != nil {
+				return err
+			}
 		}
 	case yaml.SequenceNode:
 		for _, child := range node.Content {
-			collectYAMLDurationReplacements(source, child, path, replacements)
+			if err := collectYAMLDurationReplacements(source, child, path, replacements); err != nil {
+				return err
+			}
 		}
 	}
+	return nil
 }
 
 // yamlScalarTokenBounds locates the scalar's value bytes in the original YAML,
@@ -929,7 +941,16 @@ func normalizeStringValues(data interface{}) interface{} {
 // normalizeHumanDurations converts human-readable duration strings to Go duration format.
 // For example: "10 minutes" -> "10m", "1 hour" -> "1h", "30 seconds" -> "30s"
 func normalizeHumanDurations(s string) string {
-	return humanDurationRegex.ReplaceAllStringFunc(s, func(match string) string {
+	normalized, ok := normalizeHumanDurationsChecked(s)
+	if !ok {
+		return s
+	}
+	return normalized
+}
+
+func normalizeHumanDurationsChecked(s string) (string, bool) {
+	valid := true
+	normalized := humanDurationRegex.ReplaceAllStringFunc(s, func(match string) string {
 		parts := humanDurationRegex.FindStringSubmatch(match)
 		if len(parts) != 3 {
 			return match
@@ -940,9 +961,15 @@ func normalizeHumanDurations(s string) string {
 		case strings.HasPrefix(unit, "day"):
 			n, err := strconv.Atoi(num)
 			if err != nil {
+				valid = false
 				return match
 			}
-			return strconv.Itoa(n*24) + "h"
+			totalHours, ok := checkedDurationHours(n, 24, 0)
+			if !ok {
+				valid = false
+				return match
+			}
+			return strconv.Itoa(totalHours) + "h"
 		case strings.HasPrefix(unit, "hour"):
 			return num + "h"
 		case strings.HasPrefix(unit, "minute"):
@@ -953,6 +980,7 @@ func normalizeHumanDurations(s string) string {
 			return match
 		}
 	})
+	return normalized, valid
 }
 
 // normalizeDayDurations converts day/week durations like "1d", "7d", "1d4h",
@@ -961,29 +989,46 @@ func normalizeHumanDurations(s string) string {
 // are not supported and will fail downstream parsing — users should write
 // "24h30m" instead.
 func normalizeDayDurations(s string) string {
-	return dayDurationRegex.ReplaceAllStringFunc(s, func(match string) string {
+	normalized, ok := normalizeDayDurationsChecked(s)
+	if !ok {
+		return s
+	}
+	return normalized
+}
+
+func normalizeDayDurationsChecked(s string) (string, bool) {
+	valid := true
+	normalized := dayDurationRegex.ReplaceAllStringFunc(s, func(match string) string {
 		parts := dayDurationRegex.FindStringSubmatch(match)
 		if len(parts) != 4 {
 			return match
 		}
 		n, err := strconv.Atoi(parts[1])
 		if err != nil {
+			valid = false
 			return match
 		}
 		hoursPerUnit := 24
 		if parts[2] == "w" {
 			hoursPerUnit = 24 * 7
 		}
-		totalHours := n * hoursPerUnit
+		trailingHours := 0
 		if parts[3] != "" {
 			h, err := strconv.Atoi(parts[3])
 			if err != nil {
+				valid = false
 				return match
 			}
-			totalHours += h
+			trailingHours = h
+		}
+		totalHours, ok := checkedDurationHours(n, hoursPerUnit, trailingHours)
+		if !ok {
+			valid = false
+			return match
 		}
 		return strconv.Itoa(totalHours) + "h"
 	})
+	return normalized, valid
 }
 
 // normalizeDurationScalar converts a scalar whose entire value is a bare
@@ -1007,15 +1052,31 @@ func normalizeDurationScalar(value string) string {
 	if parts[3] == "w" {
 		hoursPerUnit = 24 * 7
 	}
-	totalHours := n * hoursPerUnit
+	trailingHours := 0
 	if parts[4] != "" {
 		h, err := strconv.Atoi(parts[4])
 		if err != nil {
 			return value
 		}
-		totalHours += h
+		trailingHours = h
+	}
+	totalHours, ok := checkedDurationHours(n, hoursPerUnit, trailingHours)
+	if !ok {
+		return value
 	}
 	return sign + strconv.Itoa(totalHours) + "h"
+}
+
+// checkedDurationHours safely combines a day/week count and trailing hours.
+func checkedDurationHours(count, hoursPerUnit, trailingHours int) (int, bool) {
+	maxInt := int(^uint(0) >> 1)
+	if count < 0 || hoursPerUnit <= 0 || trailingHours < 0 {
+		return 0, false
+	}
+	if count > (maxInt-trailingHours)/hoursPerUnit {
+		return 0, false
+	}
+	return count*hoursPerUnit + trailingHours, true
 }
 
 // normalizeTimeString normalizes a single time string

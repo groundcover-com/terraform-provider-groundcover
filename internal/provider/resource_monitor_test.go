@@ -843,6 +843,24 @@ model:
 	}
 }
 
+func TestMonitorV2UnmarshalRemoteYAML_RejectsDurationOverflow(t *testing.T) {
+	remoteYAML := []byte(`title: Oversized duration monitor
+severity: high
+measurementType: state
+evaluationInterval:
+  interval: 9223372036854775807 days
+  pendingFor: 5m
+`)
+
+	remote, err := monitorV2UnmarshalRemoteYAML(context.Background(), remoteYAML)
+	if err == nil {
+		t.Fatalf("monitorV2UnmarshalRemoteYAML() unexpectedly succeeded: %#v", remote)
+	}
+	if remote != nil {
+		t.Fatalf("monitorV2UnmarshalRemoteYAML() returned partial model: %#v", remote)
+	}
+}
+
 func TestMonitorV2MapSDKToModelClassifiesMetricsQLByRollup(t *testing.T) {
 	query := monitorV2QueryFromSDK(&models.BaseQuery{
 		Expression:     "sum(metric)",

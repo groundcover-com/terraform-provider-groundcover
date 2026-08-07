@@ -1755,7 +1755,11 @@ func monitorV2ParseDuration(value types.String, attrPath path.Path, diags *diag.
 		return 0, false
 	}
 
-	normalized := monitorV2NormalizeDurationForParse(raw)
+	normalized, err := monitorV2NormalizeDurationForParse(raw)
+	if err != nil {
+		diags.AddAttributeError(attrPath, "Invalid duration", err.Error())
+		return 0, false
+	}
 	parsed, err := strfmt.ParseDuration(normalized)
 	if err != nil {
 		diags.AddAttributeError(
@@ -1768,8 +1772,16 @@ func monitorV2ParseDuration(value types.String, attrPath path.Path, diags *diag.
 	return parsed, true
 }
 
-func monitorV2NormalizeDurationForParse(value string) string {
-	return strings.TrimSpace(normalizeDayDurations(normalizeHumanDurations(value)))
+func monitorV2NormalizeDurationForParse(value string) (string, error) {
+	humanNormalized, ok := normalizeHumanDurationsChecked(value)
+	if !ok {
+		return "", errors.New("duration exceeds the supported range")
+	}
+	dayNormalized, ok := normalizeDayDurationsChecked(humanNormalized)
+	if !ok {
+		return "", errors.New("duration exceeds the supported range")
+	}
+	return strings.TrimSpace(dayNormalized), nil
 }
 
 func monitorV2NormalizeDurationString(value string) (string, bool) {
@@ -1778,7 +1790,11 @@ func monitorV2NormalizeDurationString(value string) (string, bool) {
 		return "", false
 	}
 
-	parsed, err := strfmt.ParseDuration(monitorV2NormalizeDurationForParse(raw))
+	normalized, err := monitorV2NormalizeDurationForParse(raw)
+	if err != nil {
+		return "", false
+	}
+	parsed, err := strfmt.ParseDuration(normalized)
 	if err != nil {
 		return "", false
 	}

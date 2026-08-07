@@ -459,6 +459,42 @@ func TestNormalizeTimeString(t *testing.T) {
 	}
 }
 
+func TestDurationNormalizationRejectsIntegerOverflow(t *testing.T) {
+	const maxInt = "9223372036854775807"
+	const beyondMaxInt = "9223372036854775808"
+	tests := []struct {
+		name      string
+		input     string
+		normalize func(string) string
+	}{
+		{name: "day", input: maxInt + "d", normalize: normalizeDayDurations},
+		{name: "week with trailing hour", input: maxInt + "w1h", normalize: normalizeDayDurations},
+		{name: "human-readable day", input: maxInt + " days", normalize: normalizeHumanDurations},
+		{name: "signed scalar week", input: "-" + maxInt + "w", normalize: normalizeDurationScalar},
+		{name: "day count outside integer range", input: beyondMaxInt + "d", normalize: normalizeDayDurations},
+		{name: "trailing hour outside integer range", input: "1d" + beyondMaxInt + "h", normalize: normalizeDayDurations},
+		{name: "human-readable count outside integer range", input: beyondMaxInt + " days", normalize: normalizeHumanDurations},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := tt.normalize(tt.input); got != tt.input {
+				t.Fatalf("normalization overflowed: got %q, want unchanged %q", got, tt.input)
+			}
+		})
+	}
+
+	if _, ok := normalizeDayDurationsChecked(beyondMaxInt + "d"); ok {
+		t.Fatal("checked day normalization accepted a count outside the integer range")
+	}
+	if _, ok := normalizeDayDurationsChecked("1d" + beyondMaxInt + "h"); ok {
+		t.Fatal("checked day normalization accepted trailing hours outside the integer range")
+	}
+	if _, ok := normalizeHumanDurationsChecked(beyondMaxInt + " days"); ok {
+		t.Fatal("checked human duration normalization accepted a count outside the integer range")
+	}
+}
+
 // TestCompareYamlSemantically_EmptyFields tests that server-added empty fields
 // don't cause false drift detection (regression test for apply-loop issue)
 func TestCompareYamlSemantically_EmptyFields(t *testing.T) {
