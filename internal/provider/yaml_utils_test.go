@@ -4,6 +4,8 @@ import (
 	"context"
 	"strings"
 	"testing"
+
+	"gopkg.in/yaml.v3"
 )
 
 func TestFilterYamlKeysBasedOnTemplate(t *testing.T) {
@@ -1222,11 +1224,73 @@ model:
 }
 
 func TestNormalizeMonitorYAMLDurations_PreservesNonDurationContent(t *testing.T) {
-	input := "description: |\n  [alert]\n\n  relativeTimerange:\n    from: -1d\n  Keep this blank line.\nmodel:\n  queries:\n  - expression: |\n      rate(requests_total[5m])\n    instantRollup: -1w\nlabels:\n  instantRollup: 1d\n"
-	want := "description: |\n  [alert]\n\n  relativeTimerange:\n    from: -1d\n  Keep this blank line.\nmodel:\n  queries:\n  - expression: |\n      rate(requests_total[5m])\n    instantRollup: -168h\nlabels:\n  instantRollup: 1d\n"
+	input := `description: |
+  [alert]
 
-	if got := NormalizeMonitorYAMLDurations(input); got != want {
+  relativeTimerange:
+    from: -1d
+  Keep this blank line.
+model:
+  queries:
+  - expression: |
+      rate(requests_total[5m])
+    instantRollup: -1w
+    relativeTimerange:
+      from: -1d
+    labels:
+      instantRollup: 1d
+labels:
+  instantRollup: 1d
+`
+	want := `description: |
+  [alert]
+
+  relativeTimerange:
+    from: -1d
+  Keep this blank line.
+model:
+  queries:
+  - expression: |
+      rate(requests_total[5m])
+    instantRollup: -168h
+    relativeTimerange:
+      from: -24h
+    labels:
+      instantRollup: 1d
+labels:
+  instantRollup: 1d
+`
+
+	got, err := NormalizeMonitorYAMLDurations(input)
+	if err != nil {
+		t.Fatalf("NormalizeMonitorYAMLDurations() error: %v", err)
+	}
+	if got != want {
 		t.Errorf("NormalizeMonitorYAMLDurations() mismatch.\nwant:\n%s\ngot:\n%s", want, got)
+	}
+}
+
+func TestNormalizeMonitorYAMLDurations_FlowAndTaggedKeys(t *testing.T) {
+	input := `model: {"queries": [{"instantRollup": "-1w", "relativeTimerange": {"from": !!str -1d}, "labels": {"instantRollup": 1d}}]}
+"evaluationInterval": {"interval": 1d, "pendingFor": '1w'}
+!!str notificationSettings: {!!str renotificationInterval: "2w"}
+`
+	want := `model: {"queries": [{"instantRollup": "-168h", "relativeTimerange": {"from": !!str -24h}, "labels": {"instantRollup": 1d}}]}
+"evaluationInterval": {"interval": 24h, "pendingFor": '168h'}
+!!str notificationSettings: {!!str renotificationInterval: "336h"}
+`
+
+	got, err := NormalizeMonitorYAMLDurations(input)
+	if err != nil {
+		t.Fatalf("NormalizeMonitorYAMLDurations() error: %v", err)
+	}
+	if got != want {
+		t.Errorf("NormalizeMonitorYAMLDurations() mismatch.\nwant:\n%s\ngot:\n%s", want, got)
+	}
+
+	var parsed map[string]interface{}
+	if err := yaml.Unmarshal([]byte(got), &parsed); err != nil {
+		t.Fatalf("normalized flow-style YAML is invalid: %v", err)
 	}
 }
 

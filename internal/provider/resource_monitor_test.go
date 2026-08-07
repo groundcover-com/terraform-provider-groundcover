@@ -764,6 +764,32 @@ model:
 	}
 }
 
+func TestMonitorV2UnmarshalRemoteYAML_NormalizesFlowDurations(t *testing.T) {
+	remoteYAML := []byte(`title: Flow-style monitor
+severity: high
+measurementType: state
+evaluationInterval: {interval: 10m, pendingFor: 5m}
+model:
+  "queries": [{name: threshold_input_query, expression: up, datasourceType: prometheus, queryType: instant, "relativeTimerange": {"from": !!str -1d, to: 0m}, rollup: {function: last, time: 1d}}]
+  thresholds: [{name: threshold_1, inputName: threshold_input_query, operator: gte, values: [50]}]
+`)
+
+	remote, err := monitorV2UnmarshalRemoteYAML(context.Background(), remoteYAML)
+	if err != nil {
+		t.Fatalf("monitorV2UnmarshalRemoteYAML() error: %v", err)
+	}
+	if remote.Model == nil || len(remote.Model.Queries) != 1 {
+		t.Fatalf("expected 1 query, got %#v", remote.Model)
+	}
+	query := remote.Model.Queries[0]
+	if got := time.Duration(query.Rollup.Time); got != 24*time.Hour {
+		t.Fatalf("rollup.time = %s, want 24h", got)
+	}
+	if got := time.Duration(query.RelativeTimerange.From); got != -24*time.Hour {
+		t.Fatalf("relativeTimerange.from = %s, want -24h", got)
+	}
+}
+
 func TestMonitorV2MapSDKToModelClassifiesMetricsQLByRollup(t *testing.T) {
 	query := monitorV2QueryFromSDK(&models.BaseQuery{
 		Expression:     "sum(metric)",

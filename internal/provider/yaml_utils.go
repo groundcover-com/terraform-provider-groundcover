@@ -9,6 +9,7 @@ import (
 	"strconv"
 	"strings"
 	"time"
+	"unicode/utf8"
 
 	"github.com/goccy/go-yaml/ast"
 	"github.com/goccy/go-yaml/parser"
@@ -51,8 +52,6 @@ var (
 	// values (see normalizeDurationScalar). The optional leading "-" is required
 	// for relativeTimerange.from values the UI stores as "-1d".
 	fullDayWeekDurationRegex = regexp.MustCompile(`^(-?)(\d+)([dw])(?:(\d+)h)?$`)
-	yamlMappingLineRegex     = regexp.MustCompile(`^(\s*(?:-\s*)?)([[:alnum:]_]+)(:[ \t]*)(.*)$`)
-	yamlDurationValueRegex   = regexp.MustCompile(`^(['"]?)(-?\d+[dw](?:\d+h)?)(['"]?)(\s*(?:#.*)?)$`)
 )
 
 // isMonitorDurationPath reports whether key is a duration field at its known
@@ -71,21 +70,12 @@ func isMonitorDurationPath(path []string, key string) bool {
 	case "interval", "pendingFor":
 		return parentKey == "evaluationInterval"
 	case "instantRollup":
-		return containsYAMLPathKey(path, "queries")
+		return parentKey == "queries"
 	case "renotificationInterval":
 		return parentKey == "notificationSettings"
 	default:
 		return false
 	}
-}
-
-func containsYAMLPathKey(path []string, key string) bool {
-	for _, pathKey := range path {
-		if pathKey == key {
-			return true
-		}
-	}
-	return false
 }
 
 // NormalizeMonitorYaml sorts keys in a YAML string alphabetically using AST manipulation.
@@ -191,85 +181,136 @@ func sortAstNodeGoccyWithPath(node ast.Node, path []string) {
 // NormalizeMonitorYaml, it deliberately does not sort or reformat YAML: Read
 // must preserve block scalar descriptions and query expressions before SDK
 // unmarshaling.
-func NormalizeMonitorYAMLDurations(yamlString string) string {
-	var output strings.Builder
-	path := make([]yamlPathEntry, 0)
-	blockScalarIndent := -1
+func NormalizeMonitorYAMLDurations(yamlString string) (string, error) {
+	var document yaml.Node
+	if err := yaml.Unmarshal([]byte(yamlString), &document); err != nil {
+		return "", fmt.Errorf("failed to parse monitor YAML: %w", err)
+	}
 
-	for _, line := range strings.SplitAfter(yamlString, "\n") {
-		content := strings.TrimSuffix(line, "\n")
-		newline := line[len(content):]
-		rawIndent := len(content) - len(strings.TrimLeft(content, " \t"))
-		if blockScalarIndent >= 0 {
-			if strings.TrimSpace(content) == "" || rawIndent > blockScalarIndent {
-				output.WriteString(line)
+	replacements := make([]yamlScalarReplacement, 0)
+	collectYAMLDurationReplacements(yamlString, &document, nil, &replacements)
+	sort.Slice(replacements, func(i, j int) bool {
+		return replacements[i].start > replacements[j].start
+	})
+
+	normalized := yamlString
+	for _, replacement := range replacements {
+		normalized = normalized[:replacement.start] + replacement.value + normalized[replacement.end:]
+	}
+	return normalized, nil
+}
+
+type yamlScalarReplacement struct {
+	start int
+	end   int
+	value string
+}
+
+// collectYAMLDurationReplacements finds duration scalars at supported monitor
+// paths without rendering or otherwise modifying the parsed YAML tree.
+func collectYAMLDurationReplacements(source string, node *yaml.Node, path []string, replacements *[]yamlScalarReplacement) {
+	if node == nil {
+		return
+	}
+
+	switch node.Kind {
+	case yaml.DocumentNode:
+		for _, child := range node.Content {
+			collectYAMLDurationReplacements(source, child, path, replacements)
+		}
+	case yaml.MappingNode:
+		for i := 0; i+1 < len(node.Content); i += 2 {
+			key, value := node.Content[i], node.Content[i+1]
+			if value.Kind == yaml.ScalarNode && isMonitorDurationPath(path, key.Value) {
+				normalized := normalizeDurationScalar(value.Value)
+				if normalized != value.Value {
+					if start, end, ok := yamlScalarTokenBounds(source, value); ok {
+						*replacements = append(*replacements, yamlScalarReplacement{start: start, end: end, value: normalized})
+					}
+				}
+			}
+			collectYAMLDurationReplacements(source, value, append(path, key.Value), replacements)
+		}
+	case yaml.SequenceNode:
+		for _, child := range node.Content {
+			collectYAMLDurationReplacements(source, child, path, replacements)
+		}
+	}
+}
+
+// yamlScalarTokenBounds locates the scalar's value bytes in the original YAML,
+// excluding quotes, tags, and anchors so those source details are preserved.
+func yamlScalarTokenBounds(source string, node *yaml.Node) (int, int, bool) {
+	start, ok := yamlSourceOffset(source, node.Line, node.Column)
+	if !ok {
+		return 0, 0, false
+	}
+
+	// The parser reports the start of explicit tags and anchors as the scalar's
+	// position. Skip those properties while preserving them in the source.
+	for start < len(source) && (source[start] == '!' || source[start] == '&') {
+		for start < len(source) && source[start] != ' ' && source[start] != '\t' && source[start] != '\n' {
+			start++
+		}
+		for start < len(source) && (source[start] == ' ' || source[start] == '\t') {
+			start++
+		}
+	}
+
+	if start >= len(source) {
+		return 0, 0, false
+	}
+	if source[start] == '\'' || source[start] == '"' {
+		quote := source[start]
+		contentStart := start + 1
+		for i := contentStart; i < len(source); i++ {
+			if quote == '"' && source[i] == '\\' {
+				i++
 				continue
 			}
-			blockScalarIndent = -1
+			if source[i] != quote {
+				continue
+			}
+			if quote == '\'' && i+1 < len(source) && source[i+1] == '\'' {
+				i++
+				continue
+			}
+			if source[contentStart:i] == node.Value {
+				return contentStart, i, true
+			}
+			return 0, 0, false
 		}
-		matches := yamlMappingLineRegex.FindStringSubmatch(content)
-		if matches == nil {
-			output.WriteString(line)
-			continue
-		}
-
-		indent := yamlLineIndent(matches[1])
-		// A sequence item is indented at the same level as its owning key. Treat
-		// its mapping as one level deeper so the owning key remains in the path.
-		if strings.Contains(matches[1], "-") {
-			indent++
-		}
-		for len(path) > 0 && path[len(path)-1].indent >= indent {
-			path = path[:len(path)-1]
-		}
-		key, value := matches[2], matches[4]
-		if isMonitorDurationPath(yamlPathKeys(path), key) {
-			value = normalizeYAMLDurationValue(value)
-		}
-		output.WriteString(matches[1])
-		output.WriteString(key)
-		output.WriteString(matches[3])
-		output.WriteString(value)
-		output.WriteString(newline)
-
-		if value == "" || strings.HasPrefix(value, "#") {
-			path = append(path, yamlPathEntry{indent: indent, key: key})
-		}
-		if strings.HasPrefix(value, "|") || strings.HasPrefix(value, ">") {
-			// The prefix includes "- " for a mapping in a sequence, so its length
-			// is the indentation column of the key (and of sibling fields).
-			blockScalarIndent = len(matches[1])
-		}
+		return 0, 0, false
 	}
-	return output.String()
+
+	if strings.HasPrefix(source[start:], node.Value) {
+		return start, start + len(node.Value), true
+	}
+	return 0, 0, false
 }
 
-type yamlPathEntry struct {
-	indent int
-	key    string
-}
-
-func yamlLineIndent(prefix string) int {
-	return len(prefix) - len(strings.TrimLeft(prefix, " \t"))
-}
-
-func yamlPathKeys(path []yamlPathEntry) []string {
-	keys := make([]string, len(path))
-	for i, entry := range path {
-		keys[i] = entry.key
+// yamlSourceOffset converts a one-based YAML line and rune column to a byte
+// offset in the original UTF-8 source.
+func yamlSourceOffset(source string, line, column int) (int, bool) {
+	if line < 1 || column < 1 {
+		return 0, false
 	}
-	return keys
-}
-
-func normalizeYAMLDurationValue(value string) string {
-	parts := yamlDurationValueRegex.FindStringSubmatch(value)
-	if parts == nil {
-		return value
+	offset := 0
+	for currentLine := 1; currentLine < line; currentLine++ {
+		next := strings.IndexByte(source[offset:], '\n')
+		if next < 0 {
+			return 0, false
+		}
+		offset += next + 1
 	}
-	if parts[1] != parts[3] {
-		return value
+	for currentColumn := 1; currentColumn < column; currentColumn++ {
+		if offset >= len(source) || source[offset] == '\n' {
+			return 0, false
+		}
+		_, size := utf8.DecodeRuneInString(source[offset:])
+		offset += size
 	}
-	return parts[1] + normalizeDurationScalar(parts[2]) + parts[3] + parts[4]
+	return offset, true
 }
 
 // getStringKeyFromNode extracts string value from a key node, with fallback handling

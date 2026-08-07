@@ -936,7 +936,10 @@ func (r *monitorV2Resource) readMonitorV2IntoState(ctx context.Context, id strin
 // but loses a leading negative sign; the duration-only transform preserves it
 // while leaving descriptions and query expressions byte-for-byte intact.
 func monitorV2UnmarshalRemoteYAML(ctx context.Context, remoteYaml []byte) (*models.UpdateMonitorRequest, error) {
-	normalized := NormalizeMonitorYAMLDurations(string(remoteYaml))
+	normalized, err := NormalizeMonitorYAMLDurations(string(remoteYaml))
+	if err != nil {
+		return nil, fmt.Errorf("unable to normalize monitor response YAML: %w", err)
+	}
 
 	var remote models.UpdateMonitorRequest
 	if err := yaml.Unmarshal([]byte(normalized), &remote); err != nil {
