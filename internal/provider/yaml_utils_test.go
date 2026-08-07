@@ -1173,14 +1173,18 @@ evaluationInterval:
   interval: 1d
   pendingFor: 1w
 description: retry after 1w
-renotificationInterval: "2w"
+notificationSettings:
+  renotificationInterval: "2w"
 labels:
   window: 1w
   from: -1d
+  instantRollup: 1d
+  renotificationInterval: 1d
 model:
   queries:
   - name: threshold_input_query
     expression: up
+    instantRollup: 1w
     relativeTimerange:
       from: -1d
       to: 0m
@@ -1199,10 +1203,13 @@ model:
 		`renotificationInterval: "336h"`, // duration field converted (quoted)
 		"from: -24h",                     // signed relativeTimerange.from converted
 		"time: 24h",                      // rollup window converted
+		"instantRollup: 168h",            // query instant rollup converted
 		"title: 1w",                      // non-duration field, exact token: preserved
 		"description: retry after 1w",    // free text: preserved
 		"window: 1w",                     // non-duration label, exact token: preserved
 		"from: -1d",                      // labels.from must not collide with relativeTimerange.from
+		"instantRollup: 1d",              // labels.instantRollup must not be converted
+		"renotificationInterval: 1d",     // labels.renotificationInterval must not be converted
 	}
 	for _, want := range mustContain {
 		if !strings.Contains(got, want) {
@@ -1211,6 +1218,15 @@ model:
 	}
 	if strings.Contains(got, "retry after 168h") {
 		t.Errorf("free-text description was corrupted:\n%s", got)
+	}
+}
+
+func TestNormalizeMonitorYAMLDurations_PreservesNonDurationContent(t *testing.T) {
+	input := "description: |\n  [alert]\n\n  relativeTimerange:\n    from: -1d\n  Keep this blank line.\nmodel:\n  queries:\n  - expression: |\n      rate(requests_total[5m])\n    instantRollup: -1w\nlabels:\n  instantRollup: 1d\n"
+	want := "description: |\n  [alert]\n\n  relativeTimerange:\n    from: -1d\n  Keep this blank line.\nmodel:\n  queries:\n  - expression: |\n      rate(requests_total[5m])\n    instantRollup: -168h\nlabels:\n  instantRollup: 1d\n"
+
+	if got := NormalizeMonitorYAMLDurations(input); got != want {
+		t.Errorf("NormalizeMonitorYAMLDurations() mismatch.\nwant:\n%s\ngot:\n%s", want, got)
 	}
 }
 

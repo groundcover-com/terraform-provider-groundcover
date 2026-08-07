@@ -932,14 +932,11 @@ func (r *monitorV2Resource) readMonitorV2IntoState(ctx context.Context, id strin
 
 // monitorV2UnmarshalRemoteYAML normalizes day/week duration scalars in the API
 // YAML (e.g. rollup.time "1d", relativeTimerange.from "-1d") before unmarshaling
-// into the SDK typed model. models.Duration uses time.ParseDuration, which
-// rejects the "d"/"w" units the UI stores; the legacy groundcover_monitor
-// resource already runs NormalizeMonitorYaml on the same API payload.
+// into the SDK typed model. strfmt.Duration accepts the UI's "d"/"w" units,
+// but loses a leading negative sign; the duration-only transform preserves it
+// while leaving descriptions and query expressions byte-for-byte intact.
 func monitorV2UnmarshalRemoteYAML(ctx context.Context, remoteYaml []byte) (*models.UpdateMonitorRequest, error) {
-	normalized, err := NormalizeMonitorYaml(ctx, string(remoteYaml))
-	if err != nil {
-		return nil, fmt.Errorf("unable to normalize monitor response YAML: %w", err)
-	}
+	normalized := NormalizeMonitorYAMLDurations(string(remoteYaml))
 
 	var remote models.UpdateMonitorRequest
 	if err := yaml.Unmarshal([]byte(normalized), &remote); err != nil {

@@ -50,13 +50,18 @@ var (
 	// values (see normalizeDurationScalar). The optional leading "-" is required
 	// for relativeTimerange.from values the UI stores as "-1d".
 	fullDayWeekDurationRegex = regexp.MustCompile(`^(-?)(\d+)([dw])(?:(\d+)h)?$`)
+	yamlMappingLineRegex     = regexp.MustCompile(`^(\s*(?:-\s*)?)([[:alnum:]_]+)(:[ \t]*)(.*)$`)
+	yamlDurationValueRegex   = regexp.MustCompile(`^(['"]?)(-?\d+[dw](?:\d+h)?)(['"]?)(\s*(?:#.*)?)$`)
 )
 
-// isMonitorDurationField reports whether parentKey.key is a known monitor
-// duration field. Short/ambiguous leaf names (from, to, time, interval,
-// pendingFor) require the expected parent so arbitrary nested fields such as
-// labels.from are never rewritten. Schema-unique names are matched by leaf.
-func isMonitorDurationField(parentKey, key string) bool {
+// isMonitorDurationPath reports whether key is a duration field at its known
+// monitor YAML path. Ambiguous names must be scoped so labels and annotations
+// with the same names are never rewritten.
+func isMonitorDurationPath(path []string, key string) bool {
+	parentKey := ""
+	if len(path) > 0 {
+		parentKey = path[len(path)-1]
+	}
 	switch key {
 	case "from", "to":
 		return parentKey == "relativeTimerange"
@@ -64,11 +69,22 @@ func isMonitorDurationField(parentKey, key string) bool {
 		return parentKey == "rollup"
 	case "interval", "pendingFor":
 		return parentKey == "evaluationInterval"
-	case "instantRollup", "renotificationInterval":
-		return true
+	case "instantRollup":
+		return containsYAMLPathKey(path, "queries")
+	case "renotificationInterval":
+		return parentKey == "notificationSettings"
 	default:
 		return false
 	}
+}
+
+func containsYAMLPathKey(path []string, key string) bool {
+	for _, pathKey := range path {
+		if pathKey == key {
+			return true
+		}
+	}
+	return false
 }
 
 // NormalizeMonitorYaml sorts keys in a YAML string alphabetically using AST manipulation.
@@ -116,13 +132,12 @@ func NormalizeMonitorYaml(ctx context.Context, yamlString string) (string, error
 
 // sortAstNodeGoccy recursively sorts nodes in the AST provided by goccy/go-yaml.
 func sortAstNodeGoccy(node ast.Node) {
-	sortAstNodeGoccyWithParent(node, "")
+	sortAstNodeGoccyWithPath(node, nil)
 }
 
-// sortAstNodeGoccyWithParent is the recursive AST walker. parentKey is the
-// mapping key that owns the current node (empty at the document root) and is
-// used for structural duration-field detection.
-func sortAstNodeGoccyWithParent(node ast.Node, parentKey string) {
+// sortAstNodeGoccyWithPath is the recursive AST walker. path contains the
+// mapping keys that own the current node and is used for duration detection.
+func sortAstNodeGoccyWithPath(node ast.Node, path []string) {
 	if node == nil {
 		return
 	}
@@ -144,30 +159,116 @@ func sortAstNodeGoccyWithParent(node ast.Node, parentKey string) {
 			// Scoped duration normalization: rewrite day/week scalars to hours
 			// only on known monitor duration paths. Non-duration fields like
 			// title/description/labels are left untouched.
-			if sn, ok := valNode.Value.(*ast.StringNode); ok && isMonitorDurationField(parentKey, key) {
+			if sn, ok := valNode.Value.(*ast.StringNode); ok && isMonitorDurationPath(path, key) {
 				sn.Value = normalizeDurationScalar(sn.Value)
 			}
-			sortAstNodeGoccyWithParent(valNode.Value, key)
+			sortAstNodeGoccyWithPath(valNode.Value, append(path, key))
 		}
 	case *ast.SequenceNode:
 		// NOTE: We do NOT sort the sequence elements themselves (n.Values slice)
 		// because array order often matters semantically in configuration files.
 		// We only recursively sort the internal structure of each element.
 		for _, valNode := range n.Values {
-			sortAstNodeGoccyWithParent(valNode, parentKey)
+			sortAstNodeGoccyWithPath(valNode, path)
 		}
 	case *ast.DocumentNode:
 		if n.Body != nil {
-			sortAstNodeGoccyWithParent(n.Body, parentKey)
+			sortAstNodeGoccyWithPath(n.Body, path)
 		}
 	case *ast.AnchorNode:
 		if n.Value != nil {
-			sortAstNodeGoccyWithParent(n.Value, parentKey)
+			sortAstNodeGoccyWithPath(n.Value, path)
 		}
 	case *ast.AliasNode:
 		// Alias nodes don't have children to sort
 		return
 	}
+}
+
+// NormalizeMonitorYAMLDurations rewrites only supported day/week duration
+// scalar values while preserving every other byte of the API YAML. Unlike
+// NormalizeMonitorYaml, it deliberately does not sort or reformat YAML: Read
+// must preserve block scalar descriptions and query expressions before SDK
+// unmarshaling.
+func NormalizeMonitorYAMLDurations(yamlString string) string {
+	var output strings.Builder
+	path := make([]yamlPathEntry, 0)
+	blockScalarIndent := -1
+
+	for _, line := range strings.SplitAfter(yamlString, "\n") {
+		content := strings.TrimSuffix(line, "\n")
+		newline := line[len(content):]
+		rawIndent := len(content) - len(strings.TrimLeft(content, " \t"))
+		if blockScalarIndent >= 0 {
+			if strings.TrimSpace(content) == "" || rawIndent > blockScalarIndent {
+				output.WriteString(line)
+				continue
+			}
+			blockScalarIndent = -1
+		}
+		matches := yamlMappingLineRegex.FindStringSubmatch(content)
+		if matches == nil {
+			output.WriteString(line)
+			continue
+		}
+
+		indent := yamlLineIndent(matches[1])
+		// A sequence item is indented at the same level as its owning key. Treat
+		// its mapping as one level deeper so the owning key remains in the path.
+		if strings.Contains(matches[1], "-") {
+			indent++
+		}
+		for len(path) > 0 && path[len(path)-1].indent >= indent {
+			path = path[:len(path)-1]
+		}
+		key, value := matches[2], matches[4]
+		if isMonitorDurationPath(yamlPathKeys(path), key) {
+			value = normalizeYAMLDurationValue(value)
+		}
+		output.WriteString(matches[1])
+		output.WriteString(key)
+		output.WriteString(matches[3])
+		output.WriteString(value)
+		output.WriteString(newline)
+
+		if value == "" || strings.HasPrefix(value, "#") {
+			path = append(path, yamlPathEntry{indent: indent, key: key})
+		}
+		if strings.HasPrefix(value, "|") || strings.HasPrefix(value, ">") {
+			// The prefix includes "- " for a mapping in a sequence, so its length
+			// is the indentation column of the key (and of sibling fields).
+			blockScalarIndent = len(matches[1])
+		}
+	}
+	return output.String()
+}
+
+type yamlPathEntry struct {
+	indent int
+	key    string
+}
+
+func yamlLineIndent(prefix string) int {
+	return len(prefix) - len(strings.TrimLeft(prefix, " \t"))
+}
+
+func yamlPathKeys(path []yamlPathEntry) []string {
+	keys := make([]string, len(path))
+	for i, entry := range path {
+		keys[i] = entry.key
+	}
+	return keys
+}
+
+func normalizeYAMLDurationValue(value string) string {
+	parts := yamlDurationValueRegex.FindStringSubmatch(value)
+	if parts == nil {
+		return value
+	}
+	if parts[1] != parts[3] {
+		return value
+	}
+	return parts[1] + normalizeDurationScalar(parts[2]) + parts[3] + parts[4]
 }
 
 // getStringKeyFromNode extracts string value from a key node, with fallback handling
