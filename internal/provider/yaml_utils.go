@@ -1036,7 +1036,7 @@ func normalizeDayDurationsChecked(s string) (string, bool) {
 // "-1d") into hours, since Go's time.ParseDuration understands neither "d" nor
 // "w". Values that are not exactly such a token (e.g. "5m", "1h30m", or free
 // text) are returned unchanged. Callers additionally gate this to known
-// duration fields (see isMonitorDurationField). Composite forms with
+// duration fields (see isMonitorDurationPath). Composite forms with
 // minutes/seconds are not supported.
 func normalizeDurationScalar(value string) string {
 	parts := fullDayWeekDurationRegex.FindStringSubmatch(value)
