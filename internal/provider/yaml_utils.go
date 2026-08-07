@@ -3,6 +3,7 @@ package provider
 import (
 	"context"
 	"fmt"
+	"reflect"
 	"regexp"
 	"sort"
 	"strconv"
@@ -592,6 +593,29 @@ func CompareYamlSemantically(yaml1, yaml2 string) (bool, error) {
 	result := deepEqual(normalizedData1, normalizedData2)
 
 	return result, nil
+}
+
+// YamlSemanticallyEqual reports whether two YAML documents carry the same data, letting
+// only representation differ: indentation, key order, quoting style, comments and trailing
+// newlines. Sequence order, null vs missing keys and int vs float scalars all count as
+// differences. Input that does not parse falls back to exact string comparison.
+//
+// Stricter than CompareYamlSemantically, whose empty-field stripping, duration rewriting
+// and monitor default-value rules would make unrelated configs compare equal.
+func YamlSemanticallyEqual(a, b string) bool {
+	if a == b {
+		return true
+	}
+
+	var dataA, dataB interface{}
+	if err := yaml.Unmarshal([]byte(a), &dataA); err != nil {
+		return false
+	}
+	if err := yaml.Unmarshal([]byte(b), &dataB); err != nil {
+		return false
+	}
+
+	return reflect.DeepEqual(dataA, dataB)
 }
 
 // removeIgnoredFields recursively removes fields that should be ignored during comparison

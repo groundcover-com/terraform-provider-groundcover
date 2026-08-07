@@ -147,9 +147,22 @@ func (r *logsPipelineResource) Read(ctx context.Context, req resource.ReadReques
 		uuid = configEntry.UUID
 	}
 
-	// Update state
-	state.UpdatedAt = types.StringValue(createdAt)
-	state.Value = types.StringValue(value)
+	// Every write re-serializes the document and mints a new timestamp, so refreshing
+	// unconditionally would swap the configured YAML for the backend's formatting and leave
+	// a diff that writes again on the next apply, forever. An absent singleton is a real
+	// change, not an unchanged empty document.
+	semanticallyUnchanged := configEntry != nil &&
+		!state.Value.IsNull() && !state.Value.IsUnknown() &&
+		YamlSemanticallyEqual(state.Value.ValueString(), value)
+
+	if !semanticallyUnchanged {
+		state.Value = types.StringValue(value)
+	}
+
+	// updated_at tracks writes, so it follows the value — unless state has none to keep.
+	if !semanticallyUnchanged || state.UpdatedAt.IsNull() || state.UpdatedAt.IsUnknown() {
+		state.UpdatedAt = types.StringValue(createdAt)
+	}
 
 	// Set refreshed state
 	diags = resp.State.Set(ctx, &state)
@@ -239,22 +252,38 @@ func (r *logsPipelineResource) ImportState(ctx context.Context, req resource.Imp
 func (r *logsPipelineResource) ModifyPlan(ctx context.Context, req resource.ModifyPlanRequest, resp *resource.ModifyPlanResponse) {
 	tflog.Debug(ctx, "Modifying LogsPipeline plan")
 
-	_, err := r.checkAndImportExisting(ctx, &req.State, &resp.Diagnostics)
-	if err != nil {
-		resp.Diagnostics.AddError(
-			"Error Importing LogsPipeline",
-			fmt.Sprintf("Could not import LogsPipeline: %s", err.Error()),
-		)
+	resp.Diagnostics.AddWarning(
+		"LogsPipeline is a Singleton",
+		"Your plan should never include more than one logs pipeline resource. If it does, only the latest will take place.\n"+
+			"Renaming the resource will show an incorrect plan.",
+	)
+
+	// No prior state means create; no plan means destroy.
+	if req.State.Raw.IsNull() || req.Plan.Raw.IsNull() {
 		return
 	}
 
-	resp.Diagnostics.AddWarning(
-		"LogsPipeline is a Singleton",
-		fmt.Sprintf(
-			"Your plan should never include more than one logs pipeline resource. If it does, only the latest will take place.\n"+
-				"Renaming the resource will show an incorrect plan.",
-		),
-	)
+	var state, plan logsPipelineResourceModel
+	resp.Diagnostics.Append(req.State.Get(ctx, &state)...)
+	resp.Diagnostics.Append(req.Plan.Get(ctx, &plan)...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+
+	if plan.Value.IsNull() || plan.Value.IsUnknown() || state.Value.IsNull() || state.Value.IsUnknown() {
+		return
+	}
+	if plan.Value.ValueString() == state.Value.ValueString() {
+		return
+	}
+	if !YamlSemanticallyEqual(plan.Value.ValueString(), state.Value.ValueString()) {
+		return
+	}
+
+	// Formatting-only difference. Planning the prior value drops the diff, and with it the
+	// "known after apply" the framework would otherwise put on updated_at.
+	resp.Diagnostics.Append(resp.Plan.SetAttribute(ctx, path.Root("value"), state.Value)...)
+	resp.Diagnostics.Append(resp.Plan.SetAttribute(ctx, path.Root("updated_at"), state.UpdatedAt)...)
 }
 
 func (r *logsPipelineResource) checkAndImportExisting(ctx context.Context, state *tfsdk.State, diags *diag.Diagnostics) (*models.LogsPipelineConfig, error) {

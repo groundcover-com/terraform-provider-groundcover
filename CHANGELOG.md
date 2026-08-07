@@ -1,6 +1,21 @@
-## 1.22.2
+## 1.22.3
 
 * Fixed normalization of day/week relative time ranges in `groundcover_monitor_v2` and `groundcover_monitor_v2_json`.
+
+## 1.22.2
+
+* Add documentation for the consolidated aws data integration
+* Fixed YAML drift on `groundcover_logspipeline` and `groundcover_tracespipeline` — formatting-only differences no longer plan a change
+* `groundcover_logspipeline` and `groundcover_tracespipeline` no longer issue a redundant `GET` on every `terraform plan`
+* Documented the full list of supported `data_type` values for `groundcover_storage_management_policy` — `logs`, `traces`, `events`, `monitor_instance`, and `measurements`, and documented what datatypes support `cold_move_duration`.
+
+## 1.22.1
+
+* Removed the inCloud-only wording from the `groundcover_storage_management_policy` documentation (resource description, docs, and README)
+
+## 1.22.0
+
+* Added `groundcover_storage_management_policy` — manages the per-data-type storage retention policy (default retention, cold-storage move duration, and ordered custom rules) on groundcover inCloud backends. Policies are seeded by groundcover and can be updated and imported but not created or deleted — destroying the resource only removes it from Terraform state; the policy version is managed by the backend
 * Add `awscur` example to `groundcover_dataintegration`
 
 ## 1.21.0

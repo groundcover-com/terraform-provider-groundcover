@@ -260,6 +260,10 @@ type ApiClient interface {
 	GetSkill(ctx context.Context, id string) (*models.AgentSkillDetail, error)
 	UpdateSkill(ctx context.Context, id string, req *models.AgentSkillRequest) (*models.AgentSkillDetail, error)
 	DeleteSkill(ctx context.Context, id string) error
+
+	// Storage Management (per data type; GET/PUT only, no delete)
+	GetStorageManagementPolicy(ctx context.Context, dataType string) (*models.StorageManagementPolicyResponse, error)
+	UpdateStorageManagementPolicy(ctx context.Context, dataType string, req *models.StorageManagementPolicyRequest) (*models.StorageManagementPolicyResponse, error)
 }
 
 // SdkClientWrapper implements ApiClient using the Groundcover Go SDK.

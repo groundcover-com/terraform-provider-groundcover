@@ -21,4 +21,10 @@ test:
 testacc:
 	TF_ACC=1 go test -v -cover -timeout 120m ./...
 
-.PHONY: fmt lint test testacc build install generate
+# Assert every TestAcc test is selected by an acceptance-test matrix group. Needs no
+# credentials — it only lists test names.
+check-acceptance-coverage:
+	./scripts/check-acceptance-coverage.sh .github/workflows/test.yml
+	./scripts/check-acceptance-coverage.sh .github/workflows/release.yml
+
+.PHONY: fmt lint test testacc build install generate check-acceptance-coverage

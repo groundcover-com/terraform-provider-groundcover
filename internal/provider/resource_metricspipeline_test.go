@@ -21,7 +21,7 @@ func TestAccMetricsPipelineResource(t *testing.T) {
 				Config: testAccMetricsPipelineResourceConfig(),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttr("groundcover_metricspipeline.test", "rules.keep_regex.#", "1"),
-					resource.TestCheckResourceAttr("groundcover_metricspipeline.test", "rules.keep_regex.0", "http_requests_total"),
+					resource.TestCheckResourceAttr("groundcover_metricspipeline.test", "rules.keep_regex.0", testAccMetricsPipelineKeepRegex()),
 					resource.TestCheckResourceAttrSet("groundcover_metricspipeline.test", "updated_at"),
 				),
 			},
@@ -29,6 +29,10 @@ func TestAccMetricsPipelineResource(t *testing.T) {
 				Config: testAccMetricsPipelineResourceConfigUpdated(),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttr("groundcover_metricspipeline.test", "rules.keep_regex.#", "2"),
+					// Assert the values, not just the shape, so a singleton written by
+					// someone else cannot satisfy this step.
+					resource.TestCheckResourceAttr("groundcover_metricspipeline.test", "rules.keep_regex.0", testAccMetricsPipelineKeepRegex()),
+					resource.TestCheckResourceAttr("groundcover_metricspipeline.test", "rules.keep_regex.1", "process_cpu_seconds_total"),
 					resource.TestCheckResourceAttr("groundcover_metricspipeline.test", "rules.drop_regex.#", "1"),
 					resource.TestCheckResourceAttr("groundcover_metricspipeline.test", "rules.drop_regex.0", "go_.*"),
 					resource.TestCheckResourceAttr("groundcover_metricspipeline.test", "rules.add_label.team", "platform"),
@@ -56,28 +60,35 @@ func TestAccMetricsPipelineResource_disappears(t *testing.T) {
 	})
 }
 
+// testAccMetricsPipelineKeepRegex is the first keep_regex entry, carrying testRunToken
+// so that a value written by another CI run is attributable in the plan diff rather
+// than indistinguishable from this run's own.
+func testAccMetricsPipelineKeepRegex() string {
+	return fmt.Sprintf("http_requests_total_%s", testRunToken())
+}
+
 func testAccMetricsPipelineResourceConfig() string {
-	return `
+	return fmt.Sprintf(`
 resource "groundcover_metricspipeline" "test" {
   rules = {
-    keep_regex = ["http_requests_total"]
+    keep_regex = [%[1]q]
   }
 }
-`
+`, testAccMetricsPipelineKeepRegex())
 }
 
 func testAccMetricsPipelineResourceConfigUpdated() string {
-	return `
+	return fmt.Sprintf(`
 resource "groundcover_metricspipeline" "test" {
   rules = {
-    keep_regex = ["http_requests_total", "process_cpu_seconds_total"]
+    keep_regex = [%[1]q, "process_cpu_seconds_total"]
     drop_regex = ["go_.*"]
     add_label = {
       team = "platform"
     }
   }
 }
-`
+`, testAccMetricsPipelineKeepRegex())
 }
 
 func testAccCheckMetricsPipelineResourceExists(n string) resource.TestCheckFunc {

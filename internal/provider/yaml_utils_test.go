@@ -1514,3 +1514,154 @@ func TestNormalizeHumanDurations(t *testing.T) {
 		})
 	}
 }
+
+func TestYamlSemanticallyEqual(t *testing.T) {
+	const pipeline = `ottlRules:
+- ruleName: test-rule
+  conditions:
+    - container_name == "nginx"
+  statements:
+    - set(attributes["test.key"], "test-value")
+`
+
+	tests := []struct {
+		name     string
+		a        string
+		b        string
+		expected bool
+	}{
+		{
+			name:     "identical strings",
+			a:        pipeline,
+			b:        pipeline,
+			expected: true,
+		},
+		{
+			name:     "both empty",
+			a:        "",
+			b:        "",
+			expected: true,
+		},
+		{
+			name: "sequence indentation differs",
+			a:    pipeline,
+			b: `ottlRules:
+  - ruleName: test-rule
+    conditions:
+      - container_name == "nginx"
+    statements:
+      - set(attributes["test.key"], "test-value")
+`,
+			expected: true,
+		},
+		{
+			name: "mapping key order differs",
+			a:    pipeline,
+			b: `ottlRules:
+- conditions:
+    - container_name == "nginx"
+  statements:
+    - set(attributes["test.key"], "test-value")
+  ruleName: test-rule
+`,
+			expected: true,
+		},
+		{
+			name:     "trailing newline differs",
+			a:        pipeline,
+			b:        strings.TrimRight(pipeline, "\n"),
+			expected: true,
+		},
+		{
+			name: "comments added",
+			a:    pipeline,
+			b: `# managed by terraform
+ottlRules:
+- ruleName: test-rule # drop nginx noise
+  conditions:
+    - container_name == "nginx"
+  statements:
+    - set(attributes["test.key"], "test-value")
+`,
+			expected: true,
+		},
+		{
+			name:     "scalar quoting style differs",
+			a:        "ottlRules:\n- ruleName: test-rule\n",
+			b:        "ottlRules:\n- ruleName: \"test-rule\"\n",
+			expected: true,
+		},
+		{
+			name:     "scalar value differs",
+			a:        "ottlRules:\n- ruleName: test-rule\n",
+			b:        "ottlRules:\n- ruleName: other-rule\n",
+			expected: false,
+		},
+		{
+			name:     "sequence order differs",
+			a:        "ottlRules:\n- ruleName: a\n- ruleName: b\n",
+			b:        "ottlRules:\n- ruleName: b\n- ruleName: a\n",
+			expected: false,
+		},
+		{
+			name:     "key present with null value vs key missing",
+			a:        "ottlRules:\n- ruleName: a\n  conditions:\n",
+			b:        "ottlRules:\n- ruleName: a\n",
+			expected: false,
+		},
+		{
+			name:     "empty sequence vs missing key",
+			a:        "ottlRules: []\n",
+			b:        "{}\n",
+			expected: false,
+		},
+		{
+			name:     "empty vs non-empty document",
+			a:        "",
+			b:        pipeline,
+			expected: false,
+		},
+		{
+			name:     "comment-only document equals empty document",
+			a:        "# nothing configured\n",
+			b:        "",
+			expected: true,
+		},
+		{
+			name:     "int and float scalars are not interchangeable",
+			a:        "maxSize: 1\n",
+			b:        "maxSize: 1.0\n",
+			expected: false,
+		},
+		{
+			name:     "durations are compared verbatim",
+			a:        "flushInterval: 60s\n",
+			b:        "flushInterval: 1m\n",
+			expected: false,
+		},
+		{
+			name:     "invalid yaml falls back to string comparison and differs",
+			a:        "ottlRules:\n- ruleName: a\n",
+			b:        "ottlRules:\n\tbad: \ttab-indented\n",
+			expected: false,
+		},
+		{
+			name:     "identical invalid yaml is still equal",
+			a:        "ottlRules:\n\tbad: \ttab-indented\n",
+			b:        "ottlRules:\n\tbad: \ttab-indented\n",
+			expected: true,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := YamlSemanticallyEqual(tc.a, tc.b); got != tc.expected {
+				t.Errorf("YamlSemanticallyEqual() = %v, want %v\na:\n%s\nb:\n%s", got, tc.expected, tc.a, tc.b)
+			}
+			// The comparison must be symmetric.
+			if got := YamlSemanticallyEqual(tc.b, tc.a); got != tc.expected {
+				t.Errorf("YamlSemanticallyEqual() is not symmetric: got %v, want %v\na:\n%s\nb:\n%s", got, tc.expected, tc.a, tc.b)
+			}
+		})
+	}
+}
