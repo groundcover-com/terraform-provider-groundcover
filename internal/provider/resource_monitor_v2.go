@@ -918,16 +918,34 @@ func (r *monitorV2Resource) readMonitorV2IntoState(ctx context.Context, id strin
 		return err
 	}
 
-	var remote models.UpdateMonitorRequest
-	if err := yaml.Unmarshal(remoteYaml, &remote); err != nil {
-		return fmt.Errorf("unable to unmarshal monitor response into typed model: %w", err)
+	remote, err := monitorV2UnmarshalRemoteYAML(ctx, remoteYaml)
+	if err != nil {
+		return err
 	}
 
-	mapMonitorV2SDKToModel(ctx, id, &remote, state, diags)
+	mapMonitorV2SDKToModel(ctx, id, remote, state, diags)
 	if diags.HasError() {
 		return errors.New("failed to map monitor response into Terraform state")
 	}
 	return nil
+}
+
+// monitorV2UnmarshalRemoteYAML normalizes day/week and human-readable duration
+// scalars in the API YAML (e.g. rollup.time "1d", relativeTimerange.from "-1 day") before unmarshaling
+// into the SDK typed model. strfmt.Duration accepts the UI's "d"/"w" units,
+// but loses a leading negative sign; the duration-only transform preserves it
+// while leaving descriptions and query expressions byte-for-byte intact.
+func monitorV2UnmarshalRemoteYAML(ctx context.Context, remoteYaml []byte) (*models.UpdateMonitorRequest, error) {
+	normalized, err := NormalizeMonitorYAMLDurations(string(remoteYaml))
+	if err != nil {
+		return nil, fmt.Errorf("unable to normalize monitor response YAML: %w", err)
+	}
+
+	var remote models.UpdateMonitorRequest
+	if err := yaml.Unmarshal([]byte(normalized), &remote); err != nil {
+		return nil, fmt.Errorf("unable to unmarshal monitor response into typed model: %w", err)
+	}
+	return &remote, nil
 }
 
 func buildMonitorV2CreateRequest(ctx context.Context, plan *monitorV2ResourceModel) (*models.CreateMonitorRequest, diag.Diagnostics) {
@@ -1737,7 +1755,11 @@ func monitorV2ParseDuration(value types.String, attrPath path.Path, diags *diag.
 		return 0, false
 	}
 
-	normalized := monitorV2NormalizeDurationForParse(raw)
+	normalized, err := monitorV2NormalizeDurationForParse(raw)
+	if err != nil {
+		diags.AddAttributeError(attrPath, "Invalid duration", err.Error())
+		return 0, false
+	}
 	parsed, err := strfmt.ParseDuration(normalized)
 	if err != nil {
 		diags.AddAttributeError(
@@ -1750,8 +1772,16 @@ func monitorV2ParseDuration(value types.String, attrPath path.Path, diags *diag.
 	return parsed, true
 }
 
-func monitorV2NormalizeDurationForParse(value string) string {
-	return strings.TrimSpace(normalizeDayDurations(normalizeHumanDurations(value)))
+func monitorV2NormalizeDurationForParse(value string) (string, error) {
+	humanNormalized, ok := normalizeHumanDurationsChecked(value)
+	if !ok {
+		return "", errors.New("duration exceeds the supported range")
+	}
+	dayNormalized, ok := normalizeDayDurationsChecked(humanNormalized)
+	if !ok {
+		return "", errors.New("duration exceeds the supported range")
+	}
+	return strings.TrimSpace(dayNormalized), nil
 }
 
 func monitorV2NormalizeDurationString(value string) (string, bool) {
@@ -1760,7 +1790,11 @@ func monitorV2NormalizeDurationString(value string) (string, bool) {
 		return "", false
 	}
 
-	parsed, err := strfmt.ParseDuration(monitorV2NormalizeDurationForParse(raw))
+	normalized, err := monitorV2NormalizeDurationForParse(raw)
+	if err != nil {
+		return "", false
+	}
+	parsed, err := strfmt.ParseDuration(normalized)
 	if err != nil {
 		return "", false
 	}

@@ -1,3 +1,7 @@
+## 1.22.3
+
+* Fixed normalization of day/week relative time ranges in `groundcover_monitor_v2` and `groundcover_monitor_v2_json`.
+
 ## 1.22.2
 
 * Add documentation for the consolidated aws data integration
