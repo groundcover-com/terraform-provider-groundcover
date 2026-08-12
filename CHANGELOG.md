@@ -1,6 +1,6 @@
 ## 1.22.3
 
-* Fixed `groundcover_dashboard` failing `terraform apply` with "provider produced inconsistent result after apply" when `description` was omitted — the API returns an empty string for an unset description, which the provider wrote over the `null` Terraform planned. Omitting `description` now leaves the attribute unset in state, and the `description = ""` workaround is no longer needed. Dashboards whose state still holds the empty string recorded by an earlier version plan one no-op update on the first apply after upgrading, which rewrites the attribute to unset; explicitly configured `description = ""` keeps working unchanged
+* Fixed `groundcover_dashboard` failing `terraform apply` when `description` is omitted
 
 ## 1.22.2
 
