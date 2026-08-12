@@ -1,5 +1,6 @@
 ## 1.22.3
 
+* Fixed normalization of day/week relative time ranges in `groundcover_monitor_v2` and `groundcover_monitor_v2_json`.
 * Fixed `groundcover_dashboard` failing `terraform apply` when `description` is omitted
 
 ## 1.22.2

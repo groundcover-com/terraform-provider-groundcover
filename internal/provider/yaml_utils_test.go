@@ -4,6 +4,8 @@ import (
 	"context"
 	"strings"
 	"testing"
+
+	"gopkg.in/yaml.v3"
 )
 
 func TestFilterYamlKeysBasedOnTemplate(t *testing.T) {
@@ -454,6 +456,42 @@ func TestNormalizeTimeString(t *testing.T) {
 				t.Errorf("normalizeTimeString(%q) = %q, want %q", tt.input, result, tt.expected)
 			}
 		})
+	}
+}
+
+func TestDurationNormalizationRejectsIntegerOverflow(t *testing.T) {
+	const maxInt = "9223372036854775807"
+	const beyondMaxInt = "9223372036854775808"
+	tests := []struct {
+		name      string
+		input     string
+		normalize func(string) string
+	}{
+		{name: "day", input: maxInt + "d", normalize: normalizeDayDurations},
+		{name: "week with trailing hour", input: maxInt + "w1h", normalize: normalizeDayDurations},
+		{name: "human-readable day", input: maxInt + " days", normalize: normalizeHumanDurations},
+		{name: "signed scalar week", input: "-" + maxInt + "w", normalize: normalizeDurationScalar},
+		{name: "day count outside integer range", input: beyondMaxInt + "d", normalize: normalizeDayDurations},
+		{name: "trailing hour outside integer range", input: "1d" + beyondMaxInt + "h", normalize: normalizeDayDurations},
+		{name: "human-readable count outside integer range", input: beyondMaxInt + " days", normalize: normalizeHumanDurations},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := tt.normalize(tt.input); got != tt.input {
+				t.Fatalf("normalization overflowed: got %q, want unchanged %q", got, tt.input)
+			}
+		})
+	}
+
+	if _, ok := normalizeDayDurationsChecked(beyondMaxInt + "d"); ok {
+		t.Fatal("checked day normalization accepted a count outside the integer range")
+	}
+	if _, ok := normalizeDayDurationsChecked("1d" + beyondMaxInt + "h"); ok {
+		t.Fatal("checked day normalization accepted trailing hours outside the integer range")
+	}
+	if _, ok := normalizeHumanDurationsChecked(beyondMaxInt + " days"); ok {
+		t.Fatal("checked human duration normalization accepted a count outside the integer range")
 	}
 }
 
@@ -1173,9 +1211,24 @@ evaluationInterval:
   interval: 1d
   pendingFor: 1w
 description: retry after 1w
-renotificationInterval: "2w"
+notificationSettings:
+  renotificationInterval: "2w"
 labels:
-  window: 1w`
+  window: 1w
+  from: -1d
+  instantRollup: 1d
+  renotificationInterval: 1d
+model:
+  queries:
+  - name: threshold_input_query
+    expression: up
+    instantRollup: 1w
+    relativeTimerange:
+      from: -1d
+      to: 0m
+    rollup:
+      function: last
+      time: 1d`
 
 	got, err := NormalizeMonitorYaml(ctx, input)
 	if err != nil {
@@ -1186,9 +1239,15 @@ labels:
 		"interval: 24h",                  // duration field converted
 		"pendingFor: 168h",               // duration field converted
 		`renotificationInterval: "336h"`, // duration field converted (quoted)
+		"from: -24h",                     // signed relativeTimerange.from converted
+		"time: 24h",                      // rollup window converted
+		"instantRollup: 168h",            // query instant rollup converted
 		"title: 1w",                      // non-duration field, exact token: preserved
 		"description: retry after 1w",    // free text: preserved
 		"window: 1w",                     // non-duration label, exact token: preserved
+		"from: -1d",                      // labels.from must not collide with relativeTimerange.from
+		"instantRollup: 1d",              // labels.instantRollup must not be converted
+		"renotificationInterval: 1d",     // labels.renotificationInterval must not be converted
 	}
 	for _, want := range mustContain {
 		if !strings.Contains(got, want) {
@@ -1197,6 +1256,77 @@ labels:
 	}
 	if strings.Contains(got, "retry after 168h") {
 		t.Errorf("free-text description was corrupted:\n%s", got)
+	}
+}
+
+func TestNormalizeMonitorYAMLDurations_PreservesNonDurationContent(t *testing.T) {
+	input := `description: |
+  [alert]
+
+  relativeTimerange:
+    from: -1d
+  Keep this blank line.
+model:
+  queries:
+  - expression: |
+      rate(requests_total[5m])
+    instantRollup: -1w
+    relativeTimerange:
+      from: -1d
+    labels:
+      instantRollup: 1d
+labels:
+  instantRollup: 1d
+`
+	want := `description: |
+  [alert]
+
+  relativeTimerange:
+    from: -1d
+  Keep this blank line.
+model:
+  queries:
+  - expression: |
+      rate(requests_total[5m])
+    instantRollup: -168h
+    relativeTimerange:
+      from: -24h
+    labels:
+      instantRollup: 1d
+labels:
+  instantRollup: 1d
+`
+
+	got, err := NormalizeMonitorYAMLDurations(input)
+	if err != nil {
+		t.Fatalf("NormalizeMonitorYAMLDurations() error: %v", err)
+	}
+	if got != want {
+		t.Errorf("NormalizeMonitorYAMLDurations() mismatch.\nwant:\n%s\ngot:\n%s", want, got)
+	}
+}
+
+func TestNormalizeMonitorYAMLDurations_FlowAndTaggedKeys(t *testing.T) {
+	input := `model: {"queries": [{"instantRollup": "-1w", "relativeTimerange": {"from": !!str -1d}, "labels": {"instantRollup": 1d}}]}
+"evaluationInterval": {"interval": 1d, "pendingFor": '1w'}
+!!str notificationSettings: {!!str renotificationInterval: "2w"}
+`
+	want := `model: {"queries": [{"instantRollup": "-168h", "relativeTimerange": {"from": !!str -24h}, "labels": {"instantRollup": 1d}}]}
+"evaluationInterval": {"interval": 24h, "pendingFor": '168h'}
+!!str notificationSettings: {!!str renotificationInterval: "336h"}
+`
+
+	got, err := NormalizeMonitorYAMLDurations(input)
+	if err != nil {
+		t.Fatalf("NormalizeMonitorYAMLDurations() error: %v", err)
+	}
+	if got != want {
+		t.Errorf("NormalizeMonitorYAMLDurations() mismatch.\nwant:\n%s\ngot:\n%s", want, got)
+	}
+
+	var parsed map[string]interface{}
+	if err := yaml.Unmarshal([]byte(got), &parsed); err != nil {
+		t.Fatalf("normalized flow-style YAML is invalid: %v", err)
 	}
 }
 
