@@ -178,12 +178,8 @@ func (r *dashboardResource) Create(ctx context.Context, req resource.CreateReque
 
 	plan.UUID = types.StringValue(dashboard.UUID)
 	plan.Name = types.StringValue(dashboard.Name)
-	plan.Description = types.StringValue(dashboard.Description)
-	if plan.Team.IsNull() && dashboard.Team == "" {
-		plan.Team = types.StringNull()
-	} else {
-		plan.Team = types.StringValue(dashboard.Team)
-	}
+	plan.Description = optionalStringToState(dashboard.Description, plan.Description)
+	plan.Team = optionalStringToState(dashboard.Team, plan.Team)
 	// Keep the user's original preset format if semantically the same
 	apiPresetStr := dashboard.Preset
 	areSemanticallySame, err := CompareJSONSemantically(planPresetStr, apiPresetStr)
@@ -292,12 +288,8 @@ func (r *dashboardResource) Read(ctx context.Context, req resource.ReadRequest, 
 
 	state.UUID = types.StringValue(dashboard.UUID)
 	state.Name = types.StringValue(dashboard.Name)
-	state.Description = types.StringValue(dashboard.Description)
-	if state.Team.IsNull() && dashboard.Team == "" {
-		state.Team = types.StringNull()
-	} else {
-		state.Team = types.StringValue(dashboard.Team)
-	}
+	state.Description = optionalStringToState(dashboard.Description, state.Description)
+	state.Team = optionalStringToState(dashboard.Team, state.Team)
 
 	// Normalize both presets for detailed comparison logging
 	normalizedStatePreset, errStateNorm := NormalizeJSON(ctx, originalStatePreset)
@@ -475,12 +467,8 @@ func (r *dashboardResource) Update(ctx context.Context, req resource.UpdateReque
 
 	plan.UUID = types.StringValue(dashboard.UUID)
 	plan.Name = types.StringValue(dashboard.Name)
-	plan.Description = types.StringValue(dashboard.Description)
-	if plan.Team.IsNull() && dashboard.Team == "" {
-		plan.Team = types.StringNull()
-	} else {
-		plan.Team = types.StringValue(dashboard.Team)
-	}
+	plan.Description = optionalStringToState(dashboard.Description, plan.Description)
+	plan.Team = optionalStringToState(dashboard.Team, plan.Team)
 	// Keep the user's original preset format if semantically the same
 	// This prevents format drift when the API returns semantically identical but differently formatted JSON
 	// The ModifyPlan method normalizes and compares during plan phase, so plan.Preset should already
@@ -789,6 +777,21 @@ func (r *dashboardResource) ModifyPlan(ctx context.Context, req resource.ModifyP
 	}
 
 	resp.Diagnostics.Append(resp.Plan.Set(ctx, &plan)...)
+}
+
+// optionalStringToState maps an API string back onto an Optional, non-computed
+// string attribute. The API has no notion of "unset" for these fields and
+// returns "" for both an omitted and an explicitly empty value, while Terraform
+// distinguishes null (omitted from config) from "". Writing "" over a null plan
+// value fails the apply with "provider produced inconsistent result after
+// apply", so an empty API value keeps the attribute null when the config left it
+// unset. Anything else — a value from the API, or an explicitly configured "" —
+// is stored as-is, so a value set out-of-band still surfaces as drift.
+func optionalStringToState(apiValue string, prior types.String) types.String {
+	if apiValue == "" && prior.IsNull() {
+		return types.StringNull()
+	}
+	return types.StringValue(apiValue)
 }
 
 // tagsToStringSlice converts the Terraform tags list into a []string for the

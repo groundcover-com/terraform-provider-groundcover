@@ -1,3 +1,7 @@
+## 1.22.3
+
+* Fixed `groundcover_dashboard` failing `terraform apply` with "provider produced inconsistent result after apply" when `description` was omitted — the API returns an empty string for an unset description, which the provider wrote over the `null` Terraform planned. Omitting `description` now leaves the attribute unset in state, and the `description = ""` workaround is no longer needed
+
 ## 1.22.2
 
 * Add documentation for the consolidated aws data integration
