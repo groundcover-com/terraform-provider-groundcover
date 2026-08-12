@@ -782,11 +782,19 @@ func (r *dashboardResource) ModifyPlan(ctx context.Context, req resource.ModifyP
 // optionalStringToState maps an API string back onto an Optional, non-computed
 // string attribute. The API has no notion of "unset" for these fields and
 // returns "" for both an omitted and an explicitly empty value, while Terraform
-// distinguishes null (omitted from config) from "". Writing "" over a null plan
-// value fails the apply with "provider produced inconsistent result after
-// apply", so an empty API value keeps the attribute null when the config left it
-// unset. Anything else — a value from the API, or an explicitly configured "" —
-// is stored as-is, so a value set out-of-band still surfaces as drift.
+// distinguishes null (omitted from config) from "".
+//
+// prior is the attribute's previous Terraform value: the planned value in Create
+// and Update, the persisted state in Read. Writing "" over a null planned value
+// fails the apply with "provider produced inconsistent result after apply", so
+// an empty API value keeps the attribute null whenever prior is already null.
+// Anything else — a value from the API, or an explicitly configured "" — is
+// stored as-is, so a value set out-of-band still surfaces as drift.
+//
+// Import has no prior value, so an API "" imports as null. The API cannot tell
+// an omitted value from an explicitly empty one, so no import path can recover
+// that distinction; null is correct for the common (omitted) case, and a config
+// that explicitly sets "" plans a single converging update after import.
 func optionalStringToState(apiValue string, prior types.String) types.String {
 	if apiValue == "" && prior.IsNull() {
 		return types.StringNull()

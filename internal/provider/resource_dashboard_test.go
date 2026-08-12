@@ -281,6 +281,19 @@ func TestAccDashboardResource_OmittedDescription(t *testing.T) {
 					resource.TestCheckNoResourceAttr("groundcover_dashboard.test", "description"),
 				),
 			},
+			// `description = ""` was the workaround for this bug, so configs in
+			// the wild still carry it — an explicit empty string must keep
+			// applying cleanly and stay empty rather than being folded to null.
+			{
+				Config: testAccDashboardResourceConfigEmptyDescription(dashboardName),
+				Check: resource.ComposeTestCheckFunc(
+					resource.TestCheckResourceAttr("groundcover_dashboard.test", "description", ""),
+				),
+			},
+			{
+				Config:   testAccDashboardResourceConfigEmptyDescription(dashboardName),
+				PlanOnly: true,
+			},
 		},
 	})
 }
@@ -497,6 +510,22 @@ func testAccDashboardResourceConfigNoDescription(name string) string {
 	return fmt.Sprintf(`
 resource "groundcover_dashboard" "test" {
   name        = "%s"
+  preset      = jsonencode({
+    duration      = "Last 1 hour"
+    widgets       = []
+    layout        = []
+    variables     = {}
+    schemaVersion = 3
+  })
+}
+`, name)
+}
+
+func testAccDashboardResourceConfigEmptyDescription(name string) string {
+	return fmt.Sprintf(`
+resource "groundcover_dashboard" "test" {
+  name        = "%s"
+  description = ""
   preset      = jsonencode({
     duration      = "Last 1 hour"
     widgets       = []
