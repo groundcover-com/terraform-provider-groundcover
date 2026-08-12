@@ -1,3 +1,7 @@
+## 1.22.3
+
+* Fixed `groundcover_dashboard` failing `terraform apply` when `description` is omitted
+
 ## 1.22.2
 
 * Add documentation for the consolidated aws data integration

@@ -7,9 +7,59 @@ import (
 	"testing"
 	"time"
 
+	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/hashicorp/terraform-plugin-testing/helper/resource"
 	"github.com/hashicorp/terraform-plugin-testing/terraform"
 )
+
+func TestOptionalStringToState(t *testing.T) {
+	tests := []struct {
+		name     string
+		apiValue string
+		prior    types.String
+		expected types.String
+	}{
+		{
+			name:     "unset in config and empty from api stays null",
+			apiValue: "",
+			prior:    types.StringNull(),
+			expected: types.StringNull(),
+		},
+		{
+			name:     "explicitly empty in config stays empty",
+			apiValue: "",
+			prior:    types.StringValue(""),
+			expected: types.StringValue(""),
+		},
+		{
+			name:     "set out-of-band while unset in config surfaces as drift",
+			apiValue: "from the ui",
+			prior:    types.StringNull(),
+			expected: types.StringValue("from the ui"),
+		},
+		{
+			name:     "cleared out-of-band while set in config surfaces as drift",
+			apiValue: "",
+			prior:    types.StringValue("configured"),
+			expected: types.StringValue(""),
+		},
+		{
+			name:     "value round-trips unchanged",
+			apiValue: "configured",
+			prior:    types.StringValue("configured"),
+			expected: types.StringValue("configured"),
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := optionalStringToState(tt.apiValue, tt.prior)
+			if !got.Equal(tt.expected) {
+				t.Errorf("optionalStringToState(%q, %s) = %s, want %s", tt.apiValue, tt.prior, got, tt.expected)
+			}
+		})
+	}
+}
 
 func TestAccDashboardResource(t *testing.T) {
 	timestamp := time.Now().Unix()
@@ -173,6 +223,76 @@ func TestAccDashboardResource_EmptyTeam(t *testing.T) {
 					resource.TestCheckResourceAttr("groundcover_dashboard.test", "description", "Updated empty team dashboard"),
 					resource.TestCheckNoResourceAttr("groundcover_dashboard.test", "team"),
 				),
+			},
+		},
+	})
+}
+
+// TestAccDashboardResource_OmittedDescription covers the regression where omitting
+// `description` failed the apply with "provider produced inconsistent result after
+// apply" — the API returns "" for an unset description while Terraform expected the
+// null it planned.
+func TestAccDashboardResource_OmittedDescription(t *testing.T) {
+	timestamp := time.Now().Unix()
+	dashboardName := fmt.Sprintf("no_description_dashboard_%d", timestamp)
+
+	resource.Test(t, resource.TestCase{
+		PreCheck:                 func() { testAccPreCheck(t) },
+		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
+		Steps: []resource.TestStep{
+			// Create without description — the apply must succeed and leave the
+			// attribute unset rather than storing "".
+			{
+				Config: testAccDashboardResourceConfigNoDescription(dashboardName),
+				Check: resource.ComposeTestCheckFunc(
+					resource.TestCheckResourceAttr("groundcover_dashboard.test", "name", dashboardName),
+					resource.TestCheckNoResourceAttr("groundcover_dashboard.test", "description"),
+					resource.TestCheckResourceAttrSet("groundcover_dashboard.test", "id"),
+				),
+			},
+			// Re-apply the same config — refresh must not turn the unset
+			// description into a perpetual diff.
+			{
+				Config:   testAccDashboardResourceConfigNoDescription(dashboardName),
+				PlanOnly: true,
+			},
+			// Import with no description set, to verify the API-to-state mapping
+			// keeps the attribute null.
+			{
+				ResourceName:      "groundcover_dashboard.test",
+				ImportState:       true,
+				ImportStateVerify: true,
+				ImportStateVerifyIgnore: []string{
+					"override",
+					"preset",
+				},
+			},
+			// Set a description, then remove it again — going back to unset must
+			// also stay consistent.
+			{
+				Config: testAccDashboardResourceConfigSimple(dashboardName),
+				Check: resource.ComposeTestCheckFunc(
+					resource.TestCheckResourceAttr("groundcover_dashboard.test", "description", "Simple test dashboard"),
+				),
+			},
+			{
+				Config: testAccDashboardResourceConfigNoDescription(dashboardName),
+				Check: resource.ComposeTestCheckFunc(
+					resource.TestCheckNoResourceAttr("groundcover_dashboard.test", "description"),
+				),
+			},
+			// `description = ""` was the workaround for this bug, so configs in
+			// the wild still carry it — an explicit empty string must keep
+			// applying cleanly and stay empty rather than being folded to null.
+			{
+				Config: testAccDashboardResourceConfigEmptyDescription(dashboardName),
+				Check: resource.ComposeTestCheckFunc(
+					resource.TestCheckResourceAttr("groundcover_dashboard.test", "description", ""),
+				),
+			},
+			{
+				Config:   testAccDashboardResourceConfigEmptyDescription(dashboardName),
+				PlanOnly: true,
 			},
 		},
 	})
@@ -375,6 +495,37 @@ func testAccDashboardResourceConfigSimple(name string) string {
 resource "groundcover_dashboard" "test" {
   name        = "%s"
   description = "Simple test dashboard"
+  preset      = jsonencode({
+    duration      = "Last 1 hour"
+    widgets       = []
+    layout        = []
+    variables     = {}
+    schemaVersion = 3
+  })
+}
+`, name)
+}
+
+func testAccDashboardResourceConfigNoDescription(name string) string {
+	return fmt.Sprintf(`
+resource "groundcover_dashboard" "test" {
+  name        = "%s"
+  preset      = jsonencode({
+    duration      = "Last 1 hour"
+    widgets       = []
+    layout        = []
+    variables     = {}
+    schemaVersion = 3
+  })
+}
+`, name)
+}
+
+func testAccDashboardResourceConfigEmptyDescription(name string) string {
+	return fmt.Sprintf(`
+resource "groundcover_dashboard" "test" {
+  name        = "%s"
+  description = ""
   preset      = jsonencode({
     duration      = "Last 1 hour"
     widgets       = []
