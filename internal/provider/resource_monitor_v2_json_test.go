@@ -95,7 +95,7 @@ resource "groundcover_monitor_v2_json" "test" {
     type           = "gcql"
     data_type      = "logs"
     expression     = "level:error | stats count() count_all_result"
-    instant_rollup = "5m"
+    instant_rollup = "5m0s"
   }
 
   threshold {
@@ -105,9 +105,11 @@ resource "groundcover_monitor_v2_json" "test" {
     values     = [1]
   }
 
+  // BE-2751: Go-style spellings, as the UI's Terraform export emits them, so
+  // ImportStateVerify below catches any re-normalization of durations on import.
   evaluation_interval {
-    interval    = "1m"
-    pending_for = "1m"
+    interval    = "1m0s"
+    pending_for = "1m0s"
   }
 
   execution_error_state = "OK"
