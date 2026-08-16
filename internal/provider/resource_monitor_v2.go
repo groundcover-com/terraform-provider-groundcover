@@ -303,13 +303,13 @@ func (r *monitorV2Resource) Schema(_ context.Context, _ resource.SchemaRequest, 
 						MarkdownDescription: "GCQL rollup window used to add the monitor evaluation time bucket, for example `5m` or `5 minutes`.",
 						Optional:            true,
 						Computed:            true,
-						PlanModifiers:       []planmodifier.String{suppressEquivalentDurations()},
+						PlanModifiers:       []planmodifier.String{monitorV2SuppressEquivalentDurations()},
 					},
 					"evaluation_delay": schema.StringAttribute{
 						MarkdownDescription: "Evaluation delay as a duration from `0s` to `1h`, whole seconds only, for example `15m` or `900s`. Delays query evaluation to account for late-arriving data.",
 						Optional:            true,
 						Computed:            true,
-						PlanModifiers:       []planmodifier.String{suppressEquivalentDurations()},
+						PlanModifiers:       []planmodifier.String{monitorV2SuppressEquivalentDurations()},
 					},
 				},
 				Blocks: map[string]schema.Block{
@@ -327,7 +327,7 @@ func (r *monitorV2Resource) Schema(_ context.Context, _ resource.SchemaRequest, 
 								MarkdownDescription: "Rollup time window, for example `5m` or `1 hour`.",
 								Optional:            true,
 								Computed:            true,
-								PlanModifiers:       []planmodifier.String{suppressEquivalentDurations()},
+								PlanModifiers:       []planmodifier.String{monitorV2SuppressEquivalentDurations()},
 							},
 						},
 					},
@@ -401,13 +401,13 @@ func (r *monitorV2Resource) Schema(_ context.Context, _ resource.SchemaRequest, 
 						MarkdownDescription: "How often the monitor evaluates, for example `1m`.",
 						Optional:            true,
 						Computed:            true,
-						PlanModifiers:       []planmodifier.String{suppressEquivalentDurations()},
+						PlanModifiers:       []planmodifier.String{monitorV2SuppressEquivalentDurations()},
 					},
 					"pending_for": schema.StringAttribute{
 						MarkdownDescription: "How long the condition must remain true before alerting, for example `5m`.",
 						Optional:            true,
 						Computed:            true,
-						PlanModifiers:       []planmodifier.String{suppressEquivalentDurations()},
+						PlanModifiers:       []planmodifier.String{monitorV2SuppressEquivalentDurations()},
 					},
 				},
 			},
@@ -528,7 +528,7 @@ func (r *monitorV2Resource) Schema(_ context.Context, _ resource.SchemaRequest, 
 					"renotification_interval": schema.StringAttribute{
 						MarkdownDescription: "Duration between renotifications, for example `4h`.",
 						Optional:            true,
-						PlanModifiers:       []planmodifier.String{suppressEquivalentDurations()},
+						PlanModifiers:       []planmodifier.String{monitorV2SuppressEquivalentDurations()},
 					},
 				},
 			},
@@ -564,13 +564,13 @@ func relativeTimerangeBlock() schema.SingleNestedBlock {
 				MarkdownDescription: "Start of the relative range, for example `-5m`.",
 				Optional:            true,
 				Computed:            true,
-				PlanModifiers:       []planmodifier.String{suppressEquivalentDurations()},
+				PlanModifiers:       []planmodifier.String{monitorV2SuppressEquivalentDurations()},
 			},
 			"to": schema.StringAttribute{
 				MarkdownDescription: "End of the relative range, for example `0m`.",
 				Optional:            true,
 				Computed:            true,
-				PlanModifiers:       []planmodifier.String{suppressEquivalentDurations()},
+				PlanModifiers:       []planmodifier.String{monitorV2SuppressEquivalentDurations()},
 			},
 		},
 	}
@@ -1285,6 +1285,41 @@ func monitorV2DurationStringsEqual(left, right string) bool {
 	leftNormalized, leftOK := monitorV2NormalizeDurationString(left)
 	rightNormalized, rightOK := monitorV2NormalizeDurationString(right)
 	return leftOK && rightOK && leftNormalized == rightNormalized
+}
+
+// monitorV2SuppressEquivalentDurations returns a plan modifier that treats
+// semantically equal duration strings ("1m" vs "1m0s" vs "60s") as no change,
+// keeping the state value in the plan. Without it, importing a monitor whose
+// config was exported from the UI produces a phantom diff on every duration
+// field: the UI and the API render durations Go-style ("1m0s") while Read
+// normalizes them into state ("1m"), and import has no prior state for
+// monitorV2PreserveDurationString to preserve.
+//
+// The trade-off is the one every DiffSuppressFunc makes: respelling an already
+// applied duration is a no-op, so state keeps its spelling. Writing a duration
+// for the first time is unaffected — state is null there, so the configured
+// spelling lands verbatim.
+func monitorV2SuppressEquivalentDurations() planmodifier.String {
+	return monitorV2DurationDiffSuppressor{}
+}
+
+type monitorV2DurationDiffSuppressor struct{}
+
+func (monitorV2DurationDiffSuppressor) Description(_ context.Context) string {
+	return "Suppresses changes between semantically equal duration strings."
+}
+
+func (d monitorV2DurationDiffSuppressor) MarkdownDescription(ctx context.Context) string {
+	return d.Description(ctx)
+}
+
+func (monitorV2DurationDiffSuppressor) PlanModifyString(_ context.Context, req planmodifier.StringRequest, resp *planmodifier.StringResponse) {
+	if req.StateValue.IsNull() || req.StateValue.IsUnknown() || req.PlanValue.IsNull() || req.PlanValue.IsUnknown() {
+		return
+	}
+	if monitorV2DurationStringsEqual(req.StateValue.ValueString(), req.PlanValue.ValueString()) {
+		resp.PlanValue = req.StateValue
+	}
 }
 
 func monitorV2QueryFromSDK(query *models.BaseQuery, annotations map[string]string) *monitorV2QueryModel {

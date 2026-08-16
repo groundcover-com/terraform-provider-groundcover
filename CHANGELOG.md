@@ -4,6 +4,7 @@
 * Fixed YAML drift on `groundcover_logspipeline` and `groundcover_tracespipeline` — formatting-only differences no longer plan a change
 * `groundcover_logspipeline` and `groundcover_tracespipeline` no longer issue a redundant `GET` on every `terraform plan`
 * Documented the full list of supported `data_type` values for `groundcover_storage_management_policy` — `logs`, `traces`, `events`, `monitor_instance`, and `measurements`, and documented what datatypes support `cold_move_duration`.
+* Fixed phantom plan diffs on `groundcover_monitor_v2` duration attributes — importing a monitor whose config was exported from the UI no longer plans `"1m" -> "1m0s"` on every duration field. Semantically equal durations (`1m`/`1m0s`/`60s`/`60 seconds`) now plan as no change. Consequence: respelling a duration that has already been applied is a no-op and state keeps its existing spelling; a duration written for the first time still lands in state exactly as configured.
 
 ## 1.22.1
 

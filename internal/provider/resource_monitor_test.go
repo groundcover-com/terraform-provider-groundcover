@@ -15,6 +15,7 @@ import (
 	"github.com/groundcover-com/groundcover-sdk-go/pkg/models"
 	"github.com/hashicorp/terraform-plugin-framework/attr"
 	"github.com/hashicorp/terraform-plugin-framework/diag"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/hashicorp/terraform-plugin-testing/helper/acctest"
 	"github.com/hashicorp/terraform-plugin-testing/helper/resource"
@@ -701,6 +702,86 @@ func TestMonitorV2MapSDKToModelPreservesDayWeekDurations(t *testing.T) {
 	}
 }
 
+func TestMonitorV2SuppressEquivalentDurations(t *testing.T) {
+	tests := []struct {
+		name     string
+		state    types.String
+		plan     types.String
+		wantPlan types.String
+	}{
+		{
+			name:     "imported state 1m equals config 1m0s",
+			state:    types.StringValue("1m"),
+			plan:     types.StringValue("1m0s"),
+			wantPlan: types.StringValue("1m"),
+		},
+		{
+			name:     "imported state 10m equals config 10m0s",
+			state:    types.StringValue("10m"),
+			plan:     types.StringValue("10m0s"),
+			wantPlan: types.StringValue("10m"),
+		},
+		{
+			name:     "seconds spelling equals minutes spelling",
+			state:    types.StringValue("1m"),
+			plan:     types.StringValue("60s"),
+			wantPlan: types.StringValue("1m"),
+		},
+		{
+			name:     "human-readable spelling equals go spelling",
+			state:    types.StringValue("1m"),
+			plan:     types.StringValue("60 seconds"),
+			wantPlan: types.StringValue("1m"),
+		},
+		{
+			name:     "day spelling equals hours spelling",
+			state:    types.StringValue("24h"),
+			plan:     types.StringValue("1d"),
+			wantPlan: types.StringValue("24h"),
+		},
+		{
+			name:     "real change is kept",
+			state:    types.StringValue("1m"),
+			plan:     types.StringValue("5m"),
+			wantPlan: types.StringValue("5m"),
+		},
+		{
+			// The configured spelling reaching state on first write is what
+			// keeps the human-readable durations the schema advertises usable.
+			name:     "null state on create is kept",
+			state:    types.StringNull(),
+			plan:     types.StringValue("5 minutes"),
+			wantPlan: types.StringValue("5 minutes"),
+		},
+		{
+			name:     "unknown plan is kept",
+			state:    types.StringValue("1m"),
+			plan:     types.StringUnknown(),
+			wantPlan: types.StringUnknown(),
+		},
+		{
+			name:     "unparseable values are kept",
+			state:    types.StringValue("bogus"),
+			plan:     types.StringValue("1m"),
+			wantPlan: types.StringValue("1m"),
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			req := planmodifier.StringRequest{
+				StateValue: tt.state,
+				PlanValue:  tt.plan,
+			}
+			resp := &planmodifier.StringResponse{PlanValue: tt.plan}
+			monitorV2SuppressEquivalentDurations().PlanModifyString(context.Background(), req, resp)
+			if !resp.PlanValue.Equal(tt.wantPlan) {
+				t.Fatalf("got plan value %v, want %v", resp.PlanValue, tt.wantPlan)
+			}
+		})
+	}
+}
+
 func TestMonitorV2DurationNormalizationPreservesZero(t *testing.T) {
 	if got := monitorV2DurationToType(0).ValueString(); got != "0m" {
 		t.Fatalf("monitorV2DurationToType(0) = %q, want 0m", got)
@@ -919,6 +1000,17 @@ func TestAccMonitorResource(t *testing.T) {
 	})
 }
 
+// testCheckDurationAttr asserts an attribute holds the given duration, whatever
+// spelling the provider settled on — "1m", "60s" and "60 seconds" all pass.
+func testCheckDurationAttr(resourceName, key, want string) resource.TestCheckFunc {
+	return resource.TestCheckResourceAttrWith(resourceName, key, func(got string) error {
+		if !monitorV2DurationStringsEqual(got, want) {
+			return fmt.Errorf("%s = %q, want a duration equal to %q", key, got, want)
+		}
+		return nil
+	})
+}
+
 func TestAccMonitorV2Resource(t *testing.T) {
 	name := acctest.RandomWithPrefix("test-monitor-v2")
 	updatedName := acctest.RandomWithPrefix("test-monitor-v2-updated")
@@ -956,6 +1048,15 @@ func TestAccMonitorV2Resource(t *testing.T) {
 				PlanOnly:           true,
 				ExpectNonEmptyPlan: false,
 			},
+			// relative_timerange and rollup are absent from the previous config, so
+			// their state is null here and the configured human-readable spelling
+			// lands verbatim — asserted literally, since that is the contract the
+			// schema descriptions advertise.
+			//
+			// evaluation_interval was already applied as "1m", and "60 seconds" /
+			// "1 minute" are the same durations respelled. monitorV2SuppressEquivalentDurations
+			// plans no change there, so state keeps whichever spelling it holds —
+			// assert the duration, not the spelling.
 			{
 				Config: testAccMonitorV2ResourceHumanDurationConfig(updatedName),
 				Check: resource.ComposeAggregateTestCheckFunc(
@@ -963,8 +1064,8 @@ func TestAccMonitorV2Resource(t *testing.T) {
 					resource.TestCheckResourceAttr("groundcover_monitor_v2.test", "query.relative_timerange.from", "-5 minutes"),
 					resource.TestCheckResourceAttr("groundcover_monitor_v2.test", "query.relative_timerange.to", "0m"),
 					resource.TestCheckResourceAttr("groundcover_monitor_v2.test", "query.rollup.time", "5 minutes"),
-					resource.TestCheckResourceAttr("groundcover_monitor_v2.test", "evaluation_interval.interval", "60 seconds"),
-					resource.TestCheckResourceAttr("groundcover_monitor_v2.test", "evaluation_interval.pending_for", "1 minute"),
+					testCheckDurationAttr("groundcover_monitor_v2.test", "evaluation_interval.interval", "60 seconds"),
+					testCheckDurationAttr("groundcover_monitor_v2.test", "evaluation_interval.pending_for", "1 minute"),
 				),
 			},
 			{
