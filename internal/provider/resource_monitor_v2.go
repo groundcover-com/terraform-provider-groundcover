@@ -1792,7 +1792,7 @@ func monitorV2ParseDurationString(value string) (time.Duration, bool) {
 
 	normalized, err := monitorV2NormalizeDurationForParse(raw)
 	if err != nil {
-		return "", false
+		return 0, false
 	}
 	parsed, err := strfmt.ParseDuration(normalized)
 	if err != nil {

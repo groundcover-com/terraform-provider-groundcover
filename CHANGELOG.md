@@ -2,6 +2,7 @@
 
 * Fixed normalization of day/week relative time ranges in `groundcover_monitor_v2` and `groundcover_monitor_v2_json`.
 * Fixed `groundcover_dashboard` failing `terraform apply` when `description` is omitted
+* Fixed phantom plan diffs on `groundcover_monitor_v2` and `groundcover_monitor_v2_json` duration attributes after `terraform import` — importing a monitor whose config was exported from the UI no longer plans `"1m" -> "1m0s"` on every duration field. Durations read from the API now keep the Go-style spelling the backend, the stored document and the UI export all use, instead of being rewritten to a shorter form. Durations written in a config are unchanged: whatever spelling you write is still what state holds, including human-readable forms like `5 minutes` and `1d`.
 
 ## 1.22.2
 
@@ -9,7 +10,6 @@
 * Fixed YAML drift on `groundcover_logspipeline` and `groundcover_tracespipeline` — formatting-only differences no longer plan a change
 * `groundcover_logspipeline` and `groundcover_tracespipeline` no longer issue a redundant `GET` on every `terraform plan`
 * Documented the full list of supported `data_type` values for `groundcover_storage_management_policy` — `logs`, `traces`, `events`, `monitor_instance`, and `measurements`, and documented what datatypes support `cold_move_duration`.
-* Fixed phantom plan diffs on `groundcover_monitor_v2` and `groundcover_monitor_v2_json` duration attributes after `terraform import` — importing a monitor whose config was exported from the UI no longer plans `"1m" -> "1m0s"` on every duration field. Durations read from the API now keep the Go-style spelling the backend, the stored document and the UI export all use, instead of being rewritten to a shorter form. Durations written in a config are unchanged: whatever spelling you write is still what state holds, including human-readable forms like `5 minutes` and `1d`.
 
 ## 1.22.1
 
