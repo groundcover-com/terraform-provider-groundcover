@@ -9,6 +9,7 @@ import (
 	"strconv"
 	"strings"
 	"time"
+	"unicode/utf8"
 
 	"github.com/goccy/go-yaml/ast"
 	"github.com/goccy/go-yaml/parser"
@@ -45,26 +46,37 @@ var (
 	dayDurationRegex = regexp.MustCompile(`\b(\d+)([dw])(?:(\d+)h)?\b`)
 
 	// Match a scalar whose ENTIRE value is a bare day/week duration ("1d", "7d",
-	// "1d4h", "1w", "2w4h"). Anchored on both ends so free-text values that merely
-	// contain such a token (e.g. "retry after 1w") never match. Used for scoped,
-	// per-scalar normalization of parsed YAML values (see normalizeDurationScalar).
-	fullDayWeekDurationRegex = regexp.MustCompile(`^(\d+)([dw])(?:(\d+)h)?$`)
-
-	// monitorDurationKeys are the monitor YAML fields whose scalar values are
-	// durations, mirroring the fields the typed monitor_v2 resource normalizes.
-	// Only values under these keys are day/week-normalized, so free-text fields
-	// (title, description, labels, ...) are never rewritten. Keys are matched by
-	// leaf name; in the monitor schema these names only ever carry durations.
-	monitorDurationKeys = map[string]bool{
-		"interval":               true, // evaluationInterval.interval
-		"pendingFor":             true, // evaluationInterval.pendingFor
-		"renotificationInterval": true, // notificationSettings.renotificationInterval
-		"instantRollup":          true, // query.instantRollup
-		"time":                   true, // query.rollup.time
-		"from":                   true, // relativeTimerange.from
-		"to":                     true, // relativeTimerange.to
-	}
+	// "1d4h", "1w", "2w4h"), optionally signed ("-1d"). Anchored on both ends so
+	// free-text values that merely contain such a token (e.g. "retry after 1w")
+	// never match. Used for scoped, per-scalar normalization of parsed YAML
+	// values (see normalizeDurationScalar). The optional leading "-" is required
+	// for relativeTimerange.from values the UI stores as "-1d".
+	fullDayWeekDurationRegex = regexp.MustCompile(`^(-?)(\d+)([dw])(?:(\d+)h)?$`)
 )
+
+// isMonitorDurationPath reports whether key is a duration field at its known
+// monitor YAML path. Ambiguous names must be scoped so labels and annotations
+// with the same names are never rewritten.
+func isMonitorDurationPath(path []string, key string) bool {
+	parentKey := ""
+	if len(path) > 0 {
+		parentKey = path[len(path)-1]
+	}
+	switch key {
+	case "from", "to":
+		return parentKey == "relativeTimerange"
+	case "time":
+		return parentKey == "rollup"
+	case "interval", "pendingFor":
+		return parentKey == "evaluationInterval"
+	case "instantRollup":
+		return parentKey == "queries"
+	case "renotificationInterval":
+		return parentKey == "notificationSettings"
+	default:
+		return false
+	}
+}
 
 // NormalizeMonitorYaml sorts keys in a YAML string alphabetically using AST manipulation.
 // This approach preserves comments and handles complex YAML structures consistently.
@@ -111,6 +123,12 @@ func NormalizeMonitorYaml(ctx context.Context, yamlString string) (string, error
 
 // sortAstNodeGoccy recursively sorts nodes in the AST provided by goccy/go-yaml.
 func sortAstNodeGoccy(node ast.Node) {
+	sortAstNodeGoccyWithPath(node, nil)
+}
+
+// sortAstNodeGoccyWithPath is the recursive AST walker. path contains the
+// mapping keys that own the current node and is used for duration detection.
+func sortAstNodeGoccyWithPath(node ast.Node, path []string) {
 	if node == nil {
 		return
 	}
@@ -128,34 +146,183 @@ func sortAstNodeGoccy(node ast.Node) {
 			if valNode.Value == nil {
 				continue
 			}
+			key := getStringKeyFromNode(valNode.Key)
 			// Scoped duration normalization: rewrite day/week scalars to hours
-			// only for keys that are actually duration fields (mirrors the typed
-			// monitor_v2 behavior). Non-duration fields like title/description are
-			// left untouched regardless of their value.
-			if sn, ok := valNode.Value.(*ast.StringNode); ok && monitorDurationKeys[getStringKeyFromNode(valNode.Key)] {
+			// only on known monitor duration paths. Non-duration fields like
+			// title/description/labels are left untouched.
+			if sn, ok := valNode.Value.(*ast.StringNode); ok && isMonitorDurationPath(path, key) {
 				sn.Value = normalizeDurationScalar(sn.Value)
 			}
-			sortAstNodeGoccy(valNode.Value)
+			sortAstNodeGoccyWithPath(valNode.Value, append(path, key))
 		}
 	case *ast.SequenceNode:
 		// NOTE: We do NOT sort the sequence elements themselves (n.Values slice)
 		// because array order often matters semantically in configuration files.
 		// We only recursively sort the internal structure of each element.
 		for _, valNode := range n.Values {
-			sortAstNodeGoccy(valNode)
+			sortAstNodeGoccyWithPath(valNode, path)
 		}
 	case *ast.DocumentNode:
 		if n.Body != nil {
-			sortAstNodeGoccy(n.Body)
+			sortAstNodeGoccyWithPath(n.Body, path)
 		}
 	case *ast.AnchorNode:
 		if n.Value != nil {
-			sortAstNodeGoccy(n.Value)
+			sortAstNodeGoccyWithPath(n.Value, path)
 		}
 	case *ast.AliasNode:
 		// Alias nodes don't have children to sort
 		return
 	}
+}
+
+// NormalizeMonitorYAMLDurations rewrites supported day/week and human-readable
+// duration scalar values while preserving every other byte of the API YAML. Unlike
+// NormalizeMonitorYaml, it deliberately does not sort or reformat YAML: Read
+// must preserve block scalar descriptions and query expressions before SDK
+// unmarshaling.
+func NormalizeMonitorYAMLDurations(yamlString string) (string, error) {
+	var document yaml.Node
+	if err := yaml.Unmarshal([]byte(yamlString), &document); err != nil {
+		return "", fmt.Errorf("failed to parse monitor YAML: %w", err)
+	}
+
+	replacements := make([]yamlScalarReplacement, 0)
+	if err := collectYAMLDurationReplacements(yamlString, &document, nil, &replacements); err != nil {
+		return "", err
+	}
+	sort.Slice(replacements, func(i, j int) bool {
+		return replacements[i].start > replacements[j].start
+	})
+
+	normalized := yamlString
+	for _, replacement := range replacements {
+		normalized = normalized[:replacement.start] + replacement.value + normalized[replacement.end:]
+	}
+	return normalized, nil
+}
+
+type yamlScalarReplacement struct {
+	start int
+	end   int
+	value string
+}
+
+// collectYAMLDurationReplacements finds duration scalars at supported monitor
+// paths without rendering or otherwise modifying the parsed YAML tree.
+func collectYAMLDurationReplacements(source string, node *yaml.Node, path []string, replacements *[]yamlScalarReplacement) error {
+	if node == nil {
+		return nil
+	}
+
+	switch node.Kind {
+	case yaml.DocumentNode:
+		for _, child := range node.Content {
+			if err := collectYAMLDurationReplacements(source, child, path, replacements); err != nil {
+				return err
+			}
+		}
+	case yaml.MappingNode:
+		for i := 0; i+1 < len(node.Content); i += 2 {
+			key, value := node.Content[i], node.Content[i+1]
+			if value.Kind == yaml.ScalarNode && isMonitorDurationPath(path, key.Value) {
+				normalized, err := monitorV2NormalizeDurationForParse(value.Value)
+				if err != nil {
+					return err
+				}
+				if normalized != value.Value {
+					if start, end, ok := yamlScalarTokenBounds(source, value); ok {
+						*replacements = append(*replacements, yamlScalarReplacement{start: start, end: end, value: normalized})
+					}
+				}
+			}
+			if err := collectYAMLDurationReplacements(source, value, append(path, key.Value), replacements); err != nil {
+				return err
+			}
+		}
+	case yaml.SequenceNode:
+		for _, child := range node.Content {
+			if err := collectYAMLDurationReplacements(source, child, path, replacements); err != nil {
+				return err
+			}
+		}
+	}
+	return nil
+}
+
+// yamlScalarTokenBounds locates the scalar's value bytes in the original YAML,
+// excluding quotes, tags, and anchors so those source details are preserved.
+func yamlScalarTokenBounds(source string, node *yaml.Node) (int, int, bool) {
+	start, ok := yamlSourceOffset(source, node.Line, node.Column)
+	if !ok {
+		return 0, 0, false
+	}
+
+	// The parser reports the start of explicit tags and anchors as the scalar's
+	// position. Skip those properties while preserving them in the source.
+	for start < len(source) && (source[start] == '!' || source[start] == '&') {
+		for start < len(source) && source[start] != ' ' && source[start] != '\t' && source[start] != '\n' {
+			start++
+		}
+		for start < len(source) && (source[start] == ' ' || source[start] == '\t') {
+			start++
+		}
+	}
+
+	if start >= len(source) {
+		return 0, 0, false
+	}
+	if source[start] == '\'' || source[start] == '"' {
+		quote := source[start]
+		contentStart := start + 1
+		for i := contentStart; i < len(source); i++ {
+			if quote == '"' && source[i] == '\\' {
+				i++
+				continue
+			}
+			if source[i] != quote {
+				continue
+			}
+			if quote == '\'' && i+1 < len(source) && source[i+1] == '\'' {
+				i++
+				continue
+			}
+			if source[contentStart:i] == node.Value {
+				return contentStart, i, true
+			}
+			return 0, 0, false
+		}
+		return 0, 0, false
+	}
+
+	if strings.HasPrefix(source[start:], node.Value) {
+		return start, start + len(node.Value), true
+	}
+	return 0, 0, false
+}
+
+// yamlSourceOffset converts a one-based YAML line and rune column to a byte
+// offset in the original UTF-8 source.
+func yamlSourceOffset(source string, line, column int) (int, bool) {
+	if line < 1 || column < 1 {
+		return 0, false
+	}
+	offset := 0
+	for currentLine := 1; currentLine < line; currentLine++ {
+		next := strings.IndexByte(source[offset:], '\n')
+		if next < 0 {
+			return 0, false
+		}
+		offset += next + 1
+	}
+	for currentColumn := 1; currentColumn < column; currentColumn++ {
+		if offset >= len(source) || source[offset] == '\n' {
+			return 0, false
+		}
+		_, size := utf8.DecodeRuneInString(source[offset:])
+		offset += size
+	}
+	return offset, true
 }
 
 // getStringKeyFromNode extracts string value from a key node, with fallback handling
@@ -774,7 +941,16 @@ func normalizeStringValues(data interface{}) interface{} {
 // normalizeHumanDurations converts human-readable duration strings to Go duration format.
 // For example: "10 minutes" -> "10m", "1 hour" -> "1h", "30 seconds" -> "30s"
 func normalizeHumanDurations(s string) string {
-	return humanDurationRegex.ReplaceAllStringFunc(s, func(match string) string {
+	normalized, ok := normalizeHumanDurationsChecked(s)
+	if !ok {
+		return s
+	}
+	return normalized
+}
+
+func normalizeHumanDurationsChecked(s string) (string, bool) {
+	valid := true
+	normalized := humanDurationRegex.ReplaceAllStringFunc(s, func(match string) string {
 		parts := humanDurationRegex.FindStringSubmatch(match)
 		if len(parts) != 3 {
 			return match
@@ -785,9 +961,15 @@ func normalizeHumanDurations(s string) string {
 		case strings.HasPrefix(unit, "day"):
 			n, err := strconv.Atoi(num)
 			if err != nil {
+				valid = false
 				return match
 			}
-			return strconv.Itoa(n*24) + "h"
+			totalHours, ok := checkedDurationHours(n, 24, 0)
+			if !ok {
+				valid = false
+				return match
+			}
+			return strconv.Itoa(totalHours) + "h"
 		case strings.HasPrefix(unit, "hour"):
 			return num + "h"
 		case strings.HasPrefix(unit, "minute"):
@@ -798,6 +980,7 @@ func normalizeHumanDurations(s string) string {
 			return match
 		}
 	})
+	return normalized, valid
 }
 
 // normalizeDayDurations converts day/week durations like "1d", "7d", "1d4h",
@@ -806,59 +989,94 @@ func normalizeHumanDurations(s string) string {
 // are not supported and will fail downstream parsing — users should write
 // "24h30m" instead.
 func normalizeDayDurations(s string) string {
-	return dayDurationRegex.ReplaceAllStringFunc(s, func(match string) string {
+	normalized, ok := normalizeDayDurationsChecked(s)
+	if !ok {
+		return s
+	}
+	return normalized
+}
+
+func normalizeDayDurationsChecked(s string) (string, bool) {
+	valid := true
+	normalized := dayDurationRegex.ReplaceAllStringFunc(s, func(match string) string {
 		parts := dayDurationRegex.FindStringSubmatch(match)
 		if len(parts) != 4 {
 			return match
 		}
 		n, err := strconv.Atoi(parts[1])
 		if err != nil {
+			valid = false
 			return match
 		}
 		hoursPerUnit := 24
 		if parts[2] == "w" {
 			hoursPerUnit = 24 * 7
 		}
-		totalHours := n * hoursPerUnit
+		trailingHours := 0
 		if parts[3] != "" {
 			h, err := strconv.Atoi(parts[3])
 			if err != nil {
+				valid = false
 				return match
 			}
-			totalHours += h
+			trailingHours = h
+		}
+		totalHours, ok := checkedDurationHours(n, hoursPerUnit, trailingHours)
+		if !ok {
+			valid = false
+			return match
 		}
 		return strconv.Itoa(totalHours) + "h"
 	})
+	return normalized, valid
 }
 
 // normalizeDurationScalar converts a scalar whose entire value is a bare
-// day/week duration ("1d", "7d", "1d4h", "1w", "2w4h") into hours, since Go's
-// time.ParseDuration understands neither "d" nor "w". Values that are not
-// exactly such a token (e.g. "5m", "1h30m", or free text) are returned
-// unchanged. Callers additionally gate this to known duration fields (see
-// monitorDurationKeys). Composite forms with minutes/seconds are not supported.
+// day/week duration ("1d", "7d", "1d4h", "1w", "2w4h", optionally signed like
+// "-1d") into hours, since Go's time.ParseDuration understands neither "d" nor
+// "w". Values that are not exactly such a token (e.g. "5m", "1h30m", or free
+// text) are returned unchanged. Callers additionally gate this to known
+// duration fields (see isMonitorDurationPath). Composite forms with
+// minutes/seconds are not supported.
 func normalizeDurationScalar(value string) string {
 	parts := fullDayWeekDurationRegex.FindStringSubmatch(value)
 	if parts == nil {
 		return value
 	}
-	n, err := strconv.Atoi(parts[1])
+	sign := parts[1]
+	n, err := strconv.Atoi(parts[2])
 	if err != nil {
 		return value
 	}
 	hoursPerUnit := 24
-	if parts[2] == "w" {
+	if parts[3] == "w" {
 		hoursPerUnit = 24 * 7
 	}
-	totalHours := n * hoursPerUnit
-	if parts[3] != "" {
-		h, err := strconv.Atoi(parts[3])
+	trailingHours := 0
+	if parts[4] != "" {
+		h, err := strconv.Atoi(parts[4])
 		if err != nil {
 			return value
 		}
-		totalHours += h
+		trailingHours = h
 	}
-	return strconv.Itoa(totalHours) + "h"
+	totalHours, ok := checkedDurationHours(n, hoursPerUnit, trailingHours)
+	if !ok {
+		return value
+	}
+	return sign + strconv.Itoa(totalHours) + "h"
+}
+
+// checkedDurationHours safely combines a day/week count and trailing hours.
+func checkedDurationHours(count, hoursPerUnit, trailingHours int) (int, bool) {
+	maxInt := int(^uint(0) >> 1)
+	if count < 0 || hoursPerUnit <= 0 || trailingHours < 0 {
+		return 0, false
+	}
+	if count > (maxInt-trailingHours)/hoursPerUnit {
+		return 0, false
+	}
+	return count*hoursPerUnit + trailingHours, true
 }
 
 // normalizeTimeString normalizes a single time string
