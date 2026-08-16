@@ -1813,9 +1813,28 @@ func monitorV2NormalizeDurationString(value string) (string, bool) {
 	return monitorV2DurationToString(parsed), true
 }
 
+// monitorV2ParseWholeDurationString parses only a value that is entirely a
+// duration. monitorV2ParseDurationString is deliberately looser — strfmt falls
+// back to matching a duration *substring*, so "garbage 5m garbage" parses as 5m
+// and "-5 min" parses as +5m. That looseness is fine for comparing two spellings,
+// but a value we are about to rewrite into state has to be the real thing.
+func monitorV2ParseWholeDurationString(value string) (time.Duration, bool) {
+	normalized, err := monitorV2NormalizeDurationForParse(strings.TrimSpace(value))
+	if err != nil {
+		return 0, false
+	}
+	parsed, err := time.ParseDuration(normalized)
+	if err != nil {
+		return 0, false
+	}
+	return parsed, true
+}
+
 func monitorV2DurationStringToType(value string) types.String {
-	parsed, ok := monitorV2ParseDurationString(value)
+	parsed, ok := monitorV2ParseWholeDurationString(value)
 	if !ok {
+		// Not a duration we recognise in full — keep whatever the API sent rather
+		// than canonicalizing a substring of it.
 		return monitorV2NullableString(value)
 	}
 	return monitorV2DurationToType(parsed)

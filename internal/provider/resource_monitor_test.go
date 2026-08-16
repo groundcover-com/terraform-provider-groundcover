@@ -724,6 +724,14 @@ func TestMonitorV2DurationNormalizationPreservesZero(t *testing.T) {
 	if got := monitorV2DurationAnyToType("not a duration").ValueString(); got != "not a duration" {
 		t.Fatalf("monitorV2DurationAnyToType(unparseable) = %q, want the raw value", got)
 	}
+	// strfmt's parser falls back to matching a duration substring, so these would
+	// otherwise be canonicalized into state — losing the surrounding text, and in
+	// the "-5 min" case silently flipping the sign.
+	for _, malformed := range []string{"garbage 5m garbage", "1h extra text", "-5 min"} {
+		if got := monitorV2DurationStringToType(malformed).ValueString(); got != malformed {
+			t.Errorf("monitorV2DurationStringToType(%q) = %q, want it left alone", malformed, got)
+		}
+	}
 }
 
 // TestMonitorV2UnmarshalRemoteYAML_NormalizesDayDurations is the regression for
