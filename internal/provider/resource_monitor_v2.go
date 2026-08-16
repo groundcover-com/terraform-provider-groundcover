@@ -1433,7 +1433,7 @@ func monitorV2NotificationSettingsFromSDK(ctx context.Context, settings *models.
 		ConnectedAppParams:     monitorV2ConnectedAppParamsType(ctx, settings.ConnectedAppParams, diags),
 		StatusFilters:          monitorV2IssueStatusListType(ctx, settings.StatusFilters, diags),
 		DisableRenotification:  types.BoolValue(settings.DisableRenotification),
-		RenotificationInterval: monitorV2AnyString(settings.RenotificationInterval),
+		RenotificationInterval: monitorV2DurationAnyToType(settings.RenotificationInterval),
 	}
 }
 
@@ -1533,7 +1533,11 @@ func monitorV2NullableString(value string) types.String {
 	return types.StringValue(value)
 }
 
-func monitorV2AnyString(value any) types.String {
+// monitorV2DurationAnyToType renders a duration the SDK models as a bare string
+// rather than a typed duration. BE-2751: it has to spell state the same way every
+// other duration does (see monitorV2DurationToStateString), or the one attribute
+// that goes through here keeps drifting on import while the rest do not.
+func monitorV2DurationAnyToType(value any) types.String {
 	if value == nil {
 		return types.StringNull()
 	}
@@ -1541,7 +1545,7 @@ func monitorV2AnyString(value any) types.String {
 	if str == "" || str == "<nil>" {
 		return types.StringNull()
 	}
-	return types.StringValue(normalizeTimeString(str))
+	return monitorV2DurationStringToType(str)
 }
 
 func monitorV2StringMap(ctx context.Context, value types.Map, diags *diag.Diagnostics) map[string]string {

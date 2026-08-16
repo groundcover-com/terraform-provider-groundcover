@@ -712,6 +712,18 @@ func TestMonitorV2DurationNormalizationPreservesZero(t *testing.T) {
 	if got := monitorV2DurationStringToType("5 minutes").ValueString(); got != "5m0s" {
 		t.Fatalf("monitorV2DurationStringToType(5 minutes) = %q, want 5m0s", got)
 	}
+	// BE-2751: renotification_interval is the one duration the SDK models as a bare
+	// string. It used to be short-formed while every other duration was not, so it
+	// alone kept drifting on import.
+	if got := monitorV2DurationAnyToType("1h0m0s").ValueString(); got != "1h0m0s" {
+		t.Fatalf("monitorV2DurationAnyToType(1h0m0s) = %q, want 1h0m0s", got)
+	}
+	if got := monitorV2DurationAnyToType(nil); !got.IsNull() {
+		t.Fatalf("monitorV2DurationAnyToType(nil) = %q, want null", got.ValueString())
+	}
+	if got := monitorV2DurationAnyToType("not a duration").ValueString(); got != "not a duration" {
+		t.Fatalf("monitorV2DurationAnyToType(unparseable) = %q, want the raw value", got)
+	}
 }
 
 // TestMonitorV2UnmarshalRemoteYAML_NormalizesDayDurations is the regression for
