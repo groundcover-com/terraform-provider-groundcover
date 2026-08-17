@@ -1533,10 +1533,9 @@ func monitorV2NullableString(value string) types.String {
 	return types.StringValue(value)
 }
 
-// monitorV2DurationAnyToType renders a duration the SDK models as a bare string
-// rather than a typed duration. BE-2751: it has to spell state the same way every
-// other duration does (see monitorV2DurationToStateString), or the one attribute
-// that goes through here keeps drifting on import while the rest do not.
+// monitorV2DurationAnyToType renders a duration the SDK models as a bare string.
+// It must spell state like every other duration or that attribute alone keeps
+// drifting on import.
 func monitorV2DurationAnyToType(value any) types.String {
 	if value == nil {
 		return types.StringNull()
@@ -1814,10 +1813,9 @@ func monitorV2NormalizeDurationString(value string) (string, bool) {
 }
 
 // monitorV2ParseWholeDurationString parses only a value that is entirely a
-// duration. monitorV2ParseDurationString is deliberately looser — strfmt falls
-// back to matching a duration *substring*, so "garbage 5m garbage" parses as 5m
-// and "-5 min" parses as +5m. That looseness is fine for comparing two spellings,
-// but a value we are about to rewrite into state has to be the real thing.
+// duration. strfmt falls back to matching a duration *substring* ("garbage 5m
+// garbage" parses as 5m, "-5 min" as +5m) — fine for comparing spellings, not for
+// a value about to be written into state.
 func monitorV2ParseWholeDurationString(value string) (time.Duration, bool) {
 	normalized, err := monitorV2NormalizeDurationForParse(strings.TrimSpace(value))
 	if err != nil {
@@ -1833,8 +1831,7 @@ func monitorV2ParseWholeDurationString(value string) (time.Duration, bool) {
 func monitorV2DurationStringToType(value string) types.String {
 	parsed, ok := monitorV2ParseWholeDurationString(value)
 	if !ok {
-		// Not a duration we recognise in full — keep whatever the API sent rather
-		// than canonicalizing a substring of it.
+		// Keep whatever the API sent rather than canonicalizing a substring of it.
 		return monitorV2NullableString(value)
 	}
 	return monitorV2DurationToType(parsed)
@@ -1850,21 +1847,14 @@ func monitorV2DurationToString(value time.Duration) string {
 	return normalizeTimeString(value.String())
 }
 
-// monitorV2DurationToStateString renders a duration the way the backend, the
-// stored document and the UI's Terraform export all render it — Go style, "1m0s".
-//
-// BE-2751: state used to hold the canonical short form, so a monitor imported
-// from a UI-exported config planned a phantom diff on every duration field —
-// nothing else in the chain spells them that way. Import has no prior state for
-// monitorV2PreserveDurationString to preserve, so whatever is rendered here is
-// what lands in state, and it has to match what the config was exported from.
-//
-// Durations that came from a config are unaffected: monitorV2PreserveDurationString
-// keeps the configured spelling whenever it is semantically equal to the API's.
+// monitorV2DurationToStateString renders a duration Go style ("1m0s"), matching
+// the backend, the stored document and the UI's Terraform export. BE-2751: state
+// used to hold the short form, which import — having no prior state for
+// monitorV2PreserveDurationString to preserve — turned into a phantom diff on
+// every duration field. Configured spellings are still preserved.
 func monitorV2DurationToStateString(value time.Duration) string {
-	// ponytail: zero keeps its "0m" spelling rather than Go's "0s" — relative_timerange
-	// bounds are conventionally written "0m" and this predates BE-2751. Revisit if a
-	// zero bound ever drifts on import.
+	// ponytail: zero stays "0m" rather than Go's "0s"; predates BE-2751. Revisit if
+	// a zero relative_timerange bound ever drifts on import.
 	if value == 0 {
 		return "0m"
 	}

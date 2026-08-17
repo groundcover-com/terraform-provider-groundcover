@@ -500,9 +500,7 @@ func TestMonitorV2BuildCreateRequestConnectedAppParams(t *testing.T) {
 }
 
 // BE-2751: with no prior state — i.e. import — durations must land in state
-// spelled the way the backend, the stored document and the UI's Terraform export
-// spell them ("5m0s"). State used to hold the canonical short form ("5m"), so the
-// first plan after `terraform import` showed a diff on every duration field.
+// spelled Go style, the way the API and the UI export spell them.
 func TestMonitorV2MapSDKToModelRendersGoStyleDurationsOnImport(t *testing.T) {
 	ctx := context.Background()
 	title := "duration monitor"
@@ -712,9 +710,8 @@ func TestMonitorV2DurationNormalizationPreservesZero(t *testing.T) {
 	if got := monitorV2DurationStringToType("5 minutes").ValueString(); got != "5m0s" {
 		t.Fatalf("monitorV2DurationStringToType(5 minutes) = %q, want 5m0s", got)
 	}
-	// BE-2751: renotification_interval is the one duration the SDK models as a bare
-	// string. It used to be short-formed while every other duration was not, so it
-	// alone kept drifting on import.
+	// BE-2751: the one duration the SDK models as a bare string; it used to be
+	// short-formed while the rest were not.
 	if got := monitorV2DurationAnyToType("1h0m0s").ValueString(); got != "1h0m0s" {
 		t.Fatalf("monitorV2DurationAnyToType(1h0m0s) = %q, want 1h0m0s", got)
 	}
@@ -724,9 +721,8 @@ func TestMonitorV2DurationNormalizationPreservesZero(t *testing.T) {
 	if got := monitorV2DurationAnyToType("not a duration").ValueString(); got != "not a duration" {
 		t.Fatalf("monitorV2DurationAnyToType(unparseable) = %q, want the raw value", got)
 	}
-	// strfmt's parser falls back to matching a duration substring, so these would
-	// otherwise be canonicalized into state — losing the surrounding text, and in
-	// the "-5 min" case silently flipping the sign.
+	// strfmt matches a duration substring, so these would otherwise be rewritten
+	// into state — "-5 min" even flipping sign.
 	for _, malformed := range []string{"garbage 5m garbage", "1h extra text", "-5 min"} {
 		if got := monitorV2DurationStringToType(malformed).ValueString(); got != malformed {
 			t.Errorf("monitorV2DurationStringToType(%q) = %q, want it left alone", malformed, got)
@@ -1114,11 +1110,9 @@ func TestAccMonitorV2Resource(t *testing.T) {
 					resource.TestCheckResourceAttr("groundcover_monitor_v2.test", "threshold.#", "1"),
 				),
 			},
-			// BE-2751: the config above spells durations Go-style, the way the UI's
-			// Terraform export does. ImportStateVerify is the regression test — before
-			// the fix, Read normalized the API's "1m0s" to "1m" on import while apply
-			// kept the configured "1m0s", so imported and applied state disagreed and
-			// the first plan after `terraform import` showed a diff on every duration.
+			// BE-2751 regression test: the config above spells durations Go style, as the
+			// UI export does. Before the fix, import produced "1m" and apply "1m0s", so
+			// this step failed.
 			{
 				ResourceName:      "groundcover_monitor_v2.test",
 				ImportState:       true,
