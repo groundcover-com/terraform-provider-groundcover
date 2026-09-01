@@ -1032,9 +1032,9 @@ func TestMonitorV2ValidateCustomResolveValues(t *testing.T) {
 	}
 }
 
-// TestMonitorV2ValidateThresholdCount checks that the plan rejects zero and more than one
-// threshold block: the backend evaluates a single threshold, so extra blocks would be accepted by
-// the API and silently ignored.
+// TestMonitorV2ValidateThresholdCount checks that the plan rejects zero threshold blocks and warns
+// without failing on more than one: a monitor evaluates a single threshold, so extra blocks are
+// accepted by the API and never reach the alert condition.
 func TestMonitorV2ValidateThresholdCount(t *testing.T) {
 	ctx := context.Background()
 	query := &monitorV2QueryModel{
@@ -1054,7 +1054,10 @@ func TestMonitorV2ValidateThresholdCount(t *testing.T) {
 	two.Thresholds[1].Name = types.StringValue("threshold_2")
 	diags = nil
 	validateMonitorV2Config(ctx, &two, &diags)
-	requireDiagnosticSummary(t, diags, "Too many threshold blocks")
+	requireDiagnosticSummary(t, diags, "Extra threshold blocks are ignored")
+	if diags.HasError() {
+		t.Errorf("extra threshold blocks should warn, not fail the plan, got: %v", diags)
+	}
 
 	one := testMonitorV2BasePlan(t, query)
 	diags = nil

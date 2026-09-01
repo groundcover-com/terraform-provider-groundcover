@@ -660,8 +660,10 @@ func validateMonitorV2Config(ctx context.Context, config *monitorV2ResourceModel
 	// Surface evaluation_delay parse/range errors at plan time; the result is discarded here.
 	monitorV2EvaluationDelayToSDK(config.Query.EvaluationDelay, diags)
 
-	// The backend evaluates a single threshold per monitor: extra blocks are accepted by the API
-	// and silently ignored, so reject them at plan time rather than let them look configured.
+	// A monitor evaluates a single threshold: extra blocks are accepted by the API and never
+	// reach the alert condition, so say so at plan time instead of letting them look configured.
+	// A warning rather than an error, so upgrading does not break a plan that used to pass; a
+	// future major version can reject them.
 	if n := len(config.Thresholds); n == 0 {
 		diags.AddAttributeError(
 			path.Root("threshold"),
@@ -669,10 +671,10 @@ func validateMonitorV2Config(ctx context.Context, config *monitorV2ResourceModel
 			"This resource requires exactly one threshold block.",
 		)
 	} else if n > 1 {
-		diags.AddAttributeError(
+		diags.AddAttributeWarning(
 			path.Root("threshold"),
-			"Too many threshold blocks",
-			fmt.Sprintf("This resource supports exactly one threshold block, got %d. A monitor evaluates a single threshold; for several alert levels, a separate monitor can cover each level.", n),
+			"Extra threshold blocks are ignored",
+			fmt.Sprintf("This resource supports exactly one threshold block, got %d. A monitor evaluates a single threshold, so only the first block takes effect and the rest are ignored. A future major version will reject them. For several alert levels, a separate monitor can cover each level.", n),
 		)
 	}
 

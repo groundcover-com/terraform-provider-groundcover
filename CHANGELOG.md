@@ -1,6 +1,6 @@
 ## 1.22.4
 
-* `groundcover_monitor_v2` and `groundcover_monitor_v2_json` now reject more than one `threshold` block at plan time. A monitor evaluates a single threshold, so extra blocks were accepted by the API and silently ignored. The schema description and docs said "at least one threshold block", which read as multi-threshold support
+* `groundcover_monitor_v2` and `groundcover_monitor_v2_json` now warn at plan time when more than one `threshold` block is configured. A monitor evaluates a single threshold, so only the first block takes effect and the rest are ignored; a future major version will reject them. The schema description and docs said "at least one threshold block", which read as multi-threshold support
 
 ## 1.22.3
 
