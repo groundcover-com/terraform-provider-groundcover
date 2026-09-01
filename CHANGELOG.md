@@ -1,3 +1,7 @@
+## 1.22.4
+
+* `groundcover_monitor_v2` and `groundcover_monitor_v2_json` now reject more than one `threshold` block at plan time. A monitor evaluates a single threshold, so extra blocks were accepted by the API and silently ignored. The schema description and docs said "at least one threshold block", which read as multi-threshold support
+
 ## 1.22.3
 
 * Fixed normalization of day/week relative time ranges in `groundcover_monitor_v2` and `groundcover_monitor_v2_json`.

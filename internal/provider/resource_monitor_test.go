@@ -1032,6 +1032,38 @@ func TestMonitorV2ValidateCustomResolveValues(t *testing.T) {
 	}
 }
 
+// TestMonitorV2ValidateThresholdCount checks that the plan rejects zero and more than one
+// threshold block: the backend evaluates a single threshold, so extra blocks would be accepted by
+// the API and silently ignored.
+func TestMonitorV2ValidateThresholdCount(t *testing.T) {
+	ctx := context.Background()
+	query := &monitorV2QueryModel{
+		Type:       types.StringValue(monitorV2QueryTypeGCQL),
+		Expression: types.StringValue("level:error | stats count() c"),
+		DataType:   types.StringValue("logs"),
+	}
+
+	none := testMonitorV2BasePlan(t, query)
+	none.Thresholds = nil
+	var diags diag.Diagnostics
+	validateMonitorV2Config(ctx, &none, &diags)
+	requireDiagnosticSummary(t, diags, "Missing threshold block")
+
+	two := testMonitorV2BasePlan(t, query)
+	two.Thresholds = append(two.Thresholds, two.Thresholds[0])
+	two.Thresholds[1].Name = types.StringValue("threshold_2")
+	diags = nil
+	validateMonitorV2Config(ctx, &two, &diags)
+	requireDiagnosticSummary(t, diags, "Too many threshold blocks")
+
+	one := testMonitorV2BasePlan(t, query)
+	diags = nil
+	validateMonitorV2Config(ctx, &one, &diags)
+	if diags.HasError() {
+		t.Errorf("a single threshold block should validate, got diagnostics: %v", diags)
+	}
+}
+
 func TestAccMonitorResource(t *testing.T) {
 	name := acctest.RandomWithPrefix("test-monitor")
 	updatedName := acctest.RandomWithPrefix("test-monitor-updated")

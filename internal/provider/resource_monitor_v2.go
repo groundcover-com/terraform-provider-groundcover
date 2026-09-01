@@ -361,7 +361,7 @@ func (r *monitorV2Resource) Schema(_ context.Context, _ resource.SchemaRequest, 
 				},
 			},
 			"threshold": schema.ListNestedBlock{
-				MarkdownDescription: "Required. Thresholds that decide when the monitor fires. At least one threshold block must be configured.",
+				MarkdownDescription: "Required. The threshold that decides when the monitor fires. Exactly one threshold block must be configured; the backend evaluates a single threshold per monitor. To alert at several levels, create a monitor per level.",
 				NestedObject: schema.NestedBlockObject{
 					Attributes: map[string]schema.Attribute{
 						"name": schema.StringAttribute{
@@ -660,11 +660,19 @@ func validateMonitorV2Config(ctx context.Context, config *monitorV2ResourceModel
 	// Surface evaluation_delay parse/range errors at plan time; the result is discarded here.
 	monitorV2EvaluationDelayToSDK(config.Query.EvaluationDelay, diags)
 
-	if len(config.Thresholds) == 0 {
+	// The backend evaluates a single threshold per monitor: extra blocks are accepted by the API
+	// and silently ignored, so reject them at plan time rather than let them look configured.
+	if n := len(config.Thresholds); n == 0 {
 		diags.AddAttributeError(
 			path.Root("threshold"),
 			"Missing threshold block",
-			"This resource requires at least one threshold block.",
+			"This resource requires exactly one threshold block.",
+		)
+	} else if n > 1 {
+		diags.AddAttributeError(
+			path.Root("threshold"),
+			"Too many threshold blocks",
+			fmt.Sprintf("This resource supports exactly one threshold block, got %d. A monitor evaluates a single threshold; to alert at several levels, create a monitor per level.", n),
 		)
 	}
 
