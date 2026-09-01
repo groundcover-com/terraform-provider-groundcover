@@ -361,7 +361,7 @@ func (r *monitorV2Resource) Schema(_ context.Context, _ resource.SchemaRequest, 
 				},
 			},
 			"threshold": schema.ListNestedBlock{
-				MarkdownDescription: "Required. The threshold that decides when the monitor fires. Exactly one threshold block must be configured; the backend evaluates a single threshold per monitor. To alert at several levels, create a monitor per level.",
+				MarkdownDescription: "Required. The threshold that decides when the monitor fires. Exactly one threshold block must be configured; a monitor evaluates a single threshold. For several alert levels, a separate monitor can cover each level.",
 				NestedObject: schema.NestedBlockObject{
 					Attributes: map[string]schema.Attribute{
 						"name": schema.StringAttribute{
@@ -672,7 +672,7 @@ func validateMonitorV2Config(ctx context.Context, config *monitorV2ResourceModel
 		diags.AddAttributeError(
 			path.Root("threshold"),
 			"Too many threshold blocks",
-			fmt.Sprintf("This resource supports exactly one threshold block, got %d. A monitor evaluates a single threshold; to alert at several levels, create a monitor per level.", n),
+			fmt.Sprintf("This resource supports exactly one threshold block, got %d. A monitor evaluates a single threshold; for several alert levels, a separate monitor can cover each level.", n),
 		)
 	}
 
