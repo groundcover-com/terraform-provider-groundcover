@@ -81,7 +81,7 @@ resource "groundcover_monitor_v2_json" "gcql_logs" {
 - `reducer` (Block List) Reducers that aggregate or transform query results before threshold evaluation. (see [below for nested schema](#nestedblock--reducer))
 - `routing` (List of String) Routing destinations for the monitor.
 - `team` (String) Team associated with the monitor.
-- `threshold` (Block List) Required. Thresholds that decide when the monitor fires. At least one threshold block must be configured. (see [below for nested schema](#nestedblock--threshold))
+- `threshold` (Block List) Required. The threshold that decides when the monitor fires. Exactly one threshold block must be configured; a monitor evaluates a single threshold. For several alert levels, a separate monitor can cover each level. (see [below for nested schema](#nestedblock--threshold))
 
 ### Read-Only
 

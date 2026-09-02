@@ -1,5 +1,6 @@
 ## 1.22.4
 
+* `groundcover_monitor_v2` and `groundcover_monitor_v2_json` now warn at plan time when more than one `threshold` block is configured. A monitor evaluates a single threshold, so only the first block takes effect and the rest are ignored; a future major version will reject them. The schema description and docs said "at least one threshold block", which read as multi-threshold support
 * Fixed an incorrect comment in the `groundcover_dataintegration` example: the ClickHouse and PostgreSQL (`clickhousedbm` / `postgresqldbm`) password examples use a `secretRef::k8s::` reference, which points at an existing Kubernetes secret in the cluster running the integration, but the comment told users to create it with the `groundcover_secret` resource. `groundcover_secret` produces a `secretRef::store::<id>` reference, not a `secretRef::k8s::` one
 
 ## 1.22.3
