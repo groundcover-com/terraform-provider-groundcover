@@ -1,3 +1,7 @@
+## 1.22.4
+
+* Updated the `groundcover_dataintegration` PostgreSQL and ClickHouse database-monitoring examples with built-in health metrics and query-statistics collection.
+
 ## 1.22.3
 
 * Fixed normalization of day/week relative time ranges in `groundcover_monitor_v2` and `groundcover_monitor_v2_json`.
