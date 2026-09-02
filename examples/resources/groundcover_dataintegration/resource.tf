@@ -477,12 +477,27 @@ EOT
   is_paused = false
 }
 
-# Example: ClickHouse - Query Log & Custom Metrics
-resource "groundcover_dataintegration" "clickhouse_demo" {
+# Example: ClickHouse database monitoring
+# The integration user needs SELECT on system.*. Cluster mode also requires:
+# GRANT REMOTE ON *.* TO groundcover;
+resource "groundcover_dataintegration" "clickhouse_dbm" {
   type      = "clickhousedbm"
   is_paused = false
 
   config = jsonencode({
+    version = 1
+    enabled = true
+    name    = "production-clickhouse"
+
+    host         = "clickhouse.example.com"
+    port         = 9440
+    protocol     = "native"
+    database     = "default"
+    secure       = true
+    skipVerify   = false
+    dialTimeout  = "10s"
+    queryTimeout = "30s"
+
     authentication = {
       basicAuth = {
         username = "default"
@@ -495,54 +510,40 @@ resource "groundcover_dataintegration" "clickhouse_demo" {
       }
     }
 
-    clusterMode = true          # true if your ClickHouse is running in cluster mode; false for a single node
-    clusterName = "clustername" # the name of the cluster. Relevant if clusterMode=true
-    database    = "your clickhouse db name"
-    dialTimeout = "10s"
-    enabled     = true
-    host        = "your clickhouse host details"
-    name        = "clickhouse demo integration"
-    port        = 9000
-    skipVerify  = false
-    version     = 1
+    clusterMode = true
+    clusterName = "default"
 
     labelSettings = {
       extraLabels = {
-        env = "prod"
+        environment = "production"
+        team        = "database-platform"
       }
     }
 
-    # Optional - generate metrics from custom sql's.
-    # metricsColumns - the list of metrics to be created
-    customMetricQueries = {
-      collectionInterval = "5m"
-
-      queries = [
-        {
-          name         = "test query"
-          metricPrefix = "gc_clickhouse"
-          extraLabels  = {}
-
-          metricsColumns = [
-            {
-              name       = "accounts_count"
-              metricName = "total"
-              type       = "counter"
-            }
-          ]
-
-          query = <<EOT
-SELECT
-    tier,
-    count() as accounts_count
-FROM my_accounts
-GROUP BY tier
-EOT
-        }
-      ]
+    # Built-in health metrics are Prometheus metrics. The top-level interval
+    # controls their collection cadence. Capacity and events use curated
+    # defaults when their optional include lists are omitted.
+    interval        = "1m"
+    ignoreDatabases = ["system", "information_schema"]
+    healthMetrics = {
+      enabled = true
+      topN    = 50
+      groups = {
+        parts         = { enabled = true }
+        merges        = { enabled = true }
+        mutations     = { enabled = true }
+        replication   = { enabled = true }
+        connections   = { enabled = true }
+        capacity      = { enabled = true }
+        events        = { enabled = true }
+        detachedParts = { enabled = true }
+        tableSizes    = { enabled = true }
+        viewRefreshes = { enabled = true }
+        dictionaries  = { enabled = true }
+      }
     }
 
-    # Optional - fetch query performance traces.
+    # Query logs are collected as traces, independently of health metrics.
     tables = {
       queryLog = {
         enabled       = true
@@ -606,12 +607,29 @@ EOT
   is_paused = false
 }
 
-# Example: PostgreSQL - Slow Queries & Custom Metrics
-resource "groundcover_dataintegration" "postgresql_demo" {
+# Example: PostgreSQL database monitoring
+# Before applying:
+# 1. Add pg_stat_statements to shared_preload_libraries and restart PostgreSQL.
+# 2. Run CREATE EXTENSION IF NOT EXISTS pg_stat_statements; in the monitored database.
+# 3. Run GRANT pg_monitor TO groundcover; for capability-sensitive health metrics.
+# 4. Enable track_io_timing for PostgreSQL I/O timing metrics.
+resource "groundcover_dataintegration" "postgresql_dbm" {
   type      = "postgresqldbm"
   is_paused = false
 
   config = jsonencode({
+    version = 1
+    enabled = true
+    name    = "production-postgresql"
+
+    host         = "postgresql.example.com"
+    port         = 5432
+    database     = "postgres"
+    secure       = true
+    skipVerify   = false
+    dialTimeout  = "10s"
+    queryTimeout = "30s"
+
     authentication = {
       basicAuth = {
         username = "postgres"
@@ -624,53 +642,38 @@ resource "groundcover_dataintegration" "postgresql_demo" {
       }
     }
 
-    database = "your postgresql db name"
-
-    dialTimeout = "10s"
-    enabled     = true
-    host        = "your postgres host details"
-    name        = "postgres demo integration"
-    port        = 5432
-    secure      = true
-    skipVerify  = false
-    version     = 1
-
     labelSettings = {
       extraLabels = {
-        env = "prod"
+        environment = "production"
+        team        = "database-platform"
       }
     }
 
-    # Optional - generate metrics from custom sql's.
-    # metricsColumns - the list of metrics to be created
-    customMetricQueries = {
-      collectionInterval = "5m"
-
-      queries = [
-        {
-          name         = "test query"
-          metricPrefix = "gc_postgres"
-
-          metricsColumns = [
-            {
-              name       = "accounts_count"
-              metricName = "total"
-              type       = "counter"
-            }
-          ]
-
-          query = <<EOT
-SELECT
-    tier,
-    count(*) as accounts_count
-FROM my_accounts
-GROUP BY tier
-EOT
-        }
-      ]
+    # Built-in health metrics are Prometheus metrics. Groups that are not
+    # supported by the server version, settings, grants, or current
+    # primary/standby role are gated automatically.
+    interval        = "1m"
+    ignoreDatabases = ["template0", "template1", "rdsadmin"]
+    healthMetrics = {
+      enabled = true
+      groups = {
+        connections   = { enabled = true }
+        replication   = { enabled = true }
+        standby       = { enabled = true }
+        databaseStats = { enabled = true }
+        wraparound    = { enabled = true }
+        databaseSize  = { enabled = true }
+        conflicts     = { enabled = true }
+        checkpoints   = { enabled = true }
+        wal           = { enabled = true }
+        archiver      = { enabled = true }
+        io            = { enabled = true }
+        instance      = { enabled = true }
+        locks         = { enabled = true }
+      }
     }
 
-    # Optional - fetch query performance traces.
+    # pg_stat_statements rows are collected as traces, independently of health metrics.
     tables = {
       pgStatStatements = {
         enabled       = true
@@ -823,9 +826,9 @@ output "rediscloud_dataintegration_id" {
   value       = groundcover_dataintegration.rediscloud_example.id
 }
 
-output "clickhouse_demo_dataintegration_id" {
-  description = "The ID of the ClickHouse Query Log & Custom Metrics data integration"
-  value       = groundcover_dataintegration.clickhouse_demo.id
+output "clickhouse_dbm_dataintegration_id" {
+  description = "The ID of the ClickHouse database-monitoring data integration"
+  value       = groundcover_dataintegration.clickhouse_dbm.id
 }
 
 output "clickhouse_system_metrics_dataintegration_id" {
@@ -833,9 +836,9 @@ output "clickhouse_system_metrics_dataintegration_id" {
   value       = groundcover_dataintegration.clickhouse_system_metrics_example.id
 }
 
-output "postgresql_demo_dataintegration_id" {
-  description = "The ID of the PostgreSQL Slow Queries & Custom Metrics data integration"
-  value       = groundcover_dataintegration.postgresql_demo.id
+output "postgresql_dbm_dataintegration_id" {
+  description = "The ID of the PostgreSQL database-monitoring data integration"
+  value       = groundcover_dataintegration.postgresql_dbm.id
 }
 
 output "postgresql_system_metrics_dataintegration_id" {
