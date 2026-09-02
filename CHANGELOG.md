@@ -1,3 +1,7 @@
+## 1.22.4
+
+* Fixed an incorrect comment in the `groundcover_dataintegration` example: the ClickHouse and PostgreSQL (`clickhousedbm` / `postgresqldbm`) password examples use a `secretRef::k8s::` reference, which points at an existing Kubernetes secret in the cluster running the integration, but the comment told users to create it with the `groundcover_secret` resource. `groundcover_secret` produces a `secretRef::store::<id>` reference, not a `secretRef::k8s::` one
+
 ## 1.22.3
 
 * Fixed normalization of day/week relative time ranges in `groundcover_monitor_v2` and `groundcover_monitor_v2_json`.
