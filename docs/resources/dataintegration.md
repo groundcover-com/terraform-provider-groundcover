@@ -495,18 +495,6 @@ EOT
 # Example: ClickHouse database monitoring
 # The integration user needs SELECT on system.*. Cluster mode also requires:
 # GRANT REMOTE ON *.* TO groundcover;
-variable "clickhouse_dbm_password" {
-  type        = string
-  description = "Password for the ClickHouse database-monitoring user"
-  sensitive   = true
-}
-
-resource "groundcover_secret" "clickhouse_dbm_password" {
-  name    = "clickhouse-dbm-password"
-  type    = "password"
-  content = var.clickhouse_dbm_password
-}
-
 resource "groundcover_dataintegration" "clickhouse_dbm" {
   type      = "clickhousedbm"
   is_paused = false
@@ -527,10 +515,10 @@ resource "groundcover_dataintegration" "clickhouse_dbm" {
 
     authentication = {
       basicAuth = {
-        username = "groundcover"
-        # The secret resource ID is already a secretRef::store::... value.
-        # An existing secretRef::k8s::<namespace>::<secret>::<key> can be used instead.
-        password = groundcover_secret.clickhouse_dbm_password.id
+        username = "default"
+
+        # use the groundcover_secret resource to create a secret
+        password = "secretRef::k8s::groundcover::groundcover-clickhouse::admin-password"
       }
     }
 
@@ -637,18 +625,6 @@ EOT
 # 2. Run CREATE EXTENSION IF NOT EXISTS pg_stat_statements; in the monitored database.
 # 3. Run GRANT pg_monitor TO groundcover; for capability-sensitive health metrics.
 # 4. Enable track_io_timing for PostgreSQL I/O timing metrics.
-variable "postgresql_dbm_password" {
-  type        = string
-  description = "Password for the PostgreSQL database-monitoring user"
-  sensitive   = true
-}
-
-resource "groundcover_secret" "postgresql_dbm_password" {
-  name    = "postgresql-dbm-password"
-  type    = "password"
-  content = var.postgresql_dbm_password
-}
-
 resource "groundcover_dataintegration" "postgresql_dbm" {
   type      = "postgresqldbm"
   is_paused = false
@@ -668,10 +644,10 @@ resource "groundcover_dataintegration" "postgresql_dbm" {
 
     authentication = {
       basicAuth = {
-        username = "groundcover"
-        # The secret resource ID is already a secretRef::store::... value.
-        # An existing secretRef::k8s::<namespace>::<secret>::<key> can be used instead.
-        password = groundcover_secret.postgresql_dbm_password.id
+        username = "postgres"
+
+        # use the groundcover_secret resource to create a secret
+        password = "secretRef::k8s::groundcover::groundcover-postgresql::admin-password"
       }
     }
 
