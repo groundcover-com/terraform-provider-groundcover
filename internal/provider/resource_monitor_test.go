@@ -1032,6 +1032,69 @@ func TestMonitorV2ValidateCustomResolveValues(t *testing.T) {
 	}
 }
 
+// requireSoleDiagnostic asserts that diagnostics hold exactly one entry, of the given severity and
+// with the given summary. Summary-only matching would pass on the wrong severity, and an
+// error/warning count would pass alongside unrelated diagnostics.
+func requireSoleDiagnostic(t *testing.T, diagnostics diag.Diagnostics, severity diag.Severity, summary string) {
+	t.Helper()
+
+	if len(diagnostics) != 1 {
+		t.Fatalf("want exactly 1 diagnostic %q, got %d: %v", summary, len(diagnostics), diagnostics)
+	}
+	if got := diagnostics[0]; got.Severity() != severity || !strings.Contains(got.Summary(), summary) {
+		t.Fatalf("want %v %q, got %v %q", severity, summary, got.Severity(), got.Summary())
+	}
+}
+
+// TestMonitorV2ValidateThresholdCount pins the whole threshold-count contract: zero blocks are an
+// error, one is silent, and more than one is a warning and nothing worse. A monitor evaluates a
+// single threshold, so extra blocks are accepted by the API and never reach the alert condition.
+// The last case runs through the JSON model's bridge, the other entry point into this validator.
+func TestMonitorV2ValidateThresholdCount(t *testing.T) {
+	ctx := context.Background()
+	query := &monitorV2QueryModel{
+		Type:       types.StringValue(monitorV2QueryTypeGCQL),
+		Expression: types.StringValue("level:error | stats count() c"),
+		DataType:   types.StringValue("logs"),
+	}
+
+	withTwo := func() monitorV2ResourceModel {
+		plan := testMonitorV2BasePlan(t, query)
+		plan.Thresholds = append(plan.Thresholds, plan.Thresholds[0])
+		plan.Thresholds[1].Name = types.StringValue("threshold_2")
+		return plan
+	}
+
+	none := testMonitorV2BasePlan(t, query)
+	none.Thresholds = nil
+	var diags diag.Diagnostics
+	validateMonitorV2Config(ctx, &none, &diags)
+	requireSoleDiagnostic(t, diags, diag.SeverityError, "Missing threshold block")
+
+	one := testMonitorV2BasePlan(t, query)
+	diags = nil
+	validateMonitorV2Config(ctx, &one, &diags)
+	if len(diags) != 0 {
+		t.Errorf("a single threshold block should validate silently, got: %v", diags)
+	}
+
+	two := withTwo()
+	diags = nil
+	validateMonitorV2Config(ctx, &two, &diags)
+	requireSoleDiagnostic(t, diags, diag.SeverityWarning, "Extra threshold blocks are ignored")
+
+	// groundcover_monitor_v2_json reaches the same validator through toTyped.
+	typedTwo := withTwo()
+	diags = nil
+	jsonTwo := monitorV2JsonModelFromTyped(ctx, &typedTwo, &diags)
+	if diags.HasError() {
+		t.Fatalf("building the JSON model: %v", diags)
+	}
+	diags = nil
+	validateMonitorV2Config(ctx, jsonTwo.toTyped(ctx, &diags), &diags)
+	requireSoleDiagnostic(t, diags, diag.SeverityWarning, "Extra threshold blocks are ignored")
+}
+
 func TestAccMonitorResource(t *testing.T) {
 	name := acctest.RandomWithPrefix("test-monitor")
 	updatedName := acctest.RandomWithPrefix("test-monitor-updated")

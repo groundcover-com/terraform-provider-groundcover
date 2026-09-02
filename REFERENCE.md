@@ -228,7 +228,7 @@ resource "groundcover_monitor_v2" "gcql_logs" {
 *   `severity` (String, Required): Monitor severity.
 *   `measurement_type` (String, Required): `state` or `event`.
 *   `query` (Block, Required): Typed query definition. Supports `type = "gcql"`, `type = "metricsql"`, and `type = "raw_sql"`. GCQL supports `data_type` values `logs`, `traces`, `events`, and `apm`.
-*   `threshold` (Block, Required): One or more threshold definitions. Supports optional `custom_resolve_threshold`.
+*   `threshold` (Block, Required): Exactly one threshold definition. Supports optional `custom_resolve_threshold`.
 *   `notification_settings` (Block, Optional): Notification behavior, including `connected_app_params` for per-app Slack channels.
 *   `display`, `evaluation_interval`, `reducer`, `labels`, `annotations`, and `routing` are optional monitor settings.
 

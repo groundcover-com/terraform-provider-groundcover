@@ -517,7 +517,10 @@ resource "groundcover_dataintegration" "clickhouse_dbm" {
       basicAuth = {
         username = "default"
 
-        # use the groundcover_secret resource to create a secret
+        # Use this form when the integration runs from your own cluster: it refers to an
+        # existing Kubernetes secret, as secretRef::k8s::<namespace>::<secret-name>::<key>.
+        # Create that secret in the cluster yourself. The groundcover_secret resource is not
+        # used here - it produces a secretRef::store::<id> reference instead.
         password = "secretRef::k8s::groundcover::groundcover-clickhouse::admin-password"
       }
     }
@@ -646,7 +649,10 @@ resource "groundcover_dataintegration" "postgresql_dbm" {
       basicAuth = {
         username = "postgres"
 
-        # use the groundcover_secret resource to create a secret
+        # Use this form when the integration runs from your own cluster: it refers to an
+        # existing Kubernetes secret, as secretRef::k8s::<namespace>::<secret-name>::<key>.
+        # Create that secret in the cluster yourself. The groundcover_secret resource is not
+        # used here - it produces a secretRef::store::<id> reference instead.
         password = "secretRef::k8s::groundcover::groundcover-postgresql::admin-password"
       }
     }
