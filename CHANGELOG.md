@@ -1,3 +1,10 @@
+## 1.22.5
+
+* Expanded the `groundcover_dataintegration` documentation with supported `type` values, secret reference forms, replacement rules and common `config` keys
+* Documented additional Azure, CloudWatch and Redis Cloud `config` keys
+* Added `confluentscrape` and Azure resource-type examples
+* Fixed the `clickhousedbm` and `postgresqldbm` examples to set `cluster` when the password is a `secretRef::k8s::` reference
+
 ## 1.22.4
 
 * Updated the `groundcover_dataintegration` PostgreSQL and ClickHouse database-monitoring examples with built-in health metrics and query-statistics collection. Custom metric queries remain supported but are intentionally no longer shown in these Phase 1 examples.
