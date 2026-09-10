@@ -33,17 +33,12 @@ apply rather than the plan. Changing `type` on an existing resource **replaces**
 | `clickhousedbm` | ClickHouse database monitoring: health metrics plus query-log traces | `clickhouse_dbm` |
 | `postgresqldbm` | PostgreSQL database monitoring: health metrics plus `pg_stat_statements` traces | `postgresql_dbm` |
 
-The API accepts further types that these examples do not cover yet; the integrations page in
-the groundcover app lists what your tenant supports. Synthetic checks are the exception —
-they are a data integration internally, but Terraform manages them through
-[`groundcover_synthetic_test`](./synthetic_test), not through this resource.
 
 ## Where the integration runs
 
 An integration runs in the groundcover backend unless you set `cluster` to the name of one of
-your groundcover clusters, in which case the in-cluster integrations agent runs it instead.
-Run it from a cluster when the target is only reachable from inside your network, or when
-`config` refers to a Kubernetes secret.
+your groundcover clusters, in which case the cluster-level integrations agent runs it instead.
+Run it from a cluster when the target is only reachable from inside your network.
 
 ### Secrets in `config`
 
@@ -55,9 +50,6 @@ resolved when the integration collects, and there are two forms:
 | `secretRef::store::<id>` | the groundcover secret store. Create the secret with [`groundcover_secret`](./secret) and use its `id` | no |
 | `secretRef::k8s::<namespace>::<secret-name>::<key>` | a Kubernetes Secret, read through the Kubernetes API by the agent running the integration. Create that Secret in the cluster yourself | **yes** |
 
-`groundcover_secret` only ever produces the `secretRef::store::<id>` form. A
-`secretRef::k8s::` reference has no Kubernetes API to read from when the integration runs in
-the backend, so always pair it with `cluster`.
 
 ## Common `config` keys
 
@@ -72,8 +64,7 @@ of the object. A few keys recur across most types:
 | `version` | Configuration version. Required, and `1` for every type documented here; any other value is rejected |
 | `name` | Required. Display name of the integration in the groundcover app |
 | `enabled` | Accepted for compatibility. Use the resource's `is_paused` argument to stop collection — that is the one the provider manages |
-| `labelSettings` | `extraLabels` / `dropLabels` applied to every emitted metric |
-| `exporters` | Where collected data is sent, for example `["prometheus"]` |
+| `labelSettings` | `extraLabels` applied to every emitted metric |
 | `scrapeInterval`, `interval` | Collection cadence. Accepts either a duration string (`"5m"`) or a number of **nanoseconds** (`300000000000`). Both forms appear in the examples below, and each type keeps whichever form you send |
 
 ## Replacement
