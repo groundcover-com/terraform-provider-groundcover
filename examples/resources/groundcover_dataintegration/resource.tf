@@ -583,7 +583,7 @@ resource "groundcover_dataintegration" "clickhouse_dbm" {
 
   # Runs the integration from this groundcover cluster's integrations agent instead of the
   # backend. Required here because the password below is a secretRef::k8s:: reference, which
-  # only the in-cluster agent can resolve. Drop `cluster` and use a secretRef::store::<id>
+  # only the cluster-level agent can resolve. Drop `cluster` and use a secretRef::store::<id>
   # password instead to run the integration in the backend.
   cluster   = "production-cluster"
   is_paused = false
@@ -722,7 +722,7 @@ resource "groundcover_dataintegration" "postgresql_dbm" {
 
   # Runs the integration from this groundcover cluster's integrations agent instead of the
   # backend. Required here because the password below is a secretRef::k8s:: reference, which
-  # only the in-cluster agent can resolve. Drop `cluster` and use a secretRef::store::<id>
+  # only the cluster-level agent can resolve. Drop `cluster` and use a secretRef::store::<id>
   # password instead to run the integration in the backend.
   cluster   = "production-cluster"
   is_paused = false
@@ -846,8 +846,8 @@ EOT
 
 # Example: Confluent Cloud
 # Scrapes the Confluent Cloud Metrics API export endpoint. groundcover derives the endpoint
-# itself, so scheme, metricsPath, staticTargets and httpDiscovery must not be set - a config
-# that sets any of them is rejected.
+# itself, so metricsPath, staticTargets and httpDiscovery must not be set - a config that sets
+# any of them is rejected. scheme may be omitted or set to "https"; any other value is rejected.
 # Authentication is required: a Confluent Cloud API key as the username and its secret as
 # the password. Create the secret with groundcover_secret and pass its id.
 resource "groundcover_dataintegration" "confluent_example" {

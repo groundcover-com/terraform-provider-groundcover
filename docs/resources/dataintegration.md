@@ -33,7 +33,6 @@ apply rather than the plan. Changing `type` on an existing resource **replaces**
 | `clickhousedbm` | ClickHouse database monitoring: health metrics plus query-log traces | `clickhouse_dbm` |
 | `postgresqldbm` | PostgreSQL database monitoring: health metrics plus `pg_stat_statements` traces | `postgresql_dbm` |
 
-
 ## Where the integration runs
 
 An integration runs in the groundcover backend unless you set `cluster` to the name of one of
@@ -42,14 +41,15 @@ Run it from a cluster when the target is only reachable from inside your network
 
 ### Secrets in `config`
 
-Credentials in `config` are not written in plaintext. They are `secretRef` strings that are
-resolved when the integration collects, and there are two forms:
+`config` is stored in Terraform state verbatim, and the provider does not mark it sensitive,
+so a literal password written into it is persisted in plaintext there. Reference the credential
+instead — a `secretRef` string that is resolved when the integration collects. There are two
+forms:
 
 | Form | Resolved against | Requires `cluster` |
 |---|---|---|
-| `secretRef::store::<id>` | the groundcover secret store. Create the secret with [`groundcover_secret`](./secret) and use its `id` | no |
+| `secretRef::store::<id>` | the groundcover secret store. Create the secret with [`groundcover_secret`](./secret) and pass its `id` straight through — the attribute already carries the `secretRef::store::` prefix, so do not add one | no |
 | `secretRef::k8s::<namespace>::<secret-name>::<key>` | a Kubernetes Secret, read through the Kubernetes API by the agent running the integration. Create that Secret in the cluster yourself | **yes** |
-
 
 ## Common `config` keys
 
@@ -662,7 +662,7 @@ resource "groundcover_dataintegration" "clickhouse_dbm" {
 
   # Runs the integration from this groundcover cluster's integrations agent instead of the
   # backend. Required here because the password below is a secretRef::k8s:: reference, which
-  # only the in-cluster agent can resolve. Drop `cluster` and use a secretRef::store::<id>
+  # only the cluster-level agent can resolve. Drop `cluster` and use a secretRef::store::<id>
   # password instead to run the integration in the backend.
   cluster   = "production-cluster"
   is_paused = false
@@ -801,7 +801,7 @@ resource "groundcover_dataintegration" "postgresql_dbm" {
 
   # Runs the integration from this groundcover cluster's integrations agent instead of the
   # backend. Required here because the password below is a secretRef::k8s:: reference, which
-  # only the in-cluster agent can resolve. Drop `cluster` and use a secretRef::store::<id>
+  # only the cluster-level agent can resolve. Drop `cluster` and use a secretRef::store::<id>
   # password instead to run the integration in the backend.
   cluster   = "production-cluster"
   is_paused = false
@@ -925,8 +925,8 @@ EOT
 
 # Example: Confluent Cloud
 # Scrapes the Confluent Cloud Metrics API export endpoint. groundcover derives the endpoint
-# itself, so scheme, metricsPath, staticTargets and httpDiscovery must not be set - a config
-# that sets any of them is rejected.
+# itself, so metricsPath, staticTargets and httpDiscovery must not be set - a config that sets
+# any of them is rejected. scheme may be omitted or set to "https"; any other value is rejected.
 # Authentication is required: a Confluent Cloud API key as the username and its secret as
 # the password. Create the secret with groundcover_secret and pass its id.
 resource "groundcover_dataintegration" "confluent_example" {
@@ -1279,9 +1279,9 @@ set, `scheme` must be `https`, and authentication must use `headerAuth`.
 
 ## Confluent Cloud Reference (`type = "confluentscrape"`)
 
-groundcover derives the Confluent Cloud Metrics API endpoint itself, so `scheme` (other than
-`https`), `metricsPath`, `staticTargets` and `httpDiscovery` must **not** be set — a config that
-sets any of them is rejected.
+groundcover derives the Confluent Cloud Metrics API endpoint itself, so `metricsPath`,
+`staticTargets` and `httpDiscovery` must **not** be set — a config that sets any of them is
+rejected. `scheme` may be omitted or set to `https`; any other value is rejected.
 
 | Key | Required | Description |
 |---|---|---|
@@ -1302,7 +1302,7 @@ sets any of them is rejected.
 
 ### Optional
 
-- `cluster` (String) The groundcover cluster that runs the data integration. If unspecified, it runs in the groundcover backend. Set it to run the integration from the in-cluster integrations agent instead - required when `config` uses a `secretRef::k8s::<namespace>::<secret-name>::<key>` reference, since only the agent can read Kubernetes secrets. Changing this forces a new integration to be created, which assigns a new `id`.
+- `cluster` (String) The groundcover cluster that runs the data integration. If unspecified, it runs in the groundcover backend. Set it to run the integration from the cluster-level integrations agent instead - required when `config` uses a `secretRef::k8s::<namespace>::<secret-name>::<key>` reference, since only the agent can read Kubernetes secrets. Changing this forces a new integration to be created, which assigns a new `id`.
 - `is_paused` (Boolean) Whether the data integration is paused. Default: `false`.
 
 ### Read-Only

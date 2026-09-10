@@ -64,7 +64,7 @@ func (r *dataIntegrationResource) Schema(_ context.Context, _ resource.SchemaReq
 				},
 			},
 			"cluster": schema.StringAttribute{
-				Description: "The groundcover cluster that runs the data integration. If unspecified, it runs in the groundcover backend. Set it to run the integration from the in-cluster integrations agent instead - required when `config` uses a `secretRef::k8s::<namespace>::<secret-name>::<key>` reference, since only the agent can read Kubernetes secrets. Changing this forces a new integration to be created, which assigns a new `id`.",
+				Description: "The groundcover cluster that runs the data integration. If unspecified, it runs in the groundcover backend. Set it to run the integration from the cluster-level integrations agent instead - required when `config` uses a `secretRef::k8s::<namespace>::<secret-name>::<key>` reference, since only the agent can read Kubernetes secrets. Changing this forces a new integration to be created, which assigns a new `id`.",
 				Optional:    true,
 				PlanModifiers: []planmodifier.String{
 					stringplanmodifier.RequiresReplace(),
