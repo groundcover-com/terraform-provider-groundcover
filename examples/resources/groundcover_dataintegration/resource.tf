@@ -84,13 +84,46 @@ resource "groundcover_dataintegration" "cloudwatch_example" {
         ]
       }
     ]
+    # Namespaces outside groundcover's presets - for those, awsNamespaces/awsMetrics are
+    # rejected. Each entry must list the metrics to collect; statistics default per metric.
+    customNamespaces = [
+      {
+        namespace = "MyCompany/Billing"
+        metrics = [
+          {
+            name       = "InvoiceTotal"
+            statistics = ["Maximum"]
+          }
+        ]
+      }
+    ]
+    # Restrict discovery to resources carrying these tags. Key is case-sensitive; value is a
+    # regex. A resource must match every entry to be scraped.
+    searchTags = [
+      {
+        key   = "Environment"
+        value = "prod|staging"
+      }
+    ]
     labelSettings = {
       extraLabels = { env = "prod" }
     }
     # use this parameter to enrich with resource labels
     withContextTagsOnInfoMetrics = true
-    scrapeInterval               = 300000000000
-    exporters                    = ["prometheus"]
+    # Discover resources through the AWS inventory API in addition to CloudWatch's own
+    # listing, so resources that have not emitted a metric yet still appear. Defaults to true.
+    withInventoryDiscovery = true
+    # Optional throttling of the AWS API calls, for accounts that hit CloudWatch rate limits.
+    # Omitted keys keep their defaults: listMetrics 1, getMetricData 5,
+    # getMetricStatistics 5, listInventory 10.
+    apiConcurrencyLimits = {
+      listMetrics         = 1
+      getMetricData       = 5
+      getMetricStatistics = 5
+      listInventory       = 10
+    }
+    scrapeInterval = 300000000000
+    exporters      = ["prometheus"]
   })
   is_paused = false
 }
@@ -136,8 +169,65 @@ resource "groundcover_dataintegration" "azure_example" {
         aggregations = ["Average", "Maximum", "Minimum"]
       }
     ]
+    # Pull Azure resource tags onto every metric of a discovered resource as a label.
+    # A tag named "env" arrives as the label "env" - the name is lowercased and any
+    # character outside [a-z0-9_] becomes an underscore.
+    # An entry may carry options after a "?", as a URL query string:
+    #   env?inherit             fall back to the resource group, then the subscription,
+    #                           when the resource itself is untagged
+    #   owner?name=team         emit the tag under a different label name
+    #   team?source=resourcegroup   read the value from a specific scope
+    #                           (resource | resourceGroup | subscription)
+    # A tag whose resulting label collides with an extraLabels key, or with the
+    # azure_sku_tier / azure_sku_name labels the integration generates from the resource
+    # sku, is rejected - rename one of them with ?name=.
+    resourceTags = [
+      "Environment",
+      "Owner?name=team",
+      "CostCenter?inherit"
+    ]
+    # Narrow the dimensions Azure Monitor splits each metric by. Omit to keep the defaults.
+    includedDimensions    = ["VMName"]
     azureCloudEnvironment = "AzurePublicCloud"
     scrapeInterval        = 300000000000
+    labelSettings = {
+      extraLabels = { env = "prod" }
+    }
+    exporters = ["prometheus"]
+  })
+  is_paused = false
+}
+
+# Example: Azure Metrics by resource type
+# azureResourceTypes pulls every preset metric for a resource type, as the counterpart to
+# azureMetrics naming individual metrics. At least one of the two must be set, and every
+# resource type in either must exist in groundcover's Azure presets.
+resource "groundcover_dataintegration" "azure_storage_example" {
+  type = "azuremetrics"
+  config = jsonencode({
+    name          = "Azure storage"
+    version       = 1
+    subscriptions = ["b3128f7e-54df-4d2e-9c3e-93a4f1f8c9a0"]
+    regions       = ["australiaeast"]
+
+    azureResourceTypes = ["Microsoft.Storage/storageAccounts"]
+
+    # Some resource types expose several levels of metrics. Set metricNamespace to the
+    # sub-level you want; for example blob metrics live under
+    # Microsoft.Storage/storageAccounts/blobServices while the resource type stays
+    # Microsoft.Storage/storageAccounts.
+    metricNamespace = "Microsoft.Storage/storageAccounts/blobServices"
+
+    # Optional Azure Resource Graph filter appended to the discovery query, to scope
+    # collection further than subscriptions and regions do.
+    resourceGraphQueryFilter = "| where tags['Environment'] =~ 'prod'"
+
+    # Optional Go templates for the emitted metric name and help text.
+    metricNameTemplate = "azure_{{ .Type }}_{{ .Metric }}_{{ .Aggregation }}_{{ .Unit }}"
+    metricHelpTemplate = "Azure metric {{ .Metric }} for {{ .Type }}"
+
+    resourceTags   = ["Environment", "Owner?name=team"]
+    scrapeInterval = 300000000000
     labelSettings = {
       extraLabels = { env = "prod" }
     }
@@ -432,9 +522,17 @@ resource "groundcover_dataintegration" "rediscloud_example" {
     metricsPath = "/metrics"
     scheme      = "https"
 
-    # provide the host details for discovery
-    staticTargets = [
-      "https://your-redis-cloud-address:8070"
+    # Structured Redis Cloud targets. groundcover composes the metrics URL from them, as
+    # https://<regionSlug>.redisenterprisecloud.com/v1/<accountId>/subscriptions/<subscriptionId>/databases/<databaseId>/metrics
+    # Raw staticTargets URLs are still accepted and are merged with these, but prefer this
+    # form so the URL layout stays groundcover's concern.
+    redisCloudStaticTargets = [
+      {
+        regionSlug     = "us-east-1"
+        accountId      = "12345"
+        subscriptionId = "67890"
+        databaseId     = "13579"
+      }
     ]
 
     # Relabeling options on discovered targets. keepRegex - drop all targets which don't comply with this rule. dropRegex - drop all targets which comply with this rule.
@@ -746,6 +844,49 @@ EOT
   is_paused = false
 }
 
+# Example: Confluent Cloud
+# Scrapes the Confluent Cloud Metrics API export endpoint. groundcover derives the endpoint
+# itself, so scheme, metricsPath, staticTargets and httpDiscovery must not be set - a config
+# that sets any of them is rejected.
+# Authentication is required: a Confluent Cloud API key as the username and its secret as
+# the password. Create the secret with groundcover_secret and pass its id.
+resource "groundcover_dataintegration" "confluent_example" {
+  type = "confluentscrape"
+
+  config = jsonencode({
+    version = 1
+    enabled = true
+    name    = "Confluent Cloud example"
+
+    exporters = ["prometheus"]
+
+    # Defaults are 1m / 30s when omitted. Durations are numeric (nanoseconds).
+    scrapeInterval = 60000000000
+    scrapeTimeout  = 30000000000
+
+    # At least one Kafka cluster is required. Each id must carry its resource prefix:
+    #   kafkaResourceIds       - "lkc-"
+    #   connectorResourceIds   - "lcc-"
+    #   computePoolResourceIds - "lfcp-"
+    kafkaResourceIds       = ["lkc-abc123"]
+    connectorResourceIds   = ["lcc-def456"]
+    computePoolResourceIds = ["lfcp-ghi789"]
+
+    authentication = {
+      basicAuth = {
+        username = "CONFLUENT_API_KEY"
+        # refer to groundcover_secret to create a secret
+        password = "secretRef::store::d1fc037f11f8ce58"
+      }
+    }
+
+    labelSettings = {
+      extraLabels = { env = "prod" }
+    }
+  })
+  is_paused = false
+}
+
 # Example: AWS Cost and Usage Report (CUR 2.0)
 # Point this at the S3 bucket holding the CUR 2.0 data export and the IAM role
 # groundcover assumes to read it. Create both with the aws_cost_reports_sink
@@ -856,6 +997,16 @@ output "postgresql_dbm_dataintegration_id" {
 output "postgresql_system_metrics_dataintegration_id" {
   description = "The ID of the PostgreSQL System Metrics data integration"
   value       = groundcover_dataintegration.postgresql_system_metrics_example.id
+}
+
+output "azure_storage_dataintegration_id" {
+  description = "The ID of the Azure Metrics by resource type data integration"
+  value       = groundcover_dataintegration.azure_storage_example.id
+}
+
+output "confluent_dataintegration_id" {
+  description = "The ID of the Confluent Cloud data integration"
+  value       = groundcover_dataintegration.confluent_example.id
 }
 
 output "aws_cur_dataintegration_id" {

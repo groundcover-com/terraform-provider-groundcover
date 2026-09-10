@@ -1,5 +1,7 @@
 ## 1.22.5
 
+* Documented `groundcover_dataintegration` config keys the API accepts but the provider never showed: Azure `resourceTags` (with its `?inherit` / `?name=` / `?source=` options and the label-collision rules), `azureResourceTypes`, `includedDimensions`, `metricNamespace`, `resourceGraphQueryFilter` and the metric name/help templates; CloudWatch `customNamespaces`, `searchTags`, `withInventoryDiscovery` and `apiConcurrencyLimits`; and Redis Cloud `redisCloudStaticTargets`, which composes the metrics URL from its parts instead of requiring a hand-built one
+* Added a `confluentscrape` (Confluent Cloud) example — the integration type was supported but had no example and no mention in the docs
 * Documented `groundcover_dataintegration` behaviour that was previously only discoverable from the examples: the supported `type` values, that `type` and `cluster` force replacement (and therefore a new `id`, which breaks `gc_integration_id` continuity), the two `secretRef` forms and which one needs `cluster`, and the `config` keys common to most integration types
 * Fixed the `groundcover_dataintegration` ClickHouse and PostgreSQL database-monitoring examples (`clickhousedbm` / `postgresqldbm`): they used a `secretRef::k8s::` password but did not set `cluster`, so as written the integration ran in the backend, where a Kubernetes secret reference cannot be resolved
 
