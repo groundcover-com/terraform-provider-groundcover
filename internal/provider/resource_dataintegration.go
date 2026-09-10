@@ -57,21 +57,21 @@ func (r *dataIntegrationResource) Schema(_ context.Context, _ resource.SchemaReq
 				},
 			},
 			"type": schema.StringAttribute{
-				Description: "The type of data integration (e.g., 'cloudwatch', etc.).",
+				Description: "The type of data integration, for example `aws`, `cloudwatch`, `gcpmetrics`, `azuremetrics`, `prometheusscrape`, `clickhousedbm` or `postgresqldbm`. See the supported types table in the documentation. Changing this forces a new integration to be created, which assigns a new `id`.",
 				Required:    true,
 				PlanModifiers: []planmodifier.String{
 					stringplanmodifier.RequiresReplace(),
 				},
 			},
 			"cluster": schema.StringAttribute{
-				Description: "The cluster where the data integration runs. If unspecified, it will run in the backend.",
+				Description: "The groundcover cluster that runs the data integration. If unspecified, it runs in the groundcover backend. Set it to run the integration from the in-cluster integrations agent instead - required when `config` uses a `secretRef::k8s::<namespace>::<secret-name>::<key>` reference, since only the agent can read Kubernetes secrets. Changing this forces a new integration to be created, which assigns a new `id`.",
 				Optional:    true,
 				PlanModifiers: []planmodifier.String{
 					stringplanmodifier.RequiresReplace(),
 				},
 			},
 			"config": schema.StringAttribute{
-				Description: "The JSON configuration for the data integration.",
+				Description: "The JSON configuration for the data integration, as a string - build it with `jsonencode`. Its structure depends on `type` and is validated by the API on create and update, so an invalid configuration surfaces as an apply error.",
 				Required:    true,
 			},
 			"is_paused": schema.BoolAttribute{

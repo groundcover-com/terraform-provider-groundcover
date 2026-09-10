@@ -481,7 +481,13 @@ EOT
 # The integration user needs SELECT on system.*. Cluster mode also requires:
 # GRANT REMOTE ON *.* TO groundcover;
 resource "groundcover_dataintegration" "clickhouse_dbm" {
-  type      = "clickhousedbm"
+  type = "clickhousedbm"
+
+  # Runs the integration from this groundcover cluster's integrations agent instead of the
+  # backend. Required here because the password below is a secretRef::k8s:: reference, which
+  # only the in-cluster agent can resolve. Drop `cluster` and use a secretRef::store::<id>
+  # password instead to run the integration in the backend.
+  cluster   = "production-cluster"
   is_paused = false
 
   config = jsonencode({
@@ -502,10 +508,10 @@ resource "groundcover_dataintegration" "clickhouse_dbm" {
       basicAuth = {
         username = "default"
 
-        # Use this form when the integration runs from your own cluster: it refers to an
-        # existing Kubernetes secret, as secretRef::k8s::<namespace>::<secret-name>::<key>.
-        # Create that secret in the cluster yourself. The groundcover_secret resource is not
-        # used here - it produces a secretRef::store::<id> reference instead.
+        # Refers to an existing Kubernetes secret in the cluster set above, as
+        # secretRef::k8s::<namespace>::<secret-name>::<key>. Create that secret in the
+        # cluster yourself. The groundcover_secret resource is not used here - it produces
+        # a secretRef::store::<id> reference instead.
         password = "secretRef::k8s::groundcover::groundcover-clickhouse::admin-password"
       }
     }
@@ -614,7 +620,13 @@ EOT
 # 3. Run GRANT pg_monitor TO groundcover; for capability-sensitive health metrics.
 # 4. Enable track_io_timing for PostgreSQL I/O timing metrics.
 resource "groundcover_dataintegration" "postgresql_dbm" {
-  type      = "postgresqldbm"
+  type = "postgresqldbm"
+
+  # Runs the integration from this groundcover cluster's integrations agent instead of the
+  # backend. Required here because the password below is a secretRef::k8s:: reference, which
+  # only the in-cluster agent can resolve. Drop `cluster` and use a secretRef::store::<id>
+  # password instead to run the integration in the backend.
+  cluster   = "production-cluster"
   is_paused = false
 
   config = jsonencode({
@@ -634,10 +646,10 @@ resource "groundcover_dataintegration" "postgresql_dbm" {
       basicAuth = {
         username = "postgres"
 
-        # Use this form when the integration runs from your own cluster: it refers to an
-        # existing Kubernetes secret, as secretRef::k8s::<namespace>::<secret-name>::<key>.
-        # Create that secret in the cluster yourself. The groundcover_secret resource is not
-        # used here - it produces a secretRef::store::<id> reference instead.
+        # Refers to an existing Kubernetes secret in the cluster set above, as
+        # secretRef::k8s::<namespace>::<secret-name>::<key>. Create that secret in the
+        # cluster yourself. The groundcover_secret resource is not used here - it produces
+        # a secretRef::store::<id> reference instead.
         password = "secretRef::k8s::groundcover::groundcover-postgresql::admin-password"
       }
     }

@@ -10,6 +10,77 @@ description: |-
 
 DataIntegration resource for managing groundcover's integrations with external services such as cloud providers, databases and more. This resource is composed of general metadata on the integration and a specific configuration per data source. Navigate to the relevant nested schema according to your specific needs.
 
+## Supported integration types
+
+`type` selects the data source. The API validates it, so an unrecognized value fails the
+apply rather than the plan. Changing `type` on an existing resource **replaces** it — see
+[Replacement](#replacement).
+
+| `type` | Data source | Example below |
+|---|---|---|
+| `aws` | Consolidated AWS account integration, with `vpc`, `dynamodb` and `rds` capability blocks | `aws_example` |
+| `awscur` | AWS Cost and Usage Report 2.0, read from an S3 data export | `aws_cur_example` |
+| `cloudwatch` | Amazon CloudWatch metrics | `cloudwatch_example` |
+| `gcpmetrics` | Google Cloud Monitoring metrics | `gcp_example` |
+| `azuremetrics` | Azure Monitor metrics | `azure_example` |
+| `prometheusscrape` | Prometheus endpoints, from static targets or HTTP service discovery | `prometheus_static_example`, `prometheus_discovery_example` |
+| `mongoatlasscrape` | MongoDB Atlas Prometheus endpoint | `mongodb_atlas_example` |
+| `rabbitscrape` | RabbitMQ Prometheus endpoint | `rabbitmq_example` |
+| `rediscloudscrape` | Redis Cloud Prometheus endpoint | `rediscloud_example` |
+| `clickhousescrape` | ClickHouse Prometheus endpoint (system metrics) | `clickhouse_system_metrics_example` |
+| `postgresscrape` | PostgreSQL exporter Prometheus endpoint (system metrics) | `postgresql_system_metrics_example` |
+| `clickhousedbm` | ClickHouse database monitoring: health metrics plus query-log traces | `clickhouse_dbm` |
+| `postgresqldbm` | PostgreSQL database monitoring: health metrics plus `pg_stat_statements` traces | `postgresql_dbm` |
+
+The API accepts further types that these examples do not cover yet; the integrations page in
+the groundcover app lists what your tenant supports. Synthetic checks are the exception —
+they are a data integration internally, but Terraform manages them through
+[`groundcover_synthetic_test`](./synthetic_test), not through this resource.
+
+## Where the integration runs
+
+An integration runs in the groundcover backend unless you set `cluster` to the name of one of
+your groundcover clusters, in which case the in-cluster integrations agent runs it instead.
+Run it from a cluster when the target is only reachable from inside your network, or when
+`config` refers to a Kubernetes secret.
+
+### Secrets in `config`
+
+Credentials in `config` are not written in plaintext. They are `secretRef` strings that are
+resolved when the integration collects, and there are two forms:
+
+| Form | Resolved against | Requires `cluster` |
+|---|---|---|
+| `secretRef::store::<id>` | the groundcover secret store. Create the secret with [`groundcover_secret`](./secret) and use its `id` | no |
+| `secretRef::k8s::<namespace>::<secret-name>::<key>` | a Kubernetes Secret, read through the Kubernetes API by the agent running the integration. Create that Secret in the cluster yourself | **yes** |
+
+`groundcover_secret` only ever produces the `secretRef::store::<id>` form. A
+`secretRef::k8s::` reference has no Kubernetes API to read from when the integration runs in
+the backend, so always pair it with `cluster`.
+
+## Common `config` keys
+
+`config` is an opaque JSON string as far as Terraform is concerned — build it with
+`jsonencode(...)`. Its structure depends on `type` and is validated by the API on create and
+update, so an invalid configuration surfaces as an `apply` error, not a plan error. A few
+keys recur across most types:
+
+| Key | Description |
+|---|---|
+| `version` | Configuration version. Required, and `1` for every type documented here; any other value is rejected |
+| `name` | Required. Display name of the integration in the groundcover app |
+| `enabled` | Accepted for compatibility. Use the resource's `is_paused` argument to stop collection — that is the one the provider manages |
+| `labelSettings` | `extraLabels` / `dropLabels` applied to every emitted metric |
+| `exporters` | Where collected data is sent, for example `["prometheus"]` |
+| `scrapeInterval`, `interval` | Collection cadence. Accepts either a duration string (`"5m"`) or a number of **nanoseconds** (`300000000000`). Both forms appear in the examples below, and each type keeps whichever form you send |
+
+## Replacement
+
+`type` and `cluster` cannot be changed in place: Terraform destroys the integration and
+creates a new one, which gets a **new `id`**. Emitted metrics carry that id in
+`gc_integration_id`, so series from before and after the change do not join. Expect a break
+in continuity when you change either argument.
+
 ## Example Usage
 
 ```terraform
@@ -496,7 +567,13 @@ EOT
 # The integration user needs SELECT on system.*. Cluster mode also requires:
 # GRANT REMOTE ON *.* TO groundcover;
 resource "groundcover_dataintegration" "clickhouse_dbm" {
-  type      = "clickhousedbm"
+  type = "clickhousedbm"
+
+  # Runs the integration from this groundcover cluster's integrations agent instead of the
+  # backend. Required here because the password below is a secretRef::k8s:: reference, which
+  # only the in-cluster agent can resolve. Drop `cluster` and use a secretRef::store::<id>
+  # password instead to run the integration in the backend.
+  cluster   = "production-cluster"
   is_paused = false
 
   config = jsonencode({
@@ -517,10 +594,10 @@ resource "groundcover_dataintegration" "clickhouse_dbm" {
       basicAuth = {
         username = "default"
 
-        # Use this form when the integration runs from your own cluster: it refers to an
-        # existing Kubernetes secret, as secretRef::k8s::<namespace>::<secret-name>::<key>.
-        # Create that secret in the cluster yourself. The groundcover_secret resource is not
-        # used here - it produces a secretRef::store::<id> reference instead.
+        # Refers to an existing Kubernetes secret in the cluster set above, as
+        # secretRef::k8s::<namespace>::<secret-name>::<key>. Create that secret in the
+        # cluster yourself. The groundcover_secret resource is not used here - it produces
+        # a secretRef::store::<id> reference instead.
         password = "secretRef::k8s::groundcover::groundcover-clickhouse::admin-password"
       }
     }
@@ -629,7 +706,13 @@ EOT
 # 3. Run GRANT pg_monitor TO groundcover; for capability-sensitive health metrics.
 # 4. Enable track_io_timing for PostgreSQL I/O timing metrics.
 resource "groundcover_dataintegration" "postgresql_dbm" {
-  type      = "postgresqldbm"
+  type = "postgresqldbm"
+
+  # Runs the integration from this groundcover cluster's integrations agent instead of the
+  # backend. Required here because the password below is a secretRef::k8s:: reference, which
+  # only the in-cluster agent can resolve. Drop `cluster` and use a secretRef::store::<id>
+  # password instead to run the integration in the backend.
+  cluster   = "production-cluster"
   is_paused = false
 
   config = jsonencode({
@@ -649,10 +732,10 @@ resource "groundcover_dataintegration" "postgresql_dbm" {
       basicAuth = {
         username = "postgres"
 
-        # Use this form when the integration runs from your own cluster: it refers to an
-        # existing Kubernetes secret, as secretRef::k8s::<namespace>::<secret-name>::<key>.
-        # Create that secret in the cluster yourself. The groundcover_secret resource is not
-        # used here - it produces a secretRef::store::<id> reference instead.
+        # Refers to an existing Kubernetes secret in the cluster set above, as
+        # secretRef::k8s::<namespace>::<secret-name>::<key>. Create that secret in the
+        # cluster yourself. The groundcover_secret resource is not used here - it produces
+        # a secretRef::store::<id> reference instead.
         password = "secretRef::k8s::groundcover::groundcover-postgresql::admin-password"
       }
     }
@@ -983,12 +1066,12 @@ Every capability's metrics carry `gc_integration_type = "aws"` and `gc_integrati
 
 ### Required
 
-- `config` (String) The JSON configuration for the data integration.
-- `type` (String) The type of data integration (e.g., 'cloudwatch', etc.).
+- `config` (String) The JSON configuration for the data integration, as a string - build it with `jsonencode`. Its structure depends on `type` and is validated by the API on create and update, so an invalid configuration surfaces as an apply error.
+- `type` (String) The type of data integration, for example `aws`, `cloudwatch`, `gcpmetrics`, `azuremetrics`, `prometheusscrape`, `clickhousedbm` or `postgresqldbm`. See the supported types table in the documentation. Changing this forces a new integration to be created, which assigns a new `id`.
 
 ### Optional
 
-- `cluster` (String) The cluster where the data integration runs. If unspecified, it will run in the backend.
+- `cluster` (String) The groundcover cluster that runs the data integration. If unspecified, it runs in the groundcover backend. Set it to run the integration from the in-cluster integrations agent instead - required when `config` uses a `secretRef::k8s::<namespace>::<secret-name>::<key>` reference, since only the agent can read Kubernetes secrets. Changing this forces a new integration to be created, which assigns a new `id`.
 - `is_paused` (Boolean) Whether the data integration is paused. Default: `false`.
 
 ### Read-Only

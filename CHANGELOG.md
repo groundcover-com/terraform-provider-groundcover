@@ -1,3 +1,8 @@
+## 1.22.5
+
+* Documented `groundcover_dataintegration` behaviour that was previously only discoverable from the examples: the supported `type` values, that `type` and `cluster` force replacement (and therefore a new `id`, which breaks `gc_integration_id` continuity), the two `secretRef` forms and which one needs `cluster`, and the `config` keys common to most integration types
+* Fixed the `groundcover_dataintegration` ClickHouse and PostgreSQL database-monitoring examples (`clickhousedbm` / `postgresqldbm`): they used a `secretRef::k8s::` password but did not set `cluster`, so as written the integration ran in the backend, where a Kubernetes secret reference cannot be resolved
+
 ## 1.22.4
 
 * Updated the `groundcover_dataintegration` PostgreSQL and ClickHouse database-monitoring examples with built-in health metrics and query-statistics collection. Custom metric queries remain supported but are intentionally no longer shown in these Phase 1 examples.
