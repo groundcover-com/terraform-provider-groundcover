@@ -1,11 +1,9 @@
 ## 1.22.5
 
-* Documented `groundcover_dataintegration` config keys the API accepts but the provider never showed: Azure `resourceTags` (with its `?inherit` / `?name=` / `?source=` options and the label-collision rules), `azureResourceTypes`, `includedDimensions`, `metricNamespace`, `resourceGraphQueryFilter` and the metric name/help templates; CloudWatch `customNamespaces`, `searchTags`, `withInventoryDiscovery` and `apiConcurrencyLimits`; and Redis Cloud `redisCloudStaticTargets`, which composes the metrics URL from its parts instead of requiring a hand-built one
-* Corrected the `groundcover_dataintegration` `config` guidance on secrets: the attribute is not marked sensitive and is stored in Terraform state verbatim, so a literal credential written into it is persisted in plaintext there. `secretRef` is the recommendation, not a guarantee the provider enforces
-* Corrected the `confluentscrape` example and reference: `scheme` may be omitted or set to `https`; only another value is rejected
-* Added a `confluentscrape` (Confluent Cloud) example — the integration type was supported but had no example and no mention in the docs
-* Documented `groundcover_dataintegration` behaviour that was previously only discoverable from the examples: the supported `type` values, that `type` and `cluster` force replacement (and therefore a new `id`, which breaks `gc_integration_id` continuity), the two `secretRef` forms and which one needs `cluster`, and the `config` keys common to most integration types
-* Fixed the `groundcover_dataintegration` ClickHouse and PostgreSQL database-monitoring examples (`clickhousedbm` / `postgresqldbm`): they used a `secretRef::k8s::` password but did not set `cluster`, so as written the integration ran in the backend, where a Kubernetes secret reference cannot be resolved
+* Expanded the `groundcover_dataintegration` documentation with supported `type` values, secret reference forms, replacement rules and common `config` keys
+* Documented additional Azure, CloudWatch and Redis Cloud `config` keys
+* Added `confluentscrape` and Azure resource-type examples
+* Fixed the `clickhousedbm` and `postgresqldbm` examples to set `cluster` when the password is a `secretRef::k8s::` reference
 
 ## 1.22.4
 
