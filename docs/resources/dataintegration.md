@@ -189,9 +189,7 @@ resource "groundcover_dataintegration" "cloudwatch_example" {
     }
     # use this parameter to enrich with resource labels
     withContextTagsOnInfoMetrics = true
-    # Discover resources through the AWS inventory API in addition to CloudWatch's own
-    # listing, so resources that have not emitted a metric yet still appear. Defaults to true.
-    withInventoryDiscovery = true
+
     # Optional throttling of the AWS API calls, for accounts that hit CloudWatch rate limits.
     # Omitted keys keep their defaults: listMetrics 1, getMetricData 5,
     # getMetricStatistics 5, listInventory 10.
