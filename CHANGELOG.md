@@ -1,5 +1,9 @@
 ## 1.22.5
 
+* Expanded the `groundcover_dataintegration` documentation with supported `type` values, secret reference forms, replacement rules and common `config` keys
+* Documented additional Azure, CloudWatch and Redis Cloud `config` keys
+* Added `confluentscrape` and Azure resource-type examples
+* Fixed the `clickhousedbm` and `postgresqldbm` examples to set `cluster` when the password is a `secretRef::k8s::` reference
 * Fixed `groundcover_recurring_silence` rejecting valid non-UTC timezones such as `America/New_York`
 
 ## 1.22.4
