@@ -8,6 +8,10 @@ import (
 	"flag"
 	"log"
 
+	// Embed the IANA time zone database so timezone validation works on hosts
+	// without system tzdata, such as Windows and minimal container images.
+	_ "time/tzdata"
+
 	"github.com/groundcover-com/terraform-provider-groundcover/internal/provider"
 	"github.com/hashicorp/terraform-plugin-framework/providerserver"
 )
