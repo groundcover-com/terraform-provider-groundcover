@@ -1,3 +1,7 @@
+## 1.22.5
+
+* Fixed `groundcover_recurring_silence` rejecting valid non-UTC timezones such as `America/New_York`
+
 ## 1.22.4
 
 * Updated the `groundcover_dataintegration` PostgreSQL and ClickHouse database-monitoring examples with built-in health metrics and query-statistics collection. Custom metric queries remain supported but are intentionally no longer shown in these Phase 1 examples.
