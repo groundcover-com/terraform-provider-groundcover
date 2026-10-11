@@ -47,6 +47,8 @@ resource "groundcover_monitor_v2" "gcql_logs" {
     }
   }
 
+  # execution_error_state: "OK" | "Error" | "Alerting" — when the query fails to run
+  # no_data_state:         "OK" | "NoData" | "Alerting" — when the query returns no data
   execution_error_state = "OK"
   no_data_state         = "OK"
 }
@@ -202,8 +204,9 @@ resource "groundcover_monitor_v2" "metricsql" {
     pending_for = "1m"
   }
 
-  execution_error_state = "OK"
-  no_data_state         = "OK"
+  # Surface query failures and missing data on the monitor without paging anyone.
+  execution_error_state = "Error"
+  no_data_state         = "NoData"
 }
 
 resource "groundcover_monitor_v2" "raw_sql" {
@@ -235,6 +238,7 @@ resource "groundcover_monitor_v2" "raw_sql" {
     pending_for = "1m"
   }
 
-  execution_error_state = "OK"
-  no_data_state         = "OK"
+  # Fire an alert when the query fails or returns no data.
+  execution_error_state = "Alerting"
+  no_data_state         = "Alerting"
 }

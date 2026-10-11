@@ -194,14 +194,14 @@ func (r *monitorV2Resource) Schema(_ context.Context, _ resource.SchemaRequest, 
 				},
 			},
 			"execution_error_state": schema.StringAttribute{
-				MarkdownDescription: "State to enter if query execution fails.",
+				MarkdownDescription: "What the monitor does when its query fails to run (for example, the data source is unreachable). One of `OK` (ignore the failure and stay healthy; the default), `Error` (mark the monitor as `Error` without firing an alert), or `Alerting` (fire an alert as if the threshold was crossed).",
 				Optional:            true,
 				Validators: []validator.String{
 					stringvalidator.OneOf("OK", "Error", "Alerting"),
 				},
 			},
 			"no_data_state": schema.StringAttribute{
-				MarkdownDescription: "State to enter when the query returns no data.",
+				MarkdownDescription: "What the monitor does when its query runs successfully but returns no data. One of `OK` (treat it as healthy), `NoData` (mark the monitor as `No Data` without firing an alert; the default), or `Alerting` (fire an alert as if the threshold was crossed).",
 				Optional:            true,
 				Validators: []validator.String{
 					stringvalidator.OneOf("OK", "NoData", "Alerting"),
