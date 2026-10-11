@@ -1,3 +1,7 @@
+## 1.22.6
+
+* Documented the accepted values and defaults for `execution_error_state` and `no_data_state` on `groundcover_monitor_v2` and `groundcover_monitor_v2_json`, with examples for each option
+
 ## 1.22.5
 
 * Expanded the `groundcover_dataintegration` documentation with supported `type` values, secret reference forms, replacement rules and common `config` keys
