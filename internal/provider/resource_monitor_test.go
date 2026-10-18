@@ -99,6 +99,51 @@ func TestMonitorV2BuildCreateRequestGCQL(t *testing.T) {
 	requireNoInternalMonitorV2Annotations(t, req.Annotations)
 }
 
+func TestMonitorV2HideSlackPreviewGraphRoundTrip(t *testing.T) {
+	ctx := context.Background()
+	plan := testMonitorV2BasePlan(t, &monitorV2QueryModel{
+		Type:          types.StringValue(monitorV2QueryTypeGCQL),
+		Expression:    types.StringValue(`level:error | stats count() count_all_result`),
+		DataType:      types.StringValue("logs"),
+		InstantRollup: types.StringValue("5m"),
+	})
+	plan.HideSlackPreviewGraph = types.BoolValue(true)
+
+	createReq, diags := buildMonitorV2CreateRequest(ctx, &plan)
+	if diags.HasError() {
+		t.Fatalf("buildMonitorV2CreateRequest() diagnostics: %v", diags)
+	}
+	if !createReq.HideSlackPreviewGraph {
+		t.Fatalf("CreateMonitorRequest.HideSlackPreviewGraph = false, want true")
+	}
+
+	updateReq, diags := buildMonitorV2UpdateRequest(ctx, &plan)
+	if diags.HasError() {
+		t.Fatalf("buildMonitorV2UpdateRequest() diagnostics: %v", diags)
+	}
+	if !updateReq.HideSlackPreviewGraph {
+		t.Fatalf("UpdateMonitorRequest.HideSlackPreviewGraph = false, want true")
+	}
+
+	var state monitorV2ResourceModel
+	mapMonitorV2SDKToModel(ctx, "monitor-id", updateReq, &state, &diags)
+	if diags.HasError() {
+		t.Fatalf("mapMonitorV2SDKToModel() diagnostics: %v", diags)
+	}
+	if !state.HideSlackPreviewGraph.ValueBool() {
+		t.Fatalf("state.HideSlackPreviewGraph = %v, want true", state.HideSlackPreviewGraph)
+	}
+
+	plan.HideSlackPreviewGraph = types.BoolValue(false)
+	updateReq, diags = buildMonitorV2UpdateRequest(ctx, &plan)
+	if diags.HasError() {
+		t.Fatalf("buildMonitorV2UpdateRequest() diagnostics: %v", diags)
+	}
+	if updateReq.HideSlackPreviewGraph {
+		t.Fatalf("UpdateMonitorRequest.HideSlackPreviewGraph = true, want false")
+	}
+}
+
 func TestMonitorV2BuildCreateRequestGCQLAPM(t *testing.T) {
 	ctx := context.Background()
 	plan := testMonitorV2BasePlan(t, &monitorV2QueryModel{
@@ -1242,6 +1287,45 @@ func TestAccMonitorV2Resource_pauseState(t *testing.T) {
 	})
 }
 
+func TestAccMonitorV2Resource_hideSlackPreviewGraph(t *testing.T) {
+	name := acctest.RandomWithPrefix("test-monitor-v2-hide-graph")
+
+	resource.Test(t, resource.TestCase{
+		PreCheck:                 func() { testAccPreCheck(t) },
+		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
+		Steps: []resource.TestStep{
+			{
+				Config: testAccMonitorV2PauseConfig(name, "hide_slack_preview_graph = true"),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					resource.TestCheckResourceAttr("groundcover_monitor_v2.test", "hide_slack_preview_graph", "true"),
+					resource.TestCheckNoResourceAttr("groundcover_monitor_v2.test", "annotations._gc_hide_slack_preview_graph"),
+				),
+			},
+			{
+				Config:             testAccMonitorV2PauseConfig(name, "hide_slack_preview_graph = true"),
+				PlanOnly:           true,
+				ExpectNonEmptyPlan: false,
+			},
+			{
+				ResourceName:      "groundcover_monitor_v2.test",
+				ImportState:       true,
+				ImportStateVerify: true,
+			},
+			{
+				// Omitting the attribute defaults it to false, which must clear it on the API.
+				Config: testAccMonitorV2PauseConfig(name, ""),
+				Check: resource.TestCheckResourceAttr(
+					"groundcover_monitor_v2.test", "hide_slack_preview_graph", "false"),
+			},
+			{
+				Config:             testAccMonitorV2PauseConfig(name, ""),
+				PlanOnly:           true,
+				ExpectNonEmptyPlan: false,
+			},
+		},
+	})
+}
+
 func TestAccMonitorV2Resource_importThenUpdate(t *testing.T) {
 	name := acctest.RandomWithPrefix("test-monitor-v2-import")
 	updatedName := acctest.RandomWithPrefix("test-monitor-v2-import-updated")
@@ -1370,7 +1454,7 @@ resource "groundcover_monitor_v2" "test" {
 `, name)
 }
 
-func testAccMonitorV2PauseConfig(name, isPausedLine string) string {
+func testAccMonitorV2PauseConfig(name, attributeLine string) string {
 	return fmt.Sprintf(`
 resource "groundcover_monitor_v2" "test" {
   title            = %[1]q
@@ -1405,7 +1489,7 @@ resource "groundcover_monitor_v2" "test" {
   execution_error_state = "OK"
   no_data_state         = "OK"
 }
-`, name, isPausedLine)
+`, name, attributeLine)
 }
 
 func testAccMonitorV2MetricsQLImportUpdateConfig(name string) string {

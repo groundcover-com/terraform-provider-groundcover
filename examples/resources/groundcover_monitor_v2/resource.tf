@@ -1,8 +1,9 @@
 resource "groundcover_monitor_v2" "gcql_logs" {
-  title            = "GCQL Logs Error Count"
-  severity         = "critical"
-  measurement_type = "event"
-  is_paused        = true
+  title                    = "GCQL Logs Error Count"
+  severity                 = "critical"
+  measurement_type         = "event"
+  is_paused                = true
+  hide_slack_preview_graph = true
 
   display {
     header      = "GCQL Logs Error Count"

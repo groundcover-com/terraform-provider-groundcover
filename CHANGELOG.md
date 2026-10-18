@@ -10,6 +10,10 @@
 * Fixed the `clickhousedbm` and `postgresqldbm` examples to set `cluster` when the password is a `secretRef::k8s::` reference
 * Fixed `groundcover_recurring_silence` rejecting valid non-UTC timezones such as `America/New_York`
 
+## 1.23.0
+
+* Added `hide_slack_preview_graph` to `groundcover_monitor_v2` and `groundcover_monitor_v2_json`. When `true`, Slack notifications for the monitor omit the preview graph, matching the option in the monitor UI. Defaults to `false`
+
 ## 1.22.4
 
 * Updated the `groundcover_dataintegration` PostgreSQL and ClickHouse database-monitoring examples with built-in health metrics and query-statistics collection. Custom metric queries remain supported but are intentionally no longer shown in these Phase 1 examples.

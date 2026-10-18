@@ -58,25 +58,26 @@ type monitorV2Resource struct {
 }
 
 type monitorV2ResourceModel struct {
-	ID                   types.String                        `tfsdk:"id"`
-	Title                types.String                        `tfsdk:"title"`
-	Severity             types.String                        `tfsdk:"severity"`
-	MeasurementType      types.String                        `tfsdk:"measurement_type"`
-	ExecutionErrorState  types.String                        `tfsdk:"execution_error_state"`
-	NoDataState          types.String                        `tfsdk:"no_data_state"`
-	IsPaused             types.Bool                          `tfsdk:"is_paused"`
-	AutoResolve          types.Bool                          `tfsdk:"auto_resolve"`
-	Category             types.String                        `tfsdk:"category"`
-	Team                 types.String                        `tfsdk:"team"`
-	Labels               types.Map                           `tfsdk:"labels"`
-	Annotations          types.Map                           `tfsdk:"annotations"`
-	Routing              types.List                          `tfsdk:"routing"`
-	Query                *monitorV2QueryModel                `tfsdk:"query"`
-	Reducers             []monitorV2ReducerModel             `tfsdk:"reducer"`
-	Thresholds           []monitorV2ThresholdModel           `tfsdk:"threshold"`
-	EvaluationInterval   *monitorV2EvaluationIntervalModel   `tfsdk:"evaluation_interval"`
-	Display              *monitorV2DisplayModel              `tfsdk:"display"`
-	NotificationSettings *monitorV2NotificationSettingsModel `tfsdk:"notification_settings"`
+	ID                    types.String                        `tfsdk:"id"`
+	Title                 types.String                        `tfsdk:"title"`
+	Severity              types.String                        `tfsdk:"severity"`
+	MeasurementType       types.String                        `tfsdk:"measurement_type"`
+	ExecutionErrorState   types.String                        `tfsdk:"execution_error_state"`
+	NoDataState           types.String                        `tfsdk:"no_data_state"`
+	IsPaused              types.Bool                          `tfsdk:"is_paused"`
+	AutoResolve           types.Bool                          `tfsdk:"auto_resolve"`
+	HideSlackPreviewGraph types.Bool                          `tfsdk:"hide_slack_preview_graph"`
+	Category              types.String                        `tfsdk:"category"`
+	Team                  types.String                        `tfsdk:"team"`
+	Labels                types.Map                           `tfsdk:"labels"`
+	Annotations           types.Map                           `tfsdk:"annotations"`
+	Routing               types.List                          `tfsdk:"routing"`
+	Query                 *monitorV2QueryModel                `tfsdk:"query"`
+	Reducers              []monitorV2ReducerModel             `tfsdk:"reducer"`
+	Thresholds            []monitorV2ThresholdModel           `tfsdk:"threshold"`
+	EvaluationInterval    *monitorV2EvaluationIntervalModel   `tfsdk:"evaluation_interval"`
+	Display               *monitorV2DisplayModel              `tfsdk:"display"`
+	NotificationSettings  *monitorV2NotificationSettingsModel `tfsdk:"notification_settings"`
 }
 
 type monitorV2QueryModel struct {
@@ -221,6 +222,12 @@ func (r *monitorV2Resource) Schema(_ context.Context, _ resource.SchemaRequest, 
 			},
 			"auto_resolve": schema.BoolAttribute{
 				MarkdownDescription: "Whether the monitor should auto-resolve.",
+				Optional:            true,
+				Computed:            true,
+				Default:             booldefault.StaticBool(false),
+			},
+			"hide_slack_preview_graph": schema.BoolAttribute{
+				MarkdownDescription: "Whether Slack notifications for this monitor omit the preview graph. Defaults to `false`.",
 				Optional:            true,
 				Computed:            true,
 				Default:             booldefault.StaticBool(false),
@@ -962,24 +969,25 @@ func buildMonitorV2CreateRequest(ctx context.Context, plan *monitorV2ResourceMod
 	var diags diag.Diagnostics
 	isProvisioned := true
 	req := &models.CreateMonitorRequest{
-		Annotations:          monitorV2AnnotationsToSDK(ctx, plan.Annotations, &diags),
-		AutoResolve:          monitorV2Bool(plan.AutoResolve),
-		Category:             monitorV2String(plan.Category),
-		ExecutionErrorState:  monitorV2String(plan.ExecutionErrorState),
-		IsPaused:             monitorV2BoolPtr(plan.IsPaused),
-		IsProvisioned:        &isProvisioned,
-		Labels:               monitorV2StringMap(ctx, plan.Labels, &diags),
-		MeasurementType:      monitorV2String(plan.MeasurementType),
-		NoDataState:          monitorV2String(plan.NoDataState),
-		Routing:              monitorV2StringList(ctx, plan.Routing, &diags),
-		Severity:             monitorV2String(plan.Severity),
-		Team:                 monitorV2String(plan.Team),
-		Title:                monitorV2StringPtr(plan.Title),
-		Catalog:              nil,
-		Display:              monitorV2DisplayToSDK(ctx, plan.Display, &diags),
-		EvaluationInterval:   monitorV2EvaluationIntervalToSDK(plan.EvaluationInterval, &diags),
-		Model:                monitorV2ModelToSDK(ctx, plan, &diags),
-		NotificationSettings: monitorV2NotificationSettingsToSDK(ctx, plan.NotificationSettings, &diags),
+		Annotations:           monitorV2AnnotationsToSDK(ctx, plan.Annotations, &diags),
+		AutoResolve:           monitorV2Bool(plan.AutoResolve),
+		Category:              monitorV2String(plan.Category),
+		ExecutionErrorState:   monitorV2String(plan.ExecutionErrorState),
+		HideSlackPreviewGraph: monitorV2Bool(plan.HideSlackPreviewGraph),
+		IsPaused:              monitorV2BoolPtr(plan.IsPaused),
+		IsProvisioned:         &isProvisioned,
+		Labels:                monitorV2StringMap(ctx, plan.Labels, &diags),
+		MeasurementType:       monitorV2String(plan.MeasurementType),
+		NoDataState:           monitorV2String(plan.NoDataState),
+		Routing:               monitorV2StringList(ctx, plan.Routing, &diags),
+		Severity:              monitorV2String(plan.Severity),
+		Team:                  monitorV2String(plan.Team),
+		Title:                 monitorV2StringPtr(plan.Title),
+		Catalog:               nil,
+		Display:               monitorV2DisplayToSDK(ctx, plan.Display, &diags),
+		EvaluationInterval:    monitorV2EvaluationIntervalToSDK(plan.EvaluationInterval, &diags),
+		Model:                 monitorV2ModelToSDK(ctx, plan, &diags),
+		NotificationSettings:  monitorV2NotificationSettingsToSDK(ctx, plan.NotificationSettings, &diags),
 	}
 	return req, diags
 }
@@ -987,23 +995,24 @@ func buildMonitorV2CreateRequest(ctx context.Context, plan *monitorV2ResourceMod
 func buildMonitorV2UpdateRequest(ctx context.Context, plan *monitorV2ResourceModel) (*models.UpdateMonitorRequest, diag.Diagnostics) {
 	var diags diag.Diagnostics
 	req := &models.UpdateMonitorRequest{
-		Annotations:          monitorV2AnnotationsToSDK(ctx, plan.Annotations, &diags),
-		AutoResolve:          monitorV2Bool(plan.AutoResolve),
-		Category:             monitorV2String(plan.Category),
-		ExecutionErrorState:  monitorV2String(plan.ExecutionErrorState),
-		IsPaused:             monitorV2BoolPtr(plan.IsPaused),
-		Labels:               monitorV2StringMap(ctx, plan.Labels, &diags),
-		MeasurementType:      monitorV2String(plan.MeasurementType),
-		NoDataState:          monitorV2String(plan.NoDataState),
-		Routing:              monitorV2StringList(ctx, plan.Routing, &diags),
-		Severity:             monitorV2String(plan.Severity),
-		Team:                 monitorV2String(plan.Team),
-		Title:                monitorV2StringPtr(plan.Title),
-		Catalog:              nil,
-		Display:              monitorV2DisplayToSDK(ctx, plan.Display, &diags),
-		EvaluationInterval:   monitorV2EvaluationIntervalToSDK(plan.EvaluationInterval, &diags),
-		Model:                monitorV2ModelToSDK(ctx, plan, &diags),
-		NotificationSettings: monitorV2NotificationSettingsToSDK(ctx, plan.NotificationSettings, &diags),
+		Annotations:           monitorV2AnnotationsToSDK(ctx, plan.Annotations, &diags),
+		AutoResolve:           monitorV2Bool(plan.AutoResolve),
+		Category:              monitorV2String(plan.Category),
+		ExecutionErrorState:   monitorV2String(plan.ExecutionErrorState),
+		HideSlackPreviewGraph: monitorV2Bool(plan.HideSlackPreviewGraph),
+		IsPaused:              monitorV2BoolPtr(plan.IsPaused),
+		Labels:                monitorV2StringMap(ctx, plan.Labels, &diags),
+		MeasurementType:       monitorV2String(plan.MeasurementType),
+		NoDataState:           monitorV2String(plan.NoDataState),
+		Routing:               monitorV2StringList(ctx, plan.Routing, &diags),
+		Severity:              monitorV2String(plan.Severity),
+		Team:                  monitorV2String(plan.Team),
+		Title:                 monitorV2StringPtr(plan.Title),
+		Catalog:               nil,
+		Display:               monitorV2DisplayToSDK(ctx, plan.Display, &diags),
+		EvaluationInterval:    monitorV2EvaluationIntervalToSDK(plan.EvaluationInterval, &diags),
+		Model:                 monitorV2ModelToSDK(ctx, plan, &diags),
+		NotificationSettings:  monitorV2NotificationSettingsToSDK(ctx, plan.NotificationSettings, &diags),
 	}
 	return req, diags
 }
@@ -1206,6 +1215,7 @@ func mapMonitorV2SDKToModel(ctx context.Context, id string, remote *models.Updat
 	// result". Sending is still pointer-based (monitorV2BoolPtr) so unpause works.
 	state.IsPaused = types.BoolValue(remote.IsPaused != nil && *remote.IsPaused)
 	state.AutoResolve = types.BoolValue(remote.AutoResolve)
+	state.HideSlackPreviewGraph = types.BoolValue(remote.HideSlackPreviewGraph)
 	state.Category = monitorV2NullableString(remote.Category)
 	state.Team = monitorV2NullableString(remote.Team)
 	state.Labels = monitorV2MapType(ctx, remote.Labels, diags)
