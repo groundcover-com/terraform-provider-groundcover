@@ -107,7 +107,15 @@ func TestMonitorV2HideSlackPreviewGraphRoundTrip(t *testing.T) {
 		DataType:      types.StringValue("logs"),
 		InstantRollup: types.StringValue("5m"),
 	})
-	plan.HideSlackPreviewGraph = types.BoolValue(true)
+	plan.NotificationSettings = &monitorV2NotificationSettingsModel{
+		Method:                 types.StringValue("notificationRoutes"),
+		ConnectedApps:          types.ListNull(types.StringType),
+		ConnectedAppParams:     types.MapNull(types.ObjectType{AttrTypes: monitorV2ConnectedAppDeliveryOptionsAttrTypes()}),
+		StatusFilters:          types.ListNull(types.StringType),
+		DisableRenotification:  types.BoolValue(false),
+		RenotificationInterval: types.StringNull(),
+		HideSlackPreviewGraph:  types.BoolValue(true),
+	}
 
 	createReq, diags := buildMonitorV2CreateRequest(ctx, &plan)
 	if diags.HasError() {
@@ -130,17 +138,46 @@ func TestMonitorV2HideSlackPreviewGraphRoundTrip(t *testing.T) {
 	if diags.HasError() {
 		t.Fatalf("mapMonitorV2SDKToModel() diagnostics: %v", diags)
 	}
-	if !state.HideSlackPreviewGraph.ValueBool() {
-		t.Fatalf("state.HideSlackPreviewGraph = %v, want true", state.HideSlackPreviewGraph)
+	if state.NotificationSettings == nil || !state.NotificationSettings.HideSlackPreviewGraph.ValueBool() {
+		t.Fatalf("state.NotificationSettings.HideSlackPreviewGraph not true: %+v", state.NotificationSettings)
 	}
 
-	plan.HideSlackPreviewGraph = types.BoolValue(false)
+	plan.NotificationSettings.HideSlackPreviewGraph = types.BoolValue(false)
 	updateReq, diags = buildMonitorV2UpdateRequest(ctx, &plan)
 	if diags.HasError() {
 		t.Fatalf("buildMonitorV2UpdateRequest() diagnostics: %v", diags)
 	}
 	if updateReq.HideSlackPreviewGraph {
 		t.Fatalf("UpdateMonitorRequest.HideSlackPreviewGraph = true, want false")
+	}
+
+	plan.NotificationSettings = nil
+	updateReq, diags = buildMonitorV2UpdateRequest(ctx, &plan)
+	if diags.HasError() {
+		t.Fatalf("buildMonitorV2UpdateRequest() diagnostics: %v", diags)
+	}
+	if updateReq.HideSlackPreviewGraph {
+		t.Fatalf("UpdateMonitorRequest.HideSlackPreviewGraph = true without notification_settings, want false")
+	}
+}
+
+func TestMonitorV2HideSlackPreviewGraphWithoutRemoteNotificationSettings(t *testing.T) {
+	ctx := context.Background()
+	var diags diag.Diagnostics
+
+	if got := monitorV2NotificationSettingsFromSDK(ctx, nil, false, &diags); got != nil {
+		t.Fatalf("monitorV2NotificationSettingsFromSDK(nil, false) = %+v, want nil", got)
+	}
+
+	got := monitorV2NotificationSettingsFromSDK(ctx, nil, true, &diags)
+	if diags.HasError() {
+		t.Fatalf("monitorV2NotificationSettingsFromSDK() diagnostics: %v", diags)
+	}
+	if got == nil || !got.HideSlackPreviewGraph.ValueBool() {
+		t.Fatalf("monitorV2NotificationSettingsFromSDK(nil, true) = %+v, want a block with hide_slack_preview_graph = true", got)
+	}
+	if !got.Method.IsNull() || got.DisableRenotification.ValueBool() {
+		t.Fatalf("synthesized block carries unexpected values: %+v", got)
 	}
 }
 
@@ -1289,20 +1326,24 @@ func TestAccMonitorV2Resource_pauseState(t *testing.T) {
 
 func TestAccMonitorV2Resource_hideSlackPreviewGraph(t *testing.T) {
 	name := acctest.RandomWithPrefix("test-monitor-v2-hide-graph")
+	updatedName := acctest.RandomWithPrefix("test-monitor-v2-hide-graph-updated")
+	hideGraphBlock := func(attributeLine string) string {
+		return fmt.Sprintf("notification_settings {\n    method = \"notificationRoutes\"\n    %s\n  }", attributeLine)
+	}
 
 	resource.Test(t, resource.TestCase{
 		PreCheck:                 func() { testAccPreCheck(t) },
 		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
 		Steps: []resource.TestStep{
 			{
-				Config: testAccMonitorV2PauseConfig(name, "hide_slack_preview_graph = true"),
+				Config: testAccMonitorV2PauseConfig(name, hideGraphBlock("hide_slack_preview_graph = true")),
 				Check: resource.ComposeAggregateTestCheckFunc(
-					resource.TestCheckResourceAttr("groundcover_monitor_v2.test", "hide_slack_preview_graph", "true"),
+					resource.TestCheckResourceAttr("groundcover_monitor_v2.test", "notification_settings.hide_slack_preview_graph", "true"),
 					resource.TestCheckNoResourceAttr("groundcover_monitor_v2.test", "annotations._gc_hide_slack_preview_graph"),
 				),
 			},
 			{
-				Config:             testAccMonitorV2PauseConfig(name, "hide_slack_preview_graph = true"),
+				Config:             testAccMonitorV2PauseConfig(name, hideGraphBlock("hide_slack_preview_graph = true")),
 				PlanOnly:           true,
 				ExpectNonEmptyPlan: false,
 			},
@@ -1312,13 +1353,19 @@ func TestAccMonitorV2Resource_hideSlackPreviewGraph(t *testing.T) {
 				ImportStateVerify: true,
 			},
 			{
-				// Omitting the attribute defaults it to false, which must clear it on the API.
-				Config: testAccMonitorV2PauseConfig(name, ""),
+				// Unrelated change (title) with the attribute omitted: the remote value must be kept.
+				Config: testAccMonitorV2PauseConfig(updatedName, hideGraphBlock("")),
 				Check: resource.TestCheckResourceAttr(
-					"groundcover_monitor_v2.test", "hide_slack_preview_graph", "false"),
+					"groundcover_monitor_v2.test", "notification_settings.hide_slack_preview_graph", "true"),
 			},
 			{
-				Config:             testAccMonitorV2PauseConfig(name, ""),
+				// Explicit false must reach the API and show the graph again.
+				Config: testAccMonitorV2PauseConfig(updatedName, hideGraphBlock("hide_slack_preview_graph = false")),
+				Check: resource.TestCheckResourceAttr(
+					"groundcover_monitor_v2.test", "notification_settings.hide_slack_preview_graph", "false"),
+			},
+			{
+				Config:             testAccMonitorV2PauseConfig(updatedName, hideGraphBlock("hide_slack_preview_graph = false")),
 				PlanOnly:           true,
 				ExpectNonEmptyPlan: false,
 			},
@@ -1454,7 +1501,7 @@ resource "groundcover_monitor_v2" "test" {
 `, name)
 }
 
-func testAccMonitorV2PauseConfig(name, attributeLine string) string {
+func testAccMonitorV2PauseConfig(name, extraConfig string) string {
 	return fmt.Sprintf(`
 resource "groundcover_monitor_v2" "test" {
   title            = %[1]q
@@ -1489,7 +1536,7 @@ resource "groundcover_monitor_v2" "test" {
   execution_error_state = "OK"
   no_data_state         = "OK"
 }
-`, name, attributeLine)
+`, name, extraConfig)
 }
 
 func testAccMonitorV2MetricsQLImportUpdateConfig(name string) string {

@@ -1,9 +1,8 @@
 resource "groundcover_monitor_v2" "gcql_logs" {
-  title                    = "GCQL Logs Error Count"
-  severity                 = "critical"
-  measurement_type         = "event"
-  is_paused                = true
-  hide_slack_preview_graph = true
+  title            = "GCQL Logs Error Count"
+  severity         = "critical"
+  measurement_type = "event"
+  is_paused        = true
 
   display {
     header      = "GCQL Logs Error Count"
@@ -36,11 +35,12 @@ resource "groundcover_monitor_v2" "gcql_logs" {
   }
 
   notification_settings {
-    method                  = "connectedApps"
-    connected_apps          = ["slack-connected-app-id"]
-    status_filters          = ["Alerting", "Resolved"]
-    renotification_interval = "4h"
-    disable_renotification  = false
+    method                   = "connectedApps"
+    connected_apps           = ["slack-connected-app-id"]
+    status_filters           = ["Alerting", "Resolved"]
+    renotification_interval  = "4h"
+    disable_renotification   = false
+    hide_slack_preview_graph = true
     connected_app_params = {
       "slack-connected-app-id" = {
         channels = [{ id = "C0123456789", name = "#alerts" }]

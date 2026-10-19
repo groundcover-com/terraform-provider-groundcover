@@ -58,26 +58,25 @@ type monitorV2Resource struct {
 }
 
 type monitorV2ResourceModel struct {
-	ID                    types.String                        `tfsdk:"id"`
-	Title                 types.String                        `tfsdk:"title"`
-	Severity              types.String                        `tfsdk:"severity"`
-	MeasurementType       types.String                        `tfsdk:"measurement_type"`
-	ExecutionErrorState   types.String                        `tfsdk:"execution_error_state"`
-	NoDataState           types.String                        `tfsdk:"no_data_state"`
-	IsPaused              types.Bool                          `tfsdk:"is_paused"`
-	AutoResolve           types.Bool                          `tfsdk:"auto_resolve"`
-	HideSlackPreviewGraph types.Bool                          `tfsdk:"hide_slack_preview_graph"`
-	Category              types.String                        `tfsdk:"category"`
-	Team                  types.String                        `tfsdk:"team"`
-	Labels                types.Map                           `tfsdk:"labels"`
-	Annotations           types.Map                           `tfsdk:"annotations"`
-	Routing               types.List                          `tfsdk:"routing"`
-	Query                 *monitorV2QueryModel                `tfsdk:"query"`
-	Reducers              []monitorV2ReducerModel             `tfsdk:"reducer"`
-	Thresholds            []monitorV2ThresholdModel           `tfsdk:"threshold"`
-	EvaluationInterval    *monitorV2EvaluationIntervalModel   `tfsdk:"evaluation_interval"`
-	Display               *monitorV2DisplayModel              `tfsdk:"display"`
-	NotificationSettings  *monitorV2NotificationSettingsModel `tfsdk:"notification_settings"`
+	ID                   types.String                        `tfsdk:"id"`
+	Title                types.String                        `tfsdk:"title"`
+	Severity             types.String                        `tfsdk:"severity"`
+	MeasurementType      types.String                        `tfsdk:"measurement_type"`
+	ExecutionErrorState  types.String                        `tfsdk:"execution_error_state"`
+	NoDataState          types.String                        `tfsdk:"no_data_state"`
+	IsPaused             types.Bool                          `tfsdk:"is_paused"`
+	AutoResolve          types.Bool                          `tfsdk:"auto_resolve"`
+	Category             types.String                        `tfsdk:"category"`
+	Team                 types.String                        `tfsdk:"team"`
+	Labels               types.Map                           `tfsdk:"labels"`
+	Annotations          types.Map                           `tfsdk:"annotations"`
+	Routing              types.List                          `tfsdk:"routing"`
+	Query                *monitorV2QueryModel                `tfsdk:"query"`
+	Reducers             []monitorV2ReducerModel             `tfsdk:"reducer"`
+	Thresholds           []monitorV2ThresholdModel           `tfsdk:"threshold"`
+	EvaluationInterval   *monitorV2EvaluationIntervalModel   `tfsdk:"evaluation_interval"`
+	Display              *monitorV2DisplayModel              `tfsdk:"display"`
+	NotificationSettings *monitorV2NotificationSettingsModel `tfsdk:"notification_settings"`
 }
 
 type monitorV2QueryModel struct {
@@ -146,6 +145,7 @@ type monitorV2NotificationSettingsModel struct {
 	StatusFilters          types.List   `tfsdk:"status_filters"`
 	DisableRenotification  types.Bool   `tfsdk:"disable_renotification"`
 	RenotificationInterval types.String `tfsdk:"renotification_interval"`
+	HideSlackPreviewGraph  types.Bool   `tfsdk:"hide_slack_preview_graph"`
 }
 
 type monitorV2ConnectedAppDeliveryOptionsModel struct {
@@ -222,12 +222,6 @@ func (r *monitorV2Resource) Schema(_ context.Context, _ resource.SchemaRequest, 
 			},
 			"auto_resolve": schema.BoolAttribute{
 				MarkdownDescription: "Whether the monitor should auto-resolve.",
-				Optional:            true,
-				Computed:            true,
-				Default:             booldefault.StaticBool(false),
-			},
-			"hide_slack_preview_graph": schema.BoolAttribute{
-				MarkdownDescription: "Whether Slack notifications for this monitor omit the preview graph. Defaults to `false`.",
 				Optional:            true,
 				Computed:            true,
 				Default:             booldefault.StaticBool(false),
@@ -530,6 +524,16 @@ func (r *monitorV2Resource) Schema(_ context.Context, _ resource.SchemaRequest, 
 					"renotification_interval": schema.StringAttribute{
 						MarkdownDescription: "Duration between renotifications, for example `4h`.",
 						Optional:            true,
+					},
+					"hide_slack_preview_graph": schema.BoolAttribute{
+						MarkdownDescription: "Whether Slack notifications for this monitor omit the preview graph. Applies to every notification method. When omitted, the monitor keeps its current value, including one set in the UI; set `false` explicitly to show the graph again. Without a `notification_settings` block the provider sends `false`.",
+						Optional:            true,
+						Computed:            true,
+						// No Default, as with is_paused: an omitted value keeps the refreshed
+						// remote one, so applying does not undo a value set in the UI.
+						PlanModifiers: []planmodifier.Bool{
+							boolplanmodifier.UseStateForUnknown(),
+						},
 					},
 				},
 			},
@@ -973,7 +977,7 @@ func buildMonitorV2CreateRequest(ctx context.Context, plan *monitorV2ResourceMod
 		AutoResolve:           monitorV2Bool(plan.AutoResolve),
 		Category:              monitorV2String(plan.Category),
 		ExecutionErrorState:   monitorV2String(plan.ExecutionErrorState),
-		HideSlackPreviewGraph: monitorV2Bool(plan.HideSlackPreviewGraph),
+		HideSlackPreviewGraph: monitorV2HideSlackPreviewGraphToSDK(plan.NotificationSettings),
 		IsPaused:              monitorV2BoolPtr(plan.IsPaused),
 		IsProvisioned:         &isProvisioned,
 		Labels:                monitorV2StringMap(ctx, plan.Labels, &diags),
@@ -999,7 +1003,7 @@ func buildMonitorV2UpdateRequest(ctx context.Context, plan *monitorV2ResourceMod
 		AutoResolve:           monitorV2Bool(plan.AutoResolve),
 		Category:              monitorV2String(plan.Category),
 		ExecutionErrorState:   monitorV2String(plan.ExecutionErrorState),
-		HideSlackPreviewGraph: monitorV2Bool(plan.HideSlackPreviewGraph),
+		HideSlackPreviewGraph: monitorV2HideSlackPreviewGraphToSDK(plan.NotificationSettings),
 		IsPaused:              monitorV2BoolPtr(plan.IsPaused),
 		Labels:                monitorV2StringMap(ctx, plan.Labels, &diags),
 		MeasurementType:       monitorV2String(plan.MeasurementType),
@@ -1215,7 +1219,6 @@ func mapMonitorV2SDKToModel(ctx context.Context, id string, remote *models.Updat
 	// result". Sending is still pointer-based (monitorV2BoolPtr) so unpause works.
 	state.IsPaused = types.BoolValue(remote.IsPaused != nil && *remote.IsPaused)
 	state.AutoResolve = types.BoolValue(remote.AutoResolve)
-	state.HideSlackPreviewGraph = types.BoolValue(remote.HideSlackPreviewGraph)
 	state.Category = monitorV2NullableString(remote.Category)
 	state.Team = monitorV2NullableString(remote.Team)
 	state.Labels = monitorV2MapType(ctx, remote.Labels, diags)
@@ -1223,7 +1226,7 @@ func mapMonitorV2SDKToModel(ctx context.Context, id string, remote *models.Updat
 	state.Routing = monitorV2StringListType(ctx, remote.Routing, diags)
 	state.Display = monitorV2DisplayFromSDK(ctx, remote.Display, diags)
 	state.EvaluationInterval = monitorV2PreserveEvaluationIntervalDurations(previousEvaluationInterval, monitorV2EvaluationIntervalFromSDK(remote.EvaluationInterval))
-	state.NotificationSettings = monitorV2PreserveNotificationSettingsDurations(previousNotificationSettings, monitorV2NotificationSettingsFromSDK(ctx, remote.NotificationSettings, diags))
+	state.NotificationSettings = monitorV2PreserveNotificationSettingsDurations(previousNotificationSettings, monitorV2NotificationSettingsFromSDK(ctx, remote.NotificationSettings, remote.HideSlackPreviewGraph, diags))
 
 	if remote.Model == nil {
 		state.Query = nil
@@ -1443,9 +1446,16 @@ func monitorV2DisplayFromSDK(ctx context.Context, display *models.DisplayModel, 
 	}
 }
 
-func monitorV2NotificationSettingsFromSDK(ctx context.Context, settings *models.NotificationSettings, diags *diag.Diagnostics) *monitorV2NotificationSettingsModel {
+// monitorV2NotificationSettingsFromSDK takes hideSlackPreviewGraph separately because the API
+// carries it at the monitor's top level while Terraform nests it in notification_settings. A
+// true value with no remote notificationSettings still yields a block, so the setting surfaces
+// as drift instead of being silently dropped.
+func monitorV2NotificationSettingsFromSDK(ctx context.Context, settings *models.NotificationSettings, hideSlackPreviewGraph bool, diags *diag.Diagnostics) *monitorV2NotificationSettingsModel {
 	if settings == nil {
-		return nil
+		if !hideSlackPreviewGraph {
+			return nil
+		}
+		settings = &models.NotificationSettings{}
 	}
 	return &monitorV2NotificationSettingsModel{
 		Method:                 monitorV2NullableString(settings.Method),
@@ -1454,7 +1464,15 @@ func monitorV2NotificationSettingsFromSDK(ctx context.Context, settings *models.
 		StatusFilters:          monitorV2IssueStatusListType(ctx, settings.StatusFilters, diags),
 		DisableRenotification:  types.BoolValue(settings.DisableRenotification),
 		RenotificationInterval: monitorV2AnyString(settings.RenotificationInterval),
+		HideSlackPreviewGraph:  types.BoolValue(hideSlackPreviewGraph),
 	}
+}
+
+func monitorV2HideSlackPreviewGraphToSDK(settings *monitorV2NotificationSettingsModel) bool {
+	if settings == nil {
+		return false
+	}
+	return monitorV2Bool(settings.HideSlackPreviewGraph)
 }
 
 func monitorV2RelativeRangeFromSDK(relativeRange *models.RelativeTimerange) *monitorV2RelativeRangeModel {

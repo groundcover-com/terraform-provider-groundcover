@@ -14,11 +14,10 @@ Manages a groundcover Monitor with a typed Terraform schema. This resource avoid
 
 ```terraform
 resource "groundcover_monitor_v2" "gcql_logs" {
-  title                    = "GCQL Logs Error Count"
-  severity                 = "critical"
-  measurement_type         = "event"
-  is_paused                = true
-  hide_slack_preview_graph = true
+  title            = "GCQL Logs Error Count"
+  severity         = "critical"
+  measurement_type = "event"
+  is_paused        = true
 
   display {
     header      = "GCQL Logs Error Count"
@@ -51,11 +50,12 @@ resource "groundcover_monitor_v2" "gcql_logs" {
   }
 
   notification_settings {
-    method                  = "connectedApps"
-    connected_apps          = ["slack-connected-app-id"]
-    status_filters          = ["Alerting", "Resolved"]
-    renotification_interval = "4h"
-    disable_renotification  = false
+    method                   = "connectedApps"
+    connected_apps           = ["slack-connected-app-id"]
+    status_filters           = ["Alerting", "Resolved"]
+    renotification_interval  = "4h"
+    disable_renotification   = false
+    hide_slack_preview_graph = true
     connected_app_params = {
       "slack-connected-app-id" = {
         channels = [{ id = "C0123456789", name = "#alerts" }]
@@ -277,7 +277,6 @@ resource "groundcover_monitor_v2" "raw_sql" {
 - `display` (Block, Optional) Display metadata shown in monitor issues. (see [below for nested schema](#nestedblock--display))
 - `evaluation_interval` (Block, Optional) Monitor evaluation interval and pending duration. (see [below for nested schema](#nestedblock--evaluation_interval))
 - `execution_error_state` (String) What the monitor does when its query fails to run (for example, the data source is unreachable). One of `OK` (ignore the failure and stay healthy; the default), `Error` (mark the monitor as `Error` without firing an alert), or `Alerting` (fire an alert as if the threshold was crossed).
-- `hide_slack_preview_graph` (Boolean) Whether Slack notifications for this monitor omit the preview graph. Defaults to `false`.
 - `is_paused` (Boolean) Whether the monitor is paused.
 - `labels` (Map of String) Labels to attach to the monitor and resulting alerts.
 - `no_data_state` (String) What the monitor does when its query runs successfully but returns no data. One of `OK` (treat it as healthy), `NoData` (mark the monitor as `No Data` without firing an alert; the default), or `Alerting` (fire an alert as if the threshold was crossed).
@@ -321,6 +320,7 @@ Optional:
 - `connected_app_params` (Attributes Map) Per-connected-app delivery options keyed by connected app ID. (see [below for nested schema](#nestedatt--notification_settings--connected_app_params))
 - `connected_apps` (List of String) Connected app IDs to notify.
 - `disable_renotification` (Boolean) Whether renotification is disabled.
+- `hide_slack_preview_graph` (Boolean) Whether Slack notifications for this monitor omit the preview graph. Applies to every notification method. When omitted, the monitor keeps its current value, including one set in the UI; set `false` explicitly to show the graph again. Without a `notification_settings` block the provider sends `false`.
 - `method` (String) Notification method.
 - `renotification_interval` (String) Duration between renotifications, for example `4h`.
 - `status_filters` (List of String) Issue statuses that should notify.

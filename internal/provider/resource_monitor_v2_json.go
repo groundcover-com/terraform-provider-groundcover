@@ -48,26 +48,25 @@ type monitorV2JsonResource struct {
 // whose connected_app_params is a JSON string. Keep the non-notification fields in sync with
 // monitorV2ResourceModel.
 type monitorV2JsonResourceModel struct {
-	ID                    types.String                            `tfsdk:"id"`
-	Title                 types.String                            `tfsdk:"title"`
-	Severity              types.String                            `tfsdk:"severity"`
-	MeasurementType       types.String                            `tfsdk:"measurement_type"`
-	ExecutionErrorState   types.String                            `tfsdk:"execution_error_state"`
-	NoDataState           types.String                            `tfsdk:"no_data_state"`
-	IsPaused              types.Bool                              `tfsdk:"is_paused"`
-	AutoResolve           types.Bool                              `tfsdk:"auto_resolve"`
-	HideSlackPreviewGraph types.Bool                              `tfsdk:"hide_slack_preview_graph"`
-	Category              types.String                            `tfsdk:"category"`
-	Team                  types.String                            `tfsdk:"team"`
-	Labels                types.Map                               `tfsdk:"labels"`
-	Annotations           types.Map                               `tfsdk:"annotations"`
-	Routing               types.List                              `tfsdk:"routing"`
-	Query                 *monitorV2QueryModel                    `tfsdk:"query"`
-	Reducers              []monitorV2ReducerModel                 `tfsdk:"reducer"`
-	Thresholds            []monitorV2ThresholdModel               `tfsdk:"threshold"`
-	EvaluationInterval    *monitorV2EvaluationIntervalModel       `tfsdk:"evaluation_interval"`
-	Display               *monitorV2DisplayModel                  `tfsdk:"display"`
-	NotificationSettings  *monitorV2JsonNotificationSettingsModel `tfsdk:"notification_settings"`
+	ID                   types.String                            `tfsdk:"id"`
+	Title                types.String                            `tfsdk:"title"`
+	Severity             types.String                            `tfsdk:"severity"`
+	MeasurementType      types.String                            `tfsdk:"measurement_type"`
+	ExecutionErrorState  types.String                            `tfsdk:"execution_error_state"`
+	NoDataState          types.String                            `tfsdk:"no_data_state"`
+	IsPaused             types.Bool                              `tfsdk:"is_paused"`
+	AutoResolve          types.Bool                              `tfsdk:"auto_resolve"`
+	Category             types.String                            `tfsdk:"category"`
+	Team                 types.String                            `tfsdk:"team"`
+	Labels               types.Map                               `tfsdk:"labels"`
+	Annotations          types.Map                               `tfsdk:"annotations"`
+	Routing              types.List                              `tfsdk:"routing"`
+	Query                *monitorV2QueryModel                    `tfsdk:"query"`
+	Reducers             []monitorV2ReducerModel                 `tfsdk:"reducer"`
+	Thresholds           []monitorV2ThresholdModel               `tfsdk:"threshold"`
+	EvaluationInterval   *monitorV2EvaluationIntervalModel       `tfsdk:"evaluation_interval"`
+	Display              *monitorV2DisplayModel                  `tfsdk:"display"`
+	NotificationSettings *monitorV2JsonNotificationSettingsModel `tfsdk:"notification_settings"`
 }
 
 type monitorV2JsonNotificationSettingsModel struct {
@@ -77,6 +76,7 @@ type monitorV2JsonNotificationSettingsModel struct {
 	StatusFilters          types.List   `tfsdk:"status_filters"`
 	DisableRenotification  types.Bool   `tfsdk:"disable_renotification"`
 	RenotificationInterval types.String `tfsdk:"renotification_interval"`
+	HideSlackPreviewGraph  types.Bool   `tfsdk:"hide_slack_preview_graph"`
 }
 
 // connectedAppParamJSON is the JSON shape of a single connected_app_params entry.
@@ -293,6 +293,7 @@ func (m *monitorV2JsonResourceModel) toTyped(ctx context.Context, diags *diag.Di
 			StatusFilters:          ns.StatusFilters,
 			DisableRenotification:  ns.DisableRenotification,
 			RenotificationInterval: ns.RenotificationInterval,
+			HideSlackPreviewGraph:  ns.HideSlackPreviewGraph,
 		}
 	}
 	return typed
@@ -312,6 +313,7 @@ func monitorV2JsonModelFromTyped(ctx context.Context, typed *monitorV2ResourceMo
 			StatusFilters:          ns.StatusFilters,
 			DisableRenotification:  ns.DisableRenotification,
 			RenotificationInterval: ns.RenotificationInterval,
+			HideSlackPreviewGraph:  ns.HideSlackPreviewGraph,
 		}
 	}
 	return m
