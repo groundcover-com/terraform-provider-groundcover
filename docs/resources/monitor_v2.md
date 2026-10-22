@@ -50,12 +50,12 @@ resource "groundcover_monitor_v2" "gcql_logs" {
   }
 
   notification_settings {
-    method                   = "connectedApps"
-    connected_apps           = ["slack-connected-app-id"]
-    status_filters           = ["Alerting", "Resolved"]
-    renotification_interval  = "4h"
-    disable_renotification   = false
-    hide_slack_preview_graph = true
+    method                  = "connectedApps"
+    connected_apps          = ["slack-connected-app-id"]
+    status_filters          = ["Alerting", "Resolved"]
+    renotification_interval = "4h"
+    disable_renotification  = false
+    hide_preview_graph      = true
     connected_app_params = {
       "slack-connected-app-id" = {
         channels = [{ id = "C0123456789", name = "#alerts" }]
@@ -320,7 +320,7 @@ Optional:
 - `connected_app_params` (Attributes Map) Per-connected-app delivery options keyed by connected app ID. (see [below for nested schema](#nestedatt--notification_settings--connected_app_params))
 - `connected_apps` (List of String) Connected app IDs to notify.
 - `disable_renotification` (Boolean) Whether renotification is disabled.
-- `hide_slack_preview_graph` (Boolean) Whether notifications for this monitor omit the preview graph. Only Slack notifications show a graph today. Applies to every notification method. When omitted, the monitor keeps its current value, including one set in the UI; set `false` explicitly to show the graph again. Without a `notification_settings` block the provider sends `false`.
+- `hide_preview_graph` (Boolean) Whether notifications for this monitor omit the preview graph. Only Slack notifications show a graph today. Applies to every notification method. When omitted, the monitor keeps its current value, including one set in the UI; set `false` explicitly to show the graph again. Without a `notification_settings` block the provider sends `false`.
 - `method` (String) Notification method.
 - `renotification_interval` (String) Duration between renotifications, for example `4h`.
 - `status_filters` (List of String) Issue statuses that should notify.
