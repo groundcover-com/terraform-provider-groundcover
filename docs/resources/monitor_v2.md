@@ -320,7 +320,7 @@ Optional:
 - `connected_app_params` (Attributes Map) Per-connected-app delivery options keyed by connected app ID. (see [below for nested schema](#nestedatt--notification_settings--connected_app_params))
 - `connected_apps` (List of String) Connected app IDs to notify.
 - `disable_renotification` (Boolean) Whether renotification is disabled.
-- `hide_preview_graph` (Boolean) Whether notifications for this monitor omit the preview graph. Only Slack notifications show a graph today. Applies to every notification method. When omitted, the monitor keeps its current value, including one set in the UI; set `false` explicitly to show the graph again. Without a `notification_settings` block the provider sends `false`.
+- `hide_preview_graph` (Boolean) Whether notifications for this monitor omit the preview graph. Only Slack notifications show a graph today. Applies to every notification method. Defaults to `false`, so a value turned on in the monitor UI shows up as a plan diff; set `true` to keep it.
 - `method` (String) Notification method.
 - `renotification_interval` (String) Duration between renotifications, for example `4h`.
 - `status_filters` (List of String) Issue statuses that should notify.

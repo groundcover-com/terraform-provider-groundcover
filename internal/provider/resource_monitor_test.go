@@ -1353,13 +1353,13 @@ func TestAccMonitorV2Resource_hidePreviewGraph(t *testing.T) {
 				ImportStateVerify: true,
 			},
 			{
-				// Unrelated change (title) with the attribute omitted: the remote value must be kept.
+				// Attribute omitted: the default false owns the value and resets the remote true.
 				Config: testAccMonitorV2PauseConfig(updatedName, hideGraphBlock("")),
 				Check: resource.TestCheckResourceAttr(
-					"groundcover_monitor_v2.test", "notification_settings.hide_preview_graph", "true"),
+					"groundcover_monitor_v2.test", "notification_settings.hide_preview_graph", "false"),
 			},
 			{
-				// Explicit false must reach the API and show the graph again.
+				// Explicit false is the same as omitted.
 				Config: testAccMonitorV2PauseConfig(updatedName, hideGraphBlock("hide_preview_graph = false")),
 				Check: resource.TestCheckResourceAttr(
 					"groundcover_monitor_v2.test", "notification_settings.hide_preview_graph", "false"),

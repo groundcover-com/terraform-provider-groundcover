@@ -526,14 +526,10 @@ func (r *monitorV2Resource) Schema(_ context.Context, _ resource.SchemaRequest, 
 						Optional:            true,
 					},
 					"hide_preview_graph": schema.BoolAttribute{
-						MarkdownDescription: "Whether notifications for this monitor omit the preview graph. Only Slack notifications show a graph today. Applies to every notification method. When omitted, the monitor keeps its current value, including one set in the UI; set `false` explicitly to show the graph again. Without a `notification_settings` block the provider sends `false`.",
+						MarkdownDescription: "Whether notifications for this monitor omit the preview graph. Only Slack notifications show a graph today. Applies to every notification method. Defaults to `false`, so a value turned on in the monitor UI shows up as a plan diff; set `true` to keep it.",
 						Optional:            true,
 						Computed:            true,
-						// No Default, as with is_paused: an omitted value keeps the refreshed
-						// remote one, so applying does not undo a value set in the UI.
-						PlanModifiers: []planmodifier.Bool{
-							boolplanmodifier.UseStateForUnknown(),
-						},
+						Default:             booldefault.StaticBool(false),
 					},
 				},
 			},
