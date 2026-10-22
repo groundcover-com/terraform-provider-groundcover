@@ -1,3 +1,8 @@
+## 1.22.7
+
+* Added `notification_settings.hide_preview_graph` to `groundcover_monitor_v2` and `groundcover_monitor_v2_json`. When `true`, notifications for the monitor omit the preview graph (only Slack notifications show one today), matching the option in the monitor UI. It applies to every notification method
+* Upgrade note: when `hide_preview_graph` is omitted, the provider keeps the monitor's current value, including one set in the UI. Set it to `false` explicitly to show the graph again. A monitor without a `notification_settings` block cannot keep the value: if it was turned on in the UI, the next plan shows the block being removed, and applying turns it off. Add a `notification_settings` block to keep it
+
 ## 1.22.6
 
 * Documented the accepted values and defaults for `execution_error_state` and `no_data_state` on `groundcover_monitor_v2` and `groundcover_monitor_v2_json`, with examples for each option
@@ -9,11 +14,6 @@
 * Added `confluentscrape` and Azure resource-type examples
 * Fixed the `clickhousedbm` and `postgresqldbm` examples to set `cluster` when the password is a `secretRef::k8s::` reference
 * Fixed `groundcover_recurring_silence` rejecting valid non-UTC timezones such as `America/New_York`
-
-## 1.23.0
-
-* Added `notification_settings.hide_preview_graph` to `groundcover_monitor_v2` and `groundcover_monitor_v2_json`. When `true`, notifications for the monitor omit the preview graph (only Slack notifications show one today), matching the option in the monitor UI. It applies to every notification method
-* Upgrade note: when `hide_preview_graph` is omitted, the provider keeps the monitor's current value, including one set in the UI. Set it to `false` explicitly to show the graph again. A monitor without a `notification_settings` block cannot keep the value: if it was turned on in the UI, the next plan shows the block being removed, and applying turns it off. Add a `notification_settings` block to keep it
 
 ## 1.22.4
 
