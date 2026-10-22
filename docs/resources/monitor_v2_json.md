@@ -116,7 +116,7 @@ Optional:
 - `connected_app_params` (String) JSON-encoded per-connected-app delivery options keyed by connected app ID. String form of `groundcover_monitor_v2.connected_app_params`, for schema code generators (Crossplane/upjet) that cannot represent nested maps. Each entry is an object with: `channels` (list of `{ id (required), name }`) and the optional Linear fields `team_id`, `assignee_id`, `delegate_id`, `project_id`, `resolved_status_id`, `label_ids` (list of strings), and `auto_resolve` (bool). Example: `jsonencode({ "app-id" = { channels = [{ id = "C123", name = "#alerts" }], team_id = "T1", label_ids = ["L1"], auto_resolve = true } })`.
 - `connected_apps` (List of String) Connected app IDs to notify.
 - `disable_renotification` (Boolean) Whether renotification is disabled.
-- `hide_slack_preview_graph` (Boolean) Whether Slack notifications for this monitor omit the preview graph. Applies to every notification method. When omitted, the monitor keeps its current value, including one set in the UI; set `false` explicitly to show the graph again. Without a `notification_settings` block the provider sends `false`.
+- `hide_slack_preview_graph` (Boolean) Whether notifications for this monitor omit the preview graph. Only Slack notifications show a graph today. Applies to every notification method. When omitted, the monitor keeps its current value, including one set in the UI; set `false` explicitly to show the graph again. Without a `notification_settings` block the provider sends `false`.
 - `method` (String) Notification method.
 - `renotification_interval` (String) Duration between renotifications, for example `4h`.
 - `status_filters` (List of String) Issue statuses that should notify.

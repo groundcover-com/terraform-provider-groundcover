@@ -76,7 +76,7 @@ type monitorV2JsonNotificationSettingsModel struct {
 	StatusFilters          types.List   `tfsdk:"status_filters"`
 	DisableRenotification  types.Bool   `tfsdk:"disable_renotification"`
 	RenotificationInterval types.String `tfsdk:"renotification_interval"`
-	HideSlackPreviewGraph  types.Bool   `tfsdk:"hide_slack_preview_graph"`
+	HidePreviewGraph       types.Bool   `tfsdk:"hide_preview_graph"`
 }
 
 // connectedAppParamJSON is the JSON shape of a single connected_app_params entry.
@@ -293,7 +293,7 @@ func (m *monitorV2JsonResourceModel) toTyped(ctx context.Context, diags *diag.Di
 			StatusFilters:          ns.StatusFilters,
 			DisableRenotification:  ns.DisableRenotification,
 			RenotificationInterval: ns.RenotificationInterval,
-			HideSlackPreviewGraph:  ns.HideSlackPreviewGraph,
+			HidePreviewGraph:       ns.HidePreviewGraph,
 		}
 	}
 	return typed
@@ -313,7 +313,7 @@ func monitorV2JsonModelFromTyped(ctx context.Context, typed *monitorV2ResourceMo
 			StatusFilters:          ns.StatusFilters,
 			DisableRenotification:  ns.DisableRenotification,
 			RenotificationInterval: ns.RenotificationInterval,
-			HideSlackPreviewGraph:  ns.HideSlackPreviewGraph,
+			HidePreviewGraph:       ns.HidePreviewGraph,
 		}
 	}
 	return m

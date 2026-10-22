@@ -145,7 +145,7 @@ type monitorV2NotificationSettingsModel struct {
 	StatusFilters          types.List   `tfsdk:"status_filters"`
 	DisableRenotification  types.Bool   `tfsdk:"disable_renotification"`
 	RenotificationInterval types.String `tfsdk:"renotification_interval"`
-	HideSlackPreviewGraph  types.Bool   `tfsdk:"hide_slack_preview_graph"`
+	HidePreviewGraph       types.Bool   `tfsdk:"hide_preview_graph"`
 }
 
 type monitorV2ConnectedAppDeliveryOptionsModel struct {
@@ -525,8 +525,8 @@ func (r *monitorV2Resource) Schema(_ context.Context, _ resource.SchemaRequest, 
 						MarkdownDescription: "Duration between renotifications, for example `4h`.",
 						Optional:            true,
 					},
-					"hide_slack_preview_graph": schema.BoolAttribute{
-						MarkdownDescription: "Whether Slack notifications for this monitor omit the preview graph. Applies to every notification method. When omitted, the monitor keeps its current value, including one set in the UI; set `false` explicitly to show the graph again. Without a `notification_settings` block the provider sends `false`.",
+					"hide_preview_graph": schema.BoolAttribute{
+						MarkdownDescription: "Whether notifications for this monitor omit the preview graph. Only Slack notifications show a graph today. Applies to every notification method. When omitted, the monitor keeps its current value, including one set in the UI; set `false` explicitly to show the graph again. Without a `notification_settings` block the provider sends `false`.",
 						Optional:            true,
 						Computed:            true,
 						// No Default, as with is_paused: an omitted value keeps the refreshed
@@ -977,7 +977,7 @@ func buildMonitorV2CreateRequest(ctx context.Context, plan *monitorV2ResourceMod
 		AutoResolve:           monitorV2Bool(plan.AutoResolve),
 		Category:              monitorV2String(plan.Category),
 		ExecutionErrorState:   monitorV2String(plan.ExecutionErrorState),
-		HideSlackPreviewGraph: monitorV2HideSlackPreviewGraphToSDK(plan.NotificationSettings),
+		HideSlackPreviewGraph: monitorV2HidePreviewGraphToSDK(plan.NotificationSettings),
 		IsPaused:              monitorV2BoolPtr(plan.IsPaused),
 		IsProvisioned:         &isProvisioned,
 		Labels:                monitorV2StringMap(ctx, plan.Labels, &diags),
@@ -1003,7 +1003,7 @@ func buildMonitorV2UpdateRequest(ctx context.Context, plan *monitorV2ResourceMod
 		AutoResolve:           monitorV2Bool(plan.AutoResolve),
 		Category:              monitorV2String(plan.Category),
 		ExecutionErrorState:   monitorV2String(plan.ExecutionErrorState),
-		HideSlackPreviewGraph: monitorV2HideSlackPreviewGraphToSDK(plan.NotificationSettings),
+		HideSlackPreviewGraph: monitorV2HidePreviewGraphToSDK(plan.NotificationSettings),
 		IsPaused:              monitorV2BoolPtr(plan.IsPaused),
 		Labels:                monitorV2StringMap(ctx, plan.Labels, &diags),
 		MeasurementType:       monitorV2String(plan.MeasurementType),
@@ -1446,13 +1446,13 @@ func monitorV2DisplayFromSDK(ctx context.Context, display *models.DisplayModel, 
 	}
 }
 
-// monitorV2NotificationSettingsFromSDK takes hideSlackPreviewGraph separately because the API
+// monitorV2NotificationSettingsFromSDK takes hidePreviewGraph separately because the API
 // carries it at the monitor's top level while Terraform nests it in notification_settings. A
 // true value with no remote notificationSettings still yields a block, so the setting surfaces
 // as drift instead of being silently dropped.
-func monitorV2NotificationSettingsFromSDK(ctx context.Context, settings *models.NotificationSettings, hideSlackPreviewGraph bool, diags *diag.Diagnostics) *monitorV2NotificationSettingsModel {
+func monitorV2NotificationSettingsFromSDK(ctx context.Context, settings *models.NotificationSettings, hidePreviewGraph bool, diags *diag.Diagnostics) *monitorV2NotificationSettingsModel {
 	if settings == nil {
-		if !hideSlackPreviewGraph {
+		if !hidePreviewGraph {
 			return nil
 		}
 		settings = &models.NotificationSettings{}
@@ -1464,15 +1464,15 @@ func monitorV2NotificationSettingsFromSDK(ctx context.Context, settings *models.
 		StatusFilters:          monitorV2IssueStatusListType(ctx, settings.StatusFilters, diags),
 		DisableRenotification:  types.BoolValue(settings.DisableRenotification),
 		RenotificationInterval: monitorV2AnyString(settings.RenotificationInterval),
-		HideSlackPreviewGraph:  types.BoolValue(hideSlackPreviewGraph),
+		HidePreviewGraph:       types.BoolValue(hidePreviewGraph),
 	}
 }
 
-func monitorV2HideSlackPreviewGraphToSDK(settings *monitorV2NotificationSettingsModel) bool {
+func monitorV2HidePreviewGraphToSDK(settings *monitorV2NotificationSettingsModel) bool {
 	if settings == nil {
 		return false
 	}
-	return monitorV2Bool(settings.HideSlackPreviewGraph)
+	return monitorV2Bool(settings.HidePreviewGraph)
 }
 
 func monitorV2RelativeRangeFromSDK(relativeRange *models.RelativeTimerange) *monitorV2RelativeRangeModel {

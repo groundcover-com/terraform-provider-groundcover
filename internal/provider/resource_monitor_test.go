@@ -99,7 +99,7 @@ func TestMonitorV2BuildCreateRequestGCQL(t *testing.T) {
 	requireNoInternalMonitorV2Annotations(t, req.Annotations)
 }
 
-func TestMonitorV2HideSlackPreviewGraphRoundTrip(t *testing.T) {
+func TestMonitorV2HidePreviewGraphRoundTrip(t *testing.T) {
 	ctx := context.Background()
 	plan := testMonitorV2BasePlan(t, &monitorV2QueryModel{
 		Type:          types.StringValue(monitorV2QueryTypeGCQL),
@@ -114,7 +114,7 @@ func TestMonitorV2HideSlackPreviewGraphRoundTrip(t *testing.T) {
 		StatusFilters:          types.ListNull(types.StringType),
 		DisableRenotification:  types.BoolValue(false),
 		RenotificationInterval: types.StringNull(),
-		HideSlackPreviewGraph:  types.BoolValue(true),
+		HidePreviewGraph:       types.BoolValue(true),
 	}
 
 	createReq, diags := buildMonitorV2CreateRequest(ctx, &plan)
@@ -138,11 +138,11 @@ func TestMonitorV2HideSlackPreviewGraphRoundTrip(t *testing.T) {
 	if diags.HasError() {
 		t.Fatalf("mapMonitorV2SDKToModel() diagnostics: %v", diags)
 	}
-	if state.NotificationSettings == nil || !state.NotificationSettings.HideSlackPreviewGraph.ValueBool() {
-		t.Fatalf("state.NotificationSettings.HideSlackPreviewGraph not true: %+v", state.NotificationSettings)
+	if state.NotificationSettings == nil || !state.NotificationSettings.HidePreviewGraph.ValueBool() {
+		t.Fatalf("state.NotificationSettings.HidePreviewGraph not true: %+v", state.NotificationSettings)
 	}
 
-	plan.NotificationSettings.HideSlackPreviewGraph = types.BoolValue(false)
+	plan.NotificationSettings.HidePreviewGraph = types.BoolValue(false)
 	updateReq, diags = buildMonitorV2UpdateRequest(ctx, &plan)
 	if diags.HasError() {
 		t.Fatalf("buildMonitorV2UpdateRequest() diagnostics: %v", diags)
@@ -161,7 +161,7 @@ func TestMonitorV2HideSlackPreviewGraphRoundTrip(t *testing.T) {
 	}
 }
 
-func TestMonitorV2HideSlackPreviewGraphWithoutRemoteNotificationSettings(t *testing.T) {
+func TestMonitorV2HidePreviewGraphWithoutRemoteNotificationSettings(t *testing.T) {
 	ctx := context.Background()
 	var diags diag.Diagnostics
 
@@ -173,8 +173,8 @@ func TestMonitorV2HideSlackPreviewGraphWithoutRemoteNotificationSettings(t *test
 	if diags.HasError() {
 		t.Fatalf("monitorV2NotificationSettingsFromSDK() diagnostics: %v", diags)
 	}
-	if got == nil || !got.HideSlackPreviewGraph.ValueBool() {
-		t.Fatalf("monitorV2NotificationSettingsFromSDK(nil, true) = %+v, want a block with hide_slack_preview_graph = true", got)
+	if got == nil || !got.HidePreviewGraph.ValueBool() {
+		t.Fatalf("monitorV2NotificationSettingsFromSDK(nil, true) = %+v, want a block with hide_preview_graph = true", got)
 	}
 	if !got.Method.IsNull() || got.DisableRenotification.ValueBool() {
 		t.Fatalf("synthesized block carries unexpected values: %+v", got)
@@ -1324,7 +1324,7 @@ func TestAccMonitorV2Resource_pauseState(t *testing.T) {
 	})
 }
 
-func TestAccMonitorV2Resource_hideSlackPreviewGraph(t *testing.T) {
+func TestAccMonitorV2Resource_hidePreviewGraph(t *testing.T) {
 	name := acctest.RandomWithPrefix("test-monitor-v2-hide-graph")
 	updatedName := acctest.RandomWithPrefix("test-monitor-v2-hide-graph-updated")
 	hideGraphBlock := func(attributeLine string) string {
@@ -1336,14 +1336,14 @@ func TestAccMonitorV2Resource_hideSlackPreviewGraph(t *testing.T) {
 		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
 		Steps: []resource.TestStep{
 			{
-				Config: testAccMonitorV2PauseConfig(name, hideGraphBlock("hide_slack_preview_graph = true")),
+				Config: testAccMonitorV2PauseConfig(name, hideGraphBlock("hide_preview_graph = true")),
 				Check: resource.ComposeAggregateTestCheckFunc(
-					resource.TestCheckResourceAttr("groundcover_monitor_v2.test", "notification_settings.hide_slack_preview_graph", "true"),
+					resource.TestCheckResourceAttr("groundcover_monitor_v2.test", "notification_settings.hide_preview_graph", "true"),
 					resource.TestCheckNoResourceAttr("groundcover_monitor_v2.test", "annotations._gc_hide_slack_preview_graph"),
 				),
 			},
 			{
-				Config:             testAccMonitorV2PauseConfig(name, hideGraphBlock("hide_slack_preview_graph = true")),
+				Config:             testAccMonitorV2PauseConfig(name, hideGraphBlock("hide_preview_graph = true")),
 				PlanOnly:           true,
 				ExpectNonEmptyPlan: false,
 			},
@@ -1356,16 +1356,16 @@ func TestAccMonitorV2Resource_hideSlackPreviewGraph(t *testing.T) {
 				// Unrelated change (title) with the attribute omitted: the remote value must be kept.
 				Config: testAccMonitorV2PauseConfig(updatedName, hideGraphBlock("")),
 				Check: resource.TestCheckResourceAttr(
-					"groundcover_monitor_v2.test", "notification_settings.hide_slack_preview_graph", "true"),
+					"groundcover_monitor_v2.test", "notification_settings.hide_preview_graph", "true"),
 			},
 			{
 				// Explicit false must reach the API and show the graph again.
-				Config: testAccMonitorV2PauseConfig(updatedName, hideGraphBlock("hide_slack_preview_graph = false")),
+				Config: testAccMonitorV2PauseConfig(updatedName, hideGraphBlock("hide_preview_graph = false")),
 				Check: resource.TestCheckResourceAttr(
-					"groundcover_monitor_v2.test", "notification_settings.hide_slack_preview_graph", "false"),
+					"groundcover_monitor_v2.test", "notification_settings.hide_preview_graph", "false"),
 			},
 			{
-				Config:             testAccMonitorV2PauseConfig(updatedName, hideGraphBlock("hide_slack_preview_graph = false")),
+				Config:             testAccMonitorV2PauseConfig(updatedName, hideGraphBlock("hide_preview_graph = false")),
 				PlanOnly:           true,
 				ExpectNonEmptyPlan: false,
 			},

@@ -12,8 +12,8 @@
 
 ## 1.23.0
 
-* Added `notification_settings.hide_slack_preview_graph` to `groundcover_monitor_v2` and `groundcover_monitor_v2_json`. When `true`, Slack notifications for the monitor omit the preview graph, matching the option in the monitor UI. It applies to every notification method
-* Upgrade note: when `hide_slack_preview_graph` is omitted, the provider keeps the monitor's current value, including one set in the UI. Set it to `false` explicitly to show the graph again. A monitor without a `notification_settings` block cannot keep the value: if it was turned on in the UI, the next plan shows the block being removed, and applying turns it off. Add a `notification_settings` block to keep it
+* Added `notification_settings.hide_preview_graph` to `groundcover_monitor_v2` and `groundcover_monitor_v2_json`. When `true`, notifications for the monitor omit the preview graph (only Slack notifications show one today), matching the option in the monitor UI. It applies to every notification method
+* Upgrade note: when `hide_preview_graph` is omitted, the provider keeps the monitor's current value, including one set in the UI. Set it to `false` explicitly to show the graph again. A monitor without a `notification_settings` block cannot keep the value: if it was turned on in the UI, the next plan shows the block being removed, and applying turns it off. Add a `notification_settings` block to keep it
 
 ## 1.22.4
 
