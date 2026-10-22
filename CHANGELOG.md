@@ -1,3 +1,8 @@
+## 1.22.7
+
+* Added `notification_settings.hide_preview_graph` to `groundcover_monitor_v2` and `groundcover_monitor_v2_json`. When `true`, notifications for the monitor omit the preview graph (only Slack notifications show one today), matching the option in the monitor UI. It applies to every notification method
+* Upgrade note: `hide_preview_graph` defaults to `false`. Monitors with the graph hidden in the UI show a `true -> false` diff after upgrading; add `hide_preview_graph = true` to keep it
+
 ## 1.22.6
 
 * Documented the accepted values and defaults for `execution_error_state` and `no_data_state` on `groundcover_monitor_v2` and `groundcover_monitor_v2_json`, with examples for each option

@@ -145,6 +145,7 @@ type monitorV2NotificationSettingsModel struct {
 	StatusFilters          types.List   `tfsdk:"status_filters"`
 	DisableRenotification  types.Bool   `tfsdk:"disable_renotification"`
 	RenotificationInterval types.String `tfsdk:"renotification_interval"`
+	HidePreviewGraph       types.Bool   `tfsdk:"hide_preview_graph"`
 }
 
 type monitorV2ConnectedAppDeliveryOptionsModel struct {
@@ -523,6 +524,12 @@ func (r *monitorV2Resource) Schema(_ context.Context, _ resource.SchemaRequest, 
 					"renotification_interval": schema.StringAttribute{
 						MarkdownDescription: "Duration between renotifications, for example `4h`.",
 						Optional:            true,
+					},
+					"hide_preview_graph": schema.BoolAttribute{
+						MarkdownDescription: "Whether notifications for this monitor omit the preview graph. Only Slack notifications show a graph today. Applies to every notification method. Defaults to `false`, so a value turned on in the monitor UI shows up as a plan diff; set `true` to keep it.",
+						Optional:            true,
+						Computed:            true,
+						Default:             booldefault.StaticBool(false),
 					},
 				},
 			},
@@ -962,24 +969,25 @@ func buildMonitorV2CreateRequest(ctx context.Context, plan *monitorV2ResourceMod
 	var diags diag.Diagnostics
 	isProvisioned := true
 	req := &models.CreateMonitorRequest{
-		Annotations:          monitorV2AnnotationsToSDK(ctx, plan.Annotations, &diags),
-		AutoResolve:          monitorV2Bool(plan.AutoResolve),
-		Category:             monitorV2String(plan.Category),
-		ExecutionErrorState:  monitorV2String(plan.ExecutionErrorState),
-		IsPaused:             monitorV2BoolPtr(plan.IsPaused),
-		IsProvisioned:        &isProvisioned,
-		Labels:               monitorV2StringMap(ctx, plan.Labels, &diags),
-		MeasurementType:      monitorV2String(plan.MeasurementType),
-		NoDataState:          monitorV2String(plan.NoDataState),
-		Routing:              monitorV2StringList(ctx, plan.Routing, &diags),
-		Severity:             monitorV2String(plan.Severity),
-		Team:                 monitorV2String(plan.Team),
-		Title:                monitorV2StringPtr(plan.Title),
-		Catalog:              nil,
-		Display:              monitorV2DisplayToSDK(ctx, plan.Display, &diags),
-		EvaluationInterval:   monitorV2EvaluationIntervalToSDK(plan.EvaluationInterval, &diags),
-		Model:                monitorV2ModelToSDK(ctx, plan, &diags),
-		NotificationSettings: monitorV2NotificationSettingsToSDK(ctx, plan.NotificationSettings, &diags),
+		Annotations:           monitorV2AnnotationsToSDK(ctx, plan.Annotations, &diags),
+		AutoResolve:           monitorV2Bool(plan.AutoResolve),
+		Category:              monitorV2String(plan.Category),
+		ExecutionErrorState:   monitorV2String(plan.ExecutionErrorState),
+		HideSlackPreviewGraph: monitorV2HidePreviewGraphToSDK(plan.NotificationSettings),
+		IsPaused:              monitorV2BoolPtr(plan.IsPaused),
+		IsProvisioned:         &isProvisioned,
+		Labels:                monitorV2StringMap(ctx, plan.Labels, &diags),
+		MeasurementType:       monitorV2String(plan.MeasurementType),
+		NoDataState:           monitorV2String(plan.NoDataState),
+		Routing:               monitorV2StringList(ctx, plan.Routing, &diags),
+		Severity:              monitorV2String(plan.Severity),
+		Team:                  monitorV2String(plan.Team),
+		Title:                 monitorV2StringPtr(plan.Title),
+		Catalog:               nil,
+		Display:               monitorV2DisplayToSDK(ctx, plan.Display, &diags),
+		EvaluationInterval:    monitorV2EvaluationIntervalToSDK(plan.EvaluationInterval, &diags),
+		Model:                 monitorV2ModelToSDK(ctx, plan, &diags),
+		NotificationSettings:  monitorV2NotificationSettingsToSDK(ctx, plan.NotificationSettings, &diags),
 	}
 	return req, diags
 }
@@ -987,23 +995,24 @@ func buildMonitorV2CreateRequest(ctx context.Context, plan *monitorV2ResourceMod
 func buildMonitorV2UpdateRequest(ctx context.Context, plan *monitorV2ResourceModel) (*models.UpdateMonitorRequest, diag.Diagnostics) {
 	var diags diag.Diagnostics
 	req := &models.UpdateMonitorRequest{
-		Annotations:          monitorV2AnnotationsToSDK(ctx, plan.Annotations, &diags),
-		AutoResolve:          monitorV2Bool(plan.AutoResolve),
-		Category:             monitorV2String(plan.Category),
-		ExecutionErrorState:  monitorV2String(plan.ExecutionErrorState),
-		IsPaused:             monitorV2BoolPtr(plan.IsPaused),
-		Labels:               monitorV2StringMap(ctx, plan.Labels, &diags),
-		MeasurementType:      monitorV2String(plan.MeasurementType),
-		NoDataState:          monitorV2String(plan.NoDataState),
-		Routing:              monitorV2StringList(ctx, plan.Routing, &diags),
-		Severity:             monitorV2String(plan.Severity),
-		Team:                 monitorV2String(plan.Team),
-		Title:                monitorV2StringPtr(plan.Title),
-		Catalog:              nil,
-		Display:              monitorV2DisplayToSDK(ctx, plan.Display, &diags),
-		EvaluationInterval:   monitorV2EvaluationIntervalToSDK(plan.EvaluationInterval, &diags),
-		Model:                monitorV2ModelToSDK(ctx, plan, &diags),
-		NotificationSettings: monitorV2NotificationSettingsToSDK(ctx, plan.NotificationSettings, &diags),
+		Annotations:           monitorV2AnnotationsToSDK(ctx, plan.Annotations, &diags),
+		AutoResolve:           monitorV2Bool(plan.AutoResolve),
+		Category:              monitorV2String(plan.Category),
+		ExecutionErrorState:   monitorV2String(plan.ExecutionErrorState),
+		HideSlackPreviewGraph: monitorV2HidePreviewGraphToSDK(plan.NotificationSettings),
+		IsPaused:              monitorV2BoolPtr(plan.IsPaused),
+		Labels:                monitorV2StringMap(ctx, plan.Labels, &diags),
+		MeasurementType:       monitorV2String(plan.MeasurementType),
+		NoDataState:           monitorV2String(plan.NoDataState),
+		Routing:               monitorV2StringList(ctx, plan.Routing, &diags),
+		Severity:              monitorV2String(plan.Severity),
+		Team:                  monitorV2String(plan.Team),
+		Title:                 monitorV2StringPtr(plan.Title),
+		Catalog:               nil,
+		Display:               monitorV2DisplayToSDK(ctx, plan.Display, &diags),
+		EvaluationInterval:    monitorV2EvaluationIntervalToSDK(plan.EvaluationInterval, &diags),
+		Model:                 monitorV2ModelToSDK(ctx, plan, &diags),
+		NotificationSettings:  monitorV2NotificationSettingsToSDK(ctx, plan.NotificationSettings, &diags),
 	}
 	return req, diags
 }
@@ -1213,7 +1222,7 @@ func mapMonitorV2SDKToModel(ctx context.Context, id string, remote *models.Updat
 	state.Routing = monitorV2StringListType(ctx, remote.Routing, diags)
 	state.Display = monitorV2DisplayFromSDK(ctx, remote.Display, diags)
 	state.EvaluationInterval = monitorV2PreserveEvaluationIntervalDurations(previousEvaluationInterval, monitorV2EvaluationIntervalFromSDK(remote.EvaluationInterval))
-	state.NotificationSettings = monitorV2PreserveNotificationSettingsDurations(previousNotificationSettings, monitorV2NotificationSettingsFromSDK(ctx, remote.NotificationSettings, diags))
+	state.NotificationSettings = monitorV2PreserveNotificationSettingsDurations(previousNotificationSettings, monitorV2NotificationSettingsFromSDK(ctx, remote.NotificationSettings, remote.HideSlackPreviewGraph, diags))
 
 	if remote.Model == nil {
 		state.Query = nil
@@ -1433,9 +1442,16 @@ func monitorV2DisplayFromSDK(ctx context.Context, display *models.DisplayModel, 
 	}
 }
 
-func monitorV2NotificationSettingsFromSDK(ctx context.Context, settings *models.NotificationSettings, diags *diag.Diagnostics) *monitorV2NotificationSettingsModel {
+// monitorV2NotificationSettingsFromSDK takes hidePreviewGraph separately because the API
+// carries it at the monitor's top level while Terraform nests it in notification_settings. A
+// true value with no remote notificationSettings still yields a block, so the setting surfaces
+// as drift instead of being silently dropped.
+func monitorV2NotificationSettingsFromSDK(ctx context.Context, settings *models.NotificationSettings, hidePreviewGraph bool, diags *diag.Diagnostics) *monitorV2NotificationSettingsModel {
 	if settings == nil {
-		return nil
+		if !hidePreviewGraph {
+			return nil
+		}
+		settings = &models.NotificationSettings{}
 	}
 	return &monitorV2NotificationSettingsModel{
 		Method:                 monitorV2NullableString(settings.Method),
@@ -1444,7 +1460,15 @@ func monitorV2NotificationSettingsFromSDK(ctx context.Context, settings *models.
 		StatusFilters:          monitorV2IssueStatusListType(ctx, settings.StatusFilters, diags),
 		DisableRenotification:  types.BoolValue(settings.DisableRenotification),
 		RenotificationInterval: monitorV2AnyString(settings.RenotificationInterval),
+		HidePreviewGraph:       types.BoolValue(hidePreviewGraph),
 	}
+}
+
+func monitorV2HidePreviewGraphToSDK(settings *monitorV2NotificationSettingsModel) bool {
+	if settings == nil {
+		return false
+	}
+	return monitorV2Bool(settings.HidePreviewGraph)
 }
 
 func monitorV2RelativeRangeFromSDK(relativeRange *models.RelativeTimerange) *monitorV2RelativeRangeModel {

@@ -40,6 +40,7 @@ resource "groundcover_monitor_v2" "gcql_logs" {
     status_filters          = ["Alerting", "Resolved"]
     renotification_interval = "4h"
     disable_renotification  = false
+    hide_preview_graph      = true
     connected_app_params = {
       "slack-connected-app-id" = {
         channels = [{ id = "C0123456789", name = "#alerts" }]

@@ -99,6 +99,88 @@ func TestMonitorV2BuildCreateRequestGCQL(t *testing.T) {
 	requireNoInternalMonitorV2Annotations(t, req.Annotations)
 }
 
+func TestMonitorV2HidePreviewGraphRoundTrip(t *testing.T) {
+	ctx := context.Background()
+	plan := testMonitorV2BasePlan(t, &monitorV2QueryModel{
+		Type:          types.StringValue(monitorV2QueryTypeGCQL),
+		Expression:    types.StringValue(`level:error | stats count() count_all_result`),
+		DataType:      types.StringValue("logs"),
+		InstantRollup: types.StringValue("5m"),
+	})
+	plan.NotificationSettings = &monitorV2NotificationSettingsModel{
+		Method:                 types.StringValue("notificationRoutes"),
+		ConnectedApps:          types.ListNull(types.StringType),
+		ConnectedAppParams:     types.MapNull(types.ObjectType{AttrTypes: monitorV2ConnectedAppDeliveryOptionsAttrTypes()}),
+		StatusFilters:          types.ListNull(types.StringType),
+		DisableRenotification:  types.BoolValue(false),
+		RenotificationInterval: types.StringNull(),
+		HidePreviewGraph:       types.BoolValue(true),
+	}
+
+	createReq, diags := buildMonitorV2CreateRequest(ctx, &plan)
+	if diags.HasError() {
+		t.Fatalf("buildMonitorV2CreateRequest() diagnostics: %v", diags)
+	}
+	if !createReq.HideSlackPreviewGraph {
+		t.Fatalf("CreateMonitorRequest.HideSlackPreviewGraph = false, want true")
+	}
+
+	updateReq, diags := buildMonitorV2UpdateRequest(ctx, &plan)
+	if diags.HasError() {
+		t.Fatalf("buildMonitorV2UpdateRequest() diagnostics: %v", diags)
+	}
+	if !updateReq.HideSlackPreviewGraph {
+		t.Fatalf("UpdateMonitorRequest.HideSlackPreviewGraph = false, want true")
+	}
+
+	var state monitorV2ResourceModel
+	mapMonitorV2SDKToModel(ctx, "monitor-id", updateReq, &state, &diags)
+	if diags.HasError() {
+		t.Fatalf("mapMonitorV2SDKToModel() diagnostics: %v", diags)
+	}
+	if state.NotificationSettings == nil || !state.NotificationSettings.HidePreviewGraph.ValueBool() {
+		t.Fatalf("state.NotificationSettings.HidePreviewGraph not true: %+v", state.NotificationSettings)
+	}
+
+	plan.NotificationSettings.HidePreviewGraph = types.BoolValue(false)
+	updateReq, diags = buildMonitorV2UpdateRequest(ctx, &plan)
+	if diags.HasError() {
+		t.Fatalf("buildMonitorV2UpdateRequest() diagnostics: %v", diags)
+	}
+	if updateReq.HideSlackPreviewGraph {
+		t.Fatalf("UpdateMonitorRequest.HideSlackPreviewGraph = true, want false")
+	}
+
+	plan.NotificationSettings = nil
+	updateReq, diags = buildMonitorV2UpdateRequest(ctx, &plan)
+	if diags.HasError() {
+		t.Fatalf("buildMonitorV2UpdateRequest() diagnostics: %v", diags)
+	}
+	if updateReq.HideSlackPreviewGraph {
+		t.Fatalf("UpdateMonitorRequest.HideSlackPreviewGraph = true without notification_settings, want false")
+	}
+}
+
+func TestMonitorV2HidePreviewGraphWithoutRemoteNotificationSettings(t *testing.T) {
+	ctx := context.Background()
+	var diags diag.Diagnostics
+
+	if got := monitorV2NotificationSettingsFromSDK(ctx, nil, false, &diags); got != nil {
+		t.Fatalf("monitorV2NotificationSettingsFromSDK(nil, false) = %+v, want nil", got)
+	}
+
+	got := monitorV2NotificationSettingsFromSDK(ctx, nil, true, &diags)
+	if diags.HasError() {
+		t.Fatalf("monitorV2NotificationSettingsFromSDK() diagnostics: %v", diags)
+	}
+	if got == nil || !got.HidePreviewGraph.ValueBool() {
+		t.Fatalf("monitorV2NotificationSettingsFromSDK(nil, true) = %+v, want a block with hide_preview_graph = true", got)
+	}
+	if !got.Method.IsNull() || got.DisableRenotification.ValueBool() {
+		t.Fatalf("synthesized block carries unexpected values: %+v", got)
+	}
+}
+
 func TestMonitorV2BuildCreateRequestGCQLAPM(t *testing.T) {
 	ctx := context.Background()
 	plan := testMonitorV2BasePlan(t, &monitorV2QueryModel{
@@ -1242,6 +1324,55 @@ func TestAccMonitorV2Resource_pauseState(t *testing.T) {
 	})
 }
 
+func TestAccMonitorV2Resource_hidePreviewGraph(t *testing.T) {
+	name := acctest.RandomWithPrefix("test-monitor-v2-hide-graph")
+	updatedName := acctest.RandomWithPrefix("test-monitor-v2-hide-graph-updated")
+	hideGraphBlock := func(attributeLine string) string {
+		return fmt.Sprintf("notification_settings {\n    method = \"notificationRoutes\"\n    %s\n  }", attributeLine)
+	}
+
+	resource.Test(t, resource.TestCase{
+		PreCheck:                 func() { testAccPreCheck(t) },
+		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
+		Steps: []resource.TestStep{
+			{
+				Config: testAccMonitorV2PauseConfig(name, hideGraphBlock("hide_preview_graph = true")),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					resource.TestCheckResourceAttr("groundcover_monitor_v2.test", "notification_settings.hide_preview_graph", "true"),
+					resource.TestCheckNoResourceAttr("groundcover_monitor_v2.test", "annotations._gc_hide_slack_preview_graph"),
+				),
+			},
+			{
+				Config:             testAccMonitorV2PauseConfig(name, hideGraphBlock("hide_preview_graph = true")),
+				PlanOnly:           true,
+				ExpectNonEmptyPlan: false,
+			},
+			{
+				ResourceName:      "groundcover_monitor_v2.test",
+				ImportState:       true,
+				ImportStateVerify: true,
+			},
+			{
+				// Attribute omitted: the default false owns the value and resets the remote true.
+				Config: testAccMonitorV2PauseConfig(updatedName, hideGraphBlock("")),
+				Check: resource.TestCheckResourceAttr(
+					"groundcover_monitor_v2.test", "notification_settings.hide_preview_graph", "false"),
+			},
+			{
+				// Explicit false is the same as omitted.
+				Config: testAccMonitorV2PauseConfig(updatedName, hideGraphBlock("hide_preview_graph = false")),
+				Check: resource.TestCheckResourceAttr(
+					"groundcover_monitor_v2.test", "notification_settings.hide_preview_graph", "false"),
+			},
+			{
+				Config:             testAccMonitorV2PauseConfig(updatedName, hideGraphBlock("hide_preview_graph = false")),
+				PlanOnly:           true,
+				ExpectNonEmptyPlan: false,
+			},
+		},
+	})
+}
+
 func TestAccMonitorV2Resource_importThenUpdate(t *testing.T) {
 	name := acctest.RandomWithPrefix("test-monitor-v2-import")
 	updatedName := acctest.RandomWithPrefix("test-monitor-v2-import-updated")
@@ -1370,7 +1501,7 @@ resource "groundcover_monitor_v2" "test" {
 `, name)
 }
 
-func testAccMonitorV2PauseConfig(name, isPausedLine string) string {
+func testAccMonitorV2PauseConfig(name, extraConfig string) string {
 	return fmt.Sprintf(`
 resource "groundcover_monitor_v2" "test" {
   title            = %[1]q
@@ -1405,7 +1536,7 @@ resource "groundcover_monitor_v2" "test" {
   execution_error_state = "OK"
   no_data_state         = "OK"
 }
-`, name, isPausedLine)
+`, name, extraConfig)
 }
 
 func testAccMonitorV2MetricsQLImportUpdateConfig(name string) string {

@@ -55,6 +55,7 @@ resource "groundcover_monitor_v2" "gcql_logs" {
     status_filters          = ["Alerting", "Resolved"]
     renotification_interval = "4h"
     disable_renotification  = false
+    hide_preview_graph      = true
     connected_app_params = {
       "slack-connected-app-id" = {
         channels = [{ id = "C0123456789", name = "#alerts" }]
@@ -319,6 +320,7 @@ Optional:
 - `connected_app_params` (Attributes Map) Per-connected-app delivery options keyed by connected app ID. (see [below for nested schema](#nestedatt--notification_settings--connected_app_params))
 - `connected_apps` (List of String) Connected app IDs to notify.
 - `disable_renotification` (Boolean) Whether renotification is disabled.
+- `hide_preview_graph` (Boolean) Whether notifications for this monitor omit the preview graph. Only Slack notifications show a graph today. Applies to every notification method. Defaults to `false`, so a value turned on in the monitor UI shows up as a plan diff; set `true` to keep it.
 - `method` (String) Notification method.
 - `renotification_interval` (String) Duration between renotifications, for example `4h`.
 - `status_filters` (List of String) Issue statuses that should notify.
