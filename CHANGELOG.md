@@ -1,6 +1,7 @@
-## 1.22.8
+## 1.23.0
 
-* Added `create_monitor` to `groundcover_synthetic_test` (default `true`). Set it to `false` to create the test without a monitor
+* Added `create_monitor` to `groundcover_synthetic_test`. Set it to `false` to create the test without a monitor
+* Upgrade note: tests whose monitor was deleted outside Terraform show a `false -> true` diff and get the monitor back on apply; add `create_monitor = false` to keep it off
 
 ## 1.22.7
 
