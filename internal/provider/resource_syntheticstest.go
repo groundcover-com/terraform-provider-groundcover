@@ -214,10 +214,8 @@ func (r *syntheticTestResource) Schema(_ context.Context, _ resource.SchemaReque
 				Default:     booldefault.StaticBool(true),
 			},
 			"create_monitor": schema.BoolAttribute{
-				Description: "Create a monitor for this test. Default: `true`. When `false`, the `monitor` block must be omitted.",
+				Description: "Set to `false` to create the test without a monitor; the `monitor` block must then be omitted.",
 				Optional:    true,
-				Computed:    true,
-				Default:     booldefault.StaticBool(true),
 			},
 			"interval": schema.StringAttribute{
 				Description: "How often the check runs. Supported values: `15s`, `30s`, `1m`, `5m`, `10m`, `15m`, `30m`, `1h`.",
@@ -1365,7 +1363,6 @@ func fromSDKResponse(ctx context.Context, sdkResp *models.SyntheticTestCreateReq
 	state.Enabled = types.BoolValue(sdkResp.Enabled)
 	state.Interval = types.StringValue(sdkResp.Interval)
 	state.Version = types.Int64Value(sdkResp.Version)
-	state.CreateMonitor = types.BoolValue(sdkResp.Monitor != nil)
 
 	if sdkResp.CheckConfig == nil {
 		return

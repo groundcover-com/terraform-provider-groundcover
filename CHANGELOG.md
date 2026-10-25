@@ -1,6 +1,6 @@
 ## 1.22.8
 
-* Added `create_monitor` to `groundcover_synthetic_test` (default `true`). Set it to `false` to create the test without a monitor
+* Added `create_monitor` to `groundcover_synthetic_test`. Set it to `false` to create the test without a monitor
 
 ## 1.22.7
 

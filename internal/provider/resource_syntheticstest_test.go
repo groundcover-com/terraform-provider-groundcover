@@ -33,22 +33,6 @@ func TestGetSyntheticTestEmptyIDReturnsNotFound(t *testing.T) {
 	}
 }
 
-func TestSyntheticTestFromSDKResponseDerivesCreateMonitor(t *testing.T) {
-	ctx := context.Background()
-	withMonitor := &models.SyntheticTestCreateRequest{Monitor: &models.SyntheticMonitorConfig{}}
-	withoutMonitor := &models.SyntheticTestCreateRequest{}
-
-	state := &syntheticTestResourceModel{}
-	fromSDKResponse(ctx, withMonitor, state)
-	if !state.CreateMonitor.ValueBool() {
-		t.Fatalf("expected create_monitor=true when GET returns a monitor")
-	}
-	fromSDKResponse(ctx, withoutMonitor, state)
-	if state.CreateMonitor.ValueBool() {
-		t.Fatalf("expected create_monitor=false when GET returns no monitor")
-	}
-}
-
 func TestSyntheticTestFromSDKResponsePreservesEmptyHTTPHeaders(t *testing.T) {
 	ctx := context.Background()
 	emptyHeaders := types.MapValueMust(types.StringType, map[string]attr.Value{})
@@ -358,7 +342,7 @@ func TestAccSyntheticTestResource_withoutMonitor(t *testing.T) {
 				ResourceName:            "groundcover_synthetic_test.test",
 				ImportState:             true,
 				ImportStateVerify:       true,
-				ImportStateVerifyIgnore: []string{"http_check.auth"},
+				ImportStateVerifyIgnore: []string{"http_check.auth", "create_monitor"},
 			},
 			{
 				// Flipping to true on update must create the missing monitor.
