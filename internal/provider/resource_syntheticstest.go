@@ -1365,10 +1365,7 @@ func fromSDKResponse(ctx context.Context, sdkResp *models.SyntheticTestCreateReq
 	state.Enabled = types.BoolValue(sdkResp.Enabled)
 	state.Interval = types.StringValue(sdkResp.Interval)
 	state.Version = types.Int64Value(sdkResp.Version)
-	// Only on import: GET has no createMonitor, so infer it once from the monitor's presence.
-	if state.CreateMonitor.IsNull() {
-		state.CreateMonitor = types.BoolValue(sdkResp.Monitor != nil)
-	}
+	state.CreateMonitor = types.BoolValue(sdkResp.Monitor != nil)
 
 	if sdkResp.CheckConfig == nil {
 		return
