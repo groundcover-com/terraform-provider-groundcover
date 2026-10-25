@@ -214,8 +214,10 @@ func (r *syntheticTestResource) Schema(_ context.Context, _ resource.SchemaReque
 				Default:     booldefault.StaticBool(true),
 			},
 			"create_monitor": schema.BoolAttribute{
-				Description: "Set to `false` to create the test without a monitor; the `monitor` block must then be omitted. Setting it to `false` on an existing test deletes its monitor.",
+				Description: "Whether the test has a monitor. Default: `true`. Set to `false` to create the test without one; the `monitor` block must then be omitted. Setting it to `false` on an existing test deletes its monitor.",
 				Optional:    true,
+				Computed:    true,
+				Default:     booldefault.StaticBool(true),
 			},
 			"interval": schema.StringAttribute{
 				Description: "How often the check runs. Supported values: `15s`, `30s`, `1m`, `5m`, `10m`, `15m`, `30m`, `1h`.",
@@ -1274,11 +1276,6 @@ func toSDKRequest(ctx context.Context, plan *syntheticTestResourceModel) (*model
 	sdkReq.CheckConfig = checkConfig
 
 	sdkReq.CreateMonitor = plan.CreateMonitor.ValueBoolPointer()
-	if sdkReq.CreateMonitor == nil && plan.Monitor != nil {
-		// A monitor block asks for a monitor; the backend needs it explicit when none exists yet.
-		sdkReq.CreateMonitor = new(bool)
-		*sdkReq.CreateMonitor = true
-	}
 
 	// Monitor
 	if plan.Monitor != nil {
@@ -1368,7 +1365,8 @@ func fromSDKResponse(ctx context.Context, sdkResp *models.SyntheticTestCreateReq
 	state.Enabled = types.BoolValue(sdkResp.Enabled)
 	state.Interval = types.StringValue(sdkResp.Interval)
 	state.Version = types.Int64Value(sdkResp.Version)
-	if !state.CreateMonitor.IsNull() {
+	// Only on import: GET has no createMonitor, so infer it once from the monitor's presence.
+	if state.CreateMonitor.IsNull() {
 		state.CreateMonitor = types.BoolValue(sdkResp.Monitor != nil)
 	}
 

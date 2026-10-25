@@ -342,7 +342,7 @@ func TestAccSyntheticTestResource_withoutMonitor(t *testing.T) {
 				ResourceName:            "groundcover_synthetic_test.test",
 				ImportState:             true,
 				ImportStateVerify:       true,
-				ImportStateVerifyIgnore: []string{"http_check.auth", "create_monitor"},
+				ImportStateVerifyIgnore: []string{"http_check.auth"},
 			},
 			{
 				// Flipping to true on update must create the missing monitor.

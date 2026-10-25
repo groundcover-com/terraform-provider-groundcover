@@ -623,7 +623,7 @@ assertion {
 ### Optional
 
 - `assertion` (Block List) Assertions to validate the check result. (see [below for nested schema](#nestedblock--assertion))
-- `create_monitor` (Boolean) Set to `false` to create the test without a monitor; the `monitor` block must then be omitted. Setting it to `false` on an existing test deletes its monitor.
+- `create_monitor` (Boolean) Whether the test has a monitor. Default: `true`. Set to `false` to create the test without one; the `monitor` block must then be omitted. Setting it to `false` on an existing test deletes its monitor.
 - `dns_check` (Block, Optional) DNS check configuration. Tests DNS resolution and optionally validates DNSSEC. (see [below for nested schema](#nestedblock--dns_check))
 - `enabled` (Boolean) Whether the synthetic test is enabled. Default: `true`.
 - `http_check` (Block, Optional) HTTP check configuration. Defines the endpoint to monitor. (see [below for nested schema](#nestedblock--http_check))
