@@ -324,6 +324,52 @@ func TestAccSyntheticTestResource_withMonitor(t *testing.T) {
 	})
 }
 
+func TestAccSyntheticTestResource_withoutMonitor(t *testing.T) {
+	name := acctest.RandomWithPrefix("test-synth-nomon")
+
+	resource.Test(t, resource.TestCase{
+		PreCheck:                 func() { testAccPreCheck(t) },
+		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
+		Steps: []resource.TestStep{
+			{
+				Config: testAccSyntheticTestResourceConfig_createMonitor(name, false),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					resource.TestCheckResourceAttr("groundcover_synthetic_test.test", "create_monitor", "false"),
+					resource.TestCheckNoResourceAttr("groundcover_synthetic_test.test", "monitor.%"),
+					testAccCheckSyntheticTestMonitorExists("groundcover_synthetic_test.test", false),
+				),
+			},
+			{
+				ResourceName:            "groundcover_synthetic_test.test",
+				ImportState:             true,
+				ImportStateVerify:       true,
+				ImportStateVerifyIgnore: []string{"http_check.auth"},
+			},
+			{
+				// Flipping to true on update must create the missing monitor.
+				Config: testAccSyntheticTestResourceConfig_createMonitor(name, true),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					resource.TestCheckResourceAttr("groundcover_synthetic_test.test", "create_monitor", "true"),
+					testAccCheckSyntheticTestMonitorExists("groundcover_synthetic_test.test", true),
+				),
+			},
+			{
+				// Flipping back to false must delete the monitor.
+				Config: testAccSyntheticTestResourceConfig_createMonitor(name, false),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					resource.TestCheckResourceAttr("groundcover_synthetic_test.test", "create_monitor", "false"),
+					testAccCheckSyntheticTestMonitorExists("groundcover_synthetic_test.test", false),
+				),
+			},
+			{
+				// Dropping create_monitor and adding a monitor block must create the monitor.
+				Config: testAccSyntheticTestResourceConfig_withMonitor(name),
+				Check:  resource.TestCheckResourceAttr("groundcover_synthetic_test.test", "monitor.severity", "S1"),
+			},
+		},
+	})
+}
+
 func TestAccSyntheticTestResource_sslApplyLoop(t *testing.T) {
 	name := acctest.RandomWithPrefix("test-synth-ssl-loop")
 
@@ -551,6 +597,28 @@ resource "groundcover_synthetic_test" "test" {
   }
 }
 `, name)
+}
+
+func testAccSyntheticTestResourceConfig_createMonitor(name string, createMonitor bool) string {
+	return fmt.Sprintf(`
+resource "groundcover_synthetic_test" "test" {
+  name           = %[1]q
+  interval       = "1m"
+  create_monitor = %[2]t
+
+  http_check {
+    url     = "https://httpbin.org/status/200"
+    method  = "GET"
+    timeout = "10s"
+  }
+
+  assertion {
+    source   = "statusCode"
+    operator = "eq"
+    target   = "200"
+  }
+}
+`, name, createMonitor)
 }
 
 func testAccSyntheticTestResourceConfig_updated(name string) string {
@@ -818,6 +886,33 @@ func testAccCheckSyntheticTestResourceExists(n string) resource.TestCheckFunc {
 			return fmt.Errorf("no Synthetic Test ID is set")
 		}
 
+		return nil
+	}
+}
+
+// testAccCheckSyntheticTestMonitorExists asserts via the API whether the test has a bundled monitor.
+func testAccCheckSyntheticTestMonitorExists(n string, want bool) resource.TestCheckFunc {
+	return func(s *terraform.State) error {
+		rs, ok := s.RootModule().Resources[n]
+		if !ok {
+			return fmt.Errorf("not found: %s", n)
+		}
+		ctx := context.Background()
+		apiURL := os.Getenv("GROUNDCOVER_API_URL")
+		if apiURL == "" {
+			apiURL = "https://api.groundcover.com"
+		}
+		client, err := NewSdkClientWrapper(ctx, apiURL, os.Getenv("GROUNDCOVER_API_KEY"), os.Getenv("GROUNDCOVER_BACKEND_ID"))
+		if err != nil {
+			return fmt.Errorf("failed to create client: %v", err)
+		}
+		got, err := client.GetSyntheticTest(ctx, rs.Primary.ID)
+		if err != nil {
+			return fmt.Errorf("failed to get Synthetic Test: %v", err)
+		}
+		if (got.Monitor != nil) != want {
+			return fmt.Errorf("synthetic test %s: monitor exists=%v, want %v", rs.Primary.ID, got.Monitor != nil, want)
+		}
 		return nil
 	}
 }

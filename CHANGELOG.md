@@ -1,3 +1,8 @@
+## 1.23.0
+
+* Added `create_monitor` to `groundcover_synthetic_test`. Set it to `false` to create the test without a monitor
+* Upgrade note: tests whose monitor was deleted outside Terraform show a `false -> true` diff and get the monitor back on apply; add `create_monitor = false` to keep it off
+
 ## 1.22.7
 
 * Added `notification_settings.hide_preview_graph` to `groundcover_monitor_v2` and `groundcover_monitor_v2_json`. When `true`, notifications for the monitor omit the preview graph (only Slack notifications show one today), matching the option in the monitor UI. It applies to every notification method

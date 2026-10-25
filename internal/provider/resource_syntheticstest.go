@@ -43,11 +43,12 @@ type syntheticTestResource struct {
 // --- Terraform state models ---
 
 type syntheticTestResourceModel struct {
-	ID       types.String `tfsdk:"id"`
-	Name     types.String `tfsdk:"name"`
-	Enabled  types.Bool   `tfsdk:"enabled"`
-	Interval types.String `tfsdk:"interval"`
-	Version  types.Int64  `tfsdk:"version"`
+	ID            types.String `tfsdk:"id"`
+	Name          types.String `tfsdk:"name"`
+	Enabled       types.Bool   `tfsdk:"enabled"`
+	Interval      types.String `tfsdk:"interval"`
+	Version       types.Int64  `tfsdk:"version"`
+	CreateMonitor types.Bool   `tfsdk:"create_monitor"`
 
 	HTTPCheck *syntheticHTTPCheckModel `tfsdk:"http_check"`
 	SSLCheck  *syntheticSSLCheckModel  `tfsdk:"ssl_check"`
@@ -208,6 +209,12 @@ func (r *syntheticTestResource) Schema(_ context.Context, _ resource.SchemaReque
 			},
 			"enabled": schema.BoolAttribute{
 				Description: "Whether the synthetic test is enabled. Default: `true`.",
+				Optional:    true,
+				Computed:    true,
+				Default:     booldefault.StaticBool(true),
+			},
+			"create_monitor": schema.BoolAttribute{
+				Description: "Whether the test has a monitor. Default: `true`. Set to `false` to create the test without one; the `monitor` block must then be omitted. Setting it to `false` on an existing test deletes its monitor.",
 				Optional:    true,
 				Computed:    true,
 				Default:     booldefault.StaticBool(true),
@@ -716,6 +723,14 @@ func (r *syntheticTestResource) ValidateConfig(ctx context.Context, req resource
 				fmt.Sprintf("When source is %q, the property field must not be set — the source already specifies the property.", src),
 			)
 		}
+	}
+
+	if config.Monitor != nil && config.CreateMonitor.Equal(types.BoolValue(false)) {
+		resp.Diagnostics.AddAttributeError(
+			path.Root("monitor"),
+			"Invalid attribute combination",
+			"The monitor block must not be set when create_monitor is false.",
+		)
 	}
 
 	// Validate notification routing invariants
@@ -1260,6 +1275,8 @@ func toSDKRequest(ctx context.Context, plan *syntheticTestResourceModel) (*model
 
 	sdkReq.CheckConfig = checkConfig
 
+	sdkReq.CreateMonitor = plan.CreateMonitor.ValueBoolPointer()
+
 	// Monitor
 	if plan.Monitor != nil {
 		monitorConfig := &models.SyntheticMonitorConfig{}
@@ -1348,6 +1365,7 @@ func fromSDKResponse(ctx context.Context, sdkResp *models.SyntheticTestCreateReq
 	state.Enabled = types.BoolValue(sdkResp.Enabled)
 	state.Interval = types.StringValue(sdkResp.Interval)
 	state.Version = types.Int64Value(sdkResp.Version)
+	state.CreateMonitor = types.BoolValue(sdkResp.Monitor != nil)
 
 	if sdkResp.CheckConfig == nil {
 		return
