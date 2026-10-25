@@ -353,6 +353,11 @@ func TestAccSyntheticTestResource_withoutMonitor(t *testing.T) {
 				Config: testAccSyntheticTestResourceConfig_createMonitor(name, false),
 				Check:  resource.TestCheckResourceAttr("groundcover_synthetic_test.test", "create_monitor", "false"),
 			},
+			{
+				// Dropping create_monitor and adding a monitor block must create the monitor.
+				Config: testAccSyntheticTestResourceConfig_withMonitor(name),
+				Check:  resource.TestCheckResourceAttr("groundcover_synthetic_test.test", "monitor.severity", "S1"),
+			},
 		},
 	})
 }

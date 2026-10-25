@@ -1274,6 +1274,11 @@ func toSDKRequest(ctx context.Context, plan *syntheticTestResourceModel) (*model
 	sdkReq.CheckConfig = checkConfig
 
 	sdkReq.CreateMonitor = plan.CreateMonitor.ValueBoolPointer()
+	if sdkReq.CreateMonitor == nil && plan.Monitor != nil {
+		// A monitor block asks for a monitor; the backend needs it explicit when none exists yet.
+		sdkReq.CreateMonitor = new(bool)
+		*sdkReq.CreateMonitor = true
+	}
 
 	// Monitor
 	if plan.Monitor != nil {
