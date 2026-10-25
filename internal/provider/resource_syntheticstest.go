@@ -49,6 +49,8 @@ type syntheticTestResourceModel struct {
 	Interval types.String `tfsdk:"interval"`
 	Version  types.Int64  `tfsdk:"version"`
 
+	CreateMonitor types.Bool `tfsdk:"create_monitor"`
+
 	HTTPCheck *syntheticHTTPCheckModel `tfsdk:"http_check"`
 	SSLCheck  *syntheticSSLCheckModel  `tfsdk:"ssl_check"`
 	TCPCheck  *syntheticTCPCheckModel  `tfsdk:"tcp_check"`
@@ -208,6 +210,12 @@ func (r *syntheticTestResource) Schema(_ context.Context, _ resource.SchemaReque
 			},
 			"enabled": schema.BoolAttribute{
 				Description: "Whether the synthetic test is enabled. Default: `true`.",
+				Optional:    true,
+				Computed:    true,
+				Default:     booldefault.StaticBool(true),
+			},
+			"create_monitor": schema.BoolAttribute{
+				Description: "Whether groundcover creates and manages a monitor for this test. Default: `true`. Set to `false` to run the test without a monitor; the `monitor` block must then be omitted. Changing it from `true` to `false` deletes the existing monitor.",
 				Optional:    true,
 				Computed:    true,
 				Default:     booldefault.StaticBool(true),
@@ -716,6 +724,14 @@ func (r *syntheticTestResource) ValidateConfig(ctx context.Context, req resource
 				fmt.Sprintf("When source is %q, the property field must not be set — the source already specifies the property.", src),
 			)
 		}
+	}
+
+	if config.Monitor != nil && !config.CreateMonitor.IsNull() && !config.CreateMonitor.IsUnknown() && !config.CreateMonitor.ValueBool() {
+		resp.Diagnostics.AddAttributeError(
+			path.Root("monitor"),
+			"Invalid attribute combination",
+			"The monitor block must not be set when create_monitor is false.",
+		)
 	}
 
 	// Validate notification routing invariants
@@ -1260,6 +1276,13 @@ func toSDKRequest(ctx context.Context, plan *syntheticTestResourceModel) (*model
 
 	sdkReq.CheckConfig = checkConfig
 
+	// Always explicit: on update the backend only creates a missing monitor when
+	// createMonitor=true is sent, and deletes an existing one on false.
+	if !plan.CreateMonitor.IsNull() && !plan.CreateMonitor.IsUnknown() {
+		createMonitor := plan.CreateMonitor.ValueBool()
+		sdkReq.CreateMonitor = &createMonitor
+	}
+
 	// Monitor
 	if plan.Monitor != nil {
 		monitorConfig := &models.SyntheticMonitorConfig{}
@@ -1348,6 +1371,8 @@ func fromSDKResponse(ctx context.Context, sdkResp *models.SyntheticTestCreateReq
 	state.Enabled = types.BoolValue(sdkResp.Enabled)
 	state.Interval = types.StringValue(sdkResp.Interval)
 	state.Version = types.Int64Value(sdkResp.Version)
+	// GET carries a monitor block only when a monitor exists for the test.
+	state.CreateMonitor = types.BoolValue(sdkResp.Monitor != nil)
 
 	if sdkResp.CheckConfig == nil {
 		return

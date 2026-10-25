@@ -17,6 +17,9 @@ provider "groundcover" {
 resource "groundcover_synthetic_test" "http_health_check" {
   name     = "HTTP Health Check"
   interval = "1m"
+  # Every test gets a monitor by default; set create_monitor = false to run
+  # the test without one (the monitor block must then be omitted).
+  # create_monitor = false
 
   http_check {
     url     = "https://httpbin.org/status/200"

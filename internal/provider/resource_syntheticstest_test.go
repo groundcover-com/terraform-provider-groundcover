@@ -33,6 +33,22 @@ func TestGetSyntheticTestEmptyIDReturnsNotFound(t *testing.T) {
 	}
 }
 
+func TestSyntheticTestFromSDKResponseDerivesCreateMonitor(t *testing.T) {
+	ctx := context.Background()
+	withMonitor := &models.SyntheticTestCreateRequest{Monitor: &models.SyntheticMonitorConfig{}}
+	withoutMonitor := &models.SyntheticTestCreateRequest{}
+
+	state := &syntheticTestResourceModel{}
+	fromSDKResponse(ctx, withMonitor, state)
+	if !state.CreateMonitor.ValueBool() {
+		t.Fatalf("expected create_monitor=true when GET returns a monitor")
+	}
+	fromSDKResponse(ctx, withoutMonitor, state)
+	if state.CreateMonitor.ValueBool() {
+		t.Fatalf("expected create_monitor=false when GET returns no monitor")
+	}
+}
+
 func TestSyntheticTestFromSDKResponsePreservesEmptyHTTPHeaders(t *testing.T) {
 	ctx := context.Background()
 	emptyHeaders := types.MapValueMust(types.StringType, map[string]attr.Value{})
@@ -324,6 +340,39 @@ func TestAccSyntheticTestResource_withMonitor(t *testing.T) {
 	})
 }
 
+func TestAccSyntheticTestResource_withoutMonitor(t *testing.T) {
+	name := acctest.RandomWithPrefix("test-synth-nomon")
+
+	resource.Test(t, resource.TestCase{
+		PreCheck:                 func() { testAccPreCheck(t) },
+		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
+		Steps: []resource.TestStep{
+			{
+				Config: testAccSyntheticTestResourceConfig_createMonitor(name, false),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					resource.TestCheckResourceAttr("groundcover_synthetic_test.test", "create_monitor", "false"),
+					resource.TestCheckNoResourceAttr("groundcover_synthetic_test.test", "monitor.%"),
+				),
+			},
+			{
+				ResourceName:            "groundcover_synthetic_test.test",
+				ImportState:             true,
+				ImportStateVerify:       true,
+				ImportStateVerifyIgnore: []string{"http_check.auth"},
+			},
+			{
+				// Flipping to true on update must create the missing monitor.
+				Config: testAccSyntheticTestResourceConfig_createMonitor(name, true),
+				Check:  resource.TestCheckResourceAttr("groundcover_synthetic_test.test", "create_monitor", "true"),
+			},
+			{
+				Config: testAccSyntheticTestResourceConfig_createMonitor(name, false),
+				Check:  resource.TestCheckResourceAttr("groundcover_synthetic_test.test", "create_monitor", "false"),
+			},
+		},
+	})
+}
+
 func TestAccSyntheticTestResource_sslApplyLoop(t *testing.T) {
 	name := acctest.RandomWithPrefix("test-synth-ssl-loop")
 
@@ -551,6 +600,28 @@ resource "groundcover_synthetic_test" "test" {
   }
 }
 `, name)
+}
+
+func testAccSyntheticTestResourceConfig_createMonitor(name string, createMonitor bool) string {
+	return fmt.Sprintf(`
+resource "groundcover_synthetic_test" "test" {
+  name           = %[1]q
+  interval       = "1m"
+  create_monitor = %[2]t
+
+  http_check {
+    url     = "https://httpbin.org/status/200"
+    method  = "GET"
+    timeout = "10s"
+  }
+
+  assertion {
+    source   = "statusCode"
+    operator = "eq"
+    target   = "200"
+  }
+}
+`, name, createMonitor)
 }
 
 func testAccSyntheticTestResourceConfig_updated(name string) string {

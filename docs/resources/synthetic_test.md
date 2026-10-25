@@ -32,6 +32,9 @@ provider "groundcover" {
 resource "groundcover_synthetic_test" "http_health_check" {
   name     = "HTTP Health Check"
   interval = "1m"
+  # Every test gets a monitor by default; set create_monitor = false to run
+  # the test without one (the monitor block must then be omitted).
+  # create_monitor = false
 
   http_check {
     url     = "https://httpbin.org/status/200"
@@ -604,6 +607,7 @@ assertion {
 ### Optional
 
 - `assertion` (Block List) Assertions to validate the check result. (see [below for nested schema](#nestedblock--assertion))
+- `create_monitor` (Boolean) Whether groundcover creates and manages a monitor for this test. Default: `true`. Set to `false` to run the test without a monitor; the `monitor` block must then be omitted. Changing it from `true` to `false` deletes the existing monitor.
 - `dns_check` (Block, Optional) DNS check configuration. Tests DNS resolution and optionally validates DNSSEC. (see [below for nested schema](#nestedblock--dns_check))
 - `enabled` (Boolean) Whether the synthetic test is enabled. Default: `true`.
 - `http_check` (Block, Optional) HTTP check configuration. Defines the endpoint to monitor. (see [below for nested schema](#nestedblock--http_check))
