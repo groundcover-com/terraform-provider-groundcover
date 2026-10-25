@@ -1,7 +1,6 @@
-## 1.23.0
+## 1.22.8
 
-* Added `create_monitor` to `groundcover_synthetic_test`. Default `true` keeps today's behavior; `false` creates the test without the bundled monitor and deletes the monitor of an existing test. The `monitor` block is rejected at plan time when `create_monitor` is `false`
-* Upgrade note: `create_monitor` is read from the backend, so a test whose bundled monitor was deleted outside Terraform now shows a `false -> true` diff and recreates the monitor on apply
+* Added `create_monitor` to `groundcover_synthetic_test` (default `true`). Set it to `false` to create the test without a monitor
 
 ## 1.22.7
 

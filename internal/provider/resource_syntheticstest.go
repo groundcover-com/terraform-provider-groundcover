@@ -43,13 +43,12 @@ type syntheticTestResource struct {
 // --- Terraform state models ---
 
 type syntheticTestResourceModel struct {
-	ID       types.String `tfsdk:"id"`
-	Name     types.String `tfsdk:"name"`
-	Enabled  types.Bool   `tfsdk:"enabled"`
-	Interval types.String `tfsdk:"interval"`
-	Version  types.Int64  `tfsdk:"version"`
-
-	CreateMonitor types.Bool `tfsdk:"create_monitor"`
+	ID            types.String `tfsdk:"id"`
+	Name          types.String `tfsdk:"name"`
+	Enabled       types.Bool   `tfsdk:"enabled"`
+	Interval      types.String `tfsdk:"interval"`
+	Version       types.Int64  `tfsdk:"version"`
+	CreateMonitor types.Bool   `tfsdk:"create_monitor"`
 
 	HTTPCheck *syntheticHTTPCheckModel `tfsdk:"http_check"`
 	SSLCheck  *syntheticSSLCheckModel  `tfsdk:"ssl_check"`
@@ -215,7 +214,7 @@ func (r *syntheticTestResource) Schema(_ context.Context, _ resource.SchemaReque
 				Default:     booldefault.StaticBool(true),
 			},
 			"create_monitor": schema.BoolAttribute{
-				Description: "Whether groundcover creates and manages a monitor for this test. Default: `true`. Set to `false` to run the test without a monitor; the `monitor` block must then be omitted. Changing it from `true` to `false` deletes the existing monitor.",
+				Description: "Create a monitor for this test. Default: `true`. When `false`, the `monitor` block must be omitted.",
 				Optional:    true,
 				Computed:    true,
 				Default:     booldefault.StaticBool(true),
@@ -1276,8 +1275,6 @@ func toSDKRequest(ctx context.Context, plan *syntheticTestResourceModel) (*model
 
 	sdkReq.CheckConfig = checkConfig
 
-	// Always explicit: on update the backend only creates a missing monitor when
-	// createMonitor=true is sent, and deletes an existing one on false.
 	if !plan.CreateMonitor.IsNull() && !plan.CreateMonitor.IsUnknown() {
 		createMonitor := plan.CreateMonitor.ValueBool()
 		sdkReq.CreateMonitor = &createMonitor
@@ -1371,7 +1368,6 @@ func fromSDKResponse(ctx context.Context, sdkResp *models.SyntheticTestCreateReq
 	state.Enabled = types.BoolValue(sdkResp.Enabled)
 	state.Interval = types.StringValue(sdkResp.Interval)
 	state.Version = types.Int64Value(sdkResp.Version)
-	// GET carries a monitor block only when a monitor exists for the test.
 	state.CreateMonitor = types.BoolValue(sdkResp.Monitor != nil)
 
 	if sdkResp.CheckConfig == nil {
