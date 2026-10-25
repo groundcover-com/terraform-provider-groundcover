@@ -1275,10 +1275,7 @@ func toSDKRequest(ctx context.Context, plan *syntheticTestResourceModel) (*model
 
 	sdkReq.CheckConfig = checkConfig
 
-	if !plan.CreateMonitor.IsNull() && !plan.CreateMonitor.IsUnknown() {
-		createMonitor := plan.CreateMonitor.ValueBool()
-		sdkReq.CreateMonitor = &createMonitor
-	}
+	sdkReq.CreateMonitor = plan.CreateMonitor.ValueBoolPointer()
 
 	// Monitor
 	if plan.Monitor != nil {
