@@ -725,7 +725,7 @@ func (r *syntheticTestResource) ValidateConfig(ctx context.Context, req resource
 		}
 	}
 
-	if config.Monitor != nil && !config.CreateMonitor.IsNull() && !config.CreateMonitor.IsUnknown() && !config.CreateMonitor.ValueBool() {
+	if config.Monitor != nil && config.CreateMonitor.Equal(types.BoolValue(false)) {
 		resp.Diagnostics.AddAttributeError(
 			path.Root("monitor"),
 			"Invalid attribute combination",
