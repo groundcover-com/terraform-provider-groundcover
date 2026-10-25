@@ -13,6 +13,25 @@ provider "groundcover" {
   # api_url can be set via the GROUNDCOVER_API_URL environment variable (optional)
 }
 
+# Example: HTTP check without a monitor
+resource "groundcover_synthetic_test" "http_check_no_monitor" {
+  name           = "HTTP Check Without Monitor"
+  interval       = "1m"
+  create_monitor = false
+
+  http_check {
+    url     = "https://httpbin.org/status/200"
+    method  = "GET"
+    timeout = "10s"
+  }
+
+  assertion {
+    source   = "statusCode"
+    operator = "eq"
+    target   = "200"
+  }
+}
+
 # Example: Simple HTTP health check
 resource "groundcover_synthetic_test" "http_health_check" {
   name     = "HTTP Health Check"

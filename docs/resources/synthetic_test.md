@@ -28,6 +28,25 @@ provider "groundcover" {
   # api_url can be set via the GROUNDCOVER_API_URL environment variable (optional)
 }
 
+# Example: HTTP check without a monitor
+resource "groundcover_synthetic_test" "http_check_no_monitor" {
+  name           = "HTTP Check Without Monitor"
+  interval       = "1m"
+  create_monitor = false
+
+  http_check {
+    url     = "https://httpbin.org/status/200"
+    method  = "GET"
+    timeout = "10s"
+  }
+
+  assertion {
+    source   = "statusCode"
+    operator = "eq"
+    target   = "200"
+  }
+}
+
 # Example: Simple HTTP health check
 resource "groundcover_synthetic_test" "http_health_check" {
   name     = "HTTP Health Check"
@@ -604,7 +623,7 @@ assertion {
 ### Optional
 
 - `assertion` (Block List) Assertions to validate the check result. (see [below for nested schema](#nestedblock--assertion))
-- `create_monitor` (Boolean) Set to `false` to create the test without a monitor; the `monitor` block must then be omitted.
+- `create_monitor` (Boolean) Set to `false` to create the test without a monitor; the `monitor` block must then be omitted. Setting it to `false` on an existing test deletes its monitor.
 - `dns_check` (Block, Optional) DNS check configuration. Tests DNS resolution and optionally validates DNSSEC. (see [below for nested schema](#nestedblock--dns_check))
 - `enabled` (Boolean) Whether the synthetic test is enabled. Default: `true`.
 - `http_check` (Block, Optional) HTTP check configuration. Defines the endpoint to monitor. (see [below for nested schema](#nestedblock--http_check))
