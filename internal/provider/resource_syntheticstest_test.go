@@ -106,10 +106,41 @@ func syntheticTestResponseWithHeaders(headers map[string]string) *models.Synthet
 
 func TestSyntheticAssertionsToListUsesNullForAbsentAssertions(t *testing.T) {
 	for _, assertions := range [][]*models.Assertion{nil, {}} {
-		assertionsList := syntheticAssertionsToList(assertions)
+		assertionsList := syntheticAssertionsToList(context.Background(), assertions, types.ListNull(syntheticAssertionObjectType()))
 		if !assertionsList.IsNull() {
 			t.Fatal("expected absent assertions to be represented as a null list")
 		}
+	}
+}
+
+func TestSyntheticAssertionsToListPreservesConfiguredEmptyTarget(t *testing.T) {
+	ctx := context.Background()
+	apiAssertions := []*models.Assertion{{Source: "responseHeader", Operator: "eq", Property: "x-test", Target: ""}}
+
+	prior := types.ListValueMust(syntheticAssertionObjectType(), []attr.Value{
+		types.ObjectValueMust(syntheticAssertionAttrTypes(), map[string]attr.Value{
+			"source":   types.StringValue("responseHeader"),
+			"operator": types.StringValue("eq"),
+			"target":   types.StringValue(""),
+			"property": types.StringValue("x-test"),
+			"severity": types.StringNull(),
+		}),
+	})
+	got, diags := assertionModelsFromList(ctx, syntheticAssertionsToList(ctx, apiAssertions, prior), false)
+	if diags.HasError() || len(got) != 1 {
+		t.Fatalf("unexpected result: %v %v", got, diags)
+	}
+	if got[0].Target.IsNull() || got[0].Target.ValueString() != "" {
+		t.Fatalf("expected configured empty target to be preserved, got %v", got[0].Target)
+	}
+	if !got[0].Severity.IsNull() {
+		t.Fatalf("expected absent severity to stay null, got %v", got[0].Severity)
+	}
+
+	// Without a prior "" (import, or target never set) an empty API value is still null.
+	got, diags = assertionModelsFromList(ctx, syntheticAssertionsToList(ctx, apiAssertions, types.ListNull(syntheticAssertionObjectType())), false)
+	if diags.HasError() || len(got) != 1 || !got[0].Target.IsNull() {
+		t.Fatalf("expected empty API target with no prior state to be null, got %v %v", got, diags)
 	}
 }
 
@@ -245,6 +276,28 @@ func TestAccSyntheticTestResource_applyLoop(t *testing.T) {
 					resource.TestCheckResourceAttr("groundcover_synthetic_test.test", "name", name),
 					resource.TestCheckResourceAttrSet("groundcover_synthetic_test.test", "id"),
 				),
+			},
+		},
+	})
+}
+
+func TestAccSyntheticTestResource_emptyAssertionTargetApplyLoop(t *testing.T) {
+	name := acctest.RandomWithPrefix("test-synth-empty-target")
+
+	resource.Test(t, resource.TestCase{
+		PreCheck:                 func() { testAccPreCheck(t) },
+		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
+		Steps: []resource.TestStep{
+			{
+				Config: testAccSyntheticTestResourceConfig_emptyAssertionTarget(name),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					resource.TestCheckResourceAttr("groundcover_synthetic_test.test", "assertion.1.target", ""),
+					resource.TestCheckResourceAttrSet("groundcover_synthetic_test.test", "id"),
+				),
+			},
+			{
+				Config:   testAccSyntheticTestResourceConfig_emptyAssertionTarget(name),
+				PlanOnly: true,
 			},
 		},
 	})
@@ -594,6 +647,35 @@ resource "groundcover_synthetic_test" "test" {
     source   = "responseTime"
     operator = "lt"
     target   = "5000"
+  }
+}
+`, name)
+}
+
+func testAccSyntheticTestResourceConfig_emptyAssertionTarget(name string) string {
+	return fmt.Sprintf(`
+resource "groundcover_synthetic_test" "test" {
+  name     = %[1]q
+  enabled  = true
+  interval = "1m"
+
+  http_check {
+    url     = "https://httpbin.org/status/200"
+    method  = "GET"
+    timeout = "10s"
+  }
+
+  assertion {
+    source   = "statusCode"
+    operator = "eq"
+    target   = "200"
+  }
+
+  assertion {
+    source   = "responseHeader"
+    operator = "eq"
+    property = "cf-ray"
+    target   = ""
   }
 }
 `, name)

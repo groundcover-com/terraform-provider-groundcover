@@ -1,3 +1,7 @@
+## 1.23.1
+
+* Fixed `groundcover_synthetic_test` showing a perpetual diff when an `assertion` sets `target` or `property` to `""`. The API echoes the empty string back and the provider read it as null, so every plan re-applied the test. Through the crossplane provider this was an update every ~2 seconds that also reset the synthetic's monitor alert state
+
 ## 1.23.0
 
 * Added `create_monitor` to `groundcover_synthetic_test`. Set it to `false` to create the test without a monitor

@@ -1025,20 +1025,37 @@ func assertionValueOrNull(value string) types.String {
 	return types.StringValue(value)
 }
 
-func syntheticAssertionsToList(assertions []*models.Assertion) types.List {
+// assertionValueOrPrior maps an empty API value to null, unless the prior state
+// holds an explicit "" for it: the API echoes "" back as "", so nulling it would
+// make every plan show "" -> null and update forever.
+func assertionValueOrPrior(value string, prior types.String) types.String {
+	if value == "" && !prior.IsNull() && !prior.IsUnknown() && prior.ValueString() == "" {
+		return prior
+	}
+
+	return assertionValueOrNull(value)
+}
+
+func syntheticAssertionsToList(ctx context.Context, assertions []*models.Assertion, prior types.List) types.List {
 	if len(assertions) == 0 {
 		return types.ListNull(syntheticAssertionObjectType())
 	}
 
+	priorModels, _ := assertionModelsFromList(ctx, prior, true)
+
 	elements := make([]attr.Value, 0, len(assertions))
-	for _, assertion := range assertions {
+	for i, assertion := range assertions {
+		var priorModel syntheticAssertionModel
+		if i < len(priorModels) {
+			priorModel = priorModels[i]
+		}
 		assertionObj, diags := types.ObjectValue(
 			syntheticAssertionAttrTypes(),
 			map[string]attr.Value{
 				"source":   types.StringValue(string(assertion.Source)),
 				"operator": types.StringValue(string(assertion.Operator)),
-				"target":   assertionValueOrNull(assertion.Target),
-				"property": assertionValueOrNull(assertion.Property),
+				"target":   assertionValueOrPrior(assertion.Target, priorModel.Target),
+				"property": assertionValueOrPrior(assertion.Property, priorModel.Property),
 				"severity": assertionValueOrNull(string(assertion.Severity)),
 			},
 		)
@@ -1602,9 +1619,9 @@ func fromSDKResponse(ctx context.Context, sdkResp *models.SyntheticTestCreateReq
 
 	// Assertions
 	if cc.ExecutionPolicy != nil && len(cc.ExecutionPolicy.Assertions) > 0 {
-		state.Assertion = syntheticAssertionsToList(cc.ExecutionPolicy.Assertions)
+		state.Assertion = syntheticAssertionsToList(ctx, cc.ExecutionPolicy.Assertions, state.Assertion)
 	} else {
-		state.Assertion = syntheticAssertionsToList(nil)
+		state.Assertion = types.ListNull(syntheticAssertionObjectType())
 	}
 
 	// Retries - clear when API returns none to avoid stale state
