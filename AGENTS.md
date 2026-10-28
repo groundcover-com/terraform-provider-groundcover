@@ -45,6 +45,10 @@ Before adding a new version section to `CHANGELOG.md`:
 
 Add tests to the **existing test file** for the area you're touching (e.g. add to `yaml_utils_test.go`, not a new `*_extra_test.go`). Don't create parallel test files for new cases.
 
+### Registering a new acceptance test
+
+The acceptance matrix lists tests by name in **two** workflow files: `.github/workflows/test.yml` and `.github/workflows/release.yml`. Add every new `TestAcc*` to the matching `run_regex` in both, or the release's coverage check fails (it did for v1.23.0).
+
 ### Acceptance test scope
 
 Acceptance tests hit a real backend and run slowly (30s–90s+ each). Keep coverage focused on what only acceptance tests can catch:
