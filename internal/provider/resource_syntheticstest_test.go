@@ -673,8 +673,8 @@ resource "groundcover_synthetic_test" "test" {
 
   assertion {
     source   = "responseHeader"
-    operator = "eq"
-    property = "cf-ray"
+    operator = "exists"
+    property = "content-type"
     target   = ""
   }
 }
