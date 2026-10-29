@@ -178,6 +178,7 @@ func TestAccSyntheticTestResource_basic(t *testing.T) {
 					resource.TestCheckResourceAttrSet("groundcover_synthetic_test.test", "id"),
 				),
 			},
+			{Config: testAccSyntheticTestResourceConfig_basic(name), PlanOnly: true, ExpectNonEmptyPlan: false},
 			{
 				ResourceName:            "groundcover_synthetic_test.test",
 				ImportState:             true,
@@ -205,6 +206,7 @@ func TestAccSyntheticTestResource_update(t *testing.T) {
 					resource.TestCheckResourceAttrSet("groundcover_synthetic_test.test", "id"),
 				),
 			},
+			{Config: testAccSyntheticTestResourceConfig_basic(name), PlanOnly: true, ExpectNonEmptyPlan: false},
 			{
 				Config: testAccSyntheticTestResourceConfig_updated(updatedName),
 				Check: resource.ComposeAggregateTestCheckFunc(
@@ -214,6 +216,7 @@ func TestAccSyntheticTestResource_update(t *testing.T) {
 					resource.TestCheckResourceAttr("groundcover_synthetic_test.test", "assertion.0.source", "statusCode"),
 				),
 			},
+			{Config: testAccSyntheticTestResourceConfig_updated(updatedName), PlanOnly: true, ExpectNonEmptyPlan: false},
 		},
 	})
 }
@@ -232,6 +235,7 @@ func TestAccSyntheticTestResource_applyLoop(t *testing.T) {
 					resource.TestCheckResourceAttrSet("groundcover_synthetic_test.test", "id"),
 				),
 			},
+			{Config: testAccSyntheticTestResourceConfig_basic(name), PlanOnly: true, ExpectNonEmptyPlan: false},
 			{
 				Config: testAccSyntheticTestResourceConfig_basic(name),
 				Check: resource.ComposeAggregateTestCheckFunc(
@@ -239,6 +243,7 @@ func TestAccSyntheticTestResource_applyLoop(t *testing.T) {
 					resource.TestCheckResourceAttrSet("groundcover_synthetic_test.test", "id"),
 				),
 			},
+			{Config: testAccSyntheticTestResourceConfig_basic(name), PlanOnly: true, ExpectNonEmptyPlan: false},
 			{
 				Config: testAccSyntheticTestResourceConfig_basic(name),
 				Check: resource.ComposeAggregateTestCheckFunc(
@@ -246,6 +251,7 @@ func TestAccSyntheticTestResource_applyLoop(t *testing.T) {
 					resource.TestCheckResourceAttrSet("groundcover_synthetic_test.test", "id"),
 				),
 			},
+			{Config: testAccSyntheticTestResourceConfig_basic(name), PlanOnly: true, ExpectNonEmptyPlan: false},
 		},
 	})
 }
@@ -290,6 +296,7 @@ func TestAccSyntheticTestResource_withMonitor(t *testing.T) {
 					resource.TestCheckResourceAttrSet("groundcover_synthetic_test.test", "id"),
 				),
 			},
+			{Config: testAccSyntheticTestResourceConfig_withMonitor(name), PlanOnly: true, ExpectNonEmptyPlan: false},
 			{
 				ResourceName:      "groundcover_synthetic_test.test",
 				ImportState:       true,
@@ -320,6 +327,7 @@ func TestAccSyntheticTestResource_withMonitor(t *testing.T) {
 					resource.TestCheckResourceAttr("groundcover_synthetic_test.test", "monitor.evaluation_interval.pending_for", "5m"),
 				),
 			},
+			{Config: testAccSyntheticTestResourceConfig_withMonitorUpdated(name), PlanOnly: true, ExpectNonEmptyPlan: false},
 		},
 	})
 }
@@ -339,6 +347,7 @@ func TestAccSyntheticTestResource_withoutMonitor(t *testing.T) {
 					testAccCheckSyntheticTestMonitorExists("groundcover_synthetic_test.test", false),
 				),
 			},
+			{Config: testAccSyntheticTestResourceConfig_createMonitor(name, false), PlanOnly: true, ExpectNonEmptyPlan: false},
 			{
 				ResourceName:            "groundcover_synthetic_test.test",
 				ImportState:             true,
@@ -353,6 +362,7 @@ func TestAccSyntheticTestResource_withoutMonitor(t *testing.T) {
 					testAccCheckSyntheticTestMonitorExists("groundcover_synthetic_test.test", true),
 				),
 			},
+			{Config: testAccSyntheticTestResourceConfig_createMonitor(name, true), PlanOnly: true, ExpectNonEmptyPlan: false},
 			{
 				// Flipping back to false must delete the monitor.
 				Config: testAccSyntheticTestResourceConfig_createMonitor(name, false),
@@ -361,11 +371,13 @@ func TestAccSyntheticTestResource_withoutMonitor(t *testing.T) {
 					testAccCheckSyntheticTestMonitorExists("groundcover_synthetic_test.test", false),
 				),
 			},
+			{Config: testAccSyntheticTestResourceConfig_createMonitor(name, false), PlanOnly: true, ExpectNonEmptyPlan: false},
 			{
 				// Dropping create_monitor and adding a monitor block must create the monitor.
 				Config: testAccSyntheticTestResourceConfig_withMonitor(name),
 				Check:  resource.TestCheckResourceAttr("groundcover_synthetic_test.test", "monitor.severity", "S1"),
 			},
+			{Config: testAccSyntheticTestResourceConfig_withMonitor(name), PlanOnly: true, ExpectNonEmptyPlan: false},
 		},
 	})
 }
@@ -385,6 +397,7 @@ func TestAccSyntheticTestResource_sslApplyLoop(t *testing.T) {
 					resource.TestCheckResourceAttrSet("groundcover_synthetic_test.test", "id"),
 				),
 			},
+			{Config: testAccSyntheticTestResourceConfig_sslBasic(name), PlanOnly: true, ExpectNonEmptyPlan: false},
 			{
 				Config: testAccSyntheticTestResourceConfig_sslBasic(name),
 				Check: resource.ComposeAggregateTestCheckFunc(
@@ -392,6 +405,7 @@ func TestAccSyntheticTestResource_sslApplyLoop(t *testing.T) {
 					resource.TestCheckResourceAttrSet("groundcover_synthetic_test.test", "id"),
 				),
 			},
+			{Config: testAccSyntheticTestResourceConfig_sslBasic(name), PlanOnly: true, ExpectNonEmptyPlan: false},
 			{
 				Config: testAccSyntheticTestResourceConfig_sslBasic(name),
 				Check: resource.ComposeAggregateTestCheckFunc(
@@ -399,6 +413,7 @@ func TestAccSyntheticTestResource_sslApplyLoop(t *testing.T) {
 					resource.TestCheckResourceAttrSet("groundcover_synthetic_test.test", "id"),
 				),
 			},
+			{Config: testAccSyntheticTestResourceConfig_sslBasic(name), PlanOnly: true, ExpectNonEmptyPlan: false},
 		},
 	})
 }
@@ -418,6 +433,7 @@ func TestAccSyntheticTestResource_notificationMethodApplyLoop(t *testing.T) {
 					resource.TestCheckResourceAttr("groundcover_synthetic_test.test", "monitor.disable_renotification", "true"),
 				),
 			},
+			{Config: testAccSyntheticTestResourceConfig_notificationRoutes(name), PlanOnly: true, ExpectNonEmptyPlan: false},
 			{
 				Config: testAccSyntheticTestResourceConfig_notificationRoutes(name),
 				Check: resource.ComposeAggregateTestCheckFunc(
@@ -425,6 +441,7 @@ func TestAccSyntheticTestResource_notificationMethodApplyLoop(t *testing.T) {
 					resource.TestCheckResourceAttr("groundcover_synthetic_test.test", "monitor.notification_method", "notificationRoutes"),
 				),
 			},
+			{Config: testAccSyntheticTestResourceConfig_notificationRoutes(name), PlanOnly: true, ExpectNonEmptyPlan: false},
 			{
 				Config: testAccSyntheticTestResourceConfig_notificationRoutes(name),
 				Check: resource.ComposeAggregateTestCheckFunc(
@@ -432,6 +449,7 @@ func TestAccSyntheticTestResource_notificationMethodApplyLoop(t *testing.T) {
 					resource.TestCheckResourceAttr("groundcover_synthetic_test.test", "monitor.notification_method", "notificationRoutes"),
 				),
 			},
+			{Config: testAccSyntheticTestResourceConfig_notificationRoutes(name), PlanOnly: true, ExpectNonEmptyPlan: false},
 		},
 	})
 }
@@ -451,6 +469,7 @@ func TestAccSyntheticTestResource_followRedirectsApplyLoop(t *testing.T) {
 					resource.TestCheckResourceAttr("groundcover_synthetic_test.test", "http_check.allow_insecure", "false"),
 				),
 			},
+			{Config: testAccSyntheticTestResourceConfig_withBooleans(name, true, false), PlanOnly: true, ExpectNonEmptyPlan: false},
 			{
 				Config: testAccSyntheticTestResourceConfig_withBooleans(name, true, false),
 				Check: resource.ComposeAggregateTestCheckFunc(
@@ -458,6 +477,7 @@ func TestAccSyntheticTestResource_followRedirectsApplyLoop(t *testing.T) {
 					resource.TestCheckResourceAttr("groundcover_synthetic_test.test", "http_check.allow_insecure", "false"),
 				),
 			},
+			{Config: testAccSyntheticTestResourceConfig_withBooleans(name, true, false), PlanOnly: true, ExpectNonEmptyPlan: false},
 			{
 				Config: testAccSyntheticTestResourceConfig_withBooleans(name, true, false),
 				Check: resource.ComposeAggregateTestCheckFunc(
@@ -465,6 +485,7 @@ func TestAccSyntheticTestResource_followRedirectsApplyLoop(t *testing.T) {
 					resource.TestCheckResourceAttr("groundcover_synthetic_test.test", "http_check.allow_insecure", "false"),
 				),
 			},
+			{Config: testAccSyntheticTestResourceConfig_withBooleans(name, true, false), PlanOnly: true, ExpectNonEmptyPlan: false},
 		},
 	})
 }
@@ -484,6 +505,7 @@ func TestAccSyntheticTestResource_tcpApplyLoop(t *testing.T) {
 					resource.TestCheckResourceAttrSet("groundcover_synthetic_test.test", "id"),
 				),
 			},
+			{Config: testAccSyntheticTestResourceConfig_tcpBasic(name), PlanOnly: true, ExpectNonEmptyPlan: false},
 			{
 				Config: testAccSyntheticTestResourceConfig_tcpBasic(name),
 				Check: resource.ComposeAggregateTestCheckFunc(
@@ -491,6 +513,7 @@ func TestAccSyntheticTestResource_tcpApplyLoop(t *testing.T) {
 					resource.TestCheckResourceAttrSet("groundcover_synthetic_test.test", "id"),
 				),
 			},
+			{Config: testAccSyntheticTestResourceConfig_tcpBasic(name), PlanOnly: true, ExpectNonEmptyPlan: false},
 			{
 				Config: testAccSyntheticTestResourceConfig_tcpBasic(name),
 				Check: resource.ComposeAggregateTestCheckFunc(
@@ -498,6 +521,7 @@ func TestAccSyntheticTestResource_tcpApplyLoop(t *testing.T) {
 					resource.TestCheckResourceAttrSet("groundcover_synthetic_test.test", "id"),
 				),
 			},
+			{Config: testAccSyntheticTestResourceConfig_tcpBasic(name), PlanOnly: true, ExpectNonEmptyPlan: false},
 		},
 	})
 }
@@ -553,6 +577,7 @@ func TestAccSyntheticTestResource_dnsApplyLoop(t *testing.T) {
 					resource.TestCheckResourceAttrSet("groundcover_synthetic_test.test", "id"),
 				),
 			},
+			{Config: testAccSyntheticTestResourceConfig_dnsBasic(name), PlanOnly: true, ExpectNonEmptyPlan: false},
 			{
 				Config: testAccSyntheticTestResourceConfig_dnsBasic(name),
 				Check: resource.ComposeAggregateTestCheckFunc(
@@ -560,6 +585,7 @@ func TestAccSyntheticTestResource_dnsApplyLoop(t *testing.T) {
 					resource.TestCheckResourceAttrSet("groundcover_synthetic_test.test", "id"),
 				),
 			},
+			{Config: testAccSyntheticTestResourceConfig_dnsBasic(name), PlanOnly: true, ExpectNonEmptyPlan: false},
 			{
 				Config: testAccSyntheticTestResourceConfig_dnsBasic(name),
 				Check: resource.ComposeAggregateTestCheckFunc(
@@ -567,6 +593,7 @@ func TestAccSyntheticTestResource_dnsApplyLoop(t *testing.T) {
 					resource.TestCheckResourceAttrSet("groundcover_synthetic_test.test", "id"),
 				),
 			},
+			{Config: testAccSyntheticTestResourceConfig_dnsBasic(name), PlanOnly: true, ExpectNonEmptyPlan: false},
 		},
 	})
 }

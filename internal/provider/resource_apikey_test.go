@@ -32,6 +32,7 @@ func TestAccApiKeyResource(t *testing.T) {
 					resource.TestCheckResourceAttrSet("groundcover_apikey.test", "created_by"),
 				),
 			},
+			{Config: testAccApiKeyResourceConfig(name), PlanOnly: true, ExpectNonEmptyPlan: false},
 			// ImportState testing
 			{
 				ResourceName:            "groundcover_apikey.test",
@@ -46,6 +47,7 @@ func TestAccApiKeyResource(t *testing.T) {
 					resource.TestCheckResourceAttr("groundcover_apikey.test", "name", updatedName),
 				),
 			},
+			{Config: testAccApiKeyResourceConfigUpdated(name, updatedName), PlanOnly: true, ExpectNonEmptyPlan: false},
 			// Delete testing automatically occurs in TestCase
 		},
 	})

@@ -30,6 +30,7 @@ func TestAccServiceAccountResource(t *testing.T) {
 					resource.TestCheckResourceAttr("groundcover_serviceaccount.test", "email", "test-"+name+"@example.com"),
 				),
 			},
+			{Config: testAccServiceAccountResourceConfig(name), PlanOnly: true, ExpectNonEmptyPlan: false},
 			// Update and Read testing
 			{
 				Config: testAccServiceAccountResourceConfigUpdated(name, updatedEmail),
@@ -38,6 +39,7 @@ func TestAccServiceAccountResource(t *testing.T) {
 					resource.TestCheckResourceAttr("groundcover_serviceaccount.test", "email", updatedEmail),
 				),
 			},
+			{Config: testAccServiceAccountResourceConfigUpdated(name, updatedEmail), PlanOnly: true, ExpectNonEmptyPlan: false},
 			// Delete testing automatically occurs in TestCase
 		},
 	})

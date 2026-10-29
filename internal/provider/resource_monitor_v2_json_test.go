@@ -60,6 +60,7 @@ func TestAccMonitorV2JsonResource_basic(t *testing.T) {
 					resource.TestCheckResourceAttr("groundcover_monitor_v2_json.test", "threshold.#", "1"),
 				),
 			},
+			{Config: testAccMonitorV2JsonResourceConfig(name), PlanOnly: true, ExpectNonEmptyPlan: false},
 			{
 				ResourceName:      "groundcover_monitor_v2_json.test",
 				ImportState:       true,

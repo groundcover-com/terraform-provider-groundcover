@@ -44,6 +44,7 @@ func TestAccConnectedAppJson_basic(t *testing.T) {
 					resource.TestCheckResourceAttrSet("groundcover_connected_app_json.test", "data_hash"),
 				),
 			},
+			{Config: testAccConnectedAppJsonConfig_basic(name), PlanOnly: true, ExpectNonEmptyPlan: false},
 			{
 				ResourceName:            "groundcover_connected_app_json.test",
 				ImportState:             true,

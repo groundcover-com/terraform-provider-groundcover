@@ -39,6 +39,7 @@ func TestAccIngestionKeyResource(t *testing.T) {
 					resource.TestCheckResourceAttrSet("groundcover_ingestionkey.test", "created_by"),
 				),
 			},
+			{Config: testAccIngestionKeyResourceConfig(name), PlanOnly: true, ExpectNonEmptyPlan: false},
 			// ImportState testing
 			{
 				ResourceName:            "groundcover_ingestionkey.test",
@@ -54,6 +55,7 @@ func TestAccIngestionKeyResource(t *testing.T) {
 					resource.TestCheckResourceAttr("groundcover_ingestionkey.test", "name", updatedName),
 				),
 			},
+			{Config: testAccIngestionKeyResourceConfig(updatedName), PlanOnly: true, ExpectNonEmptyPlan: false},
 			// Delete testing automatically occurs in TestCase
 		},
 	})

@@ -31,6 +31,7 @@ func TestAccSecretResource(t *testing.T) {
 					resource.TestCheckResourceAttrSet("groundcover_secret.test", "content_hash"),
 				),
 			},
+			{Config: testAccSecretResourceConfig(name, "api_key", "test-secret-content"), PlanOnly: true, ExpectNonEmptyPlan: false},
 			// ImportState testing - content is write-only and not returned on import
 			{
 				ResourceName:            "groundcover_secret.test",
@@ -47,6 +48,7 @@ func TestAccSecretResource(t *testing.T) {
 					resource.TestCheckResourceAttrSet("groundcover_secret.test", "content_hash"),
 				),
 			},
+			{Config: testAccSecretResourceConfig(updatedName, "api_key", "updated-secret-content"), PlanOnly: true, ExpectNonEmptyPlan: false},
 			// Delete testing automatically occurs in TestCase
 		},
 	})
@@ -74,6 +76,7 @@ func TestAccSecretResource_contentHashChanges(t *testing.T) {
 					}),
 				),
 			},
+			{Config: testAccSecretResourceConfig(name, "api_key", "initial-content"), PlanOnly: true, ExpectNonEmptyPlan: false},
 			// Update with different content AND name - hash should change
 			// Note: We also change name because content is write-only and Terraform won't detect changes to it alone
 			{
@@ -91,6 +94,7 @@ func TestAccSecretResource_contentHashChanges(t *testing.T) {
 					}),
 				),
 			},
+			{Config: testAccSecretResourceConfig(updatedName, "api_key", "different-content"), PlanOnly: true, ExpectNonEmptyPlan: false},
 		},
 	})
 }

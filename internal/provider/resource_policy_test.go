@@ -35,6 +35,7 @@ func TestAccPolicyResource(t *testing.T) {
 					resource.TestCheckResourceAttr("groundcover_policy.test", "role.read", "read"),
 				),
 			},
+			{Config: testAccPolicyResourceConfig(name), PlanOnly: true, ExpectNonEmptyPlan: false},
 			// ImportState testing
 			{
 				ResourceName:            "groundcover_policy.test",
@@ -50,6 +51,7 @@ func TestAccPolicyResource(t *testing.T) {
 					resource.TestCheckResourceAttr("groundcover_policy.test", "role.admin", "admin"),
 				),
 			},
+			{Config: testAccPolicyResourceConfigUpdated(updatedName), PlanOnly: true, ExpectNonEmptyPlan: false},
 			// Delete testing automatically occurs in TestCase
 		},
 	})
@@ -72,6 +74,7 @@ func TestAccPolicyResource_complex(t *testing.T) {
 					resource.TestCheckResourceAttrSet("groundcover_policy.test", "data_scope.simple.operator"),
 				),
 			},
+			{Config: testAccPolicyResourceConfigComplex(name), PlanOnly: true, ExpectNonEmptyPlan: false},
 		},
 	})
 }
@@ -113,6 +116,7 @@ func TestAccPolicyResource_advanced(t *testing.T) {
 					resource.TestCheckResourceAttrSet("groundcover_policy.test", "data_scope.advanced.traces.operator"),
 				),
 			},
+			{Config: testAccPolicyResourceConfigAdvanced(name), PlanOnly: true, ExpectNonEmptyPlan: false},
 		},
 	})
 }
@@ -133,6 +137,7 @@ func TestAccPolicyResource_advancedUpdate(t *testing.T) {
 					resource.TestCheckResourceAttrSet("groundcover_policy.test", "data_scope.simple.operator"),
 				),
 			},
+			{Config: testAccPolicyResourceConfigComplex(name), PlanOnly: true, ExpectNonEmptyPlan: false},
 			// Update to advanced data scope
 			{
 				Config: testAccPolicyResourceConfigAdvanced(updatedName),
@@ -142,6 +147,7 @@ func TestAccPolicyResource_advancedUpdate(t *testing.T) {
 					resource.TestCheckResourceAttrSet("groundcover_policy.test", "data_scope.advanced.traces.operator"),
 				),
 			},
+			{Config: testAccPolicyResourceConfigAdvanced(updatedName), PlanOnly: true, ExpectNonEmptyPlan: false},
 		},
 	})
 }
@@ -266,6 +272,7 @@ func TestAccPolicyResource_noData(t *testing.T) {
 					resource.TestCheckResourceAttr("groundcover_policy.test", "data_scope.simple.disabled", "true"),
 				),
 			},
+			{Config: testAccPolicyResourceConfigNoData(name), PlanOnly: true, ExpectNonEmptyPlan: false},
 		},
 	})
 }
@@ -320,6 +327,7 @@ func TestAccPolicyResource_emptyDataScope(t *testing.T) {
 					resource.TestCheckResourceAttr("groundcover_policy.test", "role.read", "read"),
 				),
 			},
+			{Config: testAccPolicyResourceConfigNeitherScope(name), PlanOnly: true, ExpectNonEmptyPlan: false},
 		},
 	})
 }

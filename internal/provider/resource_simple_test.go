@@ -27,6 +27,7 @@ func TestAccPolicyResourceSimple(t *testing.T) {
 					resource.TestCheckResourceAttr("groundcover_policy.test", "role.read", "read"),
 				),
 			},
+			{Config: testAccPolicyResourceSimpleConfig(name), PlanOnly: true, ExpectNonEmptyPlan: false},
 			// ImportState testing
 			{
 				ResourceName:            "groundcover_policy.test",
@@ -42,6 +43,7 @@ func TestAccPolicyResourceSimple(t *testing.T) {
 					resource.TestCheckResourceAttr("groundcover_policy.test", "role.admin", "admin"),
 				),
 			},
+			{Config: testAccPolicyResourceSimpleConfigUpdated(name), PlanOnly: true, ExpectNonEmptyPlan: false},
 		},
 	})
 }

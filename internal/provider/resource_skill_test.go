@@ -190,6 +190,7 @@ func TestAccSkillResource(t *testing.T) {
 					testAccCaptureSkillRevision("groundcover_skill.test", &initialRevision),
 				),
 			},
+			{Config: testAccSkillConfig(name, initialWhenToUse, initialDescription, initialInstructions), PlanOnly: true, ExpectNonEmptyPlan: false},
 			{ResourceName: "groundcover_skill.test", ImportState: true, ImportStateVerify: true},
 			{
 				Config: testAccSkillConfig(updatedName, updatedWhenToUse, updatedDescription, updatedInstructions),
@@ -201,6 +202,7 @@ func TestAccSkillResource(t *testing.T) {
 					testAccCheckSkillRevisionAdvanced("groundcover_skill.test", &initialRevision),
 				),
 			},
+			{Config: testAccSkillConfig(updatedName, updatedWhenToUse, updatedDescription, updatedInstructions), PlanOnly: true, ExpectNonEmptyPlan: false},
 			{
 				Config: testAccSkillConfigWithoutDescription(updatedName, updatedWhenToUse, updatedInstructions),
 				Check:  resource.TestCheckResourceAttr("groundcover_skill.test", "description", ""),
@@ -241,6 +243,7 @@ func TestAccSkillResource_outOfBandDrift(t *testing.T) {
 				Config: testAccSkillConfig(name, whenToUse, description, instructions),
 				Check:  testAccCaptureSkillID("groundcover_skill.test", &skillID),
 			},
+			{Config: testAccSkillConfig(name, whenToUse, description, instructions), PlanOnly: true, ExpectNonEmptyPlan: false},
 			{
 				PreConfig: func() {
 					if err := testAccUpdateSkillOutOfBand(skillID, name+"-remote", "Remote use case", "Remote description", "Remote instructions"); err != nil {

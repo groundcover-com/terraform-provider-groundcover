@@ -83,6 +83,7 @@ func TestAccDashboardResource(t *testing.T) {
 					resource.TestCheckResourceAttrSet("groundcover_dashboard.test", "revision_number"),
 				),
 			},
+			{Config: testAccDashboardResourceConfig(dashboardName), PlanOnly: true, ExpectNonEmptyPlan: false},
 			// ImportState testing
 			{
 				ResourceName:      "groundcover_dashboard.test",
@@ -102,6 +103,7 @@ func TestAccDashboardResource(t *testing.T) {
 					resource.TestCheckResourceAttrSet("groundcover_dashboard.test", "preset"),
 				),
 			},
+			{Config: testAccDashboardResourceConfigUpdatedDescription(dashboardName), PlanOnly: true, ExpectNonEmptyPlan: false},
 			// Tags coverage is folded in here rather than in a separate
 			// acceptance test. Add tags and confirm they land on the remote
 			// resource.
@@ -113,6 +115,7 @@ func TestAccDashboardResource(t *testing.T) {
 					resource.TestCheckResourceAttr("groundcover_dashboard.test", "tags.1", "team-a"),
 				),
 			},
+			{Config: testAccDashboardResourceConfigWithTags(dashboardName, `["Production", "team-a"]`), PlanOnly: true, ExpectNonEmptyPlan: false},
 			// Import the tagged dashboard to verify API-to-state tag
 			// reconstruction (the earlier import step ran before tags existed).
 			{
@@ -152,6 +155,7 @@ func TestAccDashboardResource(t *testing.T) {
 					resource.TestCheckNoResourceAttr("groundcover_dashboard.test", "tags"),
 				),
 			},
+			{Config: testAccDashboardResourceConfigSimple(dashboardName), PlanOnly: true, ExpectNonEmptyPlan: false},
 		},
 	})
 }
@@ -175,6 +179,7 @@ func TestAccDashboardResource_Update(t *testing.T) {
 					resource.TestCheckResourceAttrSet("groundcover_dashboard.test", "revision_number"),
 				),
 			},
+			{Config: testAccDashboardResourceConfigSimple(dashboardName), PlanOnly: true, ExpectNonEmptyPlan: false},
 			// Update name and description
 			{
 				Config: testAccDashboardResourceConfigUpdatedNameAndDescription(updatedName),
@@ -185,6 +190,7 @@ func TestAccDashboardResource_Update(t *testing.T) {
 					resource.TestCheckResourceAttrSet("groundcover_dashboard.test", "revision_number"),
 				),
 			},
+			{Config: testAccDashboardResourceConfigUpdatedNameAndDescription(updatedName), PlanOnly: true, ExpectNonEmptyPlan: false},
 			// Update preset (spec change)
 			{
 				Config: testAccDashboardResourceConfigUpdatedPreset(updatedName),
@@ -194,6 +200,7 @@ func TestAccDashboardResource_Update(t *testing.T) {
 					resource.TestCheckResourceAttrSet("groundcover_dashboard.test", "revision_number"),
 				),
 			},
+			{Config: testAccDashboardResourceConfigUpdatedPreset(updatedName), PlanOnly: true, ExpectNonEmptyPlan: false},
 		},
 	})
 }
@@ -215,6 +222,7 @@ func TestAccDashboardResource_EmptyTeam(t *testing.T) {
 					resource.TestCheckResourceAttrSet("groundcover_dashboard.test", "id"),
 				),
 			},
+			{Config: testAccDashboardResourceConfigNoTeam(dashboardName), PlanOnly: true, ExpectNonEmptyPlan: false},
 			// Update description, team should remain empty
 			{
 				Config: testAccDashboardResourceConfigNoTeamUpdated(dashboardName),
@@ -224,6 +232,7 @@ func TestAccDashboardResource_EmptyTeam(t *testing.T) {
 					resource.TestCheckNoResourceAttr("groundcover_dashboard.test", "team"),
 				),
 			},
+			{Config: testAccDashboardResourceConfigNoTeamUpdated(dashboardName), PlanOnly: true, ExpectNonEmptyPlan: false},
 		},
 	})
 }
@@ -275,12 +284,14 @@ func TestAccDashboardResource_OmittedDescription(t *testing.T) {
 					resource.TestCheckResourceAttr("groundcover_dashboard.test", "description", "Simple test dashboard"),
 				),
 			},
+			{Config: testAccDashboardResourceConfigSimple(dashboardName), PlanOnly: true, ExpectNonEmptyPlan: false},
 			{
 				Config: testAccDashboardResourceConfigNoDescription(dashboardName),
 				Check: resource.ComposeTestCheckFunc(
 					resource.TestCheckNoResourceAttr("groundcover_dashboard.test", "description"),
 				),
 			},
+			{Config: testAccDashboardResourceConfigNoDescription(dashboardName), PlanOnly: true, ExpectNonEmptyPlan: false},
 			// `description = ""` was the workaround for this bug, so configs in
 			// the wild still carry it — an explicit empty string must keep
 			// applying cleanly and stay empty rather than being folded to null.
@@ -317,6 +328,7 @@ func TestAccDashboardResource_ApplyLoopIssue(t *testing.T) {
 					resource.TestCheckResourceAttrSet("groundcover_dashboard.test", "revision_number"),
 				),
 			},
+			{Config: testAccDashboardResourceConfigWithJsonEncode(dashboardName), PlanOnly: true, ExpectNonEmptyPlan: false},
 			// Step 2: Apply the same config again - should not detect changes (no apply loop)
 			// This is the critical test - if there's an apply loop, this step will show changes
 			{
@@ -329,6 +341,7 @@ func TestAccDashboardResource_ApplyLoopIssue(t *testing.T) {
 				// ExpectNonEmptyPlan is false by default, meaning we expect no changes
 				// If there were an apply loop, this step would fail or show changes
 			},
+			{Config: testAccDashboardResourceConfigWithJsonEncode(dashboardName), PlanOnly: true, ExpectNonEmptyPlan: false},
 			// Step 3: Apply one more time to be absolutely sure there's no apply loop
 			{
 				Config: testAccDashboardResourceConfigWithJsonEncode(dashboardName),
@@ -338,6 +351,7 @@ func TestAccDashboardResource_ApplyLoopIssue(t *testing.T) {
 					resource.TestCheckResourceAttrSet("groundcover_dashboard.test", "revision_number"),
 				),
 			},
+			{Config: testAccDashboardResourceConfigWithJsonEncode(dashboardName), PlanOnly: true, ExpectNonEmptyPlan: false},
 		},
 	})
 }

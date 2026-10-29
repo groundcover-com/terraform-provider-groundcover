@@ -25,6 +25,7 @@ func TestAccMetricsPipelineResource(t *testing.T) {
 					resource.TestCheckResourceAttrSet("groundcover_metricspipeline.test", "updated_at"),
 				),
 			},
+			{Config: testAccMetricsPipelineResourceConfig(), PlanOnly: true, ExpectNonEmptyPlan: false},
 			{
 				Config: testAccMetricsPipelineResourceConfigUpdated(),
 				Check: resource.ComposeAggregateTestCheckFunc(
@@ -39,6 +40,7 @@ func TestAccMetricsPipelineResource(t *testing.T) {
 					resource.TestCheckResourceAttrSet("groundcover_metricspipeline.test", "updated_at"),
 				),
 			},
+			{Config: testAccMetricsPipelineResourceConfigUpdated(), PlanOnly: true, ExpectNonEmptyPlan: false},
 		},
 	})
 }

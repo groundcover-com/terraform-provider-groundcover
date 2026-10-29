@@ -33,6 +33,7 @@ func TestAccConnectedApp_basic(t *testing.T) {
 					resource.TestCheckResourceAttrSet("groundcover_connected_app.test", "data_hash"),
 				),
 			},
+			{Config: testAccConnectedAppConfig_basic(name), PlanOnly: true, ExpectNonEmptyPlan: false},
 			{
 				ResourceName:            "groundcover_connected_app.test",
 				ImportState:             true,
@@ -63,6 +64,7 @@ func TestAccConnectedApp_update(t *testing.T) {
 					testAccCaptureConnectedAppAttr("groundcover_connected_app.test", "data_hash", &initialHash),
 				),
 			},
+			{Config: testAccConnectedAppConfig_basic(initialName), PlanOnly: true, ExpectNonEmptyPlan: false},
 			{
 				Config: testAccConnectedAppConfig_basic(updatedName),
 				Check: resource.ComposeAggregateTestCheckFunc(
@@ -74,6 +76,7 @@ func TestAccConnectedApp_update(t *testing.T) {
 					testAccCheckConnectedAppAttrEquals("groundcover_connected_app.test", "data_hash", &initialHash),
 				),
 			},
+			{Config: testAccConnectedAppConfig_basic(updatedName), PlanOnly: true, ExpectNonEmptyPlan: false},
 		},
 	})
 }
@@ -103,6 +106,7 @@ func TestAccConnectedApp_outOfBandDrift(t *testing.T) {
 					testAccCaptureConnectedAppAttr("groundcover_connected_app.test", "data_hash", &baselineHash),
 				),
 			},
+			{Config: testAccConnectedAppConfig_basic(name), PlanOnly: true, ExpectNonEmptyPlan: false},
 			// Step 2: mutate the secret out-of-band, then re-apply the unchanged config.
 			// Drift must be detected and the configured data restored, so the hash returns
 			// to its baseline value.
@@ -117,6 +121,7 @@ func TestAccConnectedApp_outOfBandDrift(t *testing.T) {
 					testAccCheckConnectedAppAttrEquals("groundcover_connected_app.test", "data_hash", &baselineHash),
 				),
 			},
+			{Config: testAccConnectedAppConfig_basic(name), PlanOnly: true, ExpectNonEmptyPlan: false},
 		},
 	})
 }
@@ -138,6 +143,7 @@ func TestAccConnectedApp_applyLoop(t *testing.T) {
 					resource.TestCheckResourceAttrSet("groundcover_connected_app.test", "id"),
 				),
 			},
+			{Config: testAccConnectedAppConfig_basic(name), PlanOnly: true, ExpectNonEmptyPlan: false},
 			// Step 2: Apply the same config again - should not detect changes (no apply loop)
 			// This is the critical test - if there's an apply loop, this step will show changes
 			{
@@ -149,6 +155,7 @@ func TestAccConnectedApp_applyLoop(t *testing.T) {
 				// ExpectNonEmptyPlan is false by default, meaning we expect no changes
 				// If there were an apply loop, this step would fail or show changes
 			},
+			{Config: testAccConnectedAppConfig_basic(name), PlanOnly: true, ExpectNonEmptyPlan: false},
 			// Step 3: Apply one more time to be absolutely sure there's no apply loop
 			{
 				Config: testAccConnectedAppConfig_basic(name),
@@ -157,6 +164,7 @@ func TestAccConnectedApp_applyLoop(t *testing.T) {
 					resource.TestCheckResourceAttrSet("groundcover_connected_app.test", "id"),
 				),
 			},
+			{Config: testAccConnectedAppConfig_basic(name), PlanOnly: true, ExpectNonEmptyPlan: false},
 		},
 	})
 }
@@ -179,6 +187,7 @@ func TestAccConnectedApp_applyLoopWithSeverityMapping(t *testing.T) {
 					resource.TestCheckResourceAttrSet("groundcover_connected_app.test", "id"),
 				),
 			},
+			{Config: testAccConnectedAppConfig_pagerdutyWithSeverityMapping(name), PlanOnly: true, ExpectNonEmptyPlan: false},
 			// Step 2: Apply the same config again - should not detect changes (no apply loop)
 			// This is the critical test - if there's an apply loop, this step will show changes
 			{
@@ -191,6 +200,7 @@ func TestAccConnectedApp_applyLoopWithSeverityMapping(t *testing.T) {
 				// ExpectNonEmptyPlan is false by default, meaning we expect no changes
 				// If there were an apply loop, this step would fail or show changes
 			},
+			{Config: testAccConnectedAppConfig_pagerdutyWithSeverityMapping(name), PlanOnly: true, ExpectNonEmptyPlan: false},
 			// Step 3: Apply one more time to be absolutely sure there's no apply loop
 			{
 				Config: testAccConnectedAppConfig_pagerdutyWithSeverityMapping(name),
@@ -200,6 +210,7 @@ func TestAccConnectedApp_applyLoopWithSeverityMapping(t *testing.T) {
 					resource.TestCheckResourceAttrSet("groundcover_connected_app.test", "id"),
 				),
 			},
+			{Config: testAccConnectedAppConfig_pagerdutyWithSeverityMapping(name), PlanOnly: true, ExpectNonEmptyPlan: false},
 		},
 	})
 }
@@ -223,6 +234,7 @@ func TestAccConnectedApp_rootlyApplyLoop(t *testing.T) {
 					resource.TestCheckResourceAttrSet("groundcover_connected_app.test", "id"),
 				),
 			},
+			{Config: testAccConnectedAppConfig_rootlyNoWebhookURL(name), PlanOnly: true, ExpectNonEmptyPlan: false},
 			// Step 2: Apply the same config again - should not detect changes (no apply loop)
 			// Also verify webhook_url doesn't leak into state from the server's empty response
 			{
@@ -233,6 +245,7 @@ func TestAccConnectedApp_rootlyApplyLoop(t *testing.T) {
 					resource.TestCheckResourceAttrSet("groundcover_connected_app.test", "id"),
 				),
 			},
+			{Config: testAccConnectedAppConfig_rootlyNoWebhookURL(name), PlanOnly: true, ExpectNonEmptyPlan: false},
 			// Step 3: Apply one more time to be absolutely sure there's no apply loop
 			{
 				Config: testAccConnectedAppConfig_rootlyNoWebhookURL(name),
@@ -242,6 +255,7 @@ func TestAccConnectedApp_rootlyApplyLoop(t *testing.T) {
 					resource.TestCheckResourceAttrSet("groundcover_connected_app.test", "id"),
 				),
 			},
+			{Config: testAccConnectedAppConfig_rootlyNoWebhookURL(name), PlanOnly: true, ExpectNonEmptyPlan: false},
 		},
 	})
 }
@@ -263,6 +277,7 @@ func TestAccConnectedApp_opsgenieApplyLoop(t *testing.T) {
 					resource.TestCheckResourceAttrSet("groundcover_connected_app.test", "id"),
 				),
 			},
+			{Config: testAccConnectedAppConfig_opsgenieWithPriorityMapping(name), PlanOnly: true, ExpectNonEmptyPlan: false},
 			{
 				Config: testAccConnectedAppConfig_opsgenieWithPriorityMapping(name),
 				Check: resource.ComposeAggregateTestCheckFunc(
@@ -271,6 +286,7 @@ func TestAccConnectedApp_opsgenieApplyLoop(t *testing.T) {
 					resource.TestCheckResourceAttrSet("groundcover_connected_app.test", "id"),
 				),
 			},
+			{Config: testAccConnectedAppConfig_opsgenieWithPriorityMapping(name), PlanOnly: true, ExpectNonEmptyPlan: false},
 			{
 				Config: testAccConnectedAppConfig_opsgenieWithPriorityMapping(name),
 				Check: resource.ComposeAggregateTestCheckFunc(
@@ -279,6 +295,7 @@ func TestAccConnectedApp_opsgenieApplyLoop(t *testing.T) {
 					resource.TestCheckResourceAttrSet("groundcover_connected_app.test", "id"),
 				),
 			},
+			{Config: testAccConnectedAppConfig_opsgenieWithPriorityMapping(name), PlanOnly: true, ExpectNonEmptyPlan: false},
 		},
 	})
 }
@@ -300,6 +317,7 @@ func TestAccConnectedApp_incidentioApplyLoop(t *testing.T) {
 					resource.TestCheckResourceAttrSet("groundcover_connected_app.test", "id"),
 				),
 			},
+			{Config: testAccConnectedAppConfig_incidentioWithSeverityMapping(name), PlanOnly: true, ExpectNonEmptyPlan: false},
 			{
 				Config: testAccConnectedAppConfig_incidentioWithSeverityMapping(name),
 				Check: resource.ComposeAggregateTestCheckFunc(
@@ -308,6 +326,7 @@ func TestAccConnectedApp_incidentioApplyLoop(t *testing.T) {
 					resource.TestCheckResourceAttrSet("groundcover_connected_app.test", "id"),
 				),
 			},
+			{Config: testAccConnectedAppConfig_incidentioWithSeverityMapping(name), PlanOnly: true, ExpectNonEmptyPlan: false},
 			{
 				Config: testAccConnectedAppConfig_incidentioWithSeverityMapping(name),
 				Check: resource.ComposeAggregateTestCheckFunc(
@@ -316,6 +335,7 @@ func TestAccConnectedApp_incidentioApplyLoop(t *testing.T) {
 					resource.TestCheckResourceAttrSet("groundcover_connected_app.test", "id"),
 				),
 			},
+			{Config: testAccConnectedAppConfig_incidentioWithSeverityMapping(name), PlanOnly: true, ExpectNonEmptyPlan: false},
 		},
 	})
 }
@@ -336,6 +356,7 @@ func TestAccConnectedApp_msTeamsApplyLoop(t *testing.T) {
 					resource.TestCheckResourceAttrSet("groundcover_connected_app.test", "id"),
 				),
 			},
+			{Config: testAccConnectedAppConfig_msTeams(name), PlanOnly: true, ExpectNonEmptyPlan: false},
 			{
 				Config: testAccConnectedAppConfig_msTeams(name),
 				Check: resource.ComposeAggregateTestCheckFunc(
@@ -343,6 +364,7 @@ func TestAccConnectedApp_msTeamsApplyLoop(t *testing.T) {
 					resource.TestCheckResourceAttrSet("groundcover_connected_app.test", "id"),
 				),
 			},
+			{Config: testAccConnectedAppConfig_msTeams(name), PlanOnly: true, ExpectNonEmptyPlan: false},
 			{
 				Config: testAccConnectedAppConfig_msTeams(name),
 				Check: resource.ComposeAggregateTestCheckFunc(
@@ -350,6 +372,7 @@ func TestAccConnectedApp_msTeamsApplyLoop(t *testing.T) {
 					resource.TestCheckResourceAttrSet("groundcover_connected_app.test", "id"),
 				),
 			},
+			{Config: testAccConnectedAppConfig_msTeams(name), PlanOnly: true, ExpectNonEmptyPlan: false},
 		},
 	})
 }
@@ -371,6 +394,7 @@ func TestAccConnectedApp_webhookApplyLoop(t *testing.T) {
 					resource.TestCheckResourceAttrSet("groundcover_connected_app.test", "id"),
 				),
 			},
+			{Config: testAccConnectedAppConfig_webhookWithBearerAuth(name), PlanOnly: true, ExpectNonEmptyPlan: false},
 			{
 				Config: testAccConnectedAppConfig_webhookWithBearerAuth(name),
 				Check: resource.ComposeAggregateTestCheckFunc(
@@ -379,6 +403,7 @@ func TestAccConnectedApp_webhookApplyLoop(t *testing.T) {
 					resource.TestCheckResourceAttrSet("groundcover_connected_app.test", "id"),
 				),
 			},
+			{Config: testAccConnectedAppConfig_webhookWithBearerAuth(name), PlanOnly: true, ExpectNonEmptyPlan: false},
 			{
 				Config: testAccConnectedAppConfig_webhookWithBearerAuth(name),
 				Check: resource.ComposeAggregateTestCheckFunc(
@@ -387,6 +412,7 @@ func TestAccConnectedApp_webhookApplyLoop(t *testing.T) {
 					resource.TestCheckResourceAttrSet("groundcover_connected_app.test", "id"),
 				),
 			},
+			{Config: testAccConnectedAppConfig_webhookWithBearerAuth(name), PlanOnly: true, ExpectNonEmptyPlan: false},
 		},
 	})
 }
