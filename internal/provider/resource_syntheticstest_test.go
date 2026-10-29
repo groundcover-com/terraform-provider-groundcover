@@ -950,7 +950,6 @@ func testAccCheckSyntheticTestResourceDisappears(n string) resource.TestCheckFun
 	}
 }
 
-
 func TestAccSyntheticTestResource_emptyAssertionTargetApplyLoop(t *testing.T) {
 	name := acctest.RandomWithPrefix("test-synth-empty-target")
 
@@ -972,7 +971,6 @@ func TestAccSyntheticTestResource_emptyAssertionTargetApplyLoop(t *testing.T) {
 		},
 	})
 }
-
 
 func testAccSyntheticTestResourceConfig_emptyAssertionTarget(name string) string {
 	return fmt.Sprintf(`
