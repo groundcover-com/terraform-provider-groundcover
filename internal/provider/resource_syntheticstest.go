@@ -1017,6 +1017,15 @@ func assertionHasUnknownValues(assertion syntheticAssertionModel) bool {
 		assertion.Severity.IsUnknown()
 }
 
+// syntheticStringOrConfiguredEmpty keeps a configured "" when the API filled in
+// its own default for it, so "use the default" does not plan as a change (BE-3828).
+func syntheticStringOrConfiguredEmpty(value string, prior types.String) types.String {
+	if !prior.IsNull() && !prior.IsUnknown() && prior.ValueString() == "" {
+		return prior
+	}
+	return types.StringValue(value)
+}
+
 func assertionValueOrNull(value string) types.String {
 	if value == "" {
 		return types.StringNull()
@@ -1400,6 +1409,8 @@ func fromSDKResponse(ctx context.Context, sdkResp *models.SyntheticTestCreateReq
 		if !diags.HasError() {
 			state.Labels = labelsMap
 		}
+	} else if !state.Labels.IsNull() && !state.Labels.IsUnknown() && len(state.Labels.Elements()) == 0 {
+		// configured labels = {} echoes back as none; keep it or every plan re-adds {} (BE-3828)
 	} else if !state.Labels.IsNull() {
 		// API returned no labels but state had labels - clear them
 		state.Labels = types.MapNull(types.StringType)
@@ -1453,8 +1464,14 @@ func fromSDKResponse(ctx context.Context, sdkResp *models.SyntheticTestCreateReq
 		}
 
 		if http.Body != nil && (http.Body.Content != "" || string(http.Body.Type) != "") {
+			bodyType := types.StringValue(string(http.Body.Type))
+			// "raw" is what the provider sends when type is omitted; reading it back as
+			// a value would diff against the omitted config forever (BE-3828).
+			if string(http.Body.Type) == "raw" && state.HTTPCheck != nil && state.HTTPCheck.Body != nil && state.HTTPCheck.Body.Type.IsNull() {
+				bodyType = types.StringNull()
+			}
 			httpModel.Body = &syntheticHTTPBodyModel{
-				Type:    types.StringValue(string(http.Body.Type)),
+				Type:    bodyType,
 				Content: types.StringValue(http.Body.Content),
 			}
 		}
@@ -1645,16 +1662,16 @@ func fromSDKResponse(ctx context.Context, sdkResp *models.SyntheticTestCreateReq
 		}
 
 		if !prev.MonitorName.IsNull() {
-			monitorModel.MonitorName = types.StringValue(mon.MonitorName)
+			monitorModel.MonitorName = syntheticStringOrConfiguredEmpty(mon.MonitorName, prev.MonitorName)
 		}
 		if !prev.Severity.IsNull() {
 			monitorModel.Severity = types.StringValue(mon.Severity)
 		}
 		if !prev.IssueSummary.IsNull() {
-			monitorModel.IssueSummary = types.StringValue(mon.IssueSummary)
+			monitorModel.IssueSummary = syntheticStringOrConfiguredEmpty(mon.IssueSummary, prev.IssueSummary)
 		}
 		if !prev.IssueDescription.IsNull() {
-			monitorModel.IssueDescription = types.StringValue(mon.IssueDescription)
+			monitorModel.IssueDescription = syntheticStringOrConfiguredEmpty(mon.IssueDescription, prev.IssueDescription)
 		}
 		if !prev.NoDataState.IsNull() {
 			monitorModel.NoDataState = types.StringValue(mon.NoDataState)
