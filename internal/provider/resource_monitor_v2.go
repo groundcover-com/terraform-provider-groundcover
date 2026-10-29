@@ -1215,12 +1215,12 @@ func mapMonitorV2SDKToModel(ctx context.Context, id string, remote *models.Updat
 	// result". Sending is still pointer-based (monitorV2BoolPtr) so unpause works.
 	state.IsPaused = types.BoolValue(remote.IsPaused != nil && *remote.IsPaused)
 	state.AutoResolve = types.BoolValue(remote.AutoResolve)
-	state.Category = monitorV2NullableString(remote.Category)
-	state.Team = monitorV2NullableString(remote.Team)
-	state.Labels = monitorV2MapType(ctx, remote.Labels, diags)
-	state.Annotations = monitorV2MapType(ctx, monitorV2FilterAnnotations(remote.Annotations), diags)
+	state.Category = monitorV2StringOrPrior(remote.Category, state.Category)
+	state.Team = monitorV2StringOrPrior(remote.Team, state.Team)
+	state.Labels = monitorV2MapOrPrior(ctx, remote.Labels, state.Labels, diags)
+	state.Annotations = monitorV2MapOrPrior(ctx, monitorV2FilterAnnotations(remote.Annotations), state.Annotations, diags)
 	state.Routing = monitorV2StringListType(ctx, remote.Routing, diags)
-	state.Display = monitorV2DisplayFromSDK(ctx, remote.Display, diags)
+	state.Display = monitorV2DisplayFromSDK(ctx, remote.Display, state.Display, diags)
 	state.EvaluationInterval = monitorV2PreserveEvaluationIntervalDurations(previousEvaluationInterval, monitorV2EvaluationIntervalFromSDK(remote.EvaluationInterval))
 	state.NotificationSettings = monitorV2PreserveNotificationSettingsDurations(previousNotificationSettings, monitorV2NotificationSettingsFromSDK(ctx, remote.NotificationSettings, remote.HideSlackPreviewGraph, diags))
 
@@ -1429,15 +1429,18 @@ func monitorV2EvaluationIntervalFromSDK(interval *models.EvaluationInterval) *mo
 	}
 }
 
-func monitorV2DisplayFromSDK(ctx context.Context, display *models.DisplayModel, diags *diag.Diagnostics) *monitorV2DisplayModel {
+func monitorV2DisplayFromSDK(ctx context.Context, display *models.DisplayModel, prior *monitorV2DisplayModel, diags *diag.Diagnostics) *monitorV2DisplayModel {
 	if display == nil {
 		return nil
 	}
+	if prior == nil {
+		prior = &monitorV2DisplayModel{}
+	}
 	return &monitorV2DisplayModel{
 		Header:               monitorV2NullableString(display.Header),
-		Description:          monitorV2NullableString(display.Description),
-		ResourceHeaderLabels: monitorV2StringListType(ctx, display.ResourceHeaderLabels, diags),
-		ContextHeaderLabels:  monitorV2StringListType(ctx, display.ContextHeaderLabels, diags),
+		Description:          monitorV2StringOrPrior(display.Description, prior.Description),
+		ResourceHeaderLabels: monitorV2StringListOrPrior(ctx, display.ResourceHeaderLabels, prior.ResourceHeaderLabels, diags),
+		ContextHeaderLabels:  monitorV2StringListOrPrior(ctx, display.ContextHeaderLabels, prior.ContextHeaderLabels, diags),
 		TemplateLanguage:     monitorV2NullableString(display.TemplateLanguage),
 	}
 }
@@ -1565,6 +1568,30 @@ func monitorV2NullableString(value string) types.String {
 		return types.StringNull()
 	}
 	return types.StringValue(value)
+}
+
+// monitorV2StringOrPrior keeps a configured "" when the API returns "": the API
+// echoes an empty string as empty, so mapping it to null would make every plan
+// show "" -> null (BE-3828). Nothing configured still maps to null.
+func monitorV2StringOrPrior(value string, prior types.String) types.String {
+	if value == "" && !prior.IsNull() && !prior.IsUnknown() && prior.ValueString() == "" {
+		return prior
+	}
+	return monitorV2NullableString(value)
+}
+
+func monitorV2MapOrPrior(ctx context.Context, value map[string]string, prior types.Map, diags *diag.Diagnostics) types.Map {
+	if len(value) == 0 && !prior.IsNull() && !prior.IsUnknown() && len(prior.Elements()) == 0 {
+		return prior
+	}
+	return monitorV2MapType(ctx, value, diags)
+}
+
+func monitorV2StringListOrPrior(ctx context.Context, value []string, prior types.List, diags *diag.Diagnostics) types.List {
+	if len(value) == 0 && !prior.IsNull() && !prior.IsUnknown() && len(prior.Elements()) == 0 {
+		return prior
+	}
+	return monitorV2StringListType(ctx, value, diags)
 }
 
 func monitorV2AnyString(value any) types.String {
