@@ -1,5 +1,6 @@
 ## 1.23.1
 
+* Fixed configured empty values (`""`, `[]`, `{}`) and an omitted `body.type` being read back as null or as the API default, which failed the apply (`groundcover_monitor_v2`: `team`, `category`, `labels`, `annotations`, `display.*`) or showed a perpetual diff (`groundcover_metricspipeline` rule lists, `groundcover_synthetic_test` `labels`, `body.type`, `monitor_name`, `issue_summary`)
 * Fixed `groundcover_synthetic_test` showing a perpetual diff when an `assertion` sets `target` to `""` on an operator that takes no target (such as `exists`), or `property` to `""`. The API echoes the empty string back and the provider read it as null, so every plan re-applied the test. Through the crossplane provider this was an update every ~2 seconds that also reset the synthetic's monitor alert state
 
 ## 1.23.0
