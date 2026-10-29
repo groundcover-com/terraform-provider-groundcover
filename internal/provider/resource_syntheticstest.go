@@ -1017,15 +1017,6 @@ func assertionHasUnknownValues(assertion syntheticAssertionModel) bool {
 		assertion.Severity.IsUnknown()
 }
 
-// syntheticStringOrConfiguredEmpty keeps a configured "" when the API filled in
-// its own default for it, so "use the default" does not plan as a change (BE-3828).
-func syntheticStringOrConfiguredEmpty(value string, prior types.String) types.String {
-	if !prior.IsNull() && !prior.IsUnknown() && prior.ValueString() == "" {
-		return prior
-	}
-	return types.StringValue(value)
-}
-
 func assertionValueOrNull(value string) types.String {
 	if value == "" {
 		return types.StringNull()
@@ -1662,16 +1653,16 @@ func fromSDKResponse(ctx context.Context, sdkResp *models.SyntheticTestCreateReq
 		}
 
 		if !prev.MonitorName.IsNull() {
-			monitorModel.MonitorName = syntheticStringOrConfiguredEmpty(mon.MonitorName, prev.MonitorName)
+			monitorModel.MonitorName = types.StringValue(mon.MonitorName)
 		}
 		if !prev.Severity.IsNull() {
 			monitorModel.Severity = types.StringValue(mon.Severity)
 		}
 		if !prev.IssueSummary.IsNull() {
-			monitorModel.IssueSummary = syntheticStringOrConfiguredEmpty(mon.IssueSummary, prev.IssueSummary)
+			monitorModel.IssueSummary = types.StringValue(mon.IssueSummary)
 		}
 		if !prev.IssueDescription.IsNull() {
-			monitorModel.IssueDescription = syntheticStringOrConfiguredEmpty(mon.IssueDescription, prev.IssueDescription)
+			monitorModel.IssueDescription = types.StringValue(mon.IssueDescription)
 		}
 		if !prev.NoDataState.IsNull() {
 			monitorModel.NoDataState = types.StringValue(mon.NoDataState)

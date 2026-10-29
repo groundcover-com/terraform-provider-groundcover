@@ -1032,19 +1032,16 @@ func testAccCheckSyntheticTestResourceDisappears(n string) resource.TestCheckFun
 	}
 }
 
-// Configured labels = {}, an omitted body.type that the provider sends as "raw",
-// and monitor_name / issue_summary = "" that the API replaces with its default
-// must all survive a read unchanged (BE-3828).
+// Configured labels = {} and an omitted body.type that the provider sends as "raw"
+// must survive a read unchanged (BE-3828).
 func TestSyntheticTestFromSDKResponsePreservesConfiguredEmpties(t *testing.T) {
 	ctx := context.Background()
 	resp := syntheticTestResponseWithHeaders(nil)
 	resp.CheckConfig.Request.HTTP.Body = &models.Body{Type: "raw", Content: ""}
-	resp.Monitor = &models.SyntheticMonitorConfig{MonitorName: "[synthetic] - x", IssueSummary: "[synthetic] - x"}
 
 	state := &syntheticTestResourceModel{
 		Labels:    types.MapValueMust(types.StringType, map[string]attr.Value{}),
 		HTTPCheck: &syntheticHTTPCheckModel{Body: &syntheticHTTPBodyModel{Type: types.StringNull(), Content: types.StringValue("")}},
-		Monitor:   &syntheticMonitorModel{MonitorName: types.StringValue(""), IssueSummary: types.StringValue("")},
 	}
 	fromSDKResponse(ctx, resp, state)
 
@@ -1054,13 +1051,10 @@ func TestSyntheticTestFromSDKResponsePreservesConfiguredEmpties(t *testing.T) {
 	if state.HTTPCheck.Body == nil || !state.HTTPCheck.Body.Type.IsNull() {
 		t.Errorf("omitted body.type should stay null, got %v", state.HTTPCheck.Body)
 	}
-	if state.Monitor.MonitorName.ValueString() != "" || state.Monitor.IssueSummary.ValueString() != "" {
-		t.Errorf("configured \"\" replaced by API default: %v / %v", state.Monitor.MonitorName, state.Monitor.IssueSummary)
-	}
 
-	imported := &syntheticTestResourceModel{Monitor: &syntheticMonitorModel{MonitorName: types.StringValue("old")}}
+	imported := &syntheticTestResourceModel{}
 	fromSDKResponse(ctx, resp, imported)
-	if !imported.Labels.IsNull() || imported.HTTPCheck.Body.Type.ValueString() != "raw" || imported.Monitor.MonitorName.ValueString() != "[synthetic] - x" {
-		t.Errorf("unconfigured values should reflect the API: labels=%v type=%v name=%v", imported.Labels, imported.HTTPCheck.Body.Type, imported.Monitor.MonitorName)
+	if !imported.Labels.IsNull() || imported.HTTPCheck.Body.Type.ValueString() != "raw" {
+		t.Errorf("unconfigured values should reflect the API: labels=%v type=%v", imported.Labels, imported.HTTPCheck.Body.Type)
 	}
 }
