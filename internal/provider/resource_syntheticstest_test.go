@@ -949,3 +949,56 @@ func testAccCheckSyntheticTestResourceDisappears(n string) resource.TestCheckFun
 		return nil
 	}
 }
+
+
+func TestAccSyntheticTestResource_emptyAssertionTargetApplyLoop(t *testing.T) {
+	name := acctest.RandomWithPrefix("test-synth-empty-target")
+
+	resource.Test(t, resource.TestCase{
+		PreCheck:                 func() { testAccPreCheck(t) },
+		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
+		Steps: []resource.TestStep{
+			{
+				Config: testAccSyntheticTestResourceConfig_emptyAssertionTarget(name),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					resource.TestCheckResourceAttr("groundcover_synthetic_test.test", "assertion.1.target", ""),
+					resource.TestCheckResourceAttrSet("groundcover_synthetic_test.test", "id"),
+				),
+			},
+			{
+				Config:   testAccSyntheticTestResourceConfig_emptyAssertionTarget(name),
+				PlanOnly: true,
+			},
+		},
+	})
+}
+
+
+func testAccSyntheticTestResourceConfig_emptyAssertionTarget(name string) string {
+	return fmt.Sprintf(`
+resource "groundcover_synthetic_test" "test" {
+  name     = %[1]q
+  enabled  = true
+  interval = "1m"
+
+  http_check {
+    url     = "https://httpbin.org/status/200"
+    method  = "GET"
+    timeout = "10s"
+  }
+
+  assertion {
+    source   = "statusCode"
+    operator = "eq"
+    target   = "200"
+  }
+
+  assertion {
+    source   = "responseHeader"
+    operator = "exists"
+    property = "content-type"
+    target   = ""
+  }
+}
+`, name)
+}
