@@ -159,3 +159,39 @@ func TestMetricsPipelineConfigToStatePreservesConfiguredEmpties(t *testing.T) {
 		t.Errorf("unconfigured empties should be null: %+v", fresh.Rules)
 	}
 }
+
+// TestAccMetricsPipelineResource_edgeValues guards against a perpetual diff when the
+// optional rule fields are set to empty values and the API echoes them back as absent.
+func TestAccMetricsPipelineResource_edgeValues(t *testing.T) {
+	resource.Test(t, resource.TestCase{
+		PreCheck:                 func() { testAccPreCheck(t) },
+		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
+		Steps: []resource.TestStep{
+			{
+				Config: testAccMetricsPipelineResourceConfig_edgeValues(),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					resource.TestCheckResourceAttr("groundcover_metricspipeline.test", "rules.keep_regex.#", "1"),
+					resource.TestCheckResourceAttr("groundcover_metricspipeline.test", "rules.drop_regex.#", "0"),
+					resource.TestCheckResourceAttr("groundcover_metricspipeline.test", "rules.add_label.%", "0"),
+					resource.TestCheckResourceAttr("groundcover_metricspipeline.test", "rules.remove_label.#", "0"),
+					resource.TestCheckResourceAttr("groundcover_metricspipeline.test", "rules.raw", ""),
+				),
+			},
+			{Config: testAccMetricsPipelineResourceConfig_edgeValues(), PlanOnly: true, ExpectNonEmptyPlan: false},
+		},
+	})
+}
+
+func testAccMetricsPipelineResourceConfig_edgeValues() string {
+	return fmt.Sprintf(`
+resource "groundcover_metricspipeline" "test" {
+  rules = {
+    keep_regex   = [%[1]q]
+    drop_regex   = []
+    add_label    = {}
+    remove_label = []
+    raw          = ""
+  }
+}
+`, testAccMetricsPipelineKeepRegex())
+}
