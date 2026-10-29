@@ -349,9 +349,6 @@ func TestAccSyntheticTestResource_edgeValues(t *testing.T) {
 					resource.TestCheckResourceAttr("groundcover_synthetic_test.test", "assertion.#", "2"),
 					resource.TestCheckResourceAttr("groundcover_synthetic_test.test", "assertion.1.operator", "exists"),
 					resource.TestCheckResourceAttr("groundcover_synthetic_test.test", "assertion.1.target", ""),
-					resource.TestCheckResourceAttr("groundcover_synthetic_test.test", "monitor.monitor_name", ""),
-					resource.TestCheckResourceAttr("groundcover_synthetic_test.test", "monitor.issue_summary", ""),
-					resource.TestCheckResourceAttr("groundcover_synthetic_test.test", "monitor.issue_description", ""),
 					resource.TestCheckResourceAttr("groundcover_synthetic_test.test", "monitor.enabled_workflows.#", "0"),
 					resource.TestCheckResourceAttrSet("groundcover_synthetic_test.test", "id"),
 				),
@@ -802,10 +799,7 @@ resource "groundcover_synthetic_test" "test" {
   }
 
   monitor {
-    monitor_name            = ""
     severity                = "S1"
-    issue_summary           = ""
-    issue_description       = ""
     no_data_state           = "Alerting"
     execution_error_state   = "Alerting"
     renotification_interval = "1h"
