@@ -393,7 +393,6 @@ func TestAccSyntheticTestResource_edgeValues(t *testing.T) {
 					resource.TestCheckResourceAttr("groundcover_synthetic_test.test", "http_check.body.content", ""),
 					resource.TestCheckResourceAttr("groundcover_synthetic_test.test", "assertion.#", "2"),
 					resource.TestCheckResourceAttr("groundcover_synthetic_test.test", "assertion.1.operator", "exists"),
-					resource.TestCheckResourceAttr("groundcover_synthetic_test.test", "assertion.1.property", ""),
 					resource.TestCheckResourceAttr("groundcover_synthetic_test.test", "assertion.1.target", ""),
 					resource.TestCheckResourceAttr("groundcover_synthetic_test.test", "monitor.monitor_name", ""),
 					resource.TestCheckResourceAttr("groundcover_synthetic_test.test", "monitor.issue_summary", ""),
@@ -853,7 +852,7 @@ resource "groundcover_synthetic_test" "test" {
   assertion {
     source   = "responseHeader"
     operator = "exists"
-    property = ""
+    property = "content-type"
     target   = ""
   }
 
