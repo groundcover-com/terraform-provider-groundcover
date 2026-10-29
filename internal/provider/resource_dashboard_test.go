@@ -710,3 +710,44 @@ resource "groundcover_dashboard" "test" {
 }
 `, name, tagsHCL)
 }
+
+func TestAccDashboardResource_edgeValues(t *testing.T) {
+	timestamp := time.Now().Unix()
+	dashboardName := fmt.Sprintf("edge_values_dashboard_%d", timestamp)
+
+	resource.Test(t, resource.TestCase{
+		PreCheck:                 func() { testAccPreCheck(t) },
+		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
+		Steps: []resource.TestStep{
+			{
+				Config: testAccDashboardResourceConfig_edgeValues(dashboardName),
+				Check: resource.ComposeTestCheckFunc(
+					resource.TestCheckResourceAttr("groundcover_dashboard.test", "name", dashboardName),
+					resource.TestCheckResourceAttr("groundcover_dashboard.test", "description", ""),
+					resource.TestCheckResourceAttr("groundcover_dashboard.test", "team", ""),
+					resource.TestCheckResourceAttr("groundcover_dashboard.test", "tags.#", "0"),
+					resource.TestCheckResourceAttrSet("groundcover_dashboard.test", "id"),
+				),
+			},
+			{Config: testAccDashboardResourceConfig_edgeValues(dashboardName), PlanOnly: true, ExpectNonEmptyPlan: false},
+		},
+	})
+}
+
+func testAccDashboardResourceConfig_edgeValues(name string) string {
+	return fmt.Sprintf(`
+resource "groundcover_dashboard" "test" {
+  name        = "%s"
+  description = ""
+  team        = ""
+  tags        = []
+  preset      = jsonencode({
+    duration      = "Last 1 hour"
+    widgets       = []
+    layout        = []
+    variables     = {}
+    schemaVersion = 3
+  })
+}
+`, name)
+}

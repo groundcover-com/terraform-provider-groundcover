@@ -266,3 +266,32 @@ func testAccCheckSilenceResourceDisappears(n string) resource.TestCheckFunc {
 		return nil
 	}
 }
+
+// TestAccSilenceResource_edgeValues guards against a perpetual diff when the
+// Optional+Computed comment is set explicitly to "" (unlike applyLoop_noComment,
+// which omits it).
+func TestAccSilenceResource_edgeValues(t *testing.T) {
+	startsAt := time.Now().Add(1 * time.Hour).UTC().Format(time.RFC3339)
+	endsAt := time.Now().Add(2 * time.Hour).UTC().Format(time.RFC3339)
+
+	config := testAccSilenceResourceConfig_edgeValues(startsAt, endsAt)
+
+	resource.Test(t, resource.TestCase{
+		PreCheck:                 func() { testAccPreCheck(t) },
+		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
+		Steps: []resource.TestStep{
+			{
+				Config: config,
+				Check: resource.ComposeAggregateTestCheckFunc(
+					resource.TestCheckResourceAttrSet("groundcover_silence.test", "id"),
+					resource.TestCheckResourceAttr("groundcover_silence.test", "comment", ""),
+				),
+			},
+			{Config: config, PlanOnly: true, ExpectNonEmptyPlan: false},
+		},
+	})
+}
+
+func testAccSilenceResourceConfig_edgeValues(startsAt, endsAt string) string {
+	return testAccSilenceResourceConfig("", startsAt, endsAt, "service", "test-service", true, false)
+}

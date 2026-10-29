@@ -332,6 +332,36 @@ func TestAccSyntheticTestResource_withMonitor(t *testing.T) {
 	})
 }
 
+func TestAccSyntheticTestResource_edgeValues(t *testing.T) {
+	name := acctest.RandomWithPrefix("test-synth-edge")
+
+	resource.Test(t, resource.TestCase{
+		PreCheck:                 func() { testAccPreCheck(t) },
+		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
+		Steps: []resource.TestStep{
+			{
+				Config: testAccSyntheticTestResourceConfig_edgeValues(name),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					resource.TestCheckResourceAttr("groundcover_synthetic_test.test", "name", name),
+					resource.TestCheckResourceAttr("groundcover_synthetic_test.test", "labels.%", "0"),
+					resource.TestCheckResourceAttr("groundcover_synthetic_test.test", "http_check.headers.%", "0"),
+					resource.TestCheckResourceAttr("groundcover_synthetic_test.test", "http_check.body.content", ""),
+					resource.TestCheckResourceAttr("groundcover_synthetic_test.test", "assertion.#", "2"),
+					resource.TestCheckResourceAttr("groundcover_synthetic_test.test", "assertion.1.operator", "exists"),
+					resource.TestCheckResourceAttr("groundcover_synthetic_test.test", "assertion.1.property", ""),
+					resource.TestCheckResourceAttr("groundcover_synthetic_test.test", "assertion.1.target", ""),
+					resource.TestCheckResourceAttr("groundcover_synthetic_test.test", "monitor.monitor_name", ""),
+					resource.TestCheckResourceAttr("groundcover_synthetic_test.test", "monitor.issue_summary", ""),
+					resource.TestCheckResourceAttr("groundcover_synthetic_test.test", "monitor.issue_description", ""),
+					resource.TestCheckResourceAttr("groundcover_synthetic_test.test", "monitor.enabled_workflows.#", "0"),
+					resource.TestCheckResourceAttrSet("groundcover_synthetic_test.test", "id"),
+				),
+			},
+			{Config: testAccSyntheticTestResourceConfig_edgeValues(name), PlanOnly: true, ExpectNonEmptyPlan: false},
+		},
+	})
+}
+
 func TestAccSyntheticTestResource_withoutMonitor(t *testing.T) {
 	name := acctest.RandomWithPrefix("test-synth-nomon")
 
@@ -736,6 +766,57 @@ resource "groundcover_synthetic_test" "test" {
 			pending_for = "5m"
 		}
 	}
+}
+`, name)
+}
+
+func testAccSyntheticTestResourceConfig_edgeValues(name string) string {
+	return fmt.Sprintf(`
+resource "groundcover_synthetic_test" "test" {
+  name     = %[1]q
+  enabled  = true
+  interval = "1m"
+  labels   = {}
+
+  http_check {
+    url     = "https://httpbin.org/status/200"
+    method  = "GET"
+    timeout = "10s"
+    headers = {}
+
+    body {
+      content = ""
+    }
+  }
+
+  assertion {
+    source   = "statusCode"
+    operator = "eq"
+    target   = "200"
+  }
+
+  assertion {
+    source   = "responseHeader"
+    operator = "exists"
+    property = ""
+    target   = ""
+  }
+
+  monitor {
+    monitor_name            = ""
+    severity                = "S1"
+    issue_summary           = ""
+    issue_description       = ""
+    no_data_state           = "Alerting"
+    execution_error_state   = "Alerting"
+    renotification_interval = "1h"
+    enabled_workflows       = []
+
+    evaluation_interval {
+      interval    = "1m"
+      pending_for = "0s"
+    }
+  }
 }
 `, name)
 }

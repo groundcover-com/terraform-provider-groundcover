@@ -171,3 +171,48 @@ func testAccCheckApiKeyResourceDisappears(n string) resource.TestCheckFunc {
 		return nil
 	}
 }
+
+// TestAccApiKeyResource_edgeValues guards against a perpetual diff when optional
+// fields are set to empty values and the API echoes them back differently.
+func TestAccApiKeyResource_edgeValues(t *testing.T) {
+	name := acctest.RandomWithPrefix("test-apikey-edge")
+
+	resource.Test(t, resource.TestCase{
+		PreCheck:                 func() { testAccPreCheck(t) },
+		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
+		Steps: []resource.TestStep{
+			{
+				Config: testAccApiKeyResourceConfig_edgeValues(name),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					resource.TestCheckResourceAttr("groundcover_apikey.test", "name", name),
+					resource.TestCheckResourceAttr("groundcover_apikey.test", "description", ""),
+				),
+			},
+			{Config: testAccApiKeyResourceConfig_edgeValues(name), PlanOnly: true, ExpectNonEmptyPlan: false},
+		},
+	})
+}
+
+func testAccApiKeyResourceConfig_edgeValues(name string) string {
+	return fmt.Sprintf(`
+resource "groundcover_policy" "test_policy" {
+  name        = "%[1]s-policy"
+  description = "Test policy for service account"
+  role = {
+    read = "read"
+  }
+}
+
+resource "groundcover_serviceaccount" "test_sa" {
+  name         = "%[1]s-sa"
+  email        = "test-%[1]s@example.com"
+  policy_uuids = [groundcover_policy.test_policy.uuid]
+}
+
+resource "groundcover_apikey" "test" {
+  name               = %[1]q
+  description        = ""
+  service_account_id = groundcover_serviceaccount.test_sa.id
+}
+`, name)
+}

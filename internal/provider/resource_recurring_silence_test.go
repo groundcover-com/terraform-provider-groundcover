@@ -283,3 +283,28 @@ func testAccCheckRecurringSilenceResourceDisappears(n string) resource.TestCheck
 		return nil
 	}
 }
+
+// TestAccRecurringSilenceResource_edgeValues guards against a perpetual diff when the
+// Optional+Computed comment is set explicitly to "".
+func TestAccRecurringSilenceResource_edgeValues(t *testing.T) {
+	config := testAccRecurringSilenceResourceConfig_edgeValues()
+
+	resource.Test(t, resource.TestCase{
+		PreCheck:                 func() { testAccPreCheck(t) },
+		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
+		Steps: []resource.TestStep{
+			{
+				Config: config,
+				Check: resource.ComposeAggregateTestCheckFunc(
+					resource.TestCheckResourceAttrSet("groundcover_recurring_silence.test", "id"),
+					resource.TestCheckResourceAttr("groundcover_recurring_silence.test", "comment", ""),
+				),
+			},
+			{Config: config, PlanOnly: true, ExpectNonEmptyPlan: false},
+		},
+	})
+}
+
+func testAccRecurringSilenceResourceConfig_edgeValues() string {
+	return testAccRecurringSilenceResourceConfigWeekly("")
+}

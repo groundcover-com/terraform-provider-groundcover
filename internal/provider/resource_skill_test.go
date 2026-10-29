@@ -360,3 +360,26 @@ func testAccCheckSkillResourceDisappears(name string) resource.TestCheckFunc {
 		return client.DeleteSkill(context.Background(), resourceState.Primary.ID)
 	}
 }
+
+// TestAccSkillResource_edgeValues guards against a perpetual diff when the
+// Optional+Computed description is set explicitly to "".
+func TestAccSkillResource_edgeValues(t *testing.T) {
+	name := acctest.RandomWithPrefix("tf-skill-edge")
+	resource.Test(t, resource.TestCase{
+		PreCheck: func() { testAccPreCheck(t) }, ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
+		Steps: []resource.TestStep{
+			{
+				Config: testAccSkillConfig_edgeValues(name),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					resource.TestCheckResourceAttr("groundcover_skill.test", "name", name),
+					resource.TestCheckResourceAttr("groundcover_skill.test", "description", ""),
+				),
+			},
+			{Config: testAccSkillConfig_edgeValues(name), PlanOnly: true, ExpectNonEmptyPlan: false},
+		},
+	})
+}
+
+func testAccSkillConfig_edgeValues(name string) string {
+	return testAccSkillConfig(name, "Use while investigating incidents", "", "Start with active alerts.")
+}

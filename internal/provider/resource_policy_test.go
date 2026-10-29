@@ -593,3 +593,45 @@ func TestPolicyResource_StateUpgradeFunc(t *testing.T) {
 
 	t.Logf("✓ State upgrade correctly sets ID=%s from UUID=%s", upgradedStateData.ID.ValueString(), upgradedStateData.UUID.ValueString())
 }
+
+func TestAccPolicyResource_edgeValues(t *testing.T) {
+	name := acctest.RandomWithPrefix("test-policy-edge-values")
+
+	resource.Test(t, resource.TestCase{
+		PreCheck:                 func() { testAccPreCheck(t) },
+		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
+		Steps: []resource.TestStep{
+			{
+				Config: testAccPolicyResourceConfig_edgeValues(name),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					resource.TestCheckResourceAttr("groundcover_policy.test", "name", name),
+					resource.TestCheckResourceAttr("groundcover_policy.test", "description", ""),
+					resource.TestCheckResourceAttr("groundcover_policy.test", "claim_role", ""),
+					resource.TestCheckResourceAttr("groundcover_policy.test", "data_scope.simple.operator", "and"),
+					resource.TestCheckResourceAttr("groundcover_policy.test", "data_scope.simple.conditions.#", "0"),
+					resource.TestCheckResourceAttr("groundcover_policy.test", "role.read", "read"),
+				),
+			},
+			{Config: testAccPolicyResourceConfig_edgeValues(name), PlanOnly: true, ExpectNonEmptyPlan: false},
+		},
+	})
+}
+
+func testAccPolicyResourceConfig_edgeValues(name string) string {
+	return fmt.Sprintf(`
+resource "groundcover_policy" "test" {
+  name        = %[1]q
+  description = ""
+  claim_role  = ""
+  role = {
+    read = "read"
+  }
+  data_scope = {
+    simple = {
+      operator   = "and"
+      conditions = []
+    }
+  }
+}
+`, name)
+}

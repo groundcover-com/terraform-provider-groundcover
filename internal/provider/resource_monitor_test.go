@@ -1289,6 +1289,33 @@ func TestAccMonitorV2Resource(t *testing.T) {
 	})
 }
 
+func TestAccMonitorV2Resource_edgeValues(t *testing.T) {
+	name := acctest.RandomWithPrefix("test-monitor-v2-edge")
+
+	resource.Test(t, resource.TestCase{
+		PreCheck:                 func() { testAccPreCheck(t) },
+		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
+		Steps: []resource.TestStep{
+			{
+				Config: testAccMonitorV2ResourceConfig_edgeValues(name),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					resource.TestCheckResourceAttrSet("groundcover_monitor_v2.test", "id"),
+					resource.TestCheckResourceAttr("groundcover_monitor_v2.test", "title", name),
+					resource.TestCheckResourceAttr("groundcover_monitor_v2.test", "category", ""),
+					resource.TestCheckResourceAttr("groundcover_monitor_v2.test", "team", ""),
+					resource.TestCheckResourceAttr("groundcover_monitor_v2.test", "labels.%", "0"),
+					resource.TestCheckResourceAttr("groundcover_monitor_v2.test", "annotations.%", "0"),
+					resource.TestCheckResourceAttr("groundcover_monitor_v2.test", "display.description", ""),
+					resource.TestCheckResourceAttr("groundcover_monitor_v2.test", "display.resource_header_labels.#", "0"),
+					resource.TestCheckResourceAttr("groundcover_monitor_v2.test", "display.context_header_labels.#", "0"),
+					resource.TestCheckResourceAttr("groundcover_monitor_v2.test", "notification_settings.method", "notificationRoutes"),
+				),
+			},
+			{Config: testAccMonitorV2ResourceConfig_edgeValues(name), PlanOnly: true, ExpectNonEmptyPlan: false},
+		},
+	})
+}
+
 // BE-2568: is_paused must round-trip (explicit false unpauses) and an unrelated
 // update that omits is_paused must NOT change the pause state. Before the fix,
 // Optional+Computed+Default(false) forced an omitted config to plan as false, so
@@ -1502,6 +1529,54 @@ resource "groundcover_monitor_v2" "test" {
   evaluation_interval {
     interval    = "1m"
     pending_for = "1m"
+  }
+
+  execution_error_state = "OK"
+  no_data_state         = "OK"
+}
+`, name)
+}
+
+func testAccMonitorV2ResourceConfig_edgeValues(name string) string {
+	return fmt.Sprintf(`
+resource "groundcover_monitor_v2" "test" {
+  title            = %[1]q
+  severity         = "critical"
+  measurement_type = "event"
+  category         = ""
+  team             = ""
+  labels           = {}
+  annotations      = {}
+
+  display {
+    header                 = %[1]q
+    description            = ""
+    resource_header_labels = []
+    context_header_labels  = []
+  }
+
+  query {
+    type             = "gcql"
+    data_type        = "logs"
+    expression       = "level:error | stats count() count_all_result"
+    instant_rollup   = "5m"
+    evaluation_delay = "15m"
+  }
+
+  threshold {
+    name       = "threshold_1"
+    input_name = "threshold_input_query"
+    operator   = "gt"
+    values     = [1]
+  }
+
+  evaluation_interval {
+    interval    = "1m"
+    pending_for = "1m"
+  }
+
+  notification_settings {
+    method = "notificationRoutes"
   }
 
   execution_error_state = "OK"
