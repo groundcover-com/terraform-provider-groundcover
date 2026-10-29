@@ -276,6 +276,22 @@ func planToMetricsPipelineRequest(ctx context.Context, plan *metricsPipelineReso
 	return req
 }
 
+// metricsPipelineStringsOrPrior returns the API values, or the prior empty (non-nil)
+// slice when the API returns none and the user configured [].
+func metricsPipelineStringsOrPrior(values []string, prior []types.String) []types.String {
+	if len(values) == 0 {
+		if prior != nil && len(prior) == 0 {
+			return prior
+		}
+		return nil
+	}
+	out := make([]types.String, 0, len(values))
+	for _, v := range values {
+		out = append(out, types.StringValue(v))
+	}
+	return out
+}
+
 func metricsPipelineConfigToState(ctx context.Context, config *models.MetricsPipelineConfigInfo, state *metricsPipelineResourceModel, diags *diag.Diagnostics) {
 	if config == nil {
 		state.Rules = nil
@@ -290,31 +306,38 @@ func metricsPipelineConfigToState(ctx context.Context, config *models.MetricsPip
 		return
 	}
 
+	// A configured [] / {} / "" that the API returns empty must stay as configured,
+	// or every plan shows the empty value being re-added (BE-3828).
+	prior := state.Rules
+	if prior == nil {
+		prior = &metricsPipelineRulesModel{}
+	}
 	rulesModel := &metricsPipelineRulesModel{}
 
 	for _, v := range config.Rules.KeepRegex {
 		rulesModel.KeepRegex = append(rulesModel.KeepRegex, types.StringValue(v))
 	}
 
-	for _, v := range config.Rules.DropRegex {
-		rulesModel.DropRegex = append(rulesModel.DropRegex, types.StringValue(v))
-	}
+	rulesModel.DropRegex = metricsPipelineStringsOrPrior(config.Rules.DropRegex, prior.DropRegex)
+	rulesModel.RemoveLabel = metricsPipelineStringsOrPrior(config.Rules.RemoveLabel, prior.RemoveLabel)
 
-	for _, v := range config.Rules.RemoveLabel {
-		rulesModel.RemoveLabel = append(rulesModel.RemoveLabel, types.StringValue(v))
-	}
-
-	if len(config.Rules.AddLabel) > 0 {
+	switch {
+	case len(config.Rules.AddLabel) > 0:
 		addLabelMap, d := types.MapValueFrom(ctx, types.StringType, config.Rules.AddLabel)
 		diags.Append(d...)
 		rulesModel.AddLabel = addLabelMap
-	} else {
+	case !prior.AddLabel.IsNull() && !prior.AddLabel.IsUnknown() && len(prior.AddLabel.Elements()) == 0:
+		rulesModel.AddLabel = prior.AddLabel
+	default:
 		rulesModel.AddLabel = types.MapNull(types.StringType)
 	}
 
-	if config.Rules.Raw != "" {
+	switch {
+	case config.Rules.Raw != "":
 		rulesModel.Raw = types.StringValue(config.Rules.Raw)
-	} else {
+	case !prior.Raw.IsNull() && !prior.Raw.IsUnknown() && prior.Raw.ValueString() == "":
+		rulesModel.Raw = prior.Raw
+	default:
 		rulesModel.Raw = types.StringNull()
 	}
 

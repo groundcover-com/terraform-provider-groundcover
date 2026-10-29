@@ -2520,3 +2520,49 @@ YAML
 }
 `, yaml)
 }
+
+// A configured "" / {} / [] that the API echoes back empty must survive the read
+// (BE-3828); with no prior state the same empties still map to null.
+func TestMonitorV2MapSDKToModelPreservesConfiguredEmpties(t *testing.T) {
+	ctx := context.Background()
+	remote := &models.UpdateMonitorRequest{Display: &models.DisplayModel{Header: "h"}}
+
+	configured := monitorV2ResourceModel{
+		Category:    types.StringValue(""),
+		Team:        types.StringValue(""),
+		Labels:      types.MapValueMust(types.StringType, map[string]attr.Value{}),
+		Annotations: types.MapValueMust(types.StringType, map[string]attr.Value{}),
+		Display: &monitorV2DisplayModel{
+			Description:          types.StringValue(""),
+			ResourceHeaderLabels: types.ListValueMust(types.StringType, []attr.Value{}),
+			ContextHeaderLabels:  types.ListValueMust(types.StringType, []attr.Value{}),
+		},
+	}
+	var diags diag.Diagnostics
+	mapMonitorV2SDKToModel(ctx, "monitor-id", remote, &configured, &diags)
+	if diags.HasError() {
+		t.Fatalf("mapMonitorV2SDKToModel() diagnostics: %v", diags)
+	}
+	for name, v := range map[string]attr.Value{
+		"category": configured.Category, "team": configured.Team,
+		"labels": configured.Labels, "annotations": configured.Annotations,
+		"display.description":            configured.Display.Description,
+		"display.resource_header_labels": configured.Display.ResourceHeaderLabels,
+		"display.context_header_labels":  configured.Display.ContextHeaderLabels,
+	} {
+		if v.IsNull() {
+			t.Errorf("%s: configured empty became null", name)
+		}
+	}
+
+	var fresh monitorV2ResourceModel
+	mapMonitorV2SDKToModel(ctx, "monitor-id", remote, &fresh, &diags)
+	for name, v := range map[string]attr.Value{
+		"category": fresh.Category, "team": fresh.Team, "labels": fresh.Labels, "annotations": fresh.Annotations,
+		"display.description": fresh.Display.Description, "display.resource_header_labels": fresh.Display.ResourceHeaderLabels,
+	} {
+		if !v.IsNull() {
+			t.Errorf("%s: unconfigured empty should be null, got %v", name, v)
+		}
+	}
+}
