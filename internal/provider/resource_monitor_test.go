@@ -1195,6 +1195,7 @@ func TestAccMonitorResource(t *testing.T) {
 					resource.TestMatchResourceAttr("groundcover_monitor.test", "monitor_yaml", regexp.MustCompile(name)),
 				),
 			},
+			{Config: testAccMonitorResourceConfig(name), PlanOnly: true, ExpectNonEmptyPlan: false},
 			// ImportState testing
 			{
 				ResourceName:            "groundcover_monitor.test",
@@ -1210,6 +1211,7 @@ func TestAccMonitorResource(t *testing.T) {
 					resource.TestMatchResourceAttr("groundcover_monitor.test", "monitor_yaml", regexp.MustCompile(updatedName)),
 				),
 			},
+			{Config: testAccMonitorResourceConfig(updatedName), PlanOnly: true, ExpectNonEmptyPlan: false},
 			// Delete testing automatically occurs in TestCase
 		},
 	})
@@ -1235,6 +1237,7 @@ func TestAccMonitorV2Resource(t *testing.T) {
 					resource.TestCheckResourceAttr("groundcover_monitor_v2.test", "threshold.#", "1"),
 				),
 			},
+			{Config: testAccMonitorV2ResourceConfig(name), PlanOnly: true, ExpectNonEmptyPlan: false},
 			{
 				ResourceName:      "groundcover_monitor_v2.test",
 				ImportState:       true,
@@ -1286,6 +1289,33 @@ func TestAccMonitorV2Resource(t *testing.T) {
 	})
 }
 
+func TestAccMonitorV2Resource_edgeValues(t *testing.T) {
+	name := acctest.RandomWithPrefix("test-monitor-v2-edge")
+
+	resource.Test(t, resource.TestCase{
+		PreCheck:                 func() { testAccPreCheck(t) },
+		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
+		Steps: []resource.TestStep{
+			{
+				Config: testAccMonitorV2ResourceConfig_edgeValues(name),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					resource.TestCheckResourceAttrSet("groundcover_monitor_v2.test", "id"),
+					resource.TestCheckResourceAttr("groundcover_monitor_v2.test", "title", name),
+					resource.TestCheckResourceAttr("groundcover_monitor_v2.test", "category", ""),
+					resource.TestCheckResourceAttr("groundcover_monitor_v2.test", "team", ""),
+					resource.TestCheckResourceAttr("groundcover_monitor_v2.test", "labels.%", "0"),
+					resource.TestCheckResourceAttr("groundcover_monitor_v2.test", "annotations.%", "0"),
+					resource.TestCheckResourceAttr("groundcover_monitor_v2.test", "display.description", ""),
+					resource.TestCheckResourceAttr("groundcover_monitor_v2.test", "display.resource_header_labels.#", "0"),
+					resource.TestCheckResourceAttr("groundcover_monitor_v2.test", "display.context_header_labels.#", "0"),
+					resource.TestCheckResourceAttr("groundcover_monitor_v2.test", "notification_settings.method", "notificationRoutes"),
+				),
+			},
+			{Config: testAccMonitorV2ResourceConfig_edgeValues(name), PlanOnly: true, ExpectNonEmptyPlan: false},
+		},
+	})
+}
+
 // BE-2568: is_paused must round-trip (explicit false unpauses) and an unrelated
 // update that omits is_paused must NOT change the pause state. Before the fix,
 // Optional+Computed+Default(false) forced an omitted config to plan as false, so
@@ -1303,12 +1333,14 @@ func TestAccMonitorV2Resource_pauseState(t *testing.T) {
 				Check: resource.TestCheckResourceAttr(
 					"groundcover_monitor_v2.test", "is_paused", "true"),
 			},
+			{Config: testAccMonitorV2PauseConfig(name, "is_paused = true"), PlanOnly: true, ExpectNonEmptyPlan: false},
 			{
 				// Unrelated change (title) with is_paused omitted: must stay paused.
 				Config: testAccMonitorV2PauseConfig(updatedName, ""),
 				Check: resource.TestCheckResourceAttr(
 					"groundcover_monitor_v2.test", "is_paused", "true"),
 			},
+			{Config: testAccMonitorV2PauseConfig(updatedName, ""), PlanOnly: true, ExpectNonEmptyPlan: false},
 			{
 				// Explicit false must reach the API and unpause.
 				Config: testAccMonitorV2PauseConfig(updatedName, "is_paused = false"),
@@ -1358,6 +1390,7 @@ func TestAccMonitorV2Resource_hidePreviewGraph(t *testing.T) {
 				Check: resource.TestCheckResourceAttr(
 					"groundcover_monitor_v2.test", "notification_settings.hide_preview_graph", "false"),
 			},
+			{Config: testAccMonitorV2PauseConfig(updatedName, hideGraphBlock("")), PlanOnly: true, ExpectNonEmptyPlan: false},
 			{
 				// Explicit false is the same as omitted.
 				Config: testAccMonitorV2PauseConfig(updatedName, hideGraphBlock("hide_preview_graph = false")),
@@ -1390,6 +1423,7 @@ func TestAccMonitorV2Resource_importThenUpdate(t *testing.T) {
 					resource.TestCheckNoResourceAttr("groundcover_monitor_v2.test", "annotations."+monitorV2QueryTypeAnnotationKey),
 				),
 			},
+			{Config: testAccMonitorV2MetricsQLImportUpdateConfig(name), PlanOnly: true, ExpectNonEmptyPlan: false},
 			{
 				ResourceName:      "groundcover_monitor_v2.test",
 				ImportState:       true,
@@ -1403,6 +1437,7 @@ func TestAccMonitorV2Resource_importThenUpdate(t *testing.T) {
 					resource.TestCheckNoResourceAttr("groundcover_monitor_v2.test", "annotations."+monitorV2QueryTypeAnnotationKey),
 				),
 			},
+			{Config: testAccMonitorV2MetricsQLImportUpdateConfig(updatedName), PlanOnly: true, ExpectNonEmptyPlan: false},
 		},
 	})
 }
@@ -1459,6 +1494,7 @@ func TestAccMonitorV2Resource_allSupportedQueryTypes(t *testing.T) {
 					resource.TestCheckResourceAttr("groundcover_monitor_v2.raw_sql", "query.type", monitorV2QueryTypeRawSQL),
 				),
 			},
+			{Config: testAccMonitorV2AllSupportedQueryTypesConfig(suffix), PlanOnly: true, ExpectNonEmptyPlan: false},
 		},
 	})
 }
@@ -1493,6 +1529,54 @@ resource "groundcover_monitor_v2" "test" {
   evaluation_interval {
     interval    = "1m"
     pending_for = "1m"
+  }
+
+  execution_error_state = "OK"
+  no_data_state         = "OK"
+}
+`, name)
+}
+
+func testAccMonitorV2ResourceConfig_edgeValues(name string) string {
+	return fmt.Sprintf(`
+resource "groundcover_monitor_v2" "test" {
+  title            = %[1]q
+  severity         = "critical"
+  measurement_type = "event"
+  category         = ""
+  team             = ""
+  labels           = {}
+  annotations      = {}
+
+  display {
+    header                 = %[1]q
+    description            = ""
+    resource_header_labels = []
+    context_header_labels  = []
+  }
+
+  query {
+    type             = "gcql"
+    data_type        = "logs"
+    expression       = "level:error | stats count() count_all_result"
+    instant_rollup   = "5m"
+    evaluation_delay = "15m"
+  }
+
+  threshold {
+    name       = "threshold_1"
+    input_name = "threshold_input_query"
+    operator   = "gt"
+    values     = [1]
+  }
+
+  evaluation_interval {
+    interval    = "1m"
+    pending_for = "1m"
+  }
+
+  notification_settings {
+    method = "notificationRoutes"
   }
 
   execution_error_state = "OK"
@@ -1891,6 +1975,7 @@ func TestAccMonitorResource_trailingNewline(t *testing.T) {
 					testAccCheckMonitorResourcePrintDetails("groundcover_monitor.test"),
 				),
 			},
+			{Config: testAccMonitorResourceConfigWithTrailingNewline(name), PlanOnly: true, ExpectNonEmptyPlan: false},
 			// Step 2: Apply the same config again - should not detect changes (no apply loop)
 			// This verifies that the normalization fixes prevent false drift detection
 			{
@@ -1903,6 +1988,7 @@ func TestAccMonitorResource_trailingNewline(t *testing.T) {
 				// ExpectNonEmptyPlan is false by default, meaning we expect no changes
 				// If there were an apply loop, this step would fail or show changes
 			},
+			{Config: testAccMonitorResourceConfigWithTrailingNewline(name), PlanOnly: true, ExpectNonEmptyPlan: false},
 			// Step 3: Apply one more time to be absolutely sure there's no apply loop
 			{
 				Config: testAccMonitorResourceConfigWithTrailingNewline(name),
@@ -1911,6 +1997,7 @@ func TestAccMonitorResource_trailingNewline(t *testing.T) {
 					resource.TestCheckResourceAttrSet("groundcover_monitor.test", "monitor_yaml"),
 				),
 			},
+			{Config: testAccMonitorResourceConfigWithTrailingNewline(name), PlanOnly: true, ExpectNonEmptyPlan: false},
 			// Delete testing automatically occurs in TestCase
 		},
 	})
@@ -2093,6 +2180,7 @@ func TestAccMonitorResource_multilinePipeSyntax(t *testing.T) {
 					testAccCheckMonitorResourcePrintDetails("groundcover_monitor.test"),
 				),
 			},
+			{Config: testAccMonitorResourceConfigWithMultilinePipe(titleValue, headerValue), PlanOnly: true, ExpectNonEmptyPlan: false},
 			// Step 2: Apply the same config again - should not detect changes (no apply loop)
 			// This verifies that semantic comparison treats `title: |\nvalue` and `title: value` as equivalent
 			{
@@ -2103,6 +2191,7 @@ func TestAccMonitorResource_multilinePipeSyntax(t *testing.T) {
 					resource.TestMatchResourceAttr("groundcover_monitor.test", "monitor_yaml", regexp.MustCompile(regexp.QuoteMeta(titleValue))),
 				),
 			},
+			{Config: testAccMonitorResourceConfigWithMultilinePipe(titleValue, headerValue), PlanOnly: true, ExpectNonEmptyPlan: false},
 			// Step 3: Apply one more time to be absolutely sure there's no apply loop
 			{
 				Config: testAccMonitorResourceConfigWithMultilinePipe(titleValue, headerValue),
@@ -2111,6 +2200,7 @@ func TestAccMonitorResource_multilinePipeSyntax(t *testing.T) {
 					resource.TestCheckResourceAttrSet("groundcover_monitor.test", "monitor_yaml"),
 				),
 			},
+			{Config: testAccMonitorResourceConfigWithMultilinePipe(titleValue, headerValue), PlanOnly: true, ExpectNonEmptyPlan: false},
 		},
 	})
 }
@@ -2173,6 +2263,7 @@ func TestAccMonitorResource_applyLoopIssue(t *testing.T) {
 					testAccCheckMonitorResourcePrintDetails("groundcover_monitor.test"),
 				),
 			},
+			{Config: testAccMonitorResourceConfigApplyLoop(title), PlanOnly: true, ExpectNonEmptyPlan: false},
 			// Step 2: Apply the same config again - should not detect changes (no apply loop)
 			// This is the critical test - if there's an apply loop, this step will show changes
 			{
@@ -2185,6 +2276,7 @@ func TestAccMonitorResource_applyLoopIssue(t *testing.T) {
 				// ExpectNonEmptyPlan is false by default, meaning we expect no changes
 				// If there were an apply loop, this step would fail or show changes
 			},
+			{Config: testAccMonitorResourceConfigApplyLoop(title), PlanOnly: true, ExpectNonEmptyPlan: false},
 			// Step 3: Apply one more time to be absolutely sure there's no apply loop
 			{
 				Config: testAccMonitorResourceConfigApplyLoop(title),
@@ -2193,6 +2285,7 @@ func TestAccMonitorResource_applyLoopIssue(t *testing.T) {
 					resource.TestCheckResourceAttrSet("groundcover_monitor.test", "monitor_yaml"),
 				),
 			},
+			{Config: testAccMonitorResourceConfigApplyLoop(title), PlanOnly: true, ExpectNonEmptyPlan: false},
 		},
 	})
 }
@@ -2372,6 +2465,7 @@ func TestAccMonitorResource_oomKilled(t *testing.T) {
 					resource.TestMatchResourceAttr("groundcover_monitor.test", "monitor_yaml", regexp.MustCompile(`(?s)groupBy:.*alias: pod_name`)),
 				),
 			},
+			{Config: testAccMonitorResourceConfigOomKilled(title), PlanOnly: true, ExpectNonEmptyPlan: false},
 			// Step 2: Apply the same config again - should not detect changes (no apply loop)
 			// This verifies idempotency after state refresh
 			{
@@ -2382,6 +2476,7 @@ func TestAccMonitorResource_oomKilled(t *testing.T) {
 				),
 				ExpectNonEmptyPlan: false, // Should be no changes
 			},
+			{Config: testAccMonitorResourceConfigOomKilled(title), PlanOnly: true, ExpectNonEmptyPlan: false},
 		},
 	})
 }

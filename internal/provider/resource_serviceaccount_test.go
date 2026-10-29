@@ -30,6 +30,7 @@ func TestAccServiceAccountResource(t *testing.T) {
 					resource.TestCheckResourceAttr("groundcover_serviceaccount.test", "email", "test-"+name+"@example.com"),
 				),
 			},
+			{Config: testAccServiceAccountResourceConfig(name), PlanOnly: true, ExpectNonEmptyPlan: false},
 			// Update and Read testing
 			{
 				Config: testAccServiceAccountResourceConfigUpdated(name, updatedEmail),
@@ -38,6 +39,7 @@ func TestAccServiceAccountResource(t *testing.T) {
 					resource.TestCheckResourceAttr("groundcover_serviceaccount.test", "email", updatedEmail),
 				),
 			},
+			{Config: testAccServiceAccountResourceConfigUpdated(name, updatedEmail), PlanOnly: true, ExpectNonEmptyPlan: false},
 			// Delete testing automatically occurs in TestCase
 		},
 	})
@@ -148,4 +150,44 @@ func testAccCheckServiceAccountResourceDisappears(n string) resource.TestCheckFu
 
 		return nil
 	}
+}
+
+// TestAccServiceAccountResource_edgeValues guards against a perpetual diff when optional
+// fields are set to empty values and the API echoes them back differently.
+func TestAccServiceAccountResource_edgeValues(t *testing.T) {
+	name := acctest.RandomWithPrefix("test-serviceaccount-edge")
+
+	resource.Test(t, resource.TestCase{
+		PreCheck:                 func() { testAccPreCheck(t) },
+		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
+		Steps: []resource.TestStep{
+			{
+				Config: testAccServiceAccountResourceConfig_edgeValues(name),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					resource.TestCheckResourceAttr("groundcover_serviceaccount.test", "name", name),
+					resource.TestCheckResourceAttr("groundcover_serviceaccount.test", "description", ""),
+				),
+			},
+			{Config: testAccServiceAccountResourceConfig_edgeValues(name), PlanOnly: true, ExpectNonEmptyPlan: false},
+		},
+	})
+}
+
+func testAccServiceAccountResourceConfig_edgeValues(name string) string {
+	return fmt.Sprintf(`
+resource "groundcover_policy" "test_policy" {
+  name        = "%[1]s-policy"
+  description = "Test policy for service account"
+  role = {
+    read = "read"
+  }
+}
+
+resource "groundcover_serviceaccount" "test" {
+  name         = %[1]q
+  email        = "test-%[1]s@example.com"
+  description  = ""
+  policy_uuids = [groundcover_policy.test_policy.uuid]
+}
+`, name)
 }

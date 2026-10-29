@@ -190,6 +190,7 @@ func TestAccSkillResource(t *testing.T) {
 					testAccCaptureSkillRevision("groundcover_skill.test", &initialRevision),
 				),
 			},
+			{Config: testAccSkillConfig(name, initialWhenToUse, initialDescription, initialInstructions), PlanOnly: true, ExpectNonEmptyPlan: false},
 			{ResourceName: "groundcover_skill.test", ImportState: true, ImportStateVerify: true},
 			{
 				Config: testAccSkillConfig(updatedName, updatedWhenToUse, updatedDescription, updatedInstructions),
@@ -201,6 +202,7 @@ func TestAccSkillResource(t *testing.T) {
 					testAccCheckSkillRevisionAdvanced("groundcover_skill.test", &initialRevision),
 				),
 			},
+			{Config: testAccSkillConfig(updatedName, updatedWhenToUse, updatedDescription, updatedInstructions), PlanOnly: true, ExpectNonEmptyPlan: false},
 			{
 				Config: testAccSkillConfigWithoutDescription(updatedName, updatedWhenToUse, updatedInstructions),
 				Check:  resource.TestCheckResourceAttr("groundcover_skill.test", "description", ""),
@@ -241,6 +243,7 @@ func TestAccSkillResource_outOfBandDrift(t *testing.T) {
 				Config: testAccSkillConfig(name, whenToUse, description, instructions),
 				Check:  testAccCaptureSkillID("groundcover_skill.test", &skillID),
 			},
+			{Config: testAccSkillConfig(name, whenToUse, description, instructions), PlanOnly: true, ExpectNonEmptyPlan: false},
 			{
 				PreConfig: func() {
 					if err := testAccUpdateSkillOutOfBand(skillID, name+"-remote", "Remote use case", "Remote description", "Remote instructions"); err != nil {
@@ -356,4 +359,27 @@ func testAccCheckSkillResourceDisappears(name string) resource.TestCheckFunc {
 		}
 		return client.DeleteSkill(context.Background(), resourceState.Primary.ID)
 	}
+}
+
+// TestAccSkillResource_edgeValues guards against a perpetual diff when the
+// Optional+Computed description is set explicitly to "".
+func TestAccSkillResource_edgeValues(t *testing.T) {
+	name := acctest.RandomWithPrefix("tf-skill-edge")
+	resource.Test(t, resource.TestCase{
+		PreCheck: func() { testAccPreCheck(t) }, ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
+		Steps: []resource.TestStep{
+			{
+				Config: testAccSkillConfig_edgeValues(name),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					resource.TestCheckResourceAttr("groundcover_skill.test", "name", name),
+					resource.TestCheckResourceAttr("groundcover_skill.test", "description", ""),
+				),
+			},
+			{Config: testAccSkillConfig_edgeValues(name), PlanOnly: true, ExpectNonEmptyPlan: false},
+		},
+	})
+}
+
+func testAccSkillConfig_edgeValues(name string) string {
+	return testAccSkillConfig(name, "Use while investigating incidents", "", "Start with active alerts.")
 }

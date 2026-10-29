@@ -29,6 +29,7 @@ func TestAccMetricsAggregationResource(t *testing.T) {
 						fixtureTokenRegexp("test_metric_counter_")),
 				),
 			},
+			{Config: testAccMetricsAggregationResourceConfig(), PlanOnly: true, ExpectNonEmptyPlan: false},
 			// Update and Read testing
 			{
 				Config: testAccMetricsAggregationResourceConfigUpdated(),
@@ -39,6 +40,7 @@ func TestAccMetricsAggregationResource(t *testing.T) {
 						fixtureTokenRegexp("test_metric_counter_updated_")),
 				),
 			},
+			{Config: testAccMetricsAggregationResourceConfigUpdated(), PlanOnly: true, ExpectNonEmptyPlan: false},
 			// Delete testing automatically occurs in TestCase
 		},
 	})

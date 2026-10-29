@@ -37,6 +37,7 @@ func TestAccDataIntegrationResource(t *testing.T) {
 					resource.TestMatchResourceAttr("groundcover_dataintegration.test", "config", regexp.MustCompile("us-east-1")),
 				),
 			},
+			{Config: testAccDataIntegrationResourceConfig(name), PlanOnly: true, ExpectNonEmptyPlan: false},
 			// ImportState testing
 			{
 				ResourceName:      "groundcover_dataintegration.test",
@@ -57,6 +58,7 @@ func TestAccDataIntegrationResource(t *testing.T) {
 					resource.TestMatchResourceAttr("groundcover_dataintegration.test", "config", regexp.MustCompile("us-west-2")),
 				),
 			},
+			{Config: testAccDataIntegrationResourceConfigUpdated(updatedName), PlanOnly: true, ExpectNonEmptyPlan: false},
 			// Delete testing automatically occurs in TestCase
 		},
 	})

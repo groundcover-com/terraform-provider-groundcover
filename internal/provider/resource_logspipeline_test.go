@@ -34,6 +34,7 @@ func TestAccLogsPipelineResource(t *testing.T) {
 						fixtureTokenRegexp("test-rule-")),
 				),
 			},
+			{Config: testAccLogsPipelineResourceConfig(), PlanOnly: true, ExpectNonEmptyPlan: false},
 			// Update and Read testing
 			{
 				Config: testAccLogsPipelineResourceConfigUpdated(),
@@ -44,6 +45,7 @@ func TestAccLogsPipelineResource(t *testing.T) {
 						fixtureTokenRegexp("test-rule-updated-")),
 				),
 			},
+			{Config: testAccLogsPipelineResourceConfigUpdated(), PlanOnly: true, ExpectNonEmptyPlan: false},
 			// Delete testing automatically occurs in TestCase
 		},
 	})

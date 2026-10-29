@@ -39,6 +39,7 @@ func TestAccIngestionKeyResource(t *testing.T) {
 					resource.TestCheckResourceAttrSet("groundcover_ingestionkey.test", "created_by"),
 				),
 			},
+			{Config: testAccIngestionKeyResourceConfig(name), PlanOnly: true, ExpectNonEmptyPlan: false},
 			// ImportState testing
 			{
 				ResourceName:            "groundcover_ingestionkey.test",
@@ -54,6 +55,7 @@ func TestAccIngestionKeyResource(t *testing.T) {
 					resource.TestCheckResourceAttr("groundcover_ingestionkey.test", "name", updatedName),
 				),
 			},
+			{Config: testAccIngestionKeyResourceConfig(updatedName), PlanOnly: true, ExpectNonEmptyPlan: false},
 			// Delete testing automatically occurs in TestCase
 		},
 	})
@@ -207,4 +209,37 @@ func testAccProtoV6ProviderFactoriesWithInCloudBackend(t *testing.T) map[string]
 	}
 
 	return factories
+}
+
+// TestAccIngestionKeyResource_edgeValues guards against a perpetual diff when the
+// Optional+Computed tags list is set explicitly to [].
+func TestAccIngestionKeyResource_edgeValues(t *testing.T) {
+	name := acctest.RandomWithPrefix("test-ingestionkey-edge")
+
+	resource.Test(t, resource.TestCase{
+		PreCheck: func() {
+			testAccPreCheckIngestionKey(t)
+		},
+		ProtoV6ProviderFactories: testAccProtoV6ProviderFactoriesWithInCloudBackend(t),
+		Steps: []resource.TestStep{
+			{
+				Config: testAccIngestionKeyResourceConfig_edgeValues(name),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					resource.TestCheckResourceAttr("groundcover_ingestionkey.test", "name", name),
+					resource.TestCheckResourceAttr("groundcover_ingestionkey.test", "tags.#", "0"),
+				),
+			},
+			{Config: testAccIngestionKeyResourceConfig_edgeValues(name), PlanOnly: true, ExpectNonEmptyPlan: false},
+		},
+	})
+}
+
+func testAccIngestionKeyResourceConfig_edgeValues(name string) string {
+	return fmt.Sprintf(`
+resource "groundcover_ingestionkey" "test" {
+  name = %[1]q
+  type = "sensor"
+  tags = []
+}
+`, name)
 }

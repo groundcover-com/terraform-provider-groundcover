@@ -134,6 +134,7 @@ func TestAccRecurringSilenceResource(t *testing.T) {
 					resource.TestCheckResourceAttr("groundcover_recurring_silence.test", "matchers.#", "1"),
 				),
 			},
+			{Config: testAccRecurringSilenceResourceConfigWeekly(comment), PlanOnly: true, ExpectNonEmptyPlan: false},
 			{
 				ResourceName:      "groundcover_recurring_silence.test",
 				ImportState:       true,
@@ -149,6 +150,7 @@ func TestAccRecurringSilenceResource(t *testing.T) {
 					resource.TestCheckResourceAttr("groundcover_recurring_silence.test", "enabled", "false"),
 				),
 			},
+			{Config: testAccRecurringSilenceResourceConfigDaily(updatedComment), PlanOnly: true, ExpectNonEmptyPlan: false},
 		},
 	})
 }
@@ -164,8 +166,11 @@ func TestAccRecurringSilenceResource_applyLoop(t *testing.T) {
 		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
 		Steps: []resource.TestStep{
 			{Config: config, Check: resource.TestCheckResourceAttrSet("groundcover_recurring_silence.test", "id")},
+			{Config: config, PlanOnly: true, ExpectNonEmptyPlan: false},
 			{Config: config},
+			{Config: config, PlanOnly: true, ExpectNonEmptyPlan: false},
 			{Config: config},
+			{Config: config, PlanOnly: true, ExpectNonEmptyPlan: false},
 		},
 	})
 }

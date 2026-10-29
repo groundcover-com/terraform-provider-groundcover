@@ -45,6 +45,7 @@ func TestAccNotificationRoute_basic(t *testing.T) {
 					resource.TestCheckResourceAttrSet("groundcover_notification_route.test", "created_at"),
 				),
 			},
+			{Config: testAccNotificationRouteConfig_basic(name), PlanOnly: true, ExpectNonEmptyPlan: false},
 			{
 				ResourceName:      "groundcover_notification_route.test",
 				ImportState:       true,
@@ -72,6 +73,7 @@ func TestAccNotificationRoute_update(t *testing.T) {
 					resource.TestCheckResourceAttrSet("groundcover_notification_route.test", "id"),
 				),
 			},
+			{Config: testAccNotificationRouteConfig_update_step1(name), PlanOnly: true, ExpectNonEmptyPlan: false},
 			{
 				Config: testAccNotificationRouteConfig_update_step2(name),
 				Check: resource.ComposeAggregateTestCheckFunc(
@@ -83,6 +85,7 @@ func TestAccNotificationRoute_update(t *testing.T) {
 					resource.TestCheckResourceAttr("groundcover_notification_route.test", "routes.0.status.1", "Resolved"),
 				),
 			},
+			{Config: testAccNotificationRouteConfig_update_step2(name), PlanOnly: true, ExpectNonEmptyPlan: false},
 		},
 	})
 }
@@ -131,6 +134,7 @@ func TestAccNotificationRoute_applyLoop(t *testing.T) {
 					resource.TestCheckResourceAttrSet("groundcover_notification_route.test", "id"),
 				),
 			},
+			{Config: testAccNotificationRouteConfig_basic(name), PlanOnly: true, ExpectNonEmptyPlan: false},
 			// Step 2: Apply the same config again - should not detect changes (no apply loop)
 			// This is the critical test - if there's an apply loop, this step will show changes
 			{
@@ -144,6 +148,7 @@ func TestAccNotificationRoute_applyLoop(t *testing.T) {
 				// ExpectNonEmptyPlan is false by default, meaning we expect no changes
 				// If there were an apply loop, this step would fail or show changes
 			},
+			{Config: testAccNotificationRouteConfig_basic(name), PlanOnly: true, ExpectNonEmptyPlan: false},
 			// Step 3: Apply one more time to be absolutely sure there's no apply loop
 			{
 				Config: testAccNotificationRouteConfig_basic(name),
@@ -154,6 +159,7 @@ func TestAccNotificationRoute_applyLoop(t *testing.T) {
 					resource.TestCheckResourceAttrSet("groundcover_notification_route.test", "id"),
 				),
 			},
+			{Config: testAccNotificationRouteConfig_basic(name), PlanOnly: true, ExpectNonEmptyPlan: false},
 		},
 	})
 }
@@ -297,6 +303,7 @@ func TestAccNotificationRoute_noNotificationSettings(t *testing.T) {
 					resource.TestCheckResourceAttrSet("groundcover_notification_route.test", "notification_settings.%"),
 				),
 			},
+			{Config: testAccNotificationRouteConfig_noNotificationSettings(name), PlanOnly: true, ExpectNonEmptyPlan: false},
 			// ImportState testing
 			{
 				ResourceName:      "groundcover_notification_route.test",
@@ -771,4 +778,53 @@ func TestRouteParamsNotEmptyValidator(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestAccNotificationRoute_edgeValues(t *testing.T) {
+	name := acctest.RandomWithPrefix("test-route-edge-values")
+
+	resource.Test(t, resource.TestCase{
+		PreCheck:                 func() { testAccPreCheck(t) },
+		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
+		Steps: []resource.TestStep{
+			{
+				Config: testAccNotificationRouteConfig_edgeValues(name),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					resource.TestCheckResourceAttr("groundcover_notification_route.test", "name", name),
+					resource.TestCheckResourceAttr("groundcover_notification_route.test", "routes.#", "1"),
+					resource.TestCheckResourceAttrSet("groundcover_notification_route.test", "notification_settings.%"),
+					resource.TestCheckNoResourceAttr("groundcover_notification_route.test", "notification_settings.renotification_interval"),
+					resource.TestCheckResourceAttrSet("groundcover_notification_route.test", "id"),
+				),
+			},
+			{Config: testAccNotificationRouteConfig_edgeValues(name), PlanOnly: true, ExpectNonEmptyPlan: false},
+		},
+	})
+}
+
+func testAccNotificationRouteConfig_edgeValues(name string) string {
+	return fmt.Sprintf(`
+resource "groundcover_connected_app" "test" {
+  name = "%[1]s-slack"
+  type = "slack-webhook"
+  data = {
+    url = "https://hooks.slack.com/services/TEST/WEBHOOK/URL"
+  }
+}
+
+resource "groundcover_notification_route" "test" {
+  name  = %[1]q
+  query = "env:test"
+
+  routes = [{
+    status = ["Alerting"]
+    connected_apps = [{
+      type = "slack-webhook"
+      id   = groundcover_connected_app.test.id
+    }]
+  }]
+
+  notification_settings = {}
+}
+`, name)
 }

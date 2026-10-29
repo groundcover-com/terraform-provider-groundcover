@@ -41,6 +41,7 @@ func TestAccSilenceResource(t *testing.T) {
 					resource.TestCheckResourceAttr("groundcover_silence.test", "matchers.0.is_contains", "false"),
 				),
 			},
+			{Config: testAccSilenceResourceConfig(comment, startsAt, endsAt, "service", "test-service", true, false), PlanOnly: true, ExpectNonEmptyPlan: false},
 			// ImportState testing
 			{
 				ResourceName:      "groundcover_silence.test",
@@ -58,6 +59,7 @@ func TestAccSilenceResource(t *testing.T) {
 					resource.TestCheckResourceAttr("groundcover_silence.test", "matchers.0.value", "updated-workload"),
 				),
 			},
+			{Config: testAccSilenceResourceConfig(updatedComment, updatedStartsAt, updatedEndsAt, "workload", "updated-workload", true, false), PlanOnly: true, ExpectNonEmptyPlan: false},
 			// Delete testing automatically occurs in TestCase
 		},
 	})
@@ -106,6 +108,7 @@ func TestAccSilenceResource_applyLoop(t *testing.T) {
 					resource.TestCheckResourceAttr("groundcover_silence.test", "comment", comment),
 				),
 			},
+			{Config: testAccSilenceResourceConfig(comment, startsAt, endsAt, "service", "test-service", true, false), PlanOnly: true, ExpectNonEmptyPlan: false},
 			// Step 2: Apply the same config again - should not detect changes (no apply loop)
 			{
 				Config: testAccSilenceResourceConfig(comment, startsAt, endsAt, "service", "test-service", true, false),
@@ -116,6 +119,7 @@ func TestAccSilenceResource_applyLoop(t *testing.T) {
 				// ExpectNonEmptyPlan is false by default, meaning we expect no changes
 				// If there were an apply loop, this step would fail or show changes
 			},
+			{Config: testAccSilenceResourceConfig(comment, startsAt, endsAt, "service", "test-service", true, false), PlanOnly: true, ExpectNonEmptyPlan: false},
 			// Step 3: Apply one more time to be absolutely sure there's no apply loop
 			{
 				Config: testAccSilenceResourceConfig(comment, startsAt, endsAt, "service", "test-service", true, false),
@@ -124,6 +128,7 @@ func TestAccSilenceResource_applyLoop(t *testing.T) {
 					resource.TestCheckResourceAttr("groundcover_silence.test", "comment", comment),
 				),
 			},
+			{Config: testAccSilenceResourceConfig(comment, startsAt, endsAt, "service", "test-service", true, false), PlanOnly: true, ExpectNonEmptyPlan: false},
 			// Delete testing automatically occurs in TestCase
 		},
 	})
@@ -150,6 +155,7 @@ func TestAccSilenceResource_applyLoop_noComment(t *testing.T) {
 					resource.TestCheckResourceAttrSet("groundcover_silence.test", "comment"),
 				),
 			},
+			{Config: config, PlanOnly: true, ExpectNonEmptyPlan: false},
 			// Step 2: Apply same config — expect no changes
 			{
 				Config: config,
@@ -158,6 +164,7 @@ func TestAccSilenceResource_applyLoop_noComment(t *testing.T) {
 					resource.TestCheckResourceAttrSet("groundcover_silence.test", "comment"),
 				),
 			},
+			{Config: config, PlanOnly: true, ExpectNonEmptyPlan: false},
 			// Step 3: Apply again — expect no changes
 			{
 				Config: config,
@@ -166,6 +173,7 @@ func TestAccSilenceResource_applyLoop_noComment(t *testing.T) {
 					resource.TestCheckResourceAttrSet("groundcover_silence.test", "comment"),
 				),
 			},
+			{Config: config, PlanOnly: true, ExpectNonEmptyPlan: false},
 		},
 	})
 }
