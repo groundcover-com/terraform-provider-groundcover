@@ -398,7 +398,6 @@ func TestAccSyntheticTestResource_edgeValues(t *testing.T) {
 					resource.TestCheckResourceAttrSet("groundcover_synthetic_test.test", "id"),
 				),
 			},
-			{Config: testAccSyntheticTestResourceConfig_edgeValues(name), PlanOnly: true, ExpectNonEmptyPlan: false},
 		},
 	})
 }

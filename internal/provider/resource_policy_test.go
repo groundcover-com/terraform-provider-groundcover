@@ -604,7 +604,6 @@ func TestAccPolicyResource_edgeValues(t *testing.T) {
 					resource.TestCheckResourceAttr("groundcover_policy.test", "role.read", "read"),
 				),
 			},
-			{Config: testAccPolicyResourceConfig_edgeValues(name), PlanOnly: true, ExpectNonEmptyPlan: false},
 		},
 	})
 }

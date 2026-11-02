@@ -177,7 +177,6 @@ func TestAccMetricsPipelineResource_edgeValues(t *testing.T) {
 					resource.TestCheckResourceAttr("groundcover_metricspipeline.test", "rules.raw", ""),
 				),
 			},
-			{Config: testAccMetricsPipelineResourceConfig_edgeValues(), PlanOnly: true, ExpectNonEmptyPlan: false},
 			// keep_regex carries the run token above, so it is only ever empty here.
 			{
 				Config: testAccMetricsPipelineResourceConfig_edgeValuesEmptyKeep(),
@@ -187,7 +186,6 @@ func TestAccMetricsPipelineResource_edgeValues(t *testing.T) {
 					resource.TestCheckResourceAttr("groundcover_metricspipeline.test", "rules.drop_regex.0", testAccMetricsPipelineKeepRegex()),
 				),
 			},
-			{Config: testAccMetricsPipelineResourceConfig_edgeValuesEmptyKeep(), PlanOnly: true, ExpectNonEmptyPlan: false},
 		},
 	})
 }

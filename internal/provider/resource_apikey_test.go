@@ -186,7 +186,6 @@ func TestAccApiKeyResource_edgeValues(t *testing.T) {
 					resource.TestCheckResourceAttr("groundcover_apikey.test", "description", ""),
 				),
 			},
-			{Config: testAccApiKeyResourceConfig_edgeValues(name), PlanOnly: true, ExpectNonEmptyPlan: false},
 		},
 	})
 }

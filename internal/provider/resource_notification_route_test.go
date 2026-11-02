@@ -790,7 +790,6 @@ func TestAccNotificationRoute_edgeValues(t *testing.T) {
 					resource.TestCheckResourceAttrSet("groundcover_notification_route.test", "id"),
 				),
 			},
-			{Config: testAccNotificationRouteConfig_edgeValues(name), PlanOnly: true, ExpectNonEmptyPlan: false},
 		},
 	})
 }

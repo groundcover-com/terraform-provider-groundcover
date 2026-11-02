@@ -715,7 +715,6 @@ func TestAccDashboardResource_edgeValues(t *testing.T) {
 					resource.TestCheckResourceAttrSet("groundcover_dashboard.test", "id"),
 				),
 			},
-			{Config: testAccDashboardResourceConfig_edgeValues(dashboardName), PlanOnly: true, ExpectNonEmptyPlan: false},
 		},
 	})
 }

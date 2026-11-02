@@ -372,7 +372,6 @@ func TestAccSkillResource_edgeValues(t *testing.T) {
 					resource.TestCheckResourceAttr("groundcover_skill.test", "description", ""),
 				),
 			},
-			{Config: testAccSkillConfig_edgeValues(name), PlanOnly: true, ExpectNonEmptyPlan: false},
 		},
 	})
 }

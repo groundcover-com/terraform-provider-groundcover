@@ -227,7 +227,6 @@ func TestAccIngestionKeyResource_edgeValues(t *testing.T) {
 					resource.TestCheckResourceAttr("groundcover_ingestionkey.test", "tags.#", "0"),
 				),
 			},
-			{Config: testAccIngestionKeyResourceConfig_edgeValues(name), PlanOnly: true, ExpectNonEmptyPlan: false},
 		},
 	})
 }

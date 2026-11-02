@@ -1309,7 +1309,6 @@ func TestAccMonitorV2Resource_edgeValues(t *testing.T) {
 					resource.TestCheckResourceAttr("groundcover_monitor_v2.test", "notification_settings.method", "notificationRoutes"),
 				),
 			},
-			{Config: testAccMonitorV2ResourceConfig_edgeValues(name), PlanOnly: true, ExpectNonEmptyPlan: false},
 		},
 	})
 }

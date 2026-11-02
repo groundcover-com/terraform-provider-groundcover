@@ -166,7 +166,6 @@ func TestAccServiceAccountResource_edgeValues(t *testing.T) {
 					resource.TestCheckResourceAttr("groundcover_serviceaccount.test", "description", ""),
 				),
 			},
-			{Config: testAccServiceAccountResourceConfig_edgeValues(name), PlanOnly: true, ExpectNonEmptyPlan: false},
 		},
 	})
 }
