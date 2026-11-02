@@ -1025,17 +1025,6 @@ func assertionValueOrNull(value string) types.String {
 	return types.StringValue(value)
 }
 
-// assertionValueOrPrior maps an empty API value to null, unless the prior state
-// holds an explicit "" for it: the API echoes "" back as "", so nulling it would
-// make every plan show "" -> null and update forever.
-func assertionValueOrPrior(value string, prior types.String) types.String {
-	if value == "" && !prior.IsNull() && !prior.IsUnknown() && prior.ValueString() == "" {
-		return prior
-	}
-
-	return assertionValueOrNull(value)
-}
-
 func syntheticAssertionsToList(ctx context.Context, assertions []*models.Assertion, prior types.List) types.List {
 	if len(assertions) == 0 {
 		return types.ListNull(syntheticAssertionObjectType())
@@ -1054,8 +1043,8 @@ func syntheticAssertionsToList(ctx context.Context, assertions []*models.Asserti
 			map[string]attr.Value{
 				"source":   types.StringValue(string(assertion.Source)),
 				"operator": types.StringValue(string(assertion.Operator)),
-				"target":   assertionValueOrPrior(assertion.Target, priorModel.Target),
-				"property": assertionValueOrPrior(assertion.Property, priorModel.Property),
+				"target":   stringOrPrior(assertion.Target, priorModel.Target),
+				"property": stringOrPrior(assertion.Property, priorModel.Property),
 				"severity": assertionValueOrNull(string(assertion.Severity)),
 			},
 		)

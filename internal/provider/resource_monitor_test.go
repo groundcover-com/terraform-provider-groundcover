@@ -2532,6 +2532,7 @@ func TestMonitorV2MapSDKToModelPreservesConfiguredEmpties(t *testing.T) {
 		Team:        types.StringValue(""),
 		Labels:      types.MapValueMust(types.StringType, map[string]attr.Value{}),
 		Annotations: types.MapValueMust(types.StringType, map[string]attr.Value{}),
+		Routing:     types.ListValueMust(types.StringType, []attr.Value{}),
 		Display: &monitorV2DisplayModel{
 			Description:          types.StringValue(""),
 			ResourceHeaderLabels: types.ListValueMust(types.StringType, []attr.Value{}),
@@ -2545,7 +2546,7 @@ func TestMonitorV2MapSDKToModelPreservesConfiguredEmpties(t *testing.T) {
 	}
 	for name, v := range map[string]attr.Value{
 		"category": configured.Category, "team": configured.Team,
-		"labels": configured.Labels, "annotations": configured.Annotations,
+		"labels": configured.Labels, "annotations": configured.Annotations, "routing": configured.Routing,
 		"display.description":            configured.Display.Description,
 		"display.resource_header_labels": configured.Display.ResourceHeaderLabels,
 		"display.context_header_labels":  configured.Display.ContextHeaderLabels,
@@ -2558,7 +2559,7 @@ func TestMonitorV2MapSDKToModelPreservesConfiguredEmpties(t *testing.T) {
 	var fresh monitorV2ResourceModel
 	mapMonitorV2SDKToModel(ctx, "monitor-id", remote, &fresh, &diags)
 	for name, v := range map[string]attr.Value{
-		"category": fresh.Category, "team": fresh.Team, "labels": fresh.Labels, "annotations": fresh.Annotations,
+		"category": fresh.Category, "team": fresh.Team, "labels": fresh.Labels, "annotations": fresh.Annotations, "routing": fresh.Routing,
 		"display.description": fresh.Display.Description, "display.resource_header_labels": fresh.Display.ResourceHeaderLabels,
 	} {
 		if !v.IsNull() {

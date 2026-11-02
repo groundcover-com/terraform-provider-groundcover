@@ -133,10 +133,10 @@ func testAccCheckMetricsPipelineResourceDisappears() resource.TestCheckFunc {
 // (BE-3828); with no prior state the same empties still map to null.
 func TestMetricsPipelineConfigToStatePreservesConfiguredEmpties(t *testing.T) {
 	ctx := context.Background()
-	config := &models.MetricsPipelineConfigInfo{Rules: &models.RelabelConfig{KeepRegex: []string{"^up$"}}}
+	config := &models.MetricsPipelineConfigInfo{Rules: &models.RelabelConfig{DropRegex: []string{"^up$"}}}
 
 	configured := metricsPipelineResourceModel{Rules: &metricsPipelineRulesModel{
-		DropRegex:   []types.String{},
+		KeepRegex:   []types.String{},
 		RemoveLabel: []types.String{},
 		AddLabel:    types.MapValueMust(types.StringType, map[string]attr.Value{}),
 		Raw:         types.StringValue(""),
@@ -146,8 +146,8 @@ func TestMetricsPipelineConfigToStatePreservesConfiguredEmpties(t *testing.T) {
 	if diags.HasError() {
 		t.Fatalf("metricsPipelineConfigToState() diagnostics: %v", diags)
 	}
-	if configured.Rules.DropRegex == nil || configured.Rules.RemoveLabel == nil {
-		t.Errorf("configured [] became nil: drop_regex=%v remove_label=%v", configured.Rules.DropRegex, configured.Rules.RemoveLabel)
+	if configured.Rules.KeepRegex == nil || configured.Rules.RemoveLabel == nil {
+		t.Errorf("configured [] became nil: keep_regex=%v remove_label=%v", configured.Rules.KeepRegex, configured.Rules.RemoveLabel)
 	}
 	if configured.Rules.AddLabel.IsNull() || configured.Rules.Raw.IsNull() {
 		t.Errorf("configured empty became null: add_label=%v raw=%v", configured.Rules.AddLabel, configured.Rules.Raw)
@@ -155,7 +155,7 @@ func TestMetricsPipelineConfigToStatePreservesConfiguredEmpties(t *testing.T) {
 
 	var fresh metricsPipelineResourceModel
 	metricsPipelineConfigToState(ctx, config, &fresh, &diags)
-	if fresh.Rules.DropRegex != nil || fresh.Rules.RemoveLabel != nil || !fresh.Rules.AddLabel.IsNull() || !fresh.Rules.Raw.IsNull() {
+	if fresh.Rules.KeepRegex != nil || fresh.Rules.RemoveLabel != nil || !fresh.Rules.AddLabel.IsNull() || !fresh.Rules.Raw.IsNull() {
 		t.Errorf("unconfigured empties should be null: %+v", fresh.Rules)
 	}
 }

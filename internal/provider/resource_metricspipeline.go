@@ -276,22 +276,6 @@ func planToMetricsPipelineRequest(ctx context.Context, plan *metricsPipelineReso
 	return req
 }
 
-// metricsPipelineStringsOrPrior returns the API values, or the prior empty (non-nil)
-// slice when the API returns none and the user configured [].
-func metricsPipelineStringsOrPrior(values []string, prior []types.String) []types.String {
-	if len(values) == 0 {
-		if prior != nil && len(prior) == 0 {
-			return prior
-		}
-		return nil
-	}
-	out := make([]types.String, 0, len(values))
-	for _, v := range values {
-		out = append(out, types.StringValue(v))
-	}
-	return out
-}
-
 func metricsPipelineConfigToState(ctx context.Context, config *models.MetricsPipelineConfigInfo, state *metricsPipelineResourceModel, diags *diag.Diagnostics) {
 	if config == nil {
 		state.Rules = nil
@@ -314,12 +298,9 @@ func metricsPipelineConfigToState(ctx context.Context, config *models.MetricsPip
 	}
 	rulesModel := &metricsPipelineRulesModel{}
 
-	for _, v := range config.Rules.KeepRegex {
-		rulesModel.KeepRegex = append(rulesModel.KeepRegex, types.StringValue(v))
-	}
-
-	rulesModel.DropRegex = metricsPipelineStringsOrPrior(config.Rules.DropRegex, prior.DropRegex)
-	rulesModel.RemoveLabel = metricsPipelineStringsOrPrior(config.Rules.RemoveLabel, prior.RemoveLabel)
+	rulesModel.KeepRegex = stringSliceOrPrior(config.Rules.KeepRegex, prior.KeepRegex)
+	rulesModel.DropRegex = stringSliceOrPrior(config.Rules.DropRegex, prior.DropRegex)
+	rulesModel.RemoveLabel = stringSliceOrPrior(config.Rules.RemoveLabel, prior.RemoveLabel)
 
 	switch {
 	case len(config.Rules.AddLabel) > 0:
