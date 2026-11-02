@@ -1215,12 +1215,12 @@ func mapMonitorV2SDKToModel(ctx context.Context, id string, remote *models.Updat
 	// result". Sending is still pointer-based (monitorV2BoolPtr) so unpause works.
 	state.IsPaused = types.BoolValue(remote.IsPaused != nil && *remote.IsPaused)
 	state.AutoResolve = types.BoolValue(remote.AutoResolve)
-	state.Category = monitorV2NullableString(remote.Category)
-	state.Team = monitorV2NullableString(remote.Team)
-	state.Labels = monitorV2MapType(ctx, remote.Labels, diags)
-	state.Annotations = monitorV2MapType(ctx, monitorV2FilterAnnotations(remote.Annotations), diags)
-	state.Routing = monitorV2StringListType(ctx, remote.Routing, diags)
-	state.Display = monitorV2DisplayFromSDK(ctx, remote.Display, diags)
+	state.Category = stringOrPrior(remote.Category, state.Category)
+	state.Team = stringOrPrior(remote.Team, state.Team)
+	state.Labels = stringMapOrPrior(ctx, remote.Labels, state.Labels, diags)
+	state.Annotations = stringMapOrPrior(ctx, monitorV2FilterAnnotations(remote.Annotations), state.Annotations, diags)
+	state.Routing = stringListOrPrior(ctx, remote.Routing, state.Routing, diags)
+	state.Display = monitorV2DisplayFromSDK(ctx, remote.Display, state.Display, diags)
 	state.EvaluationInterval = monitorV2PreserveEvaluationIntervalDurations(previousEvaluationInterval, monitorV2EvaluationIntervalFromSDK(remote.EvaluationInterval))
 	state.NotificationSettings = monitorV2PreserveNotificationSettingsDurations(previousNotificationSettings, monitorV2NotificationSettingsFromSDK(ctx, remote.NotificationSettings, remote.HideSlackPreviewGraph, diags))
 
@@ -1429,15 +1429,18 @@ func monitorV2EvaluationIntervalFromSDK(interval *models.EvaluationInterval) *mo
 	}
 }
 
-func monitorV2DisplayFromSDK(ctx context.Context, display *models.DisplayModel, diags *diag.Diagnostics) *monitorV2DisplayModel {
+func monitorV2DisplayFromSDK(ctx context.Context, display *models.DisplayModel, prior *monitorV2DisplayModel, diags *diag.Diagnostics) *monitorV2DisplayModel {
 	if display == nil {
 		return nil
 	}
+	if prior == nil {
+		prior = &monitorV2DisplayModel{}
+	}
 	return &monitorV2DisplayModel{
 		Header:               monitorV2NullableString(display.Header),
-		Description:          monitorV2NullableString(display.Description),
-		ResourceHeaderLabels: monitorV2StringListType(ctx, display.ResourceHeaderLabels, diags),
-		ContextHeaderLabels:  monitorV2StringListType(ctx, display.ContextHeaderLabels, diags),
+		Description:          stringOrPrior(display.Description, prior.Description),
+		ResourceHeaderLabels: stringListOrPrior(ctx, display.ResourceHeaderLabels, prior.ResourceHeaderLabels, diags),
+		ContextHeaderLabels:  stringListOrPrior(ctx, display.ContextHeaderLabels, prior.ContextHeaderLabels, diags),
 		TemplateLanguage:     monitorV2NullableString(display.TemplateLanguage),
 	}
 }
@@ -1645,15 +1648,6 @@ func monitorV2ConnectedAppParamsToSDK(ctx context.Context, value types.Map, diag
 			AutoResolve:      options.AutoResolve.ValueBool(),
 		}
 	}
-	return result
-}
-
-func monitorV2MapType(ctx context.Context, value map[string]string, diags *diag.Diagnostics) types.Map {
-	if len(value) == 0 {
-		return types.MapNull(types.StringType)
-	}
-	result, mapDiags := types.MapValueFrom(ctx, types.StringType, value)
-	diags.Append(mapDiags...)
 	return result
 }
 

@@ -1,3 +1,10 @@
+## 1.23.1
+
+* Closed Terraform drift on configured empty values. `""`, `[]`, `{}` and an omitted `body.type` now read back as configured, so `plan` is clean after `apply`:
+  * `groundcover_monitor_v2`: `team`, `category`, `labels`, `annotations`, `routing`, `display.*` (previously the apply failed with an inconsistent result)
+  * `groundcover_metricspipeline`: `keep_regex`, `drop_regex`, `remove_label`, `add_label`, `raw`
+  * `groundcover_synthetic_test`: `labels`, `body.type`, and `assertion` `target`/`property` set to `""` (such as `target = ""` on `exists`). Through the crossplane provider this drift was an update every ~2 seconds that also reset the synthetic's monitor alert state
+
 ## 1.23.0
 
 * Added `create_monitor` to `groundcover_synthetic_test`. Set it to `false` to create the test without a monitor
