@@ -178,8 +178,29 @@ func TestAccMetricsPipelineResource_edgeValues(t *testing.T) {
 				),
 			},
 			{Config: testAccMetricsPipelineResourceConfig_edgeValues(), PlanOnly: true, ExpectNonEmptyPlan: false},
+			// keep_regex carries the run token above, so it is only ever empty here.
+			{
+				Config: testAccMetricsPipelineResourceConfig_edgeValuesEmptyKeep(),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					resource.TestCheckResourceAttr("groundcover_metricspipeline.test", "rules.keep_regex.#", "0"),
+					resource.TestCheckResourceAttr("groundcover_metricspipeline.test", "rules.drop_regex.#", "1"),
+					resource.TestCheckResourceAttr("groundcover_metricspipeline.test", "rules.drop_regex.0", testAccMetricsPipelineKeepRegex()),
+				),
+			},
+			{Config: testAccMetricsPipelineResourceConfig_edgeValuesEmptyKeep(), PlanOnly: true, ExpectNonEmptyPlan: false},
 		},
 	})
+}
+
+func testAccMetricsPipelineResourceConfig_edgeValuesEmptyKeep() string {
+	return fmt.Sprintf(`
+resource "groundcover_metricspipeline" "test" {
+  rules = {
+    keep_regex = []
+    drop_regex = [%[1]q]
+  }
+}
+`, testAccMetricsPipelineKeepRegex())
 }
 
 func testAccMetricsPipelineResourceConfig_edgeValues() string {

@@ -1302,6 +1302,7 @@ func TestAccMonitorV2Resource_edgeValues(t *testing.T) {
 					resource.TestCheckResourceAttr("groundcover_monitor_v2.test", "team", ""),
 					resource.TestCheckResourceAttr("groundcover_monitor_v2.test", "labels.%", "0"),
 					resource.TestCheckResourceAttr("groundcover_monitor_v2.test", "annotations.%", "0"),
+					resource.TestCheckResourceAttr("groundcover_monitor_v2.test", "routing.#", "0"),
 					resource.TestCheckResourceAttr("groundcover_monitor_v2.test", "display.description", ""),
 					resource.TestCheckResourceAttr("groundcover_monitor_v2.test", "display.resource_header_labels.#", "0"),
 					resource.TestCheckResourceAttr("groundcover_monitor_v2.test", "display.context_header_labels.#", "0"),
@@ -1538,6 +1539,7 @@ resource "groundcover_monitor_v2" "test" {
   team             = ""
   labels           = {}
   annotations      = {}
+  routing          = []
 
   display {
     header                 = %[1]q
