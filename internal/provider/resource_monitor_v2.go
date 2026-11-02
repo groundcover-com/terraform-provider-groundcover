@@ -1651,15 +1651,6 @@ func monitorV2ConnectedAppParamsToSDK(ctx context.Context, value types.Map, diag
 	return result
 }
 
-func monitorV2MapType(ctx context.Context, value map[string]string, diags *diag.Diagnostics) types.Map {
-	if len(value) == 0 {
-		return types.MapNull(types.StringType)
-	}
-	result, mapDiags := types.MapValueFrom(ctx, types.StringType, value)
-	diags.Append(mapDiags...)
-	return result
-}
-
 func monitorV2StringListType(ctx context.Context, value []string, diags *diag.Diagnostics) types.List {
 	if len(value) == 0 {
 		return types.ListNull(types.StringType)
