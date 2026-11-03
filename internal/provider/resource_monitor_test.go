@@ -1114,6 +1114,49 @@ func TestMonitorV2ValidateCustomResolveValues(t *testing.T) {
 	}
 }
 
+// TestMonitorV2ValidateUnknownRequiredQueryFields covers values that are only known at apply time,
+// such as `time = each.value` under for_each (#144). Unknown is not missing, so validation must
+// not report it; a genuinely empty value still is.
+func TestMonitorV2ValidateUnknownRequiredQueryFields(t *testing.T) {
+	ctx := context.Background()
+
+	metricsQL := func(function, time types.String) *monitorV2ResourceModel {
+		plan := testMonitorV2BasePlan(t, &monitorV2QueryModel{
+			Type:       types.StringValue(monitorV2QueryTypeMetricsQL),
+			Expression: types.StringValue("up"),
+			Rollup:     &monitorV2RollupModel{Function: function, Time: time},
+		})
+		return &plan
+	}
+
+	var diags diag.Diagnostics
+	validateMonitorV2Config(ctx, metricsQL(types.StringValue("last"), types.StringUnknown()), &diags)
+	if len(diags) != 0 {
+		t.Errorf("unknown rollup.time should validate, got: %v", diags)
+	}
+
+	diags = nil
+	validateMonitorV2Config(ctx, metricsQL(types.StringUnknown(), types.StringValue("5m")), &diags)
+	if len(diags) != 0 {
+		t.Errorf("unknown rollup.function should validate, got: %v", diags)
+	}
+
+	diags = nil
+	validateMonitorV2Config(ctx, metricsQL(types.StringValue("last"), types.StringValue("")), &diags)
+	requireSoleDiagnostic(t, diags, diag.SeverityError, "Missing MetricsQL rollup time")
+
+	gcql := testMonitorV2BasePlan(t, &monitorV2QueryModel{
+		Type:       types.StringValue(monitorV2QueryTypeGCQL),
+		Expression: types.StringValue("level:error | stats count() c"),
+		DataType:   types.StringUnknown(),
+	})
+	diags = nil
+	validateMonitorV2Config(ctx, &gcql, &diags)
+	if len(diags) != 0 {
+		t.Errorf("unknown data_type should validate, got: %v", diags)
+	}
+}
+
 // requireSoleDiagnostic asserts that diagnostics hold exactly one entry, of the given severity and
 // with the given summary. Summary-only matching would pass on the wrong severity, and an
 // error/warning count would pass alongside unrelated diagnostics.

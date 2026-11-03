@@ -622,7 +622,7 @@ func validateMonitorV2Config(ctx context.Context, config *monitorV2ResourceModel
 	switch queryType {
 	case monitorV2QueryTypeGCQL:
 		monitorV2ValidateUnsupportedQueryFields(config.Query, queryType, diags)
-		if monitorV2String(config.Query.DataType) == "" {
+		if !config.Query.DataType.IsUnknown() && monitorV2String(config.Query.DataType) == "" {
 			diags.AddAttributeError(
 				path.Root("query").AtName("data_type"),
 				"Missing GCQL data type",
@@ -638,14 +638,14 @@ func validateMonitorV2Config(ctx context.Context, config *monitorV2ResourceModel
 				"`rollup` is required when query.type is `metricsql`.",
 			)
 		} else {
-			if monitorV2String(config.Query.Rollup.Function) == "" {
+			if !config.Query.Rollup.Function.IsUnknown() && monitorV2String(config.Query.Rollup.Function) == "" {
 				diags.AddAttributeError(
 					path.Root("query").AtName("rollup").AtName("function"),
 					"Missing MetricsQL rollup function",
 					"`rollup.function` is required when query.type is `metricsql`.",
 				)
 			}
-			if monitorV2String(config.Query.Rollup.Time) == "" {
+			if !config.Query.Rollup.Time.IsUnknown() && monitorV2String(config.Query.Rollup.Time) == "" {
 				diags.AddAttributeError(
 					path.Root("query").AtName("rollup").AtName("time"),
 					"Missing MetricsQL rollup time",
