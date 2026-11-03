@@ -4,6 +4,7 @@
   * `groundcover_monitor_v2`: `team`, `category`, `labels`, `annotations`, `routing`, `display.*` (previously the apply failed with an inconsistent result)
   * `groundcover_metricspipeline`: `keep_regex`, `drop_regex`, `remove_label`, `add_label`, `raw`
   * `groundcover_synthetic_test`: `labels`, `body.type`, and `assertion` `target`/`property` set to `""` (such as `target = ""` on `exists`). Through the crossplane provider this drift was an update every ~2 seconds that also reset the synthetic's monitor alert state
+* Fixed `groundcover_monitor_v2` failing `terraform validate` when `query.rollup.time`, `query.rollup.function` or `query.data_type` is only known at apply time, such as `time = each.value` under `for_each`. Validation now skips unknown values instead of reporting them as missing (#144)
 
 ## 1.23.0
 
