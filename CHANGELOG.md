@@ -1,3 +1,8 @@
+## 1.24.0
+
+* Added `disable_renotification` to `groundcover_notification_route` `notification_settings`
+* If you disabled renotification in the UI, you'll see a diff after upgrading. Add `disable_renotification = true` to keep it off
+
 ## 1.23.1
 
 * Closed Terraform drift on configured empty values. `""`, `[]`, `{}` and an omitted `body.type` now read back as configured, so `plan` is clean after `apply`:

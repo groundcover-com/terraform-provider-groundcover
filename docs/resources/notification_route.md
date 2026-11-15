@@ -169,6 +169,11 @@ resource "groundcover_notification_route" "slack_app_and_linear" {
       ]
     }
   ]
+
+  # Notify once per issue instead of repeating while it stays open
+  notification_settings = {
+    disable_renotification = true
+  }
 }
 
 output "critical_route_id" {
@@ -257,6 +262,7 @@ Optional:
 
 Optional:
 
+- `disable_renotification` (Boolean) Whether renotification is disabled. When `true`, `renotification_interval` is ignored.
 - `renotification_interval` (String) Duration between renotifications (e.g., '1h', '30m'). The API may normalize this value.
 
 ## Import

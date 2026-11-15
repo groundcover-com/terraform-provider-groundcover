@@ -17,6 +17,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/booldefault"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
@@ -95,6 +96,7 @@ type routeConnectedAppParamsWire struct {
 
 type notificationSettingsModel struct {
 	RenotificationInterval types.String `tfsdk:"renotification_interval"`
+	DisableRenotification  types.Bool   `tfsdk:"disable_renotification"`
 }
 
 func (r *notificationRouteResource) Metadata(_ context.Context, req resource.MetadataRequest, resp *resource.MetadataResponse) {
@@ -239,6 +241,12 @@ func (r *notificationRouteResource) Schema(_ context.Context, _ resource.SchemaR
 					"renotification_interval": schema.StringAttribute{
 						Description: "Duration between renotifications (e.g., '1h', '30m'). The API may normalize this value.",
 						Optional:    true,
+					},
+					"disable_renotification": schema.BoolAttribute{
+						Description: "Whether renotification is disabled. When `true`, `renotification_interval` is ignored.",
+						Optional:    true,
+						Computed:    true,
+						Default:     booldefault.StaticBool(false),
 					},
 				},
 			},
@@ -662,6 +670,7 @@ func notificationSettingsToSDK(ctx context.Context, settings types.Object) (*mod
 	if !settingsModel.RenotificationInterval.IsNull() && !settingsModel.RenotificationInterval.IsUnknown() {
 		req.RenotificationInterval = settingsModel.RenotificationInterval.ValueString()
 	}
+	req.DisableRenotification = settingsModel.DisableRenotification.ValueBool()
 
 	return req, diags
 }
@@ -674,11 +683,13 @@ func notificationSettingsSDKToObject(ctx context.Context, sdkSettings *models.No
 		normalized := normalizeDuration(sdkSettings.RenotificationInterval)
 		renotificationInterval = types.StringValue(normalized)
 	}
+	disableRenotification := sdkSettings != nil && sdkSettings.DisableRenotification
 
 	obj, objDiags := types.ObjectValue(
 		notificationSettingsAttrTypes(),
 		map[string]attr.Value{
 			"renotification_interval": renotificationInterval,
+			"disable_renotification":  types.BoolValue(disableRenotification),
 		},
 	)
 	diags.Append(objDiags...)
@@ -786,7 +797,9 @@ func preserveEquivalentDuration(ctx context.Context, original, updated types.Obj
 	updInterval := updSettings.RenotificationInterval.ValueString()
 
 	if durationsEqual(origInterval, updInterval) {
-		return original
+		attrs := updated.Attributes()
+		attrs["renotification_interval"] = origSettings.RenotificationInterval
+		return types.ObjectValueMust(notificationSettingsAttrTypes(), attrs)
 	}
 
 	return updated
@@ -1018,5 +1031,6 @@ func routeRuleAttrTypes() map[string]attr.Type {
 func notificationSettingsAttrTypes() map[string]attr.Type {
 	return map[string]attr.Type{
 		"renotification_interval": types.StringType,
+		"disable_renotification":  types.BoolType,
 	}
 }

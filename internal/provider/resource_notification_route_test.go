@@ -69,6 +69,7 @@ func TestAccNotificationRoute_update(t *testing.T) {
 					resource.TestCheckResourceAttr("groundcover_notification_route.test", "routes.#", "1"),
 					resource.TestCheckResourceAttr("groundcover_notification_route.test", "routes.0.status.#", "1"),
 					resource.TestCheckResourceAttr("groundcover_notification_route.test", "routes.0.status.0", "Alerting"),
+					resource.TestCheckResourceAttr("groundcover_notification_route.test", "notification_settings.disable_renotification", "false"),
 					resource.TestCheckResourceAttrSet("groundcover_notification_route.test", "id"),
 				),
 			},
@@ -81,7 +82,19 @@ func TestAccNotificationRoute_update(t *testing.T) {
 					resource.TestCheckResourceAttr("groundcover_notification_route.test", "routes.0.status.#", "2"),
 					resource.TestCheckResourceAttr("groundcover_notification_route.test", "routes.0.status.0", "Alerting"),
 					resource.TestCheckResourceAttr("groundcover_notification_route.test", "routes.0.status.1", "Resolved"),
+					resource.TestCheckResourceAttr("groundcover_notification_route.test", "notification_settings.disable_renotification", "true"),
+					resource.TestCheckResourceAttr("groundcover_notification_route.test", "notification_settings.renotification_interval", "1h"),
 				),
+			},
+			{
+				Config:             testAccNotificationRouteConfig_update_step2(name),
+				PlanOnly:           true,
+				ExpectNonEmptyPlan: false,
+			},
+			// Removing disable_renotification turns renotification back on.
+			{
+				Config: testAccNotificationRouteConfig_update_step1(name),
+				Check:  resource.TestCheckResourceAttr("groundcover_notification_route.test", "notification_settings.disable_renotification", "false"),
 			},
 		},
 	})
@@ -240,6 +253,7 @@ resource "groundcover_notification_route" "test" {
 
   notification_settings = {
     renotification_interval = "1h"
+    disable_renotification  = true
   }
 }
 `, name)
@@ -577,6 +591,71 @@ func TestNotificationRouteConnectedAppParamsToSDK(t *testing.T) {
 			assertParamsJSON(t, app.Params, tc.wantJSON)
 		})
 	}
+}
+
+func TestNotificationRouteDisableRenotificationRoundTrip(t *testing.T) {
+	ctx := context.Background()
+
+	for _, tc := range []struct {
+		name     string
+		interval types.String
+		disable  types.Bool
+	}{
+		{"false", types.StringNull(), types.BoolValue(false)},
+		{"true", types.StringNull(), types.BoolValue(true)},
+		{"true with interval", types.StringValue("1h"), types.BoolValue(true)},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			planned := types.ObjectValueMust(notificationSettingsAttrTypes(), map[string]attr.Value{
+				"renotification_interval": tc.interval,
+				"disable_renotification":  tc.disable,
+			})
+
+			req, diags := notificationSettingsToSDK(ctx, planned)
+			if diags.HasError() {
+				t.Fatalf("to SDK: %v", diags)
+			}
+			// The API echoes the request back, dropping disableRenotification when false (omitempty).
+			got, diags := notificationSettingsSDKToObject(ctx, &models.NotificationSettingsResponse{
+				RenotificationInterval: req.RenotificationInterval,
+				DisableRenotification:  req.DisableRenotification,
+			})
+			if diags.HasError() {
+				t.Fatalf("from SDK: %v", diags)
+			}
+			if !got.Equal(planned) {
+				t.Errorf("round trip mismatch:\n got  %v\n want %v", got, planned)
+			}
+		})
+	}
+
+	t.Run("nil settings read as false", func(t *testing.T) {
+		got, diags := notificationSettingsSDKToObject(ctx, nil)
+		if diags.HasError() {
+			t.Fatalf("from SDK: %v", diags)
+		}
+		if v := got.Attributes()["disable_renotification"]; !v.Equal(types.BoolValue(false)) {
+			t.Errorf("disable_renotification = %v, want false", v)
+		}
+	})
+
+	t.Run("duration preservation keeps the remote flag", func(t *testing.T) {
+		prior := types.ObjectValueMust(notificationSettingsAttrTypes(), map[string]attr.Value{
+			"renotification_interval": types.StringValue("60m"),
+			"disable_renotification":  types.BoolValue(false),
+		})
+		remote := types.ObjectValueMust(notificationSettingsAttrTypes(), map[string]attr.Value{
+			"renotification_interval": types.StringValue("1h"),
+			"disable_renotification":  types.BoolValue(true),
+		})
+		want := types.ObjectValueMust(notificationSettingsAttrTypes(), map[string]attr.Value{
+			"renotification_interval": types.StringValue("60m"),
+			"disable_renotification":  types.BoolValue(true),
+		})
+		if got := preserveEquivalentDuration(ctx, prior, remote); !got.Equal(want) {
+			t.Errorf("got %v, want %v", got, want)
+		}
+	})
 }
 
 func TestNotificationRouteConnectedAppParamsFromSDK(t *testing.T) {
