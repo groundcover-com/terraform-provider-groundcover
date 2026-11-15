@@ -154,6 +154,11 @@ resource "groundcover_notification_route" "slack_app_and_linear" {
       ]
     }
   ]
+
+  # Notify once per issue instead of repeating while it stays open
+  notification_settings = {
+    disable_renotification = true
+  }
 }
 
 output "critical_route_id" {
