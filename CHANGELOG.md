@@ -1,7 +1,7 @@
-## 1.23.2
+## 1.24.0
 
-* Fixed `groundcover_notification_route` ignoring `notification_settings.disable_renotification`. Setting it to `true` now turns renotification off for the route, matching the option in the UI. It defaults to `false`
-* Upgrade note: routes with renotification disabled in the UI show a `true -> false` diff after upgrading; add `disable_renotification = true` to keep it
+* Added `disable_renotification` to `groundcover_notification_route` `notification_settings`
+* If you disabled renotification in the UI, you'll see a diff after upgrading. Add `disable_renotification = true` to keep it off
 
 ## 1.23.1
 
