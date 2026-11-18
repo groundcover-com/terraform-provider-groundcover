@@ -9,9 +9,13 @@ terraform {
 provider "groundcover" {}
 
 # Replace the cluster, instance endpoints and secret references before applying.
+# Create the referenced Kubernetes Secrets in the cluster that runs the integration.
 # Use one stable endpoint per instance, including each replica.
+# For grants and the optional monitoring-account exclusion, follow the MySQL setup guide.
+# Reconnect the monitoring sessions after changing actor rules and reapply the rules after restart.
+# https://docs.groundcover.com/collect-data/data-sources/mysql-database-monitoring
 locals {
-  cluster = "my-cluster"
+  cluster = "production-cluster"
 }
 
 # Primary: measure statements. The server certificate must match the host.
