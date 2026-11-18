@@ -1,6 +1,6 @@
 ## 1.24.1
 
-* Documented MySQL monitoring with `groundcover_dataintegration`, including primary and replica examples and per-group health settings.
+* Added a MySQL monitoring example to `groundcover_dataintegration`.
 
 ## 1.24.0
 

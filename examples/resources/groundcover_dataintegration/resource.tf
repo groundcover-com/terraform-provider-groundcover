@@ -711,6 +711,40 @@ EOT
   is_paused = false
 }
 
+# Example: MySQL database monitoring
+# Prepare the monitoring account on each instance. If you exclude its statements,
+# reconnect its sessions and reapply the exclusion after a MySQL restart.
+# https://docs.groundcover.com/collect-data/data-sources/mysql-database-monitoring
+resource "groundcover_dataintegration" "mysql_dbm" {
+  for_each = {
+    primary = { host = "mysql-primary.example.com", statements = true, health = false }
+    replica = { host = "mysql-replica.example.com", statements = false, health = true }
+  }
+
+  type    = "mysqldbm"
+  cluster = "production-cluster"
+  config = jsonencode({
+    version  = 1
+    enabled  = true
+    name     = "mysql-${each.key}"
+    host     = each.value.host
+    secure   = true
+    interval = "1m"
+    authentication = {
+      basicAuth = {
+        username = "groundcover"
+        password = "secretRef::k8s::groundcover::mysql-${each.key}::password"
+      }
+    }
+    statements = { enabled = each.value.statements, maxQueries = 200 }
+    healthMetrics = {
+      enabled = each.value.health
+      groups  = { waits = { enabled = false } }
+    }
+    labelSettings = { extraLabels = { environment = "production" } }
+  })
+}
+
 # Example: PostgreSQL database monitoring
 # Before applying:
 # 1. Add pg_stat_statements to shared_preload_libraries and restart PostgreSQL.

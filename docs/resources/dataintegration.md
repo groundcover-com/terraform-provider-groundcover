@@ -32,7 +32,7 @@ apply rather than the plan. Changing `type` on an existing resource **replaces**
 | `postgresscrape` | PostgreSQL exporter Prometheus endpoint (system metrics) | `postgresql_system_metrics_example` |
 | `clickhousedbm` | ClickHouse database monitoring: health metrics plus query-log traces | `clickhouse_dbm` |
 | `postgresqldbm` | PostgreSQL database monitoring: health metrics plus `pg_stat_statements` traces | `postgresql_dbm` |
-| `mysqldbm` | MySQL interval-based statement measurements and health metrics | `mysql_primary`, `mysql_replica` |
+| `mysqldbm` | MySQL interval-based statement measurements and health metrics | `mysql_dbm` |
 
 ## Where the integration runs
 
@@ -190,9 +190,7 @@ resource "groundcover_dataintegration" "cloudwatch_example" {
     }
     # use this parameter to enrich with resource labels
     withContextTagsOnInfoMetrics = true
-    # Discover resources through the AWS inventory API in addition to CloudWatch's own
-    # listing, so resources that have not emitted a metric yet still appear. Defaults to true.
-    withInventoryDiscovery = true
+
     # Optional throttling of the AWS API calls, for accounts that hit CloudWatch rate limits.
     # Omitted keys keep their defaults: listMetrics 1, getMetricData 5,
     # getMetricStatistics 5, listInventory 10.
@@ -791,6 +789,40 @@ EOT
   is_paused = false
 }
 
+# Example: MySQL database monitoring
+# Prepare the monitoring account on each instance. If you exclude its statements,
+# reconnect its sessions and reapply the exclusion after a MySQL restart.
+# https://docs.groundcover.com/collect-data/data-sources/mysql-database-monitoring
+resource "groundcover_dataintegration" "mysql_dbm" {
+  for_each = {
+    primary = { host = "mysql-primary.example.com", statements = true, health = false }
+    replica = { host = "mysql-replica.example.com", statements = false, health = true }
+  }
+
+  type    = "mysqldbm"
+  cluster = "production-cluster"
+  config = jsonencode({
+    version  = 1
+    enabled  = true
+    name     = "mysql-${each.key}"
+    host     = each.value.host
+    secure   = true
+    interval = "1m"
+    authentication = {
+      basicAuth = {
+        username = "groundcover"
+        password = "secretRef::k8s::groundcover::mysql-${each.key}::password"
+      }
+    }
+    statements = { enabled = each.value.statements, maxQueries = 200 }
+    healthMetrics = {
+      enabled = each.value.health
+      groups  = { waits = { enabled = false } }
+    }
+    labelSettings = { extraLabels = { environment = "production" } }
+  })
+}
+
 # Example: PostgreSQL database monitoring
 # Before applying:
 # 1. Add pg_stat_statements to shared_preload_libraries and restart PostgreSQL.
@@ -1095,106 +1127,6 @@ output "aws_cur_dataintegration_id" {
 }
 ```
 
-## MySQL database monitoring (`mysqldbm`)
-
-Create one resource per instance, using a stable hostname reachable from the execution cluster or backend. The primary example collects statement measurements and the replica example collects health metrics. Either instance can collect both by setting both `statements.enabled` and `healthMetrics.enabled` to `true`. Enable at least one capability.
-
-Prepare the monitoring account and grants on each instance. To exclude the account's own statements, a database administrator can set its Performance Schema actor's `ENABLED` and `HISTORY` to `NO`. Reconnect existing monitoring sessions so they inherit the rule, or update their thread instrumentation. Reapply the rule after a server restart and on failover targets. Terraform manages the groundcover integration only. The [MySQL setup guide](https://docs.groundcover.com/collect-data/data-sources/mysql-database-monitoring) includes the SQL recipe and collection checks.
-
-```terraform
-terraform {
-  required_providers {
-    groundcover = {
-      source = "groundcover-com/groundcover"
-    }
-  }
-}
-
-provider "groundcover" {}
-
-# Replace the cluster, instance endpoints and secret references before applying.
-# Create the referenced Kubernetes Secrets in the cluster that runs the integration.
-# Use one stable endpoint per instance, including each replica.
-# For grants and the optional monitoring-account exclusion, follow the MySQL setup guide.
-# Reconnect the monitoring sessions after changing actor rules and reapply the rules after restart.
-# https://docs.groundcover.com/collect-data/data-sources/mysql-database-monitoring
-locals {
-  cluster = "production-cluster"
-}
-
-# Primary: measure statements. The server certificate must match the host.
-resource "groundcover_dataintegration" "mysql_primary" {
-  type    = "mysqldbm"
-  cluster = local.cluster
-
-  config = jsonencode({
-    version = 1
-    name    = "mysql-primary"
-    enabled = true
-    host    = "mysql-primary.example.com"
-    port    = 3306
-    secure  = true
-    tls = {
-      ca = "secretRef::k8s::groundcover::mysql-primary-tls::ca.crt"
-    }
-    authentication = {
-      basicAuth = {
-        username = "groundcover"
-        password = "secretRef::k8s::groundcover::mysql-primary-monitor::password"
-      }
-    }
-    interval = "1m"
-    statements = {
-      enabled       = true
-      maxQueries    = 200
-      filterInserts = false
-    }
-    healthMetrics   = { enabled = false }
-    ignoreDatabases = ["scratch"]
-    labelSettings   = { extraLabels = { environment = "production" } }
-  })
-}
-
-# Replica: collect health metrics using the collector's trusted CAs.
-# Disable groups for which the monitoring account has no grants.
-resource "groundcover_dataintegration" "mysql_replica" {
-  type    = "mysqldbm"
-  cluster = local.cluster
-
-  config = jsonencode({
-    version = 1
-    name    = "mysql-replica"
-    enabled = true
-    host    = "mysql-replica.example.com"
-    authentication = {
-      basicAuth = {
-        username = "groundcover"
-        password = "secretRef::k8s::groundcover::mysql-replica-monitor::password"
-      }
-    }
-    statements = { enabled = false }
-    healthMetrics = {
-      enabled = true
-      groups = {
-        transactions = { enabled = false }
-        waits        = { enabled = false }
-        tableSize    = { enabled = false }
-      }
-    }
-    labelSettings = { extraLabels = { environment = "production" } }
-  })
-}
-```
-
-| Configuration | Behavior |
-|---|---|
-| Connection | `host` is required. `port` defaults to `3306`. The optional `database` sets the connection database. `dialTimeout` and `queryTimeout` accept positive durations and each defaults to `10s`. |
-| Credentials and TLS | Use a secret reference for `authentication.basicAuth.password`. TLS is verified by default (`secure = true`, `skipVerify = false`). Supply `tls.ca` for a custom trust bundle. For mutual TLS, supply both `tls.clientCertificate` and `tls.clientKey`. All three TLS fields take secret references. For backend execution, omit `cluster` and use groundcover secret-store references. |
-| Interval | One top-level `interval` controls statements and health. It defaults to `1m`. Supported intervals are `1m`, `5m`, `10m`, `15m`, `30m` and `1h`. |
-| Statements | Collection requires `statements.enabled = true`. `maxQueries` limits the statements exported per interval, ranked by execution time. Omitted or zero selects 200, and the maximum is 1000. `filterInserts` defaults to `false`. |
-| Health groups | `healthMetrics.enabled = true` enables all groups by default. Set `healthMetrics.groups.<group>.enabled = false` to disable individual groups. Supported keys are `instance`, `connections`, `throughput`, `bufferPool`, `io`, `redo`, `locks`, `queryEfficiency`, `tableCache`, `transactions`, `replication`, `tableSize`, `waits` and `performanceSchema`. |
-| Filtering and labels | `ignoreDatabases` excludes exact, case-sensitive schema names from statement measurements and table sizes. `labelSettings.extraLabels` adds labels to emitted metrics. |
-
 ## AWS Integration Reference (`type = "aws"`)
 
 The `aws` type is a single integration that carries **one sub-config block per capability**, so an AWS account is configured once instead of once per signal.
@@ -1399,7 +1331,7 @@ rejected. `scheme` may be omitted or set to `https`; any other value is rejected
 ### Required
 
 - `config` (String) The JSON configuration for the data integration, as a string - build it with `jsonencode`. Its structure depends on `type` and is validated by the API on create and update, so an invalid configuration surfaces as an apply error.
-- `type` (String) The type of data integration, for example `aws`, `cloudwatch`, `gcpmetrics`, `azuremetrics`, `prometheusscrape`, `clickhousedbm`, `postgresqldbm` or `mysqldbm`. See the supported types table in the documentation. Changing this forces a new integration to be created, which assigns a new `id`.
+- `type` (String) The type of data integration, for example `aws`, `cloudwatch`, `gcpmetrics`, `azuremetrics`, `prometheusscrape`, `clickhousedbm` or `postgresqldbm`. See the supported types table in the documentation. Changing this forces a new integration to be created, which assigns a new `id`.
 
 ### Optional
 

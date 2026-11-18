@@ -57,7 +57,7 @@ func (r *dataIntegrationResource) Schema(_ context.Context, _ resource.SchemaReq
 				},
 			},
 			"type": schema.StringAttribute{
-				Description: "The type of data integration, for example `aws`, `cloudwatch`, `gcpmetrics`, `azuremetrics`, `prometheusscrape`, `clickhousedbm`, `postgresqldbm` or `mysqldbm`. See the supported types table in the documentation. Changing this forces a new integration to be created, which assigns a new `id`.",
+				Description: "The type of data integration, for example `aws`, `cloudwatch`, `gcpmetrics`, `azuremetrics`, `prometheusscrape`, `clickhousedbm` or `postgresqldbm`. See the supported types table in the documentation. Changing this forces a new integration to be created, which assigns a new `id`.",
 				Required:    true,
 				PlanModifiers: []planmodifier.String{
 					stringplanmodifier.RequiresReplace(),
