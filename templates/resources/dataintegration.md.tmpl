@@ -32,6 +32,7 @@ apply rather than the plan. Changing `type` on an existing resource **replaces**
 | `postgresscrape` | PostgreSQL exporter Prometheus endpoint (system metrics) | `postgresql_system_metrics_example` |
 | `clickhousedbm` | ClickHouse database monitoring: health metrics plus query-log traces | `clickhouse_dbm` |
 | `postgresqldbm` | PostgreSQL database monitoring: health metrics plus `pg_stat_statements` traces | `postgresql_dbm` |
+| `mysqldbm` | MySQL interval-based statement measurements and health metrics | `mysql_primary`, `mysql_replica` |
 
 ## Where the integration runs
 
@@ -77,6 +78,23 @@ in continuity when you change either argument.
 ## Example Usage
 
 {{ tffile "examples/resources/groundcover_dataintegration/resource.tf" }}
+
+## MySQL database monitoring (`mysqldbm`)
+
+Create one resource per instance, using a stable hostname reachable from the execution cluster or backend. The primary example collects statement measurements and the replica example collects health metrics. Either instance can collect both by setting both `statements.enabled` and `healthMetrics.enabled` to `true`. Enable at least one capability.
+
+Prepare the monitoring account and grants on each instance. To exclude the account's own statements, a database administrator can set its Performance Schema actor's `ENABLED` and `HISTORY` to `NO`. Reconnect existing monitoring sessions so they inherit the rule, or update their thread instrumentation. Reapply the rule after a server restart and on failover targets. Terraform manages the groundcover integration only. The [MySQL setup guide](https://docs.groundcover.com/collect-data/data-sources/mysql-database-monitoring) includes the SQL recipe and collection checks.
+
+{{ tffile "examples/resources/groundcover_dataintegration/mysql/main.tf" }}
+
+| Configuration | Behavior |
+|---|---|
+| Connection | `host` is required. `port` defaults to `3306`. The optional `database` sets the connection database. `dialTimeout` and `queryTimeout` accept positive durations and each defaults to `10s`. |
+| Credentials and TLS | Use a secret reference for `authentication.basicAuth.password`. TLS is verified by default (`secure = true`, `skipVerify = false`). Supply `tls.ca` for a custom trust bundle. For mutual TLS, supply both `tls.clientCertificate` and `tls.clientKey`. All three TLS fields take secret references. For backend execution, omit `cluster` and use groundcover secret-store references. |
+| Interval | One top-level `interval` controls statements and health. It defaults to `1m`. Supported intervals are `1m`, `5m`, `10m`, `15m`, `30m` and `1h`. |
+| Statements | Collection requires `statements.enabled = true`. `maxQueries` limits the statements exported per interval, ranked by execution time. Omitted or zero selects 200, and the maximum is 1000. `filterInserts` defaults to `false`. |
+| Health groups | `healthMetrics.enabled = true` enables all groups by default. Set `healthMetrics.groups.<group>.enabled = false` to disable individual groups. Supported keys are `instance`, `connections`, `throughput`, `bufferPool`, `io`, `redo`, `locks`, `queryEfficiency`, `tableCache`, `transactions`, `replication`, `tableSize`, `waits` and `performanceSchema`. |
+| Filtering and labels | `ignoreDatabases` excludes exact, case-sensitive schema names from statement measurements and table sizes. `labelSettings.extraLabels` adds labels to emitted metrics. |
 
 ## AWS Integration Reference (`type = "aws"`)
 

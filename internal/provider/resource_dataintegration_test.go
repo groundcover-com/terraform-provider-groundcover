@@ -62,6 +62,63 @@ func TestAccDataIntegrationResource(t *testing.T) {
 	})
 }
 
+func TestAccDataIntegrationResource_mysql(t *testing.T) {
+	const address = "groundcover_dataintegration.test"
+	name := acctest.RandomWithPrefix("test-mysql")
+	healthOnly := testAccMySQLIntegrationConfig(name, false, true)
+	statementsOnly := testAccMySQLIntegrationConfig(name, true, false)
+
+	resource.Test(t, resource.TestCase{
+		PreCheck:                 func() { testAccPreCheck(t) },
+		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
+		Steps: []resource.TestStep{
+			{
+				Config: healthOnly,
+				Check: resource.ComposeAggregateTestCheckFunc(
+					resource.TestCheckResourceAttr(address, "type", "mysqldbm"),
+					resource.TestMatchResourceAttr(address, "config", regexp.MustCompile(`"waits":\{"enabled":false\}`)),
+				),
+			},
+			{
+				ResourceName:      address,
+				ImportState:       true,
+				ImportStateVerify: true,
+				ImportStateIdFunc: testAccDataIntegrationImportStateIdFunc,
+			},
+			{Config: statementsOnly},
+			{Config: statementsOnly, PlanOnly: true},
+		},
+	})
+}
+
+// Keep this synthetic integration paused. The lifecycle test only needs the configuration API.
+func testAccMySQLIntegrationConfig(name string, statements, health bool) string {
+	return fmt.Sprintf(`
+resource "groundcover_dataintegration" "test" {
+  type      = "mysqldbm"
+  is_paused = true
+  config = jsonencode({
+    version  = 1
+    name     = %q
+    enabled  = true
+    host     = "mysql.example.test"
+    interval = "5m"
+    authentication = {
+      basicAuth = {
+        username = "groundcover"
+        password = "secretRef::store::test-mysql-password"
+      }
+    }
+    statements = { enabled = %t, maxQueries = 20 }
+    healthMetrics = {
+      enabled = %t
+      groups  = { waits = { enabled = false } }
+    }
+  })
+}
+`, name, statements, health)
+}
+
 func TestAccDataIntegrationResource_disappears(t *testing.T) {
 	name := acctest.RandomWithPrefix("test-cloudwatch")
 

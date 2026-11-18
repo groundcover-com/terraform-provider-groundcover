@@ -1,3 +1,7 @@
+## 1.24.1
+
+* Documented MySQL monitoring with `groundcover_dataintegration`, including primary and replica examples and per-group health settings.
+
 ## 1.24.0
 
 * Added `disable_renotification` to `groundcover_notification_route` `notification_settings`

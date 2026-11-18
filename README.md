@@ -34,6 +34,7 @@ Basic usage examples can be found in the `examples/` directory:
     *   Demonstrates how to create and manage dashboards with customizable widgets and layouts.
 *   **Data Integration Resource:** [`examples/resources/groundcover_dataintegration/resource.tf`](./examples/resources/groundcover_dataintegration/resource.tf)
     *   Demonstrates how to create and manage data integrations, including PostgreSQL and ClickHouse health metrics and query-statistics collection.
+    *   [MySQL primary and replica](./examples/resources/groundcover_dataintegration/mysql/main.tf) shows how to enable statement measurements and health groups independently.
 *   **Silence Resource:** [`examples/resources/groundcover_silence/resource.tf`](./examples/resources/groundcover_silence/resource.tf)
     *   Demonstrates how to create and manage alert silences with time windows and matchers.
 *   **Recurring Silence Resource:** [`examples/resources/groundcover_recurring_silence/resource.tf`](./examples/resources/groundcover_recurring_silence/resource.tf)
