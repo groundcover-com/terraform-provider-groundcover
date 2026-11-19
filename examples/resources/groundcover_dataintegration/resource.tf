@@ -711,6 +711,33 @@ EOT
   is_paused = false
 }
 
+# Example: MySQL database monitoring
+# Prepare the monitoring account on each instance. If you exclude its statements,
+# reconnect its sessions and reapply the exclusion after a MySQL restart.
+# https://docs.groundcover.com/collect-data/data-sources/mysql-database-monitoring
+resource "groundcover_dataintegration" "mysql_reader" {
+  type      = "mysqldbm"
+  cluster   = "demo-cluster" # Cluster containing the MySQL service and Secret.
+  is_paused = false
+
+  config = jsonencode({
+    version       = 1
+    enabled       = true
+    name          = "mysql-reader"
+    host          = "mysql-replica.demo-ng.svc.cluster.local"
+    secure        = false # This demo instance runs without TLS.
+    interval      = "1m"
+    statements    = { enabled = true }
+    healthMetrics = { enabled = true }
+    authentication = {
+      basicAuth = {
+        username = "demo_reader"
+        password = "secretRef::k8s::demo-ng::mysql-reader-integration::password"
+      }
+    }
+  })
+}
+
 # Example: PostgreSQL database monitoring
 # Before applying:
 # 1. Add pg_stat_statements to shared_preload_libraries and restart PostgreSQL.

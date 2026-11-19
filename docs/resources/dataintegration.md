@@ -32,6 +32,7 @@ apply rather than the plan. Changing `type` on an existing resource **replaces**
 | `postgresscrape` | PostgreSQL exporter Prometheus endpoint (system metrics) | `postgresql_system_metrics_example` |
 | `clickhousedbm` | ClickHouse database monitoring: health metrics plus query-log traces | `clickhouse_dbm` |
 | `postgresqldbm` | PostgreSQL database monitoring: health metrics plus `pg_stat_statements` traces | `postgresql_dbm` |
+| `mysqldbm` | MySQL interval-based statement measurements and health metrics | `mysql_reader` |
 
 ## Where the integration runs
 
@@ -786,6 +787,33 @@ EOT
     }
   })
   is_paused = false
+}
+
+# Example: MySQL database monitoring
+# Prepare the monitoring account on each instance. If you exclude its statements,
+# reconnect its sessions and reapply the exclusion after a MySQL restart.
+# https://docs.groundcover.com/collect-data/data-sources/mysql-database-monitoring
+resource "groundcover_dataintegration" "mysql_reader" {
+  type      = "mysqldbm"
+  cluster   = "demo-cluster" # Cluster containing the MySQL service and Secret.
+  is_paused = false
+
+  config = jsonencode({
+    version       = 1
+    enabled       = true
+    name          = "mysql-reader"
+    host          = "mysql-replica.demo-ng.svc.cluster.local"
+    secure        = false # This demo instance runs without TLS.
+    interval      = "1m"
+    statements    = { enabled = true }
+    healthMetrics = { enabled = true }
+    authentication = {
+      basicAuth = {
+        username = "demo_reader"
+        password = "secretRef::k8s::demo-ng::mysql-reader-integration::password"
+      }
+    }
+  })
 }
 
 # Example: PostgreSQL database monitoring
