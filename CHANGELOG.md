@@ -1,3 +1,7 @@
+## 1.24.2
+
+* Fixed `groundcover_serviceaccount` reporting a successful deletion and dropping the account from state when active API keys block deletion.
+
 ## 1.24.1
 
 * Added a MySQL monitoring example to `groundcover_dataintegration`.

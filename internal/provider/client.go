@@ -469,10 +469,9 @@ func handleApiError(ctx context.Context, err error, operation string, resourceId
 		tflog.Warn(ctx, "Mapping SDK error to ErrNotFound based on substring match ('not found', ' 404 ', or '[404]').", logFields)
 		return ErrNotFound
 	}
-	// Handle specific case for service account deletion where 400 can mean already deleted or invalid state
-	if operation == "DeleteServiceAccount" && (statusCode == http.StatusBadRequest || strings.Contains(errStr, "[400]")) {
-		tflog.Warn(ctx, "Mapping SDK error to ErrNotFound for DeleteServiceAccount 400 error (likely already deleted).", logFields)
-		return ErrNotFound
+
+	if operation == "DeleteServiceAccount" && statusCode == http.StatusBadRequest {
+		return fmt.Errorf("cannot delete service account %q; revoke any active API keys and retry", resourceId)
 	}
 
 	// Handle specific case for ingestion key deletion where resource not found should be treated as success
