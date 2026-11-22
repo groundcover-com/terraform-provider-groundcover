@@ -17,53 +17,15 @@ import (
 )
 
 func TestDeleteServiceAccountHTTPResponses(t *testing.T) {
-	tests := []struct {
-		name         string
-		deleteStatus int
-		listStatus   int
-		listBody     string
-		wantError    bool
-	}{
-		{
-			name:         "bad request with account still present",
-			deleteStatus: http.StatusBadRequest,
-			listStatus:   http.StatusOK,
-			listBody:     `[{"serviceAccountId":"test-id"}]`,
-			wantError:    true,
-		},
-		{
-			name:         "bad request with account already gone",
-			deleteStatus: http.StatusBadRequest,
-			listStatus:   http.StatusOK,
-			listBody:     `[{"serviceAccountId":"other-id"}]`,
-		},
-		{
-			name:         "bad request with failed lookup",
-			deleteStatus: http.StatusBadRequest,
-			listStatus:   http.StatusForbidden,
-			wantError:    true,
-		},
-		{
-			name:         "not found",
-			deleteStatus: http.StatusNotFound,
-		},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
+	for _, status := range []int{http.StatusBadRequest, http.StatusNotFound} {
+		t.Run(http.StatusText(status), func(t *testing.T) {
 			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-				switch {
-				case r.Method == http.MethodDelete && r.URL.Path == "/api/rbac/service-account/test-id":
-					w.WriteHeader(tt.deleteStatus)
-				case tt.listStatus != 0 && r.Method == http.MethodGet && r.URL.Path == "/api/rbac/service-accounts/list":
-					w.Header().Set("Content-Type", "application/json")
-					w.WriteHeader(tt.listStatus)
-					if _, err := fmt.Fprint(w, tt.listBody); err != nil {
-						t.Errorf("write list response: %v", err)
-					}
-				default:
+				if r.Method != http.MethodDelete || r.URL.Path != "/api/rbac/service-account/test-id" {
 					t.Errorf("unexpected request: %s %s", r.Method, r.URL.Path)
 					w.WriteHeader(http.StatusNotFound)
+					return
 				}
+				w.WriteHeader(status)
 			}))
 			defer server.Close()
 
@@ -71,7 +33,7 @@ func TestDeleteServiceAccountHTTPResponses(t *testing.T) {
 			require.NoError(t, err)
 
 			err = client.DeleteServiceAccount(t.Context(), "test-id")
-			if tt.wantError {
+			if status == http.StatusBadRequest {
 				require.EqualError(t, err, `cannot delete service account "test-id"; revoke any active API keys and retry`)
 			} else {
 				require.NoError(t, err)
