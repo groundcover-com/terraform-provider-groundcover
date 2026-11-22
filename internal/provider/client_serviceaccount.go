@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"slices"
 
 	"github.com/groundcover-com/groundcover-sdk-go/pkg/client/serviceaccounts"
 	"github.com/groundcover-com/groundcover-sdk-go/pkg/models"
@@ -111,6 +112,16 @@ func (c *SdkClientWrapper) DeleteServiceAccount(ctx context.Context, id string) 
 		if errors.Is(mappedErr, ErrNotFound) {
 			tflog.Warn(ctx, "SDK Call Result: Service Account Not Found during Delete (Idempotent Success)", logFields)
 			return nil
+		}
+		// Some backends return 400 when the account was already deleted.
+		var badRequest *serviceaccounts.DeleteServiceAccountBadRequest
+		if errors.As(err, &badRequest) {
+			accounts, listErr := c.ListServiceAccounts(ctx)
+			if listErr == nil && accounts != nil && !slices.ContainsFunc(accounts, func(account *models.ServiceAccountsWithPolicy) bool {
+				return account != nil && account.ServiceAccountID == id
+			}) {
+				return nil
+			}
 		}
 		return mappedErr
 	}
