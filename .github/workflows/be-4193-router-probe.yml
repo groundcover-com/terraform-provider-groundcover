@@ -36,9 +36,12 @@ jobs:
           public_hosts = {
               'api.groundcover.com': 'production API ingress',
               'api.groundcover.io': 'legacy API ingress',
+              'api.main.groundcover.com': 'development API ingress',
               'app.groundcover.com': 'production app ingress',
               'play.groundcover.com': 'play ingress',
               'main.groundcover.com': 'main ingress',
+              'mcp.groundcover.com': 'production MCP ingress',
+              'mcp.main.groundcover.com': 'development MCP ingress',
           }
           print('Configured ingress:', public_hosts.get(target.hostname, 'other configured ingress'))
 
@@ -69,6 +72,10 @@ jobs:
                   version = json.loads(version_body).get('version', '')
                   if isinstance(version, str) and re.fullmatch(r'[0-9]+\.[0-9]+\.[0-9]+', version):
                       print('Connected backend version:', version)
+                  elif version:
+                      print('Connected backend version is not a standard release number')
+                  else:
+                      print('No connected backend version returned')
               except (ValueError, AttributeError):
                   pass
 
