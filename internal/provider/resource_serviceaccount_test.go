@@ -5,13 +5,40 @@ package provider
 import (
 	"context"
 	"fmt"
+	"net/http"
+	"net/http/httptest"
 	"os"
 	"testing"
 
 	"github.com/hashicorp/terraform-plugin-testing/helper/acctest"
 	"github.com/hashicorp/terraform-plugin-testing/helper/resource"
 	"github.com/hashicorp/terraform-plugin-testing/terraform"
+	"github.com/stretchr/testify/require"
 )
+
+func TestDeleteServiceAccountHTTPResponses(t *testing.T) {
+	for _, status := range []int{http.StatusBadRequest, http.StatusNotFound} {
+		t.Run(http.StatusText(status), func(t *testing.T) {
+			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				if r.Method != http.MethodDelete || r.URL.Path != "/api/rbac/service-account/test-id" {
+					t.Errorf("unexpected request: %s %s", r.Method, r.URL.Path)
+				}
+				w.WriteHeader(status)
+			}))
+			defer server.Close()
+
+			client, err := NewSdkClientWrapper(t.Context(), server.URL, "test-key", "test-backend")
+			require.NoError(t, err)
+
+			err = client.DeleteServiceAccount(t.Context(), "test-id")
+			if status == http.StatusBadRequest {
+				require.ErrorContains(t, err, "[400]")
+			} else {
+				require.NoError(t, err)
+			}
+		})
+	}
+}
 
 func TestAccServiceAccountResource(t *testing.T) {
 	name := acctest.RandomWithPrefix("test-serviceaccount")
