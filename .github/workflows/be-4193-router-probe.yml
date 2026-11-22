@@ -1,0 +1,82 @@
+name: BE-4193 Router Probe
+
+on:
+  push:
+    branches: [codex/be-4193-router-probe]
+
+permissions: {}
+
+jobs:
+  repeat-delete:
+    runs-on: ubuntu-latest
+    environment: testing
+    timeout-minutes: 2
+    env:
+      API_URL: ${{ secrets.GROUNDCOVER_API_URL }}
+      API_KEY: ${{ secrets.GROUNDCOVER_API_KEY }}
+      BACKEND_ID: ${{ secrets.GROUNDCOVER_BACKEND_ID }}
+    steps:
+      - name: Probe the configured testing router
+        run: |
+          python3 - <<'PY'
+          import http.client
+          import json
+          import os
+          import re
+          import secrets
+          from urllib.parse import urlsplit
+
+          base = os.environ['API_URL'].strip()
+          target = urlsplit(base if '://' in base else 'https://' + base)
+          token = os.environ['API_KEY']
+          backend_id = os.environ['BACKEND_ID']
+          if target.scheme != 'https' or not target.hostname or target.username or not token or not backend_id:
+              raise SystemExit('Expected an HTTPS endpoint and configured testing credentials')
+
+          public_hosts = {
+              'api.groundcover.com': 'production API ingress',
+              'api.groundcover.io': 'legacy API ingress',
+              'app.groundcover.com': 'production app ingress',
+              'play.groundcover.com': 'play ingress',
+              'main.groundcover.com': 'main ingress',
+          }
+          print('Configured ingress:', public_hosts.get(target.hostname, 'other configured ingress'))
+
+          def send(method, path):
+              trace = secrets.token_hex(16)
+              print(f'{method} probe trace ID: {trace}', flush=True)
+              conn = http.client.HTTPSConnection(target.hostname, target.port, timeout=15)
+              try:
+                  conn.request(method, target.path.rstrip('/') + path, headers={
+                      'Authorization': f'Bearer {token}',
+                      'X-Backend-Id': backend_id,
+                      'User-Agent': 'groundcover-go-sdk',
+                      'traceparent': f'00-{trace}-{secrets.token_hex(8)}-01',
+                  })
+                  response = conn.getresponse()
+                  body = response.read(8192)
+                  print(f'{method} probe HTTP status: {response.status}')
+                  return response.status, body
+              except (OSError, ValueError, http.client.HTTPException) as exc:
+                  print(f'{method} probe transport error: {type(exc).__name__}')
+                  return None, b''
+              finally:
+                  conn.close()
+
+          version_status, version_body = send('GET', '/api/system/is-latest-version')
+          if version_status == 200:
+              try:
+                  version = json.loads(version_body).get('version', '')
+                  if isinstance(version, str) and re.fullmatch(r'[0-9]+\.[0-9]+\.[0-9]+', version):
+                      print('Connected backend version:', version)
+              except (ValueError, AttributeError):
+                  pass
+
+          # Account created and already deleted by the failed acceptance test.
+          status, body = send('DELETE', '/api/rbac/service-account/d3bd7343-92fc-4caf-bbb3-fd5fdcd484cd')
+          if status is None:
+              raise SystemExit('Repeat-delete probe did not receive a response')
+          if status == 400:
+              print('Response matches API-keys error:', b'has API keys and cannot be deleted' in body)
+              print('Response body is empty:', not body)
+          PY
